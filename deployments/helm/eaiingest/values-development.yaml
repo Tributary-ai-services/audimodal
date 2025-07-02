@@ -1,0 +1,81 @@
+# Development environment values
+app:
+  replicaCount: 1
+  
+  env:
+    EAI_ENV: development
+    EAI_LOG_LEVEL: debug
+    EAI_METRICS_ENABLED: true
+    EAI_TRACING_ENABLED: true
+  
+  resources:
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+
+# Use smaller resource allocations for development
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "devpassword"
+    username: "eaiuser"
+    password: "devpassword"
+    database: "eaiingest_dev"
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "devpassword"
+  master:
+    persistence:
+      enabled: true
+      size: 2Gi
+    resources:
+      limits:
+        memory: "256Mi"
+        cpu: "200m"
+      requests:
+        memory: "128Mi"
+        cpu: "50m"
+
+# Enable monitoring for development
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+    adminPassword: "admin123"
+
+# Smaller persistent volume for development
+persistence:
+  size: 10Gi
+
+# Disable autoscaling in development
+autoscaling:
+  enabled: false
+
+# Development secrets (insecure - only for dev!)
+secrets:
+  jwtSecret: "dev-jwt-secret-not-for-production"
+  encryptionKey: "dev-32-byte-encryption-key-dev!"
+  
+  database:
+    password: "devpassword"
+  
+  redis:
+    password: "devpassword"

@@ -1,0 +1,174 @@
+# Production environment values
+app:
+  replicaCount: 3
+  
+  env:
+    EAI_ENV: production
+    EAI_LOG_LEVEL: warn
+    EAI_METRICS_ENABLED: true
+    EAI_TRACING_ENABLED: true
+  
+  resources:
+    limits:
+      memory: "2Gi"
+      cpu: "1500m"
+    requests:
+      memory: "1Gi"
+      cpu: "750m"
+
+# Use production-grade resource allocations
+postgresql:
+  enabled: true
+  auth:
+    existingSecret: "postgres-production-secret"  # Use external secret
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: "fast-ssd"
+    resources:
+      limits:
+        memory: "4Gi"
+        cpu: "2000m"
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    existingSecret: "redis-production-secret"  # Use external secret
+  master:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "fast-ssd"
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Full monitoring stack for production
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 15s
+  grafana:
+    enabled: true
+    persistence:
+      enabled: true
+      size: 10Gi
+    adminPassword: "use-external-secret"
+
+# Large persistent volume for production
+persistence:
+  size: 500Gi
+  storageClass: "fast-ssd"
+
+# Production autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Production ingress with proper TLS
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  hosts:
+    - host: api.eaiingest.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: eaiingest-production-tls
+      hosts:
+        - api.eaiingest.com
+
+# Security context for production
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+podSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+
+# Network policies enabled in production
+networkPolicy:
+  enabled: true
+  ingress:
+    enabled: true
+    from:
+      - namespaceSelector:
+          matchLabels:
+            name: nginx-ingress
+  egress:
+    enabled: true
+    to:
+      - namespaceSelector:
+          matchLabels:
+            name: eaiingest
+
+# Production backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  storageClass: "standard"
+
+# Production secrets (should be managed externally)
+secrets:
+  # These should be provided via external secret management (e.g., Vault, AWS Secrets Manager)
+  jwtSecret: ""  # Provided externally
+  encryptionKey: ""  # Provided externally
+  
+  database:
+    host: ""  # Managed database service
+    password: ""  # Provided externally
+  
+  redis:
+    host: ""  # Managed Redis service
+    password: ""  # Provided externally
+  
+  # Cloud provider credentials
+  aws:
+    region: "us-west-2"
+    accessKeyId: ""  # Provided externally
+    secretAccessKey: ""  # Provided externally
+  
+  gcp:
+    projectId: ""  # Provided externally
+    credentialsJson: ""  # Provided externally
+  
+  azure:
+    storageAccount: ""  # Provided externally
+    storageKey: ""  # Provided externally

@@ -1,0 +1,38 @@
+apiVersion: v2
+name: eaiingest
+description: A Helm chart for eAIIngest - Enterprise AI Content Ingestion Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+home: https://github.com/jscharber/eaiingest
+sources:
+  - https://github.com/jscharber/eaiingest
+keywords:
+  - ai
+  - content
+  - ingestion
+  - processing
+  - enterprise
+maintainers:
+  - name: eAIIngest Team
+    email: team@eaiingest.com
+dependencies:
+  - name: postgresql
+    version: 12.1.9
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: 17.4.3
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: prometheus
+    version: 15.18.0
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+  - name: grafana
+    version: 6.44.11
+    repository: https://grafana.github.io/helm-charts
+    condition: monitoring.grafana.enabled
+annotations:
+  category: Analytics
+  licenses: MIT

@@ -1,0 +1,272 @@
+embedding_models:
+  - model: OpenAI text-embedding-3-small
+    use_case: Text (RAG, search)
+    speed: Fast
+    accuracy: Very High
+    cost_license: "$0.00002 / 1K tokens (API)"
+    vendor: OpenAI
+    dim: 1536
+    context: 8192
+    multilingual: false
+    modality: Text
+    hardware: Cloud
+    fine_tunable: false
+    license: Proprietary
+    last_updated: 2024
+    ref_url: https://platform.openai.com/docs/guides/embeddings
+
+  - model: Cohere Embed v3
+    use_case: Text, Multilingual
+    speed: Fast
+    accuracy: High
+    cost_license: Paid API, free tier available
+    vendor: Cohere
+    dim: 1024
+    context: 512
+    multilingual: true
+    modality: Text
+    hardware: Cloud
+    fine_tunable: false
+    license: Proprietary
+    last_updated: 2024
+    ref_url: https://docs.cohere.com/docs/embeddings
+
+  - model: Cohere Embed v4
+    use_case: Long-form, multilingual search
+    speed: Medium
+    accuracy: Very High
+    cost_license: Paid API
+    vendor: Cohere
+    dim: 1536
+    context: 131072
+    multilingual: true
+    modality: Text
+    hardware: Cloud
+    fine_tunable: false
+    license: Proprietary
+    last_updated: 2025
+    ref_url: https://docs.cohere.com/docs/embeddings-reference
+
+  - model: BGE (BAAI)
+    use_case: Open source RAG
+    speed: Medium
+    accuracy: High
+    cost_license: Free / Open Source
+    vendor: BAAI
+    dim: 1024
+    context: 512
+    multilingual: false
+    modality: Text
+    hardware: CPU/GPU
+    fine_tunable: true
+    license: Apache 2.0
+    last_updated: 2023
+    ref_url: https://huggingface.co/BAAI/bge-large-en
+
+  - model: E5 (Google/BAAI)
+    use_case: Retrieval, QA
+    speed: Medium
+    accuracy: High
+    cost_license: Free / Open Source
+    vendor: Google/BAAI
+    dim: 1024
+    context: 512
+    multilingual: true
+    modality: Text
+    hardware: CPU/GPU
+    fine_tunable: true
+    license: Apache 2.0
+    last_updated: 2023
+    ref_url: https://huggingface.co/intfloat/e5-large
+
+  - model: MiniLM (all-MiniLM-L6-v2)
+    use_case: General-purpose, fast
+    speed: Very Fast
+    accuracy: Medium
+    cost_license: Free / Open Source
+    vendor: SBERT
+    dim: 384
+    context: 256–512
+    multilingual: false
+    modality: Text
+    hardware: CPU/GPU
+    fine_tunable: false
+    license: Apache 2.0
+    last_updated: 2021
+    ref_url: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+
+  - model: Instructor XL
+    use_case: Task-aware embeddings
+    speed: Medium
+    accuracy: Very High
+    cost_license: Free / Open Source
+    vendor: HKUNLP
+    dim: 768
+    context: 512
+    multilingual: true
+    modality: Text
+    hardware: GPU
+    fine_tunable: true
+    license: Apache 2.0
+    last_updated: 2023
+    ref_url: https://huggingface.co/hkunlp/instructor-xl
+
+  - model: CLIP (ViT-B/32)
+    use_case: Image+Text matching
+    speed: Medium
+    accuracy: Good
+    cost_license: Free / Open Source
+    vendor: OpenAI
+    dim: 512
+    context: 77
+    multilingual: true
+    modality: Multimodal
+    hardware: GPU
+    fine_tunable: true
+    license: MIT
+    last_updated: 2021
+    ref_url: https://huggingface.co/openai/clip-vit-base-patch32
+
+  - model: BLIP-2
+    use_case: Image captioning + embeddings
+    speed: Slow
+    accuracy: High
+    cost_license: Free / Open Source
+    vendor: Salesforce
+    dim: 1024
+    context: 512
+    multilingual: true
+    modality: Multimodal
+    hardware: GPU
+    fine_tunable: true
+    license: BSD-3
+    last_updated: 2023
+    ref_url: https://huggingface.co/Salesforce/blip2-opt-2.7b
+
+  - model: GTE (Google v1)
+    use_case: Web-scale retrieval
+    speed: Fast
+    accuracy: High
+    cost_license: Free / Open Source
+    vendor: Google
+    dim: 768
+    context: 512
+    multilingual: true
+    modality: Text
+    hardware: CPU/GPU
+    fine_tunable: false
+    license: Apache 2.0
+    last_updated: 2023
+    ref_url: https://huggingface.co/thenlper/gte-large
+
+  - model: GTE v1.5 (Alibaba)
+    use_case: Large context retrieval
+    speed: Fast
+    accuracy: High
+    cost_license: Free / Open Source
+    vendor: Alibaba DAMO
+    dim: 768
+    context: 8192
+    multilingual: true
+    modality: Text
+    hardware: CPU/GPU
+    fine_tunable: false
+    license: Apache 2.0
+    last_updated: 2024
+    ref_url: https://huggingface.co/thenlper/gte-large-en-v1.5
+
+  - model: LaBSE
+    use_case: Multilingual sentence embeddings
+    speed: Medium
+    accuracy: High
+    cost_license: Free / Open Source
+    vendor: Google
+    dim: 768
+    context: 512
+    multilingual: true
+    modality: Text
+    hardware: CPU/GPU
+    fine_tunable: false
+    license: Apache 2.0
+    last_updated: 2020
+    ref_url: https://huggingface.co/sentence-transformers/LaBSE
+
+  - model: MPNet
+    use_case: General text understanding
+    speed: Medium
+    accuracy: Medium-High
+    cost_license: Free / Open Source
+    vendor: Microsoft/SBERT
+    dim: 768
+    context: 384–512
+    multilingual: false
+    modality: Text
+    hardware: CPU/GPU
+    fine_tunable: false
+    license: Apache 2.0
+    last_updated: 2021
+    ref_url: https://huggingface.co/sentence-transformers/all-mpnet-base-v2
+
+  - model: DeepLake (Activeloop)
+    use_case: Embedding + storage infra
+    speed: Medium
+    accuracy: Varies
+    cost_license: Free tier + storage-based pricing
+    vendor: Activeloop
+    dim: null
+    context: null
+    multilingual: true
+    modality: Multimodal
+    hardware: CPU/GPU
+    fine_tunable: null
+    license: MPL v2.0
+    last_updated: 2024
+    ref_url: https://docs.deeplake.ai/en/latest/integrations/llm/embedding.html
+
+  - model: Gemma Embedding (Google)
+    use_case: Text embeddings from LLMs
+    speed: Fast
+    accuracy: SOTA
+    cost_license: Free / Open Source
+    vendor: Google DeepMind
+    dim: 3072
+    context: 128000
+    multilingual: false
+    modality: Text
+    hardware: GPU
+    fine_tunable: true
+    license: Apache 2.0
+    last_updated: 2025
+    ref_url: https://huggingface.co/google/gemma-2b-it
+
+  - model: textembedding-gecko@001 (Google)
+    use_case: General embedding API
+    speed: Fast
+    accuracy: High
+    cost_license: API via Vertex AI
+    vendor: Google Cloud
+    dim: 768
+    context: 3072
+    multilingual: true
+    modality: Text
+    hardware: Cloud
+    fine_tunable: false
+    license: Proprietary
+    last_updated: 2025
+    ref_url: https://cloud.google.com/vertex-ai/docs/generative-ai/embeddings/get-text-embeddings
+
+  - model: gemini-embedding-001 (Google)
+    use_case: Unified multimodal embedding
+    speed: Fast
+    accuracy: High
+    cost_license: API via Vertex AI
+    vendor: Google DeepMind
+    dim: Varies
+    context: 2048
+    multilingual: true
+    modality: Multimodal
+    hardware: Cloud
+    fine_tunable: false
+    license: Proprietary
+    last_updated: 2025
+    ref_url: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/model-versioning-overview

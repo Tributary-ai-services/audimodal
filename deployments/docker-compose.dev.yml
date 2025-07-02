@@ -1,0 +1,224 @@
+version: '3.8'
+
+# Development environment with hot reload and debugging
+services:
+  # eAIIngest development application
+  eaiingest-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder  # Use builder stage for development
+    container_name: eaiingest-app-dev
+    ports:
+      - "8080:8080"
+      - "2345:2345"  # Delve debugger port
+    environment:
+      - EAI_ENV=development
+      - EAI_LOG_LEVEL=debug
+      - EAI_DB_HOST=postgres-dev
+      - EAI_DB_PORT=5432
+      - EAI_DB_NAME=eaiingest_dev
+      - EAI_DB_USER=eaiuser
+      - EAI_DB_PASSWORD=devpassword
+      - EAI_REDIS_HOST=redis-dev
+      - EAI_REDIS_PORT=6379
+      - EAI_JWT_SECRET=dev-jwt-secret-change-in-production
+      - EAI_ENCRYPTION_KEY=dev-32-byte-encryption-key-here!
+      - EAI_STORAGE_LOCAL_PATH=/app/data/storage
+      - EAI_TEMP_DIR=/app/temp
+      - EAI_HOT_RELOAD=true
+      - EAI_DEBUG_PORT=2345
+    volumes:
+      - .:/app:cached
+      - go_modules:/go/pkg/mod
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+    command: |
+      sh -c "
+        go mod download &&
+        go install github.com/cosmtrek/air@latest &&
+        go install github.com/go-delve/delve/cmd/dlv@latest &&
+        air -c .air.toml
+      "
+    working_dir: /app
+    depends_on:
+      - postgres-dev
+      - redis-dev
+      - mailhog
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+
+  # PostgreSQL for development
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: eaiingest-postgres-dev
+    environment:
+      - POSTGRES_DB=eaiingest_dev
+      - POSTGRES_USER=eaiuser
+      - POSTGRES_PASSWORD=devpassword
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./deployments/postgres/init-dev.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+
+  # Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: eaiingest-redis-dev
+    command: redis-server --appendonly yes --requirepass devpassword
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+
+  # MinIO for local S3 testing
+  minio-dev:
+    image: minio/minio:latest
+    container_name: eaiingest-minio-dev
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_dev_data:/data
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: eaiingest-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: eaiingest-jaeger-dev
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"  # Jaeger UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+
+  # Prometheus for metrics (development)
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: eaiingest-prometheus-dev
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployments/prometheus/prometheus-dev.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_dev_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=24h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+
+  # Grafana for visualization (development)
+  grafana-dev:
+    image: grafana/grafana:latest
+    container_name: eaiingest-grafana-dev
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_dev_data:/var/lib/grafana
+      - ./deployments/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deployments/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus-dev
+
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: eaiingest-pgadmin-dev
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@eaiingest.dev
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_dev_data:/var/lib/pgadmin
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+    depends_on:
+      - postgres-dev
+
+  # Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: eaiingest-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis-dev:6379:0:devpassword
+    ports:
+      - "8081:8081"
+    networks:
+      - eaiingest-dev-network
+    restart: unless-stopped
+    depends_on:
+      - redis-dev
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local
+  minio_dev_data:
+    driver: local
+  prometheus_dev_data:
+    driver: local
+  grafana_dev_data:
+    driver: local
+  pgadmin_dev_data:
+    driver: local
+  go_modules:
+    driver: local
+
+networks:
+  eaiingest-dev-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
