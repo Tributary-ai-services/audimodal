@@ -1,0 +1,281 @@
+# Default values for eaiingest
+# This is a YAML-formatted file.
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# Application configuration
+app:
+  image:
+    registry: docker.io
+    repository: eaiingest/eaiingest
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 3
+  
+  # Resource limits and requests
+  resources:
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  # Node selector
+  nodeSelector: {}
+  
+  # Tolerations
+  tolerations: []
+  
+  # Affinity
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+              - eaiingest
+          topologyKey: kubernetes.io/hostname
+  
+  # Environment variables
+  env:
+    EAI_ENV: production
+    EAI_LOG_LEVEL: info
+    EAI_METRICS_ENABLED: true
+    EAI_TRACING_ENABLED: true
+  
+  # Configuration files
+  config:
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      readTimeout: "30s"
+      writeTimeout: "30s"
+      idleTimeout: "120s"
+    
+    logging:
+      level: "info"
+      format: "json"
+      output: "stdout"
+    
+    processing:
+      maxConcurrentJobs: 10
+      jobTimeout: "30m"
+      retryAttempts: 3
+    
+    classification:
+      maxConcurrentClassifications: 10
+      defaultTimeout: "30s"
+      maxTextLength: 1000000
+    
+    dlp:
+      enabled: true
+      confidenceThreshold: 0.8
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: eaiingest.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: eaiingest-tls
+      hosts:
+        - eaiingest.example.com
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteMany
+  size: 50Gi
+  annotations: {}
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+# Pod security context
+podSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# PostgreSQL dependency configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "changeThisPassword"
+    username: "eaiuser"
+    password: "changeThisPassword"
+    database: "eaiingest"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+
+# Redis dependency configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "changeThisPassword"
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+
+# Monitoring configuration
+monitoring:
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      path: /metrics
+  
+  grafana:
+    enabled: true
+    adminPassword: "admin123"
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+
+# Networking
+networkPolicy:
+  enabled: true
+  ingress:
+    enabled: true
+    from: []
+  egress:
+    enabled: true
+    to: []
+
+# Secrets (these should be overridden in production)
+secrets:
+  jwtSecret: "change-this-jwt-secret-in-production"
+  encryptionKey: "change-this-32-byte-encryption-key!"
+  
+  # Database credentials
+  database:
+    host: ""
+    port: "5432"
+    name: "eaiingest"
+    username: "eaiuser"
+    password: "changeThisPassword"
+  
+  # Redis credentials
+  redis:
+    host: ""
+    port: "6379"
+    password: "changeThisPassword"
+  
+  # Cloud provider credentials
+  aws:
+    region: "us-west-2"
+    accessKeyId: ""
+    secretAccessKey: ""
+  
+  gcp:
+    projectId: ""
+    credentialsJson: ""
+  
+  azure:
+    storageAccount: ""
+    storageKey: ""
+    tenantId: ""
+    clientId: ""
+    clientSecret: ""
+
+# Health checks
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Backup configuration
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "7d"
+  storageClass: "standard"
+  
+# Migration jobs
+migration:
+  enabled: true
+  image:
+    repository: eaiingest/migrations
+    tag: "latest"
+    pullPolicy: IfNotPresent

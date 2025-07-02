@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: eaiingest-service
+  namespace: eaiingest
+  labels:
+    app.kubernetes.io/name: eaiingest
+    app.kubernetes.io/component: application
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: eaiingest
+    app.kubernetes.io/component: application
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-service
+  namespace: eaiingest
+  labels:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/component: proxy
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/component: proxy
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: eaiingest
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: eaiingest
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: redis
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: eaiingest
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+  - name: prometheus
+    port: 9090
+    targetPort: prometheus
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: monitoring
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: eaiingest
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: visualization
+spec:
+  type: LoadBalancer
+  ports:
+  - name: grafana
+    port: 3000
+    targetPort: grafana
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: visualization

@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Production eAIIngest application
+  eaiingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: eaiingest-app-prod
+    ports:
+      - "8080:8080"
+    environment:
+      - EAI_ENV=production
+      - EAI_LOG_LEVEL=warn
+      - EAI_DB_HOST=${EAI_DB_HOST}
+      - EAI_DB_PORT=${EAI_DB_PORT:-5432}
+      - EAI_DB_NAME=${EAI_DB_NAME}
+      - EAI_DB_USER=${EAI_DB_USER}
+      - EAI_DB_PASSWORD=${EAI_DB_PASSWORD}
+      - EAI_REDIS_HOST=${EAI_REDIS_HOST}
+      - EAI_REDIS_PORT=${EAI_REDIS_PORT:-6379}
+      - EAI_REDIS_PASSWORD=${EAI_REDIS_PASSWORD}
+      - EAI_JWT_SECRET=${EAI_JWT_SECRET}
+      - EAI_ENCRYPTION_KEY=${EAI_ENCRYPTION_KEY}
+      - EAI_AWS_REGION=${EAI_AWS_REGION}
+      - EAI_AWS_ACCESS_KEY_ID=${EAI_AWS_ACCESS_KEY_ID}
+      - EAI_AWS_SECRET_ACCESS_KEY=${EAI_AWS_SECRET_ACCESS_KEY}
+      - EAI_GCP_PROJECT_ID=${EAI_GCP_PROJECT_ID}
+      - EAI_GCP_CREDENTIALS_PATH=/app/secrets/gcp-credentials.json
+      - EAI_AZURE_STORAGE_ACCOUNT=${EAI_AZURE_STORAGE_ACCOUNT}
+      - EAI_AZURE_STORAGE_KEY=${EAI_AZURE_STORAGE_KEY}
+      - EAI_METRICS_ENABLED=true
+      - EAI_TRACING_ENABLED=true
+      - EAI_JAEGER_ENDPOINT=${EAI_JAEGER_ENDPOINT}
+    volumes:
+      - /app/data:/app/data:ro
+      - /app/logs:/app/logs
+      - /app/secrets:/app/secrets:ro
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+    networks:
+      - eaiingest-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Nginx reverse proxy and load balancer
+  nginx:
+    image: nginx:alpine
+    container_name: eaiingest-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deployments/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deployments/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deployments/ssl:/etc/ssl:ro
+      - /var/log/nginx:/var/log/nginx
+    depends_on:
+      - eaiingest
+    networks:
+      - eaiingest-network
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+networks:
+  eaiingest-network:
+    external: true
