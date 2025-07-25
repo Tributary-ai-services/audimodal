@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eAIIngest Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="icon" type="image/x-icon" href="/static/images/favicon.ico">
+    <meta name="description" content="Enterprise AI Document Processing Platform Management Dashboard">
+</head>
+<body>
+    <!-- Navigation Header -->
+    <header class="navbar">
+        <div class="navbar-brand">
+            <img src="/static/images/logo.svg" alt="eAIIngest" class="logo">
+            <h1>eAIIngest</h1>
+        </div>
+        <nav class="navbar-nav">
+            <a href="#dashboard" class="nav-link active" data-section="dashboard">
+                <i class="icon-dashboard"></i> Dashboard
+            </a>
+            <a href="#tenants" class="nav-link" data-section="tenants">
+                <i class="icon-users"></i> Tenants
+            </a>
+            <a href="#processing" class="nav-link" data-section="processing">
+                <i class="icon-cpu"></i> Processing
+            </a>
+            <a href="#storage" class="nav-link" data-section="storage">
+                <i class="icon-database"></i> Storage
+            </a>
+            <a href="#analytics" class="nav-link" data-section="analytics">
+                <i class="icon-chart"></i> Analytics
+            </a>
+            <a href="#settings" class="nav-link" data-section="settings">
+                <i class="icon-settings"></i> Settings
+            </a>
+        </nav>
+        <div class="navbar-user">
+            <div class="user-info">
+                <span class="user-name">Admin User</span>
+                <span class="user-role">System Administrator</span>
+            </div>
+            <button class="btn-logout" onclick="logout()">
+                <i class="icon-logout"></i> Logout
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="content-section active">
+            <div class="section-header">
+                <h2>Platform Overview</h2>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="refreshDashboard()">
+                        <i class="icon-refresh"></i> Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- System Status Cards -->
+            <div class="status-grid">
+                <div class="status-card">
+                    <div class="status-icon">
+                        <i class="icon-heart status-healthy"></i>
+                    </div>
+                    <div class="status-content">
+                        <h3>System Health</h3>
+                        <p class="status-value" id="system-health">Healthy</p>
+                        <p class="status-detail">All services operational</p>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon">
+                        <i class="icon-document"></i>
+                    </div>
+                    <div class="status-content">
+                        <h3>Documents Processed</h3>
+                        <p class="status-value" id="docs-processed">0</p>
+                        <p class="status-detail">Last 24 hours</p>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon">
+                        <i class="icon-users"></i>
+                    </div>
+                    <div class="status-content">
+                        <h3>Active Tenants</h3>
+                        <p class="status-value" id="active-tenants">0</p>
+                        <p class="status-detail">Currently active</p>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <div class="status-icon">
+                        <i class="icon-storage"></i>
+                    </div>
+                    <div class="status-content">
+                        <h3>Storage Used</h3>
+                        <p class="status-value" id="storage-used">0 GB</p>
+                        <p class="status-detail">Total storage</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts and Metrics -->
+            <div class="metrics-grid">
+                <div class="metrics-card">
+                    <h3>Processing Queue</h3>
+                    <canvas id="queue-chart" width="400" height="200"></canvas>
+                </div>
+
+                <div class="metrics-card">
+                    <h3>Document Types</h3>
+                    <canvas id="types-chart" width="400" height="200"></canvas>
+                </div>
+
+                <div class="metrics-card">
+                    <h3>System Performance</h3>
+                    <canvas id="performance-chart" width="400" height="200"></canvas>
+                </div>
+
+                <div class="metrics-card">
+                    <h3>Recent Activity</h3>
+                    <div class="activity-feed" id="activity-feed">
+                        <!-- Activity items will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tenants Section -->
+        <section id="tenants-section" class="content-section">
+            <div class="section-header">
+                <h2>Tenant Management</h2>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="showCreateTenantModal()">
+                        <i class="icon-plus"></i> Create Tenant
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="data-table" id="tenants-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>ID</th>
+                            <th>Status</th>
+                            <th>Documents</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Tenant rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Processing Section -->
+        <section id="processing-section" class="content-section">
+            <div class="section-header">
+                <h2>Document Processing</h2>
+                <div class="header-actions">
+                    <button class="btn btn-primary" onclick="showUploadModal()">
+                        <i class="icon-upload"></i> Upload Documents
+                    </button>
+                </div>
+            </div>
+
+            <div class="processing-grid">
+                <div class="processing-card">
+                    <h3>Active Sessions</h3>
+                    <div id="active-sessions" class="session-list">
+                        <!-- Processing sessions will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="processing-card">
+                    <h3>Queue Status</h3>
+                    <div class="queue-stats">
+                        <div class="queue-stat">
+                            <span class="stat-label">Pending</span>
+                            <span class="stat-value" id="queue-pending">0</span>
+                        </div>
+                        <div class="queue-stat">
+                            <span class="stat-label">Processing</span>
+                            <span class="stat-value" id="queue-processing">0</span>
+                        </div>
+                        <div class="queue-stat">
+                            <span class="stat-label">Completed</span>
+                            <span class="stat-value" id="queue-completed">0</span>
+                        </div>
+                        <div class="queue-stat">
+                            <span class="stat-label">Failed</span>
+                            <span class="stat-value" id="queue-failed">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Storage Section -->
+        <section id="storage-section" class="content-section">
+            <div class="section-header">
+                <h2>Storage Management</h2>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="analyzeStorage()">
+                        <i class="icon-analyze"></i> Analyze Storage
+                    </button>
+                </div>
+            </div>
+
+            <div class="storage-overview">
+                <div class="storage-card">
+                    <h3>Vector Store</h3>
+                    <div class="storage-details">
+                        <p>Datasets: <span id="vector-datasets">0</span></p>
+                        <p>Vectors: <span id="vector-count">0</span></p>
+                        <p>Size: <span id="vector-size">0 MB</span></p>
+                    </div>
+                </div>
+
+                <div class="storage-card">
+                    <h3>Document Store</h3>
+                    <div class="storage-details">
+                        <p>Files: <span id="doc-files">0</span></p>
+                        <p>Chunks: <span id="doc-chunks">0</span></p>
+                        <p>Size: <span id="doc-size">0 GB</span></p>
+                    </div>
+                </div>
+
+                <div class="storage-card">
+                    <h3>Cloud Storage</h3>
+                    <div class="storage-details">
+                        <p>S3 Buckets: <span id="s3-buckets">0</span></p>
+                        <p>GCS Buckets: <span id="gcs-buckets">0</span></p>
+                        <p>Objects: <span id="cloud-objects">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics-section" class="content-section">
+            <div class="section-header">
+                <h2>Analytics & Insights</h2>
+                <div class="header-actions">
+                    <select id="analytics-timeframe" onchange="updateAnalytics()">
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                        <option value="90d">Last 90 Days</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="analytics-grid">
+                <div class="analytics-card">
+                    <h3>Processing Trends</h3>
+                    <canvas id="trends-chart" width="600" height="300"></canvas>
+                </div>
+
+                <div class="analytics-card">
+                    <h3>Content Classification</h3>
+                    <canvas id="classification-chart" width="400" height="300"></canvas>
+                </div>
+
+                <div class="analytics-card">
+                    <h3>DLP Violations</h3>
+                    <canvas id="dlp-chart" width="400" height="300"></canvas>
+                </div>
+
+                <div class="analytics-card">
+                    <h3>Performance Metrics</h3>
+                    <div class="metrics-list">
+                        <div class="metric-item">
+                            <span class="metric-label">Avg Processing Time</span>
+                            <span class="metric-value" id="avg-processing-time">0s</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Success Rate</span>
+                            <span class="metric-value" id="success-rate">0%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Throughput</span>
+                            <span class="metric-value" id="throughput">0 docs/min</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings-section" class="content-section">
+            <div class="section-header">
+                <h2>System Settings</h2>
+                <div class="header-actions">
+                    <button class="btn btn-success" onclick="saveSettings()">
+                        <i class="icon-save"></i> Save Settings
+                    </button>
+                </div>
+            </div>
+
+            <div class="settings-grid">
+                <div class="settings-card">
+                    <h3>Server Configuration</h3>
+                    <form id="server-config-form">
+                        <div class="form-group">
+                            <label for="log-level">Log Level</label>
+                            <select id="log-level" name="log_level">
+                                <option value="debug">Debug</option>
+                                <option value="info" selected>Info</option>
+                                <option value="warn">Warning</option>
+                                <option value="error">Error</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="max-request-size">Max Request Size (MB)</label>
+                            <input type="number" id="max-request-size" name="max_request_size" value="10" min="1" max="1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="rate-limit">Rate Limit (RPS)</label>
+                            <input type="number" id="rate-limit" name="rate_limit_rps" value="100" min="1" max="10000">
+                        </div>
+                    </form>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Security Settings</h3>
+                    <form id="security-config-form">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="tls-enabled" name="tls_enabled" checked>
+                                Enable TLS/HTTPS
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="auth-enabled" name="auth_enabled" checked>
+                                Enable Authentication
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="jwt-expiration">JWT Expiration</label>
+                            <select id="jwt-expiration" name="jwt_expiration">
+                                <option value="1h">1 Hour</option>
+                                <option value="8h">8 Hours</option>
+                                <option value="24h" selected>24 Hours</option>
+                                <option value="7d">7 Days</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Processing Settings</h3>
+                    <form id="processing-config-form">
+                        <div class="form-group">
+                            <label for="chunk-size">Default Chunk Size</label>
+                            <input type="number" id="chunk-size" name="chunk_size" value="1000" min="100" max="10000">
+                        </div>
+                        <div class="form-group">
+                            <label for="chunk-overlap">Chunk Overlap</label>
+                            <input type="number" id="chunk-overlap" name="chunk_overlap" value="200" min="0" max="1000">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="dlp-enabled" name="dlp_enabled" checked>
+                                Enable DLP Scanning
+                            </label>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay" style="display: none;">
+        <!-- Create Tenant Modal -->
+        <div id="create-tenant-modal" class="modal">
+            <div class="modal-header">
+                <h3>Create New Tenant</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-tenant-form">
+                    <div class="form-group">
+                        <label for="tenant-name">Tenant Name</label>
+                        <input type="text" id="tenant-name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="tenant-description">Description</label>
+                        <textarea id="tenant-description" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="tenant-plan">Plan</label>
+                        <select id="tenant-plan" name="plan">
+                            <option value="basic">Basic</option>
+                            <option value="professional">Professional</option>
+                            <option value="enterprise">Enterprise</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="createTenant()">Create Tenant</button>
+            </div>
+        </div>
+
+        <!-- Upload Documents Modal -->
+        <div id="upload-modal" class="modal">
+            <div class="modal-header">
+                <h3>Upload Documents</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" id="upload-area">
+                    <i class="icon-upload"></i>
+                    <p>Drag and drop files here or <button class="btn-link" onclick="selectFiles()">browse</button></p>
+                    <input type="file" id="file-input" multiple style="display: none;">
+                </div>
+                <div id="upload-progress" class="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p id="upload-status">Uploading...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="uploadFiles()" id="upload-btn" disabled>Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/api.js"></script>
+</body>
+</html>

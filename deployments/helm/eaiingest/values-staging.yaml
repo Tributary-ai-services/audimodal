@@ -1,0 +1,102 @@
+# Staging environment values
+app:
+  replicaCount: 2
+  
+  env:
+    EAI_ENV: staging
+    EAI_LOG_LEVEL: info
+    EAI_METRICS_ENABLED: true
+    EAI_TRACING_ENABLED: true
+  
+  resources:
+    limits:
+      memory: "1Gi"
+      cpu: "800m"
+    requests:
+      memory: "512Mi"
+      cpu: "400m"
+
+# Use moderate resource allocations for staging
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "staging-password-change-me"
+    username: "eaiuser"
+    password: "staging-password-change-me"
+    database: "eaiingest_staging"
+  primary:
+    persistence:
+      enabled: true
+      size: 15Gi
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "800m"
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "staging-redis-password-change-me"
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      limits:
+        memory: "512Mi"
+        cpu: "400m"
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+
+# Enable full monitoring for staging
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
+    adminPassword: "staging-admin-change-me"
+
+# Moderate persistent volume for staging
+persistence:
+  size: 30Gi
+
+# Enable basic autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+# Staging ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+  hosts:
+    - host: staging.eaiingest.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: eaiingest-staging-tls
+      hosts:
+        - staging.eaiingest.example.com
+
+# Staging secrets (should be provided via external secret management)
+secrets:
+  jwtSecret: "staging-jwt-secret-change-in-production"
+  encryptionKey: "staging-32-byte-encryption-key!"
+  
+  database:
+    password: "staging-password-change-me"
+  
+  redis:
+    password: "staging-redis-password-change-me"

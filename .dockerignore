@@ -1,0 +1,77 @@
+# Dockerfile and Docker-related files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Tests
+*_test.go
+test/
+tests/
+testdata/
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+dist/
+build/
+bin/
+
+# Dependencies that will be downloaded
+vendor/
+
+# Environment files
+.env*
+!.env.example
+
+# IDE files
+*.iml
+
+# Coverage files
+*.out
+coverage.html
+
+# Binaries
+main
+eaiingest
+*.exe
+
+# Node modules (if any frontend)
+node_modules/
+
+# Python (if any Python tools)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Local development
+dev/
+local/
