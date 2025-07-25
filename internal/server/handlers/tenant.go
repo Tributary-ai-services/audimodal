@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -66,14 +67,14 @@ func (h *TenantHandler) ListTenants(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert to response format
-	response := make([]TenantResponse, len(tenants))
+	responseData := make([]TenantResponse, len(tenants))
 	for i, tenant := range tenants {
-		response[i] = h.toTenantResponse(&tenant)
+		responseData[i] = h.toTenantResponse(&tenant)
 	}
 
 	// Get total count for pagination
 	totalCount := int64(len(tenants)) // This is a simplified approach
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // HandleTenant handles tenant-specific routes
@@ -164,8 +165,8 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := h.toTenantResponse(tenant)
-	response.WriteCreated(w, getRequestID(r), response)
+	responseData := h.toTenantResponse(tenant)
+	response.WriteCreated(w, getRequestID(r), responseData)
 }
 
 // GetTenant handles GET /api/v1/tenants/{id}
@@ -177,8 +178,8 @@ func (h *TenantHandler) GetTenant(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	response := h.toTenantResponse(tenant)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toTenantResponse(tenant)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // UpdateTenant handles PUT /api/v1/tenants/{id}
@@ -217,8 +218,8 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request, ten
 		return
 	}
 
-	response := h.toTenantResponse(tenant)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toTenantResponse(tenant)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // DeleteTenant handles DELETE /api/v1/tenants/{id}
@@ -352,5 +353,3 @@ func getPagination(ctx context.Context) (page, pageSize, offset int) {
 	}
 	return 1, 20, 0
 }
-
-import "context"

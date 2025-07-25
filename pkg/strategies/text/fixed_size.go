@@ -301,6 +301,17 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 			}
 		}
 		
+		// Safety check for slice bounds
+		if start < 0 {
+			start = 0
+		}
+		if end > len(text) {
+			end = len(text)
+		}
+		if start >= end {
+			break
+		}
+		
 		chunkText := text[start:end]
 		chunkText = strings.TrimSpace(chunkText)
 		
@@ -352,6 +363,17 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 }
 
 func (s *FixedSizeStrategy) findSentenceBreak(text string, start, end int) int {
+	// Validate input parameters
+	if start < 0 {
+		start = 0
+	}
+	if end > len(text) {
+		end = len(text)
+	}
+	if start >= end {
+		return end
+	}
+	
 	// Look for sentence-ending punctuation
 	sentenceEnders := []rune{'.', '!', '?'}
 	
@@ -372,6 +394,17 @@ func (s *FixedSizeStrategy) findSentenceBreak(text string, start, end int) int {
 }
 
 func (s *FixedSizeStrategy) findParagraphBreak(text string, start, end int) int {
+	// Validate input parameters
+	if start < 0 {
+		start = 0
+	}
+	if end > len(text) {
+		end = len(text)
+	}
+	if start >= end {
+		return end
+	}
+	
 	// Look for double newlines (paragraph breaks)
 	for i := end - 1; i > start+1; i-- {
 		if text[i] == '\n' && text[i-1] == '\n' {

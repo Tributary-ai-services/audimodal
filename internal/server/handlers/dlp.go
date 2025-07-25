@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -257,9 +258,9 @@ func (h *DLPHandler) ListPolicies(w http.ResponseWriter, r *http.Request, tenant
 	}
 
 	// Convert to response format
-	response := make([]DLPPolicyResponse, len(policies))
+	responseData := make([]DLPPolicyResponse, len(policies))
 	for i, policy := range policies {
-		response[i] = h.toPolicyResponse(&policy)
+		responseData[i] = h.toPolicyResponse(&policy)
 	}
 
 	// Get total count
@@ -271,7 +272,7 @@ func (h *DLPHandler) ListPolicies(w http.ResponseWriter, r *http.Request, tenant
 	}
 	countQuery.Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // CreatePolicy handles POST /api/v1/tenants/{tenant_id}/dlp-policies
@@ -312,8 +313,8 @@ func (h *DLPHandler) CreatePolicy(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	response := h.toPolicyResponse(policy)
-	response.WriteCreated(w, getRequestID(r), response)
+	responseData := h.toPolicyResponse(policy)
+	response.WriteCreated(w, getRequestID(r), responseData)
 }
 
 // GetPolicy handles GET /api/v1/tenants/{tenant_id}/dlp-policies/{id}
@@ -332,8 +333,8 @@ func (h *DLPHandler) GetPolicy(w http.ResponseWriter, r *http.Request, tenantID 
 		return
 	}
 
-	response := h.toPolicyResponse(&policy)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toPolicyResponse(&policy)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // UpdatePolicy handles PUT /api/v1/tenants/{tenant_id}/dlp-policies/{id}
@@ -377,8 +378,8 @@ func (h *DLPHandler) UpdatePolicy(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	response := h.toPolicyResponse(&policy)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toPolicyResponse(&policy)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // DeletePolicy handles DELETE /api/v1/tenants/{tenant_id}/dlp-policies/{id}
@@ -481,9 +482,9 @@ func (h *DLPHandler) ListViolations(w http.ResponseWriter, r *http.Request, tena
 	}
 
 	// Convert to response format
-	response := make([]DLPViolationResponse, len(violations))
+	responseData := make([]DLPViolationResponse, len(violations))
 	for i, violation := range violations {
-		response[i] = h.toViolationResponse(&violation)
+		responseData[i] = h.toViolationResponse(&violation)
 	}
 
 	// Get total count
@@ -497,7 +498,7 @@ func (h *DLPHandler) ListViolations(w http.ResponseWriter, r *http.Request, tena
 	}
 	countQuery.Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // GetViolation handles GET /api/v1/tenants/{tenant_id}/violations/{id}
@@ -516,8 +517,8 @@ func (h *DLPHandler) GetViolation(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	response := h.toViolationResponse(&violation)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toViolationResponse(&violation)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // ListPolicyViolations handles GET /api/v1/tenants/{tenant_id}/dlp-policies/{id}/violations
@@ -545,16 +546,16 @@ func (h *DLPHandler) ListPolicyViolations(w http.ResponseWriter, r *http.Request
 	}
 
 	// Convert to response format
-	response := make([]DLPViolationResponse, len(violations))
+	responseData := make([]DLPViolationResponse, len(violations))
 	for i, violation := range violations {
-		response[i] = h.toViolationResponse(&violation)
+		responseData[i] = h.toViolationResponse(&violation)
 	}
 
 	// Get total count
 	var totalCount int64
 	tenantRepo.DB().Model(&models.DLPViolation{}).Where("policy_id = ?", policyID).Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // UpdateViolation handles PUT /api/v1/tenants/{tenant_id}/violations/{id}
@@ -589,8 +590,8 @@ func (h *DLPHandler) UpdateViolation(w http.ResponseWriter, r *http.Request, ten
 		return
 	}
 
-	response := h.toViolationResponse(&violation)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toViolationResponse(&violation)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // AcknowledgeViolation handles POST /api/v1/tenants/{tenant_id}/violations/{id}/acknowledge
@@ -633,14 +634,14 @@ func (h *DLPHandler) AcknowledgeViolation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	response := h.toViolationResponse(&violation)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toViolationResponse(&violation)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // Helper methods
 
 func (h *DLPHandler) toPolicyResponse(policy *models.DLPPolicy) DLPPolicyResponse {
-	response := DLPPolicyResponse{
+	responseData := DLPPolicyResponse{
 		ID:             policy.ID,
 		TenantID:       policy.TenantID,
 		Name:           policy.Name,
@@ -659,14 +660,14 @@ func (h *DLPHandler) toPolicyResponse(policy *models.DLPPolicy) DLPPolicyRespons
 
 	if policy.LastTriggered != nil {
 		lastTriggered := policy.LastTriggered.Format("2006-01-02T15:04:05Z")
-		response.LastTriggered = &lastTriggered
+		responseData.LastTriggered = &lastTriggered
 	}
 
-	return response
+	return responseData
 }
 
 func (h *DLPHandler) toViolationResponse(violation *models.DLPViolation) DLPViolationResponse {
-	response := DLPViolationResponse{
+	responseData := DLPViolationResponse{
 		ID:             violation.ID,
 		TenantID:       violation.TenantID,
 		PolicyID:       violation.PolicyID,
@@ -690,10 +691,8 @@ func (h *DLPHandler) toViolationResponse(violation *models.DLPViolation) DLPViol
 
 	if violation.AcknowledgedAt != nil {
 		acknowledgedAt := violation.AcknowledgedAt.Format("2006-01-02T15:04:05Z")
-		response.AcknowledgedAt = &acknowledgedAt
+		responseData.AcknowledgedAt = &acknowledgedAt
 	}
 
-	return response
+	return responseData
 }
-
-import "time"

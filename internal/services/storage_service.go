@@ -19,7 +19,7 @@ import (
 	"github.com/jscharber/eAIIngest/pkg/storage/local"
 )
 
-// StorageService provides high-level storage operations for the eAIIngest platform
+// StorageService provides high-level storage operations for the Audimodal.ai platform
 type StorageService struct {
 	storageManager *storage.StorageManager
 	db             *database.Database

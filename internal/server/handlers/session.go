@@ -166,9 +166,9 @@ func (h *ProcessingSessionHandler) ListSessions(w http.ResponseWriter, r *http.R
 	}
 
 	// Convert to response format
-	response := make([]ProcessingSessionResponse, len(sessions))
+	responseData := make([]ProcessingSessionResponse, len(sessions))
 	for i, session := range sessions {
-		response[i] = h.toSessionResponse(&session)
+		responseData[i] = h.toSessionResponse(&session)
 	}
 
 	// Get total count
@@ -179,7 +179,7 @@ func (h *ProcessingSessionHandler) ListSessions(w http.ResponseWriter, r *http.R
 	}
 	countQuery.Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // CreateSession handles POST /api/v1/tenants/{tenant_id}/sessions
@@ -198,9 +198,9 @@ func (h *ProcessingSessionHandler) CreateSession(w http.ResponseWriter, r *http.
 	}
 
 	// Calculate total files and bytes
-	totalFiles := len(req.FileSpecs)
+	totalFiles := len(req.Files)
 	var totalBytes int64
-	for _, file := range req.FileSpecs {
+	for _, file := range req.Files {
 		totalBytes += file.Size
 	}
 
@@ -209,7 +209,7 @@ func (h *ProcessingSessionHandler) CreateSession(w http.ResponseWriter, r *http.
 		TenantID:    tenantID,
 		Name:        req.Name,
 		DisplayName: req.DisplayName,
-		FileSpecs:   req.FileSpecs,
+		FileSpecs:   req.Files,
 		Options:     req.Options,
 		Status:      models.SessionStatusPending,
 		TotalFiles:  totalFiles,
@@ -225,8 +225,8 @@ func (h *ProcessingSessionHandler) CreateSession(w http.ResponseWriter, r *http.
 		return
 	}
 
-	response := h.toSessionResponse(session)
-	response.WriteCreated(w, getRequestID(r), response)
+	responseData := h.toSessionResponse(session)
+	response.WriteCreated(w, getRequestID(r), responseData)
 }
 
 // GetSession handles GET /api/v1/tenants/{tenant_id}/sessions/{id}
@@ -245,8 +245,8 @@ func (h *ProcessingSessionHandler) GetSession(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	response := h.toSessionResponse(&session)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toSessionResponse(&session)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // UpdateSession handles PUT /api/v1/tenants/{tenant_id}/sessions/{id}
@@ -280,12 +280,12 @@ func (h *ProcessingSessionHandler) UpdateSession(w http.ResponseWriter, r *http.
 	// Update fields
 	session.Name = req.Name
 	session.DisplayName = req.DisplayName
-	session.FileSpecs = req.FileSpecs
+	session.FileSpecs = req.Files
 	session.Options = req.Options
-	session.TotalFiles = len(req.FileSpecs)
+	session.TotalFiles = len(req.Files)
 	
 	var totalBytes int64
-	for _, file := range req.FileSpecs {
+	for _, file := range req.Files {
 		totalBytes += file.Size
 	}
 	session.TotalBytes = totalBytes
@@ -299,8 +299,8 @@ func (h *ProcessingSessionHandler) UpdateSession(w http.ResponseWriter, r *http.
 		return
 	}
 
-	response := h.toSessionResponse(&session)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toSessionResponse(&session)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // DeleteSession handles DELETE /api/v1/tenants/{tenant_id}/sessions/{id}
@@ -369,8 +369,8 @@ func (h *ProcessingSessionHandler) StartSession(w http.ResponseWriter, r *http.R
 
 	// TODO: Trigger actual processing pipeline
 	
-	response := h.toSessionResponse(&session)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toSessionResponse(&session)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // StopSession handles POST /api/v1/tenants/{tenant_id}/sessions/{id}/stop
@@ -407,8 +407,8 @@ func (h *ProcessingSessionHandler) StopSession(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	response := h.toSessionResponse(&session)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toSessionResponse(&session)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // RetrySession handles POST /api/v1/tenants/{tenant_id}/sessions/{id}/retry
@@ -452,8 +452,8 @@ func (h *ProcessingSessionHandler) RetrySession(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	response := h.toSessionResponse(&session)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toSessionResponse(&session)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // ListSessionFiles handles GET /api/v1/tenants/{tenant_id}/sessions/{id}/files
@@ -541,7 +541,7 @@ func (h *ProcessingSessionHandler) GetSessionStatus(w http.ResponseWriter, r *ht
 // Helper methods
 
 func (h *ProcessingSessionHandler) toSessionResponse(session *models.ProcessingSession) ProcessingSessionResponse {
-	response := ProcessingSessionResponse{
+	responseData := ProcessingSessionResponse{
 		ID:             session.ID,
 		TenantID:       session.TenantID,
 		Name:           session.Name,
@@ -565,13 +565,13 @@ func (h *ProcessingSessionHandler) toSessionResponse(session *models.ProcessingS
 
 	if session.StartedAt != nil {
 		startedAt := session.StartedAt.Format("2006-01-02T15:04:05Z")
-		response.StartedAt = &startedAt
+		responseData.StartedAt = &startedAt
 	}
 
 	if session.CompletedAt != nil {
 		completedAt := session.CompletedAt.Format("2006-01-02T15:04:05Z")
-		response.CompletedAt = &completedAt
+		responseData.CompletedAt = &completedAt
 	}
 
-	return response
+	return responseData
 }

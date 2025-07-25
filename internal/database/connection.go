@@ -19,7 +19,7 @@ type Config struct {
 	Port     int    `yaml:"port" env:"DB_PORT" default:"5432"`
 	Username string `yaml:"username" env:"DB_USERNAME" default:"postgres"`
 	Password string `yaml:"password" env:"DB_PASSWORD" default:""`
-	Database string `yaml:"database" env:"DB_DATABASE" default:"eaiingest"`
+	Database string `yaml:"database" env:"DB_DATABASE" default:"audimodal"`
 	SSLMode  string `yaml:"ssl_mode" env:"DB_SSL_MODE" default:"disable"`
 	
 	// Connection pool settings

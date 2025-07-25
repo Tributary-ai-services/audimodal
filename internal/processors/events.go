@@ -2,7 +2,6 @@ package processors
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -40,29 +39,26 @@ func NewEventHandler(coordinator *Coordinator, producer *events.Producer) *Event
 
 // HandleFileDiscovered handles file discovery events
 func (eh *EventHandler) HandleFileDiscovered(ctx context.Context, event *events.Event) error {
-	var eventData map[string]any
-	if err := json.Unmarshal(event.Data, &eventData); err != nil {
-		return fmt.Errorf("failed to unmarshal event data: %w", err)
+	eventData := event.Payload
+
+	// Use TenantID from the event header instead of payload
+	tenantID := event.TenantID
+	if tenantID == uuid.Nil {
+		return fmt.Errorf("missing tenant_id in event")
 	}
 
-	tenantIDStr, ok := eventData["tenant_id"].(string)
-	if !ok {
-		return fmt.Errorf("missing tenant_id in event data")
-	}
-
-	tenantID, err := uuid.Parse(tenantIDStr)
-	if err != nil {
-		return fmt.Errorf("invalid tenant_id: %w", err)
-	}
-
-	fileIDStr, ok := eventData["file_id"].(string)
-	if !ok {
-		return fmt.Errorf("missing file_id in event data")
-	}
-
-	fileID, err := uuid.Parse(fileIDStr)
-	if err != nil {
-		return fmt.Errorf("invalid file_id: %w", err)
+	// Get file_id from payload or event headers
+	var fileID uuid.UUID
+	if event.FileID != nil {
+		fileID = *event.FileID
+	} else if fileIDStr, ok := eventData["file_id"].(string); ok {
+		var err error
+		fileID, err = uuid.Parse(fileIDStr)
+		if err != nil {
+			return fmt.Errorf("invalid file_id: %w", err)
+		}
+	} else {
+		return fmt.Errorf("missing file_id in event")
 	}
 
 	// Check if auto-processing is enabled
@@ -89,19 +85,11 @@ func (eh *EventHandler) HandleFileDiscovered(ctx context.Context, event *events.
 
 // HandleProcessingRequested handles explicit processing requests
 func (eh *EventHandler) HandleProcessingRequested(ctx context.Context, event *events.Event) error {
-	var eventData map[string]any
-	if err := json.Unmarshal(event.Data, &eventData); err != nil {
-		return fmt.Errorf("failed to unmarshal event data: %w", err)
-	}
+	eventData := event.Payload
 
-	tenantIDStr, ok := eventData["tenant_id"].(string)
-	if !ok {
-		return fmt.Errorf("missing tenant_id in event data")
-	}
-
-	tenantID, err := uuid.Parse(tenantIDStr)
-	if err != nil {
-		return fmt.Errorf("invalid tenant_id: %w", err)
+	tenantID := event.TenantID
+	if tenantID == uuid.Nil {
+		return fmt.Errorf("missing tenant_id in event")
 	}
 
 	// Check if it's a single file or multiple files
@@ -163,19 +151,11 @@ func (eh *EventHandler) HandleProcessingRequested(ctx context.Context, event *ev
 
 // HandleDataSourceSync handles data source synchronization events
 func (eh *EventHandler) HandleDataSourceSync(ctx context.Context, event *events.Event) error {
-	var eventData map[string]any
-	if err := json.Unmarshal(event.Data, &eventData); err != nil {
-		return fmt.Errorf("failed to unmarshal event data: %w", err)
-	}
+	eventData := event.Payload
 
-	tenantIDStr, ok := eventData["tenant_id"].(string)
-	if !ok {
-		return fmt.Errorf("missing tenant_id in event data")
-	}
-
-	tenantID, err := uuid.Parse(tenantIDStr)
-	if err != nil {
-		return fmt.Errorf("invalid tenant_id: %w", err)
+	tenantID := event.TenantID
+	if tenantID == uuid.Nil {
+		return fmt.Errorf("missing tenant_id in event")
 	}
 
 	dataSourceIDStr, ok := eventData["data_source_id"].(string)
@@ -213,10 +193,7 @@ func (eh *EventHandler) HandleDataSourceSync(ctx context.Context, event *events.
 
 // HandleSessionStatusUpdate handles session status update events
 func (eh *EventHandler) HandleSessionStatusUpdate(ctx context.Context, event *events.Event) error {
-	var eventData map[string]any
-	if err := json.Unmarshal(event.Data, &eventData); err != nil {
-		return fmt.Errorf("failed to unmarshal event data: %w", err)
-	}
+	eventData := event.Payload
 
 	sessionIDStr, ok := eventData["session_id"].(string)
 	if !ok {
@@ -324,43 +301,74 @@ func (eh *EventHandler) emitProcessingEvent(eventType string, tenantID, fileID, 
 		eventData.Metadata = metadata
 	}
 
-	data, err := json.Marshal(eventData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event data: %w", err)
-	}
-
 	event := &events.Event{
-		ID:        uuid.New().String(),
+		ID:        uuid.New(),
 		Type:      eventType,
-		Source:    "processing.coordinator",
-		Data:      data,
-		Timestamp: time.Now(),
+		TenantID:  eventData.TenantID,
+		Payload:   map[string]interface{}{
+			"session_id": eventData.SessionID,
+			"file_id":    eventData.FileID,
+			"status":     eventData.Status,
+			"progress":   eventData.Progress,
+			"message":    eventData.Message,
+			"error":      eventData.Error,
+			"metadata":   eventData.Metadata,
+		},
+		CreatedAt: time.Now(),
 	}
 
-	if tenantID != uuid.Nil {
-		event.TenantID = tenantID.String()
-	}
-
-	return eh.producer.Publish(context.Background(), event)
+	return eh.producer.PublishEvent(context.Background(), event)
 }
 
-// RegisterEventHandlers registers all processing event handlers
-func (eh *EventHandler) RegisterEventHandlers(consumer *events.Consumer) error {
-	// Register handlers for different event types
-	handlers := map[string]func(context.Context, *events.Event) error{
-		"file.discovered":         eh.HandleFileDiscovered,
-		"processing.requested":    eh.HandleProcessingRequested,
-		"datasource.synced":       eh.HandleDataSourceSync,
-		"session.status.update":   eh.HandleSessionStatusUpdate,
+// RegisterEventHandlers registers all processing event handlers with the event bus
+func (eh *EventHandler) RegisterEventHandlers(bus events.EventBusInterface) error {
+	// Subscribe this handler to relevant event types
+	eventTypes := []string{
+		"file.discovered",
+		"processing.requested", 
+		"datasource.synced",
+		"session.status.update",
 	}
+	
+	return bus.Subscribe(eh, eventTypes...)
+}
 
-	for eventType, handler := range handlers {
-		if err := consumer.Subscribe(eventType, handler); err != nil {
-			return fmt.Errorf("failed to register handler for %s: %w", eventType, err)
-		}
+// Implement EventHandler interface methods
+
+// HandleEvent processes a single event
+func (eh *EventHandler) HandleEvent(ctx context.Context, event interface{}) error {
+	ev, ok := event.(*events.Event)
+	if !ok {
+		return fmt.Errorf("expected *events.Event, got %T", event)
 	}
+	
+	switch ev.Type {
+	case "file.discovered":
+		return eh.HandleFileDiscovered(ctx, ev)
+	case "processing.requested":
+		return eh.HandleProcessingRequested(ctx, ev)
+	case "datasource.synced":
+		return eh.HandleDataSourceSync(ctx, ev)
+	case "session.status.update":
+		return eh.HandleSessionStatusUpdate(ctx, ev)
+	default:
+		return fmt.Errorf("unknown event type: %s", ev.Type)
+	}
+}
 
-	return nil
+// GetEventTypes returns the event types this handler can process
+func (eh *EventHandler) GetEventTypes() []string {
+	return []string{
+		"file.discovered",
+		"processing.requested",
+		"datasource.synced", 
+		"session.status.update",
+	}
+}
+
+// GetName returns the handler name for logging
+func (eh *EventHandler) GetName() string {
+	return "ProcessingEventHandler"
 }
 
 // ProcessingEventEmitter provides methods to emit processing events
@@ -464,22 +472,22 @@ func (pee *ProcessingEventEmitter) emitEvent(ctx context.Context, eventType stri
 		eventData.Metadata = metadata
 	}
 
-	data, err := json.Marshal(eventData)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event data: %w", err)
-	}
 
 	event := &events.Event{
-		ID:        uuid.New().String(),
+		ID:        uuid.New(),
 		Type:      eventType,
-		Source:    "processing.pipeline",
-		Data:      data,
-		Timestamp: time.Now(),
+		TenantID:  tenantID,
+		Payload:   map[string]interface{}{
+			"session_id": sessionID,
+			"file_id":    fileID,
+			"status":     status,
+			"progress":   progress,
+			"message":    "",
+			"error":      errorMsg,
+			"metadata":   metadata,
+		},
+		CreatedAt: time.Now(),
 	}
 
-	if tenantID != uuid.Nil {
-		event.TenantID = tenantID.String()
-	}
-
-	return pee.producer.Publish(ctx, event)
+	return pee.producer.PublishEvent(ctx, event)
 }

@@ -8,12 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jscharber/eAIIngest/pkg/auth"
 	"github.com/jscharber/eAIIngest/pkg/classification"
-	"github.com/jscharber/eAIIngest/pkg/chunking"
-	"github.com/jscharber/eAIIngest/pkg/dlp"
+	"github.com/jscharber/eAIIngest/pkg/dlp/types"
 	"github.com/jscharber/eAIIngest/pkg/events"
-	"github.com/jscharber/eAIIngest/pkg/readers"
 	"github.com/jscharber/eAIIngest/pkg/storage"
 	"github.com/jscharber/eAIIngest/pkg/workflow"
 )
@@ -200,7 +199,13 @@ func (tr *TestRunner) testContentClassification() error {
 	ctx := context.Background()
 	testContent := "This is a business document about quarterly financial reports and earnings data."
 	
-	result, err := tr.env.Classifier.Classify(ctx, testContent)
+	// Create proper classification input
+	input := &classification.ClassificationInput{
+		Content:  testContent,
+		TenantID: uuid.New(),
+	}
+	
+	result, err := tr.env.Classifier.Classify(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to classify content: %w", err)
 	}
@@ -234,9 +239,9 @@ func (tr *TestRunner) testDLPDetection() error {
 	
 	for _, result := range results {
 		switch result.Type {
-		case dlp.PIITypeSSN:
+		case string(types.PIITypeSSN):
 			foundSSN = true
-		case dlp.PIITypeCreditCard:
+		case string(types.PIITypeCreditCard):
 			foundCC = true
 		}
 	}
@@ -253,21 +258,19 @@ func (tr *TestRunner) testDLPDetection() error {
 }
 
 func (tr *TestRunner) testEventSystem() error {
-	ctx := context.Background()
-	
 	// Create a test event
 	event := &events.Event{
-		ID:        events.GenerateEventID(),
-		Type:      events.EventTypeFileProcessed,
-		Source:    "test-runner",
-		Timestamp: time.Now(),
-		Data: map[string]interface{}{
+		ID:       uuid.New(),
+		Type:     "file_processed",
+		TenantID: uuid.New(),
+		Payload: map[string]interface{}{
 			"test": "data",
 		},
+		CreatedAt: time.Now(),
 	}
 	
 	// Publish event
-	err := tr.env.EventBus.Publish(ctx, event)
+	err := tr.env.EventBus.Publish(event)
 	if err != nil {
 		return fmt.Errorf("failed to publish event: %w", err)
 	}
@@ -278,7 +281,7 @@ func (tr *TestRunner) testEventSystem() error {
 func (tr *TestRunner) testStorageResolvers() error {
 	// Test local file URL parsing
 	localURL := "file:///tmp/test.txt"
-	resolver, err := tr.env.StorageRegistry.GetResolver(localURL)
+	resolver, err := tr.env.StorageRegistry.GetResolver(storage.ProviderLocal)
 	if err != nil {
 		return fmt.Errorf("failed to get local resolver: %w", err)
 	}
@@ -288,19 +291,19 @@ func (tr *TestRunner) testStorageResolvers() error {
 		return fmt.Errorf("failed to parse local URL: %w", err)
 	}
 	
-	if parsedURL.Scheme != "file" {
-		return fmt.Errorf("incorrect URL scheme parsed")
+	if parsedURL.Provider != storage.ProviderLocal {
+		return fmt.Errorf("incorrect URL provider parsed")
 	}
 	
 	// Test S3 URL parsing
 	s3URL := "s3://test-bucket/path/file.txt"
-	s3ParsedURL, err := storage.ParseURL(s3URL)
+	s3ParsedURL, err := tr.env.StorageRegistry.ParseURL(s3URL)
 	if err != nil {
 		return fmt.Errorf("failed to parse S3 URL: %w", err)
 	}
 	
-	if s3ParsedURL.Scheme != "s3" {
-		return fmt.Errorf("incorrect S3 scheme")
+	if s3ParsedURL.Provider != storage.ProviderAWS {
+		return fmt.Errorf("incorrect S3 provider")
 	}
 	
 	if s3ParsedURL.Bucket != "test-bucket" {
@@ -372,7 +375,11 @@ func (tr *TestRunner) testEndToEndPipeline() error {
 	}
 	
 	// Classify content
-	classificationResult, err := tr.env.Classifier.Classify(ctx, content)
+	input := &classification.ClassificationInput{
+		Content:  content,
+		TenantID: uuid.New(),
+	}
+	classificationResult, err := tr.env.Classifier.Classify(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to classify content: %w", err)
 	}

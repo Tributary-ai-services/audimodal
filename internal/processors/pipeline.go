@@ -111,7 +111,7 @@ func GetDefaultPipelineConfig() *PipelineConfig {
 		AutoSelectStrategy:    true,
 		EnableQualityFilter:   true,
 		MinQualityThreshold:   0.3,
-		TempStoragePath:       "/tmp/eaiingest",
+		TempStoragePath:       "/tmp/audimodal",
 		EnableMetrics:         true,
 	}
 }
@@ -388,8 +388,8 @@ func (p *Pipeline) convertToDBChunk(chunk core.Chunk, request *ProcessingRequest
 		SizeBytes:        chunk.Metadata.SizeBytes,
 		StartPosition:    chunk.Metadata.StartPosition,
 		EndPosition:      chunk.Metadata.EndPosition,
-		PageNumber:       chunk.Metadata.PageNumber,
-		LineNumber:       chunk.Metadata.LineNumber,
+		PageNumber:       nil, // Could be extracted from context if needed
+		LineNumber:       nil, // Could be extracted from context if needed
 		Relationships:    chunk.Metadata.Relationships,
 		ProcessedAt:      chunk.Metadata.ProcessedAt,
 		ProcessedBy:      chunk.Metadata.ProcessedBy,
@@ -441,7 +441,7 @@ func (p *Pipeline) updateFileStatus(ctx context.Context, fileID uuid.UUID, statu
 	
 	// We need to find the tenant for this file first
 	var file models.File
-	if err := p.db.GORM().Where("id = ?", fileID).First(&file).Error; err != nil {
+	if err := p.db.DB().Where("id = ?", fileID).First(&file).Error; err != nil {
 		return fmt.Errorf("failed to find file: %w", err)
 	}
 
@@ -472,7 +472,7 @@ func (p *Pipeline) updateFileChunkCount(ctx context.Context, fileID uuid.UUID, c
 	tenantService := p.db.NewTenantService()
 	
 	var file models.File
-	if err := p.db.GORM().Where("id = ?", fileID).First(&file).Error; err != nil {
+	if err := p.db.DB().Where("id = ?", fileID).First(&file).Error; err != nil {
 		return fmt.Errorf("failed to find file: %w", err)
 	}
 

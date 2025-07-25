@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -154,16 +155,16 @@ func (h *DataSourceHandler) ListDataSources(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Convert to response format
-	response := make([]DataSourceResponse, len(dataSources))
+	responseData := make([]DataSourceResponse, len(dataSources))
 	for i, ds := range dataSources {
-		response[i] = h.toDataSourceResponse(&ds)
+		responseData[i] = h.toDataSourceResponse(&ds)
 	}
 
 	// Get total count
 	var totalCount int64
 	tenantRepo.DB().Model(&models.DataSource{}).Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // CreateDataSource handles POST /api/v1/tenants/{tenant_id}/data-sources
@@ -204,8 +205,8 @@ func (h *DataSourceHandler) CreateDataSource(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response := h.toDataSourceResponse(dataSource)
-	response.WriteCreated(w, getRequestID(r), response)
+	responseData := h.toDataSourceResponse(dataSource)
+	response.WriteCreated(w, getRequestID(r), responseData)
 }
 
 // GetDataSource handles GET /api/v1/tenants/{tenant_id}/data-sources/{id}
@@ -224,8 +225,8 @@ func (h *DataSourceHandler) GetDataSource(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	response := h.toDataSourceResponse(&dataSource)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toDataSourceResponse(&dataSource)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // UpdateDataSource handles PUT /api/v1/tenants/{tenant_id}/data-sources/{id}
@@ -268,8 +269,8 @@ func (h *DataSourceHandler) UpdateDataSource(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response := h.toDataSourceResponse(&dataSource)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toDataSourceResponse(&dataSource)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // DeleteDataSource handles DELETE /api/v1/tenants/{tenant_id}/data-sources/{id}
@@ -327,12 +328,12 @@ func (h *DataSourceHandler) TriggerSync(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	response := map[string]interface{}{
+	responseData := map[string]interface{}{
 		"message": "Sync triggered successfully",
 		"sync_status": "running",
 	}
 
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // TestConnection handles POST /api/v1/tenants/{tenant_id}/data-sources/{id}/test
@@ -444,5 +445,3 @@ func getTenantContext(ctx context.Context) *database.TenantContext {
 	}
 	return nil
 }
-
-import "context"

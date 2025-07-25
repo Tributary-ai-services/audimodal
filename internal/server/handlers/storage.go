@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -441,6 +440,7 @@ func (h *CredentialHandler) storeCredentials(w http.ResponseWriter, r *http.Requ
 		KeyFile:         req.KeyFile,
 		ExpiresAt:       req.ExpiresAt,
 	}
+	_ = credentials // TODO: implement credentials storage
 
 	// This would need to be implemented in the storage service
 	// if err := h.storageService.StoreCredentials(r.Context(), tenantID, credentials); err != nil {

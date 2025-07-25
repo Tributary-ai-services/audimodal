@@ -1,6 +1,9 @@
-# eAIIngest - Enterprise AI Document Processing Platform
+# AudiModal.ai
 
-A comprehensive, enterprise-grade document processing platform designed to intelligently ingest, analyze, and route documents using AI-powered classification and processing strategies.
+AudiModal.ai is a multi-tenant, cloud-native SaaS platform for secure, AI-driven document processing at enterprise scale. Built for regulated industries, it unifies multimodal data ingestion, compliance automation, and real-time streaming into a single, Kubernetes-powered architecture.
+
+With built-in support for GDPR, HIPAA, SOX, and PCI DSS, AudiModal.ai delivers auditable document workflows, zero-trust security, and full data sovereignty—while supporting massive scale across thousands of users and millions of documents.
+
 
 ## 🚀 Quick Start
 
@@ -259,7 +262,7 @@ go test ./test/integration/... -tags=integration
 Located in the `scripts/` directory:
 
 - `install-go.sh`: Install latest Go version
-- `setup-dev.sh`: Setup complete development environment  
+- `setup-dev.sh`: Setup complete development environment
 - `run-tests.sh`: Run comprehensive test suite
 - `generate-crds.sh`: Generate and validate CRDs
 - `build-images.sh`: Build and optionally push Docker images
@@ -305,4 +308,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-*This README was generated to help you get started quickly with the eAIIngest platform. For detailed documentation, please refer to the `docs/` directory.*
+*This README was generated to help you get started quickly with the AudiModal platform. For detailed documentation, please refer to the `docs/` directory.*

@@ -97,7 +97,7 @@ func TestFixedSizeStrategy_ProcessChunk(t *testing.T) {
 	}
 	
 	// Verify chunk metadata
-	for i, chunk := range chunks {
+	for _, chunk := range chunks {
 		if chunk.Metadata.ChunkType != "text" {
 			t.Errorf("Expected chunk type 'text', got %s", chunk.Metadata.ChunkType)
 		}
@@ -111,7 +111,6 @@ func TestFixedSizeStrategy_ProcessChunk(t *testing.T) {
 		}
 		
 		// Check chunk ID format
-		expectedID := "test:chunk:" + string(rune('1'+i))
 		if !containsSubstring(chunk.Metadata.ChunkID, "test:chunk:") {
 			t.Errorf("Expected chunk ID to contain 'test:chunk:', got %s", chunk.Metadata.ChunkID)
 		}

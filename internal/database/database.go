@@ -1,5 +1,5 @@
 // Package database provides database connectivity, models, and tenant isolation
-// for the eAIIngest platform. It includes comprehensive migration support,
+// for the Audimodal.ai platform. It includes comprehensive migration support,
 // tenant-scoped operations, and compliance features.
 package database
 
@@ -291,7 +291,7 @@ func GetDefaultConfig() *Config {
 		Port:            5432,
 		Username:        "postgres",
 		Password:        "",
-		Database:        "eaiingest",
+		Database:        "audimodal",
 		SSLMode:         "disable",
 		MaxOpenConns:    25,
 		MaxIdleConns:    5,

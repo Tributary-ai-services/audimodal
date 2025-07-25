@@ -256,7 +256,7 @@ func createFileProcessingWorkflow() *WorkflowDefinition {
 
 // DemoWorkflowExecution demonstrates a complete workflow execution
 func DemoWorkflowExecution() error {
-	fmt.Println("=== Event-Driven Processing Workflow Demo ===\n")
+	fmt.Println("=== Event-Driven Processing Workflow Demo ===")
 	
 	if err := ExampleIntegration(); err != nil {
 		return fmt.Errorf("demo failed: %w", err)
@@ -268,7 +268,7 @@ func DemoWorkflowExecution() error {
 
 // ExampleEventTypes demonstrates the different types of events in the system
 func ExampleEventTypes() {
-	fmt.Println("=== Available Event Types ===\n")
+	fmt.Println("=== Available Event Types ===")
 	
 	eventTypes := []string{
 		EventFileDiscovered,

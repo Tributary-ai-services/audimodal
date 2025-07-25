@@ -1,6 +1,6 @@
-# eAIIngest Deployment Guide
+# AudiModal Deployment Guide
 
-This directory contains deployment configurations and scripts for the eAIIngest platform. The platform supports multiple deployment methods and environments.
+This directory contains deployment configurations and scripts for the AudiModal platform. The platform supports multiple deployment methods and environments.
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ This directory contains deployment configurations and scripts for the eAIIngest 
    docker-compose -f docker-compose.dev.yml up -d
    
    # View logs
-   docker-compose -f docker-compose.dev.yml logs -f eaiingest-dev
+   docker-compose -f docker-compose.dev.yml logs -f audimodal-dev
    
    # Stop environment
    docker-compose -f docker-compose.dev.yml down
@@ -33,7 +33,7 @@ This directory contains deployment configurations and scripts for the eAIIngest 
    - Application: http://localhost:8080
    - Grafana: http://localhost:3000 (admin/admin123)
    - Prometheus: http://localhost:9090
-   - pgAdmin: http://localhost:5050 (admin@eaiingest.dev/admin123)
+   - pgAdmin: http://localhost:5050 (admin@audimodal.dev/admin123)
    - Redis Commander: http://localhost:8081
    - MinIO Console: http://localhost:9001 (minioadmin/minioadmin123)
    - Jaeger: http://localhost:16686
@@ -85,14 +85,14 @@ helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
 
 # Install with default values
-helm install eaiingest ./deployments/helm/eaiingest
+helm install audimodal ./deployments/helm/audimodal
 
 # Install with environment-specific values
-helm install eaiingest ./deployments/helm/eaiingest \
-  -f ./deployments/helm/eaiingest/values-production.yaml
+helm install audimodal ./deployments/helm/audimodal \
+  -f ./deployments/helm/audimodal/values-production.yaml
 
 # Upgrade deployment
-helm upgrade eaiingest ./deployments/helm/eaiingest \
+helm upgrade audimodal ./deployments/helm/audimodal \
   --set app.image.tag=v1.2.0
 ```
 
@@ -143,20 +143,20 @@ Create these secrets before deploying to production:
 
 ```bash
 # Application secrets
-kubectl create secret generic eaiingest-secrets \
+kubectl create secret generic audimodal-secrets \
   --from-literal=jwt-secret="your-jwt-secret" \
   --from-literal=encryption-key="your-32-byte-key" \
-  --namespace eaiingest
+  --namespace audimodal
 
 # Database secrets
 kubectl create secret generic postgres-secrets \
   --from-literal=postgres-password="your-db-password" \
-  --namespace eaiingest
+  --namespace audimodal
 
 # Redis secrets
 kubectl create secret generic redis-secrets \
   --from-literal=redis-password="your-redis-password" \
-  --namespace eaiingest
+  --namespace audimodal
 ```
 
 ## Deployment Scripts
@@ -260,42 +260,42 @@ Key configuration options:
 
 ```bash
 # Core application
-EAI_ENV=production
-EAI_LOG_LEVEL=info
-EAI_CONFIG_PATH=/app/config/app.yaml
+AUDIMODAL_ENV=production
+AUDIMODAL_LOG_LEVEL=info
+AUDIMODAL_CONFIG_PATH=/app/config/app.yaml
 
 # Database
-EAI_DB_HOST=postgres-service
-EAI_DB_PORT=5432
-EAI_DB_NAME=eaiingest
-EAI_DB_USER=eaiuser
-EAI_DB_PASSWORD=secret
+AUDIMODAL_DB_HOST=postgres-service
+AUDIMODAL_DB_PORT=5432
+AUDIMODAL_DB_NAME=audimodal
+AUDIMODAL_DB_USER=audiuser
+AUDIMODAL_DB_PASSWORD=secret
 
 # Redis
-EAI_REDIS_HOST=redis-service
-EAI_REDIS_PORT=6379
-EAI_REDIS_PASSWORD=secret
+AUDIMODAL_REDIS_HOST=redis-service
+AUDIMODAL_REDIS_PORT=6379
+AUDIMODAL_REDIS_PASSWORD=secret
 
 # Authentication
-EAI_JWT_SECRET=your-jwt-secret
-EAI_ENCRYPTION_KEY=your-32-byte-key
+AUDIMODAL_JWT_SECRET=your-jwt-secret
+AUDIMODAL_ENCRYPTION_KEY=your-32-byte-key
 
 # Cloud providers
-EAI_AWS_REGION=us-west-2
-EAI_AWS_ACCESS_KEY_ID=key
-EAI_AWS_SECRET_ACCESS_KEY=secret
+AUDIMODAL_AWS_REGION=us-west-2
+AUDIMODAL_AWS_ACCESS_KEY_ID=key
+AUDIMODAL_AWS_SECRET_ACCESS_KEY=secret
 
 # Monitoring
-EAI_METRICS_ENABLED=true
-EAI_TRACING_ENABLED=true
-EAI_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+AUDIMODAL_METRICS_ENABLED=true
+AUDIMODAL_TRACING_ENABLED=true
+AUDIMODAL_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
 ```
 
 ### ConfigMaps
 
 Application configuration is managed through Kubernetes ConfigMaps:
 
-- `eaiingest-config`: Main application configuration
+- `audimodal-config`: Main application configuration
 - `nginx-config`: Nginx proxy configuration
 - `prometheus-config`: Monitoring configuration
 
@@ -305,26 +305,26 @@ Application configuration is managed through Kubernetes ConfigMaps:
 
 1. **Pods not starting:**
    ```bash
-   kubectl describe pod <pod-name> -n eaiingest
-   kubectl logs <pod-name> -n eaiingest
+   kubectl describe pod <pod-name> -n audimodal
+   kubectl logs <pod-name> -n audimodal
    ```
 
 2. **Database connection issues:**
    ```bash
-   kubectl exec -it <app-pod> -n eaiingest -- sh
+   kubectl exec -it <app-pod> -n audimodal -- sh
    pg_isready -h postgres-service -p 5432
    ```
 
 3. **Redis connection issues:**
    ```bash
-   kubectl exec -it <app-pod> -n eaiingest -- sh
+   kubectl exec -it <app-pod> -n audimodal -- sh
    redis-cli -h redis-service -p 6379 ping
    ```
 
 4. **Storage issues:**
    ```bash
-   kubectl get pvc -n eaiingest
-   kubectl describe pvc <pvc-name> -n eaiingest
+   kubectl get pvc -n audimodal
+   kubectl describe pvc <pvc-name> -n audimodal
    ```
 
 ### Health Checks
@@ -340,13 +340,13 @@ Application provides several health endpoints:
 
 ```bash
 # Application logs
-kubectl logs -f deployment/eaiingest-app -n eaiingest
+kubectl logs -f deployment/audimodal-app -n audimodal
 
 # All pods logs
-kubectl logs -f -l app.kubernetes.io/name=eaiingest -n eaiingest
+kubectl logs -f -l app.kubernetes.io/name=audimodal -n audimodal
 
 # Specific container logs
-kubectl logs -f <pod-name> -c <container-name> -n eaiingest
+kubectl logs -f <pod-name> -c <container-name> -n audimodal
 ```
 
 ### Performance Monitoring
@@ -366,12 +366,12 @@ Automated backups are configured for production:
 
 ```bash
 # Manual backup
-kubectl exec -it postgres-0 -n eaiingest -- \
-  pg_dump -U eaiuser eaiingest > backup.sql
+kubectl exec -it postgres-0 -n audimodal -- \
+  pg_dump -U audiuser audimodal > backup.sql
 
 # Restore from backup
-kubectl exec -i postgres-0 -n eaiingest -- \
-  psql -U eaiuser eaiingest < backup.sql
+kubectl exec -i postgres-0 -n audimodal -- \
+  psql -U audiuser audimodal < backup.sql
 ```
 
 ### Application Data Backup
@@ -380,10 +380,10 @@ Persistent volumes are backed up according to the backup schedule:
 
 ```bash
 # List backup jobs
-kubectl get cronjobs -n eaiingest
+kubectl get cronjobs -n audimodal
 
 # Check backup status
-kubectl get jobs -n eaiingest
+kubectl get jobs -n audimodal
 ```
 
 ## Scaling
@@ -392,10 +392,10 @@ kubectl get jobs -n eaiingest
 
 ```bash
 # Manual scaling
-kubectl scale deployment eaiingest-app --replicas=5 -n eaiingest
+kubectl scale deployment audimodal-app --replicas=5 -n audimodal
 
 # Autoscaling configuration
-kubectl get hpa -n eaiingest
+kubectl get hpa -n audimodal
 ```
 
 ### Vertical Scaling
