@@ -1,0 +1,544 @@
+package server
+
+import (
+	"os"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// Test configuration loading and validation
+func TestConfig_Load(t *testing.T) {
+	// Save original environment variables
+	originalEnvVars := map[string]string{
+		"DEEPLAKE_API_URL":     os.Getenv("DEEPLAKE_API_URL"),
+		"DEEPLAKE_API_KEY":     os.Getenv("DEEPLAKE_API_KEY"),
+		"DEEPLAKE_TENANT_ID":   os.Getenv("DEEPLAKE_TENANT_ID"),
+		"DEEPLAKE_API_TIMEOUT": os.Getenv("DEEPLAKE_API_TIMEOUT"),
+		"DEEPLAKE_API_RETRIES": os.Getenv("DEEPLAKE_API_RETRIES"),
+	}
+	
+	// Clean up environment variables after test
+	defer func() {
+		for key, value := range originalEnvVars {
+			if value == "" {
+				os.Unsetenv(key)
+			} else {
+				os.Setenv(key, value)
+			}
+		}
+	}()
+	
+	t.Run("DefaultConfiguration", func(t *testing.T) {
+		// Clear environment variables
+		os.Unsetenv("DEEPLAKE_API_URL")
+		os.Unsetenv("DEEPLAKE_API_KEY")
+		os.Unsetenv("DEEPLAKE_TENANT_ID")
+		os.Unsetenv("DEEPLAKE_API_TIMEOUT")
+		os.Unsetenv("DEEPLAKE_API_RETRIES")
+		
+		config := &Config{}
+		
+		// Verify default values are applied
+		assert.Equal(t, 30*time.Second, config.DeepLakeAPI.Timeout)
+		assert.Equal(t, 3, config.DeepLakeAPI.Retries)
+		assert.Equal(t, "eAIIngest-Go-Client/1.0", config.DeepLakeAPI.UserAgent)
+		assert.Equal(t, 10, config.DeepLakeAPI.MaxIdleConns)
+		assert.Equal(t, 100, config.DeepLakeAPI.MaxConnsPerHost)
+		assert.Equal(t, 90*time.Second, config.DeepLakeAPI.IdleConnTimeout)
+	})
+	
+	t.Run("EnvironmentVariableOverrides", func(t *testing.T) {
+		// Set environment variables
+		os.Setenv("DEEPLAKE_API_URL", "https://api.deeplake.ai")
+		os.Setenv("DEEPLAKE_API_KEY", "test-api-key-123")
+		os.Setenv("DEEPLAKE_TENANT_ID", "test-tenant-456")
+		os.Setenv("DEEPLAKE_API_TIMEOUT", "45s")
+		os.Setenv("DEEPLAKE_API_RETRIES", "5")
+		os.Setenv("DEEPLAKE_API_USER_AGENT", "Custom-Agent/2.0")
+		os.Setenv("DEEPLAKE_API_MAX_IDLE_CONNS", "20")
+		os.Setenv("DEEPLAKE_API_MAX_CONNS_PER_HOST", "200")
+		os.Setenv("DEEPLAKE_API_IDLE_CONN_TIMEOUT", "120s")
+		
+		config := &Config{}
+		err := config.LoadFromEnv()
+		require.NoError(t, err)
+		
+		assert.Equal(t, "https://api.deeplake.ai", config.DeepLakeAPI.BaseURL)
+		assert.Equal(t, "test-api-key-123", config.DeepLakeAPI.APIKey)
+		assert.Equal(t, "test-tenant-456", config.DeepLakeAPI.TenantID)
+		assert.Equal(t, 45*time.Second, config.DeepLakeAPI.Timeout)
+		assert.Equal(t, 5, config.DeepLakeAPI.Retries)
+		assert.Equal(t, "Custom-Agent/2.0", config.DeepLakeAPI.UserAgent)
+		assert.Equal(t, 20, config.DeepLakeAPI.MaxIdleConns)
+		assert.Equal(t, 200, config.DeepLakeAPI.MaxConnsPerHost)
+		assert.Equal(t, 120*time.Second, config.DeepLakeAPI.IdleConnTimeout)
+	})
+	
+	t.Run("TLSConfiguration", func(t *testing.T) {
+		os.Setenv("DEEPLAKE_API_TLS_INSECURE_SKIP_VERIFY", "true")
+		os.Setenv("DEEPLAKE_API_TLS_CERT_FILE", "/path/to/client.crt")
+		os.Setenv("DEEPLAKE_API_TLS_KEY_FILE", "/path/to/client.key")
+		os.Setenv("DEEPLAKE_API_TLS_CA_FILE", "/path/to/ca.crt")
+		
+		config := &Config{}
+		err := config.LoadFromEnv()
+		require.NoError(t, err)
+		
+		assert.True(t, config.DeepLakeAPI.TLSInsecureSkipVerify)
+		assert.Equal(t, "/path/to/client.crt", config.DeepLakeAPI.TLSCertFile)
+		assert.Equal(t, "/path/to/client.key", config.DeepLakeAPI.TLSKeyFile)
+		assert.Equal(t, "/path/to/ca.crt", config.DeepLakeAPI.TLSCAFile)
+		
+		// Clean up TLS environment variables
+		os.Unsetenv("DEEPLAKE_API_TLS_INSECURE_SKIP_VERIFY")
+		os.Unsetenv("DEEPLAKE_API_TLS_CERT_FILE")
+		os.Unsetenv("DEEPLAKE_API_TLS_KEY_FILE")
+		os.Unsetenv("DEEPLAKE_API_TLS_CA_FILE")
+	})
+	
+	t.Run("HealthCheckConfiguration", func(t *testing.T) {
+		os.Setenv("DEEPLAKE_API_HEALTH_CHECK_ENABLED", "true")
+		os.Setenv("DEEPLAKE_API_HEALTH_CHECK_INTERVAL", "60s")
+		os.Setenv("DEEPLAKE_API_HEALTH_CHECK_TIMEOUT", "15s")
+		
+		config := &Config{}
+		err := config.LoadFromEnv()
+		require.NoError(t, err)
+		
+		assert.True(t, config.DeepLakeAPI.HealthCheckEnabled)
+		assert.Equal(t, 60*time.Second, config.DeepLakeAPI.HealthCheckInterval)
+		assert.Equal(t, 15*time.Second, config.DeepLakeAPI.HealthCheckTimeout)
+		
+		// Clean up health check environment variables
+		os.Unsetenv("DEEPLAKE_API_HEALTH_CHECK_ENABLED")
+		os.Unsetenv("DEEPLAKE_API_HEALTH_CHECK_INTERVAL")
+		os.Unsetenv("DEEPLAKE_API_HEALTH_CHECK_TIMEOUT")
+	})
+	
+	t.Run("CacheConfiguration", func(t *testing.T) {
+		os.Setenv("DEEPLAKE_API_CACHE_ENABLED", "true")
+		os.Setenv("DEEPLAKE_API_CACHE_TTL", "10m")
+		os.Setenv("DEEPLAKE_API_CACHE_MAX_SIZE", "2000")
+		
+		config := &Config{}
+		err := config.LoadFromEnv()
+		require.NoError(t, err)
+		
+		assert.True(t, config.DeepLakeAPI.CacheEnabled)
+		assert.Equal(t, 10*time.Minute, config.DeepLakeAPI.CacheTTL)
+		assert.Equal(t, 2000, config.DeepLakeAPI.CacheMaxSize)
+		
+		// Clean up cache environment variables
+		os.Unsetenv("DEEPLAKE_API_CACHE_ENABLED")
+		os.Unsetenv("DEEPLAKE_API_CACHE_TTL")
+		os.Unsetenv("DEEPLAKE_API_CACHE_MAX_SIZE")
+	})
+	
+	t.Run("RateLimitConfiguration", func(t *testing.T) {
+		os.Setenv("DEEPLAKE_API_RATE_LIMIT_ENABLED", "true")
+		os.Setenv("DEEPLAKE_API_RATE_LIMIT_RPS", "150.5")
+		os.Setenv("DEEPLAKE_API_RATE_LIMIT_BURST", "300")
+		
+		config := &Config{}
+		err := config.LoadFromEnv()
+		require.NoError(t, err)
+		
+		assert.True(t, config.DeepLakeAPI.RateLimitEnabled)
+		assert.Equal(t, 150.5, config.DeepLakeAPI.RateLimitRPS)
+		assert.Equal(t, 300, config.DeepLakeAPI.RateLimitBurst)
+		
+		// Clean up rate limit environment variables
+		os.Unsetenv("DEEPLAKE_API_RATE_LIMIT_ENABLED")
+		os.Unsetenv("DEEPLAKE_API_RATE_LIMIT_RPS")
+		os.Unsetenv("DEEPLAKE_API_RATE_LIMIT_BURST")
+	})
+}
+
+// Test configuration validation
+func TestConfig_Validate(t *testing.T) {
+	t.Run("ValidConfiguration", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:  "https://api.deeplake.ai",
+				APIKey:   "valid-api-key",
+				TenantID: "valid-tenant-id",
+				Timeout:  30 * time.Second,
+				Retries:  3,
+			},
+		}
+		
+		err := config.Validate()
+		assert.NoError(t, err)
+	})
+	
+	t.Run("MissingBaseURL", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				APIKey:   "valid-api-key",
+				TenantID: "valid-tenant-id",
+				Timeout:  30 * time.Second,
+				Retries:  3,
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "base URL is required")
+	})
+	
+	t.Run("MissingAPIKey", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:  "https://api.deeplake.ai",
+				TenantID: "valid-tenant-id",
+				Timeout:  30 * time.Second,
+				Retries:  3,
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "API key is required")
+	})
+	
+	t.Run("InvalidBaseURL", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:  "invalid-url",
+				APIKey:   "valid-api-key",
+				TenantID: "valid-tenant-id",
+				Timeout:  30 * time.Second,
+				Retries:  3,
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid base URL")
+	})
+	
+	t.Run("InvalidTimeout", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:  "https://api.deeplake.ai",
+				APIKey:   "valid-api-key",
+				TenantID: "valid-tenant-id",
+				Timeout:  0, // Invalid timeout
+				Retries:  3,
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "timeout must be positive")
+	})
+	
+	t.Run("InvalidRetries", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:  "https://api.deeplake.ai",
+				APIKey:   "valid-api-key",
+				TenantID: "valid-tenant-id",
+				Timeout:  30 * time.Second,
+				Retries:  -1, // Invalid retries
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "retries must be non-negative")
+	})
+	
+	t.Run("InvalidTLSConfiguration", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:     "https://api.deeplake.ai",
+				APIKey:      "valid-api-key",
+				TenantID:    "valid-tenant-id",
+				Timeout:     30 * time.Second,
+				Retries:     3,
+				TLSCertFile: "/path/to/cert.crt",
+				// Missing TLSKeyFile
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "both TLS cert and key files must be provided")
+	})
+	
+	t.Run("InvalidConnectionPoolSettings", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:         "https://api.deeplake.ai",
+				APIKey:          "valid-api-key",
+				TenantID:        "valid-tenant-id",
+				Timeout:         30 * time.Second,
+				Retries:         3,
+				MaxIdleConns:    -1, // Invalid
+				MaxConnsPerHost: 100,
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "connection pool settings must be positive")
+	})
+	
+	t.Run("InvalidCacheSettings", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:      "https://api.deeplake.ai",
+				APIKey:       "valid-api-key",
+				TenantID:     "valid-tenant-id",
+				Timeout:      30 * time.Second,
+				Retries:      3,
+				CacheEnabled: true,
+				CacheTTL:     0, // Invalid TTL
+				CacheMaxSize: 1000,
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "cache TTL must be positive when caching is enabled")
+	})
+	
+	t.Run("InvalidRateLimitSettings", func(t *testing.T) {
+		config := &Config{
+			DeepLakeAPI: &DeepLakeAPIConfig{
+				BaseURL:           "https://api.deeplake.ai",
+				APIKey:            "valid-api-key",
+				TenantID:          "valid-tenant-id",
+				Timeout:           30 * time.Second,
+				Retries:           3,
+				RateLimitEnabled:  true,
+				RateLimitRPS:      0, // Invalid RPS
+				RateLimitBurst:    100,
+			},
+		}
+		
+		err := config.Validate()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "rate limit RPS must be positive when rate limiting is enabled")
+	})
+}
+
+// Test configuration file loading
+func TestConfig_LoadFromFile(t *testing.T) {
+	t.Run("ValidYAMLFile", func(t *testing.T) {
+		// Create temporary config file
+		configContent := `
+deeplake_api:
+  base_url: "https://api.deeplake.ai"
+  api_key: "test-key-from-file"
+  tenant_id: "test-tenant-from-file"
+  timeout: "45s"
+  retries: 5
+  user_agent: "Test-Agent/1.0"
+  
+  max_idle_conns: 15
+  max_conns_per_host: 150
+  idle_conn_timeout: "120s"
+  
+  tls_insecure_skip_verify: false
+  tls_cert_file: "/path/to/cert.crt"
+  tls_key_file: "/path/to/key.key"
+  tls_ca_file: "/path/to/ca.crt"
+  
+  health_check_enabled: true
+  health_check_interval: "45s"
+  health_check_timeout: "12s"
+  
+  cache_enabled: true
+  cache_ttl: "8m"
+  cache_max_size: 1500
+  
+  rate_limit_enabled: true
+  rate_limit_rps: 125.0
+  rate_limit_burst: 250
+`
+		
+		// Create temporary file
+		tmpFile, err := os.CreateTemp("", "config-*.yaml")
+		require.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+		
+		_, err = tmpFile.WriteString(configContent)
+		require.NoError(t, err)
+		tmpFile.Close()
+		
+		// Load configuration from file
+		config, err := LoadConfigFromFile(tmpFile.Name())
+		require.NoError(t, err)
+		
+		// Verify configuration values
+		assert.Equal(t, "https://api.deeplake.ai", config.DeepLakeAPI.BaseURL)
+		assert.Equal(t, "test-key-from-file", config.DeepLakeAPI.APIKey)
+		assert.Equal(t, "test-tenant-from-file", config.DeepLakeAPI.TenantID)
+		assert.Equal(t, 45*time.Second, config.DeepLakeAPI.Timeout)
+		assert.Equal(t, 5, config.DeepLakeAPI.Retries)
+		assert.Equal(t, "Test-Agent/1.0", config.DeepLakeAPI.UserAgent)
+		
+		assert.Equal(t, 15, config.DeepLakeAPI.MaxIdleConns)
+		assert.Equal(t, 150, config.DeepLakeAPI.MaxConnsPerHost)
+		assert.Equal(t, 120*time.Second, config.DeepLakeAPI.IdleConnTimeout)
+		
+		assert.False(t, config.DeepLakeAPI.TLSInsecureSkipVerify)
+		assert.Equal(t, "/path/to/cert.crt", config.DeepLakeAPI.TLSCertFile)
+		assert.Equal(t, "/path/to/key.key", config.DeepLakeAPI.TLSKeyFile)
+		assert.Equal(t, "/path/to/ca.crt", config.DeepLakeAPI.TLSCAFile)
+		
+		assert.True(t, config.DeepLakeAPI.HealthCheckEnabled)
+		assert.Equal(t, 45*time.Second, config.DeepLakeAPI.HealthCheckInterval)
+		assert.Equal(t, 12*time.Second, config.DeepLakeAPI.HealthCheckTimeout)
+		
+		assert.True(t, config.DeepLakeAPI.CacheEnabled)
+		assert.Equal(t, 8*time.Minute, config.DeepLakeAPI.CacheTTL)
+		assert.Equal(t, 1500, config.DeepLakeAPI.CacheMaxSize)
+		
+		assert.True(t, config.DeepLakeAPI.RateLimitEnabled)
+		assert.Equal(t, 125.0, config.DeepLakeAPI.RateLimitRPS)
+		assert.Equal(t, 250, config.DeepLakeAPI.RateLimitBurst)
+	})
+	
+	t.Run("NonExistentFile", func(t *testing.T) {
+		_, err := LoadConfigFromFile("/nonexistent/config.yaml")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read config file")
+	})
+	
+	t.Run("InvalidYAMLFile", func(t *testing.T) {
+		// Create temporary file with invalid YAML
+		tmpFile, err := os.CreateTemp("", "invalid-config-*.yaml")
+		require.NoError(t, err)
+		defer os.Remove(tmpFile.Name())
+		
+		_, err = tmpFile.WriteString("invalid: yaml: content: [")
+		require.NoError(t, err)
+		tmpFile.Close()
+		
+		_, err = LoadConfigFromFile(tmpFile.Name())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse config file")
+	})
+}
+
+// Test configuration merging (environment variables override file values)
+func TestConfig_EnvironmentOverridesFile(t *testing.T) {
+	// Create temporary config file
+	configContent := `
+deeplake_api:
+  base_url: "https://file.deeplake.ai"
+  api_key: "file-api-key"
+  timeout: "30s"
+  retries: 3
+`
+	
+	tmpFile, err := os.CreateTemp("", "merge-config-*.yaml")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	
+	_, err = tmpFile.WriteString(configContent)
+	require.NoError(t, err)
+	tmpFile.Close()
+	
+	// Set environment variables that should override file values
+	os.Setenv("DEEPLAKE_API_URL", "https://env.deeplake.ai")
+	os.Setenv("DEEPLAKE_API_RETRIES", "7")
+	defer func() {
+		os.Unsetenv("DEEPLAKE_API_URL")
+		os.Unsetenv("DEEPLAKE_API_RETRIES")
+	}()
+	
+	// Load configuration
+	config, err := LoadConfigFromFile(tmpFile.Name())
+	require.NoError(t, err)
+	
+	// Apply environment overrides
+	err = config.LoadFromEnv()
+	require.NoError(t, err)
+	
+	// Verify that environment variables override file values
+	assert.Equal(t, "https://env.deeplake.ai", config.DeepLakeAPI.BaseURL) // From env
+	assert.Equal(t, "file-api-key", config.DeepLakeAPI.APIKey)             // From file
+	assert.Equal(t, 30*time.Second, config.DeepLakeAPI.Timeout)            // From file
+	assert.Equal(t, 7, config.DeepLakeAPI.Retries)                         // From env (overridden)
+}
+
+// Test default value application
+func TestConfig_ApplyDefaults(t *testing.T) {
+	config := &Config{
+		DeepLakeAPI: DeepLakeAPIConfig{
+			BaseURL: "https://api.deeplake.ai",
+			APIKey:  "test-key",
+			// All other fields should get defaults
+		},
+	}
+	
+	config.ApplyDefaults()
+	
+	// Verify defaults were applied
+	assert.Equal(t, 30*time.Second, config.DeepLakeAPI.Timeout)
+	assert.Equal(t, 3, config.DeepLakeAPI.Retries)
+	assert.Equal(t, "eAIIngest-Go-Client/1.0", config.DeepLakeAPI.UserAgent)
+	assert.Equal(t, 10, config.DeepLakeAPI.MaxIdleConns)
+	assert.Equal(t, 100, config.DeepLakeAPI.MaxConnsPerHost)
+	assert.Equal(t, 90*time.Second, config.DeepLakeAPI.IdleConnTimeout)
+	assert.False(t, config.DeepLakeAPI.TLSInsecureSkipVerify)
+	assert.True(t, config.DeepLakeAPI.HealthCheckEnabled)
+	assert.Equal(t, 30*time.Second, config.DeepLakeAPI.HealthCheckInterval)
+	assert.Equal(t, 10*time.Second, config.DeepLakeAPI.HealthCheckTimeout)
+	assert.True(t, config.DeepLakeAPI.CacheEnabled)
+	assert.Equal(t, 5*time.Minute, config.DeepLakeAPI.CacheTTL)
+	assert.Equal(t, 1000, config.DeepLakeAPI.CacheMaxSize)
+	assert.False(t, config.DeepLakeAPI.RateLimitEnabled)
+	assert.Equal(t, 100.0, config.DeepLakeAPI.RateLimitRPS)
+	assert.Equal(t, 200, config.DeepLakeAPI.RateLimitBurst)
+}
+
+// Benchmark configuration loading
+func BenchmarkConfig_LoadFromEnv(b *testing.B) {
+	// Set up environment variables
+	os.Setenv("DEEPLAKE_API_URL", "https://api.deeplake.ai")
+	os.Setenv("DEEPLAKE_API_KEY", "benchmark-api-key")
+	os.Setenv("DEEPLAKE_TENANT_ID", "benchmark-tenant")
+	defer func() {
+		os.Unsetenv("DEEPLAKE_API_URL")
+		os.Unsetenv("DEEPLAKE_API_KEY")
+		os.Unsetenv("DEEPLAKE_TENANT_ID")
+	}()
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		config := &Config{}
+		err := config.LoadFromEnv()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// Benchmark configuration validation
+func BenchmarkConfig_Validate(b *testing.B) {
+	config := &Config{
+		DeepLakeAPI: DeepLakeAPIConfig{
+			BaseURL:  "https://api.deeplake.ai",
+			APIKey:   "benchmark-api-key",
+			TenantID: "benchmark-tenant",
+			Timeout:  30 * time.Second,
+			Retries:  3,
+		},
+	}
+	
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := config.Validate()
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}

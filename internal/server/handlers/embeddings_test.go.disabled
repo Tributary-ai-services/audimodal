@@ -1,0 +1,997 @@
+package handlers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/google/uuid"
+	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
+
+// Mock DeepLake API client
+type MockDeepLakeAPIClient struct {
+	mock.Mock
+}
+
+func (m *MockDeepLakeAPIClient) CreateDataset(ctx context.Context, config *embeddings.DatasetConfig) error {
+	args := m.Called(ctx, config)
+	return args.Error(0)
+}
+
+func (m *MockDeepLakeAPIClient) InsertVectors(ctx context.Context, datasetName string, vectors []*embeddings.DocumentVector) error {
+	args := m.Called(ctx, datasetName, vectors)
+	return args.Error(0)
+}
+
+func (m *MockDeepLakeAPIClient) SearchSimilar(ctx context.Context, datasetName string, queryVector []float32, options *embeddings.SearchOptions) (*embeddings.SearchResult, error) {
+	args := m.Called(ctx, datasetName, queryVector, options)
+	return args.Get(0).(*embeddings.SearchResult), args.Error(1)
+}
+
+func (m *MockDeepLakeAPIClient) SearchByText(ctx context.Context, datasetName string, queryText string, options *embeddings.SearchOptions) (*embeddings.SearchResult, error) {
+	args := m.Called(ctx, datasetName, queryText, options)
+	return args.Get(0).(*embeddings.SearchResult), args.Error(1)
+}
+
+func (m *MockDeepLakeAPIClient) GetVector(ctx context.Context, datasetName string, vectorID string) (*embeddings.DocumentVector, error) {
+	args := m.Called(ctx, datasetName, vectorID)
+	return args.Get(0).(*embeddings.DocumentVector), args.Error(1)
+}
+
+func (m *MockDeepLakeAPIClient) DeleteVector(ctx context.Context, datasetName string, vectorID string) error {
+	args := m.Called(ctx, datasetName, vectorID)
+	return args.Error(0)
+}
+
+func (m *MockDeepLakeAPIClient) UpdateVector(ctx context.Context, datasetName string, vectorID string, metadata map[string]interface{}) error {
+	args := m.Called(ctx, datasetName, vectorID, metadata)
+	return args.Error(0)
+}
+
+func (m *MockDeepLakeAPIClient) GetDatasetInfo(ctx context.Context, datasetName string) (*embeddings.DatasetInfo, error) {
+	args := m.Called(ctx, datasetName)
+	return args.Get(0).(*embeddings.DatasetInfo), args.Error(1)
+}
+
+func (m *MockDeepLakeAPIClient) ListDatasets(ctx context.Context) ([]*embeddings.DatasetInfo, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*embeddings.DatasetInfo), args.Error(1)
+}
+
+func (m *MockDeepLakeAPIClient) GetDatasetStats(ctx context.Context, datasetName string) (map[string]interface{}, error) {
+	args := m.Called(ctx, datasetName)
+	return args.Get(0).(map[string]interface{}), args.Error(1)
+}
+
+func (m *MockDeepLakeAPIClient) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+// Mock embedding service
+type MockEmbeddingService struct {
+	mock.Mock
+}
+
+func (m *MockEmbeddingService) ProcessDocument(ctx context.Context, request *embeddings.ProcessDocumentRequest) (*embeddings.ProcessDocumentResponse, error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(*embeddings.ProcessDocumentResponse), args.Error(1)
+}
+
+func (m *MockEmbeddingService) ProcessChunks(ctx context.Context, request *embeddings.ProcessChunksRequest) (*embeddings.ProcessChunksResponse, error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(*embeddings.ProcessChunksResponse), args.Error(1)
+}
+
+func (m *MockEmbeddingService) SearchDocuments(ctx context.Context, request *embeddings.SearchRequest) (*embeddings.SearchResponse, error) {
+	args := m.Called(ctx, request)
+	return args.Get(0).(*embeddings.SearchResponse), args.Error(1)
+}
+
+func (m *MockEmbeddingService) GetDocumentVectors(ctx context.Context, documentID string) ([]*embeddings.DocumentVector, error) {
+	args := m.Called(ctx, documentID)
+	return args.Get(0).([]*embeddings.DocumentVector), args.Error(1)
+}
+
+func (m *MockEmbeddingService) DeleteDocument(ctx context.Context, documentID string) error {
+	args := m.Called(ctx, documentID)
+	return args.Error(0)
+}
+
+func (m *MockEmbeddingService) GetStats(ctx context.Context) (*embeddings.ServiceStats, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(*embeddings.ServiceStats), args.Error(1)
+}
+
+// Helper function to create a test handler with mocks
+func createTestHandler() (*EmbeddingHandler, *MockEmbeddingService, *MockDeepLakeAPIClient) {
+	mockService := &MockEmbeddingService{}
+	mockAPIClient := &MockDeepLakeAPIClient{}
+	
+	handler := &EmbeddingHandler{
+		service:   mockService,
+		apiClient: mockAPIClient,
+	}
+	
+	return handler, mockService, mockAPIClient
+}
+
+// Helper function to create HTTP request
+func createRequest(method, url string, body interface{}) *http.Request {
+	var bodyReader *bytes.Buffer
+	if body != nil {
+		jsonBody, _ := json.Marshal(body)
+		bodyReader = bytes.NewBuffer(jsonBody)
+	} else {
+		bodyReader = bytes.NewBuffer([]byte{})
+	}
+	
+	req := httptest.NewRequest(method, url, bodyReader)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-ID", "test-tenant-id")
+	return req
+}
+
+// Test dataset operations
+func TestEmbeddingHandler_DatasetOperations(t *testing.T) {
+	handler, _, mockAPIClient := createTestHandler()
+	
+	t.Run("CreateDataset", func(t *testing.T) {
+		datasetConfig := embeddings.DatasetConfig{
+			Name:        "test-dataset",
+			Description: "Test dataset",
+			Dimensions:  1536,
+			MetricType:  "cosine",
+			IndexType:   "hnsw",
+		}
+		
+		mockAPIClient.On("CreateDataset", mock.Anything, &datasetConfig).Return(nil)
+		
+		req := createRequest("POST", "/api/v1/embeddings/datasets", datasetConfig)
+		rr := httptest.NewRecorder()
+		
+		handler.CreateDataset(rr, req)
+		
+		assert.Equal(t, http.StatusCreated, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "dataset created successfully", response["message"])
+		assert.Equal(t, "test-dataset", response["name"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("CreateDataset_InvalidJSON", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/api/v1/embeddings/datasets", strings.NewReader("invalid json"))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		
+		handler.CreateDataset(rr, req)
+		
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+	})
+	
+	t.Run("CreateDataset_APIError", func(t *testing.T) {
+		datasetConfig := embeddings.DatasetConfig{
+			Name:       "test-dataset",
+			Dimensions: 1536,
+		}
+		
+		apiError := &embeddings.EmbeddingError{
+			Type:    "dataset_exists",
+			Message: "dataset already exists",
+			Code:    "DATASET_EXISTS",
+		}
+		
+		mockAPIClient.On("CreateDataset", mock.Anything, &datasetConfig).Return(apiError)
+		
+		req := createRequest("POST", "/api/v1/embeddings/datasets", datasetConfig)
+		rr := httptest.NewRecorder()
+		
+		handler.CreateDataset(rr, req)
+		
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Contains(t, response, "error")
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("ListDatasets", func(t *testing.T) {
+		expectedDatasets := []*embeddings.DatasetInfo{
+			{
+				Name:        "dataset1",
+				Description: "First dataset",
+				Dimensions:  1536,
+				VectorCount: 100,
+				MetricType:  "cosine",
+				IndexType:   "hnsw",
+				CreatedAt:   time.Now(),
+			},
+			{
+				Name:        "dataset2",
+				Description: "Second dataset",
+				Dimensions:  768,
+				VectorCount: 50,
+				MetricType:  "euclidean",
+				IndexType:   "flat",
+				CreatedAt:   time.Now(),
+			},
+		}
+		
+		mockAPIClient.On("ListDatasets", mock.Anything).Return(expectedDatasets, nil)
+		
+		req := createRequest("GET", "/api/v1/embeddings/datasets", nil)
+		rr := httptest.NewRecorder()
+		
+		handler.ListDatasets(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(2), response["count"])
+		
+		datasets := response["datasets"].([]interface{})
+		assert.Len(t, datasets, 2)
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("GetDatasetInfo", func(t *testing.T) {
+		expectedInfo := &embeddings.DatasetInfo{
+			Name:        "test-dataset",
+			Description: "Test dataset",
+			Dimensions:  1536,
+			VectorCount: 100,
+			MetricType:  "cosine",
+			IndexType:   "hnsw",
+			CreatedAt:   time.Now(),
+		}
+		
+		mockAPIClient.On("GetDatasetInfo", mock.Anything, "test-dataset").Return(expectedInfo, nil)
+		
+		req := createRequest("GET", "/api/v1/embeddings/datasets/test-dataset", nil)
+		req = mux.SetURLVars(req, map[string]string{"datasetName": "test-dataset"})
+		rr := httptest.NewRecorder()
+		
+		handler.GetDatasetInfo(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response embeddings.DatasetInfo
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-dataset", response.Name)
+		assert.Equal(t, 1536, response.Dimensions)
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("GetDatasetStats", func(t *testing.T) {
+		expectedStats := map[string]interface{}{
+			"name":         "test-dataset",
+			"vector_count": 100,
+			"dimensions":   1536,
+			"storage_size": int64(1024000),
+			"metric_type":  "cosine",
+			"index_type":   "hnsw",
+		}
+		
+		mockAPIClient.On("GetDatasetStats", mock.Anything, "test-dataset").Return(expectedStats, nil)
+		
+		req := createRequest("GET", "/api/v1/embeddings/datasets/test-dataset/stats", nil)
+		req = mux.SetURLVars(req, map[string]string{"datasetName": "test-dataset"})
+		rr := httptest.NewRecorder()
+		
+		handler.GetDatasetStats(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "test-dataset", response["name"])
+		assert.Equal(t, float64(100), response["vector_count"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+}
+
+// Test vector operations
+func TestEmbeddingHandler_VectorOperations(t *testing.T) {
+	handler, _, mockAPIClient := createTestHandler()
+	
+	t.Run("InsertVector", func(t *testing.T) {
+		vector := embeddings.DocumentVector{
+			ID:         "vec-1",
+			DocumentID: "doc-1",
+			ChunkID:    "chunk-1",
+			Vector:     []float32{0.1, 0.2, 0.3},
+			Content:    "Test content",
+			Metadata:   map[string]interface{}{"test": "true"},
+		}
+		
+		mockAPIClient.On("InsertVectors", mock.Anything, "test-dataset", mock.MatchedBy(func(vectors []*embeddings.DocumentVector) bool {
+			return len(vectors) == 1 && vectors[0].ID == "vec-1"
+		})).Return(nil)
+		
+		req := createRequest("POST", "/api/v1/embeddings/datasets/test-dataset/vectors", vector)
+		req = mux.SetURLVars(req, map[string]string{"datasetName": "test-dataset"})
+		rr := httptest.NewRecorder()
+		
+		handler.InsertVector(rr, req)
+		
+		assert.Equal(t, http.StatusCreated, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "vector inserted successfully", response["message"])
+		assert.Equal(t, "vec-1", response["vector_id"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("InsertVectorsBatch", func(t *testing.T) {
+		vectors := []*embeddings.DocumentVector{
+			{
+				ID:         "vec-1",
+				DocumentID: "doc-1",
+				Vector:     []float32{0.1, 0.2, 0.3},
+				Content:    "Test content 1",
+			},
+			{
+				ID:         "vec-2",
+				DocumentID: "doc-2",
+				Vector:     []float32{0.4, 0.5, 0.6},
+				Content:    "Test content 2",
+			},
+		}
+		
+		requestBody := struct {
+			Vectors []*embeddings.DocumentVector `json:"vectors"`
+		}{
+			Vectors: vectors,
+		}
+		
+		mockAPIClient.On("InsertVectors", mock.Anything, "test-dataset", mock.MatchedBy(func(v []*embeddings.DocumentVector) bool {
+			return len(v) == 2
+		})).Return(nil)
+		
+		req := createRequest("POST", "/api/v1/embeddings/datasets/test-dataset/vectors/batch", requestBody)
+		req = mux.SetURLVars(req, map[string]string{"datasetName": "test-dataset"})
+		rr := httptest.NewRecorder()
+		
+		handler.InsertVectorsBatch(rr, req)
+		
+		assert.Equal(t, http.StatusCreated, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "vectors inserted successfully", response["message"])
+		assert.Equal(t, float64(2), response["inserted_count"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("GetVector", func(t *testing.T) {
+		expectedVector := &embeddings.DocumentVector{
+			ID:         "vec-1",
+			DocumentID: "doc-1",
+			ChunkID:    "chunk-1",
+			Vector:     []float32{0.1, 0.2, 0.3},
+			Content:    "Test content",
+			Metadata:   map[string]interface{}{"test": "true"},
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		}
+		
+		mockAPIClient.On("GetVector", mock.Anything, "test-dataset", "vec-1").Return(expectedVector, nil)
+		
+		req := createRequest("GET", "/api/v1/embeddings/datasets/test-dataset/vectors/vec-1", nil)
+		req = mux.SetURLVars(req, map[string]string{
+			"datasetName": "test-dataset",
+			"vectorId":    "vec-1",
+		})
+		rr := httptest.NewRecorder()
+		
+		handler.GetVector(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response embeddings.DocumentVector
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "vec-1", response.ID)
+		assert.Equal(t, "doc-1", response.DocumentID)
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("UpdateVector", func(t *testing.T) {
+		updateRequest := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"updated": true,
+				"version": "1.1",
+			},
+		}
+		
+		mockAPIClient.On("UpdateVector", mock.Anything, "test-dataset", "vec-1", mock.MatchedBy(func(metadata map[string]interface{}) bool {
+			return metadata["updated"] == true
+		})).Return(nil)
+		
+		req := createRequest("PUT", "/api/v1/embeddings/datasets/test-dataset/vectors/vec-1", updateRequest)
+		req = mux.SetURLVars(req, map[string]string{
+			"datasetName": "test-dataset",
+			"vectorId":    "vec-1",
+		})
+		rr := httptest.NewRecorder()
+		
+		handler.UpdateVector(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "vector updated successfully", response["message"])
+		assert.Equal(t, "vec-1", response["vector_id"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("DeleteVector", func(t *testing.T) {
+		mockAPIClient.On("DeleteVector", mock.Anything, "test-dataset", "vec-1").Return(nil)
+		
+		req := createRequest("DELETE", "/api/v1/embeddings/datasets/test-dataset/vectors/vec-1", nil)
+		req = mux.SetURLVars(req, map[string]string{
+			"datasetName": "test-dataset",
+			"vectorId":    "vec-1",
+		})
+		rr := httptest.NewRecorder()
+		
+		handler.DeleteVector(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "vector deleted successfully", response["message"])
+		assert.Equal(t, "vec-1", response["vector_id"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("DeleteVectorsBatch", func(t *testing.T) {
+		vectorIDs := []string{"vec-1", "vec-2", "vec-3"}
+		
+		// Mock successful deletion for all vectors
+		mockAPIClient.On("DeleteVector", mock.Anything, "test-dataset", "vec-1").Return(nil)
+		mockAPIClient.On("DeleteVector", mock.Anything, "test-dataset", "vec-2").Return(nil)
+		mockAPIClient.On("DeleteVector", mock.Anything, "test-dataset", "vec-3").Return(nil)
+		
+		req := createRequest("DELETE", "/api/v1/embeddings/datasets/test-dataset/vectors/batch", vectorIDs)
+		req = mux.SetURLVars(req, map[string]string{"datasetName": "test-dataset"})
+		rr := httptest.NewRecorder()
+		
+		handler.DeleteVectorsBatch(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "batch delete completed", response["message"])
+		assert.Equal(t, float64(3), response["deleted_count"])
+		assert.Equal(t, float64(3), response["total_count"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+}
+
+// Test search operations
+func TestEmbeddingHandler_SearchOperations(t *testing.T) {
+	handler, mockService, mockAPIClient := createTestHandler()
+	
+	t.Run("SearchDocuments", func(t *testing.T) {
+		searchRequest := embeddings.SearchRequest{
+			Query:    "test query",
+			Dataset:  "test-dataset",
+			TenantID: uuid.MustParse("test-tenant-id"),
+			Options: &embeddings.SearchOptions{
+				TopK:            5,
+				IncludeContent:  true,
+				IncludeMetadata: true,
+			},
+		}
+		
+		expectedResponse := &embeddings.SearchResponse{
+			Results: []*embeddings.SimilarityResult{
+				{
+					DocumentVector: &embeddings.DocumentVector{
+						ID:         "vec-1",
+						DocumentID: "doc-1",
+						Content:    "Test result",
+						Vector:     []float32{0.1, 0.2, 0.3},
+					},
+					Score:    0.95,
+					Distance: 0.05,
+					Rank:     1,
+				},
+			},
+			QueryTime:  25.5,
+			TotalFound: 1,
+			HasMore:    false,
+		}
+		
+		mockService.On("SearchDocuments", mock.Anything, mock.MatchedBy(func(req *embeddings.SearchRequest) bool {
+			return req.Query == "test query"
+		})).Return(expectedResponse, nil)
+		
+		req := createRequest("POST", "/api/v1/embeddings/search", searchRequest)
+		rr := httptest.NewRecorder()
+		
+		handler.SearchDocuments(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response embeddings.SearchResponse
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Len(t, response.Results, 1)
+		assert.Equal(t, "vec-1", response.Results[0].DocumentVector.ID)
+		
+		mockService.AssertExpectations(t)
+	})
+	
+	t.Run("SearchByText", func(t *testing.T) {
+		searchRequest := struct {
+			QueryText string                    `json:"query_text"`
+			Options   *embeddings.SearchOptions `json:"options,omitempty"`
+		}{
+			QueryText: "test text query",
+			Options: &embeddings.SearchOptions{
+				TopK:            3,
+				IncludeContent:  true,
+				IncludeMetadata: true,
+			},
+		}
+		
+		expectedResult := &embeddings.SearchResult{
+			Results: []*embeddings.SimilarityResult{
+				{
+					DocumentVector: &embeddings.DocumentVector{
+						ID:         "vec-2",
+						DocumentID: "doc-2",
+						Content:    "Text search result",
+						Vector:     []float32{0.4, 0.5, 0.6},
+					},
+					Score:    0.88,
+					Distance: 0.12,
+					Rank:     1,
+				},
+			},
+			QueryTime:  30.8,
+			TotalFound: 1,
+			HasMore:    false,
+		}
+		
+		mockAPIClient.On("SearchByText", mock.Anything, "test-dataset", "test text query", mock.Anything).Return(expectedResult, nil)
+		
+		req := createRequest("POST", "/api/v1/embeddings/datasets/test-dataset/search/text", searchRequest)
+		req = mux.SetURLVars(req, map[string]string{"datasetName": "test-dataset"})
+		rr := httptest.NewRecorder()
+		
+		handler.SearchByText(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response embeddings.SearchResult
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Len(t, response.Results, 1)
+		assert.Equal(t, "vec-2", response.Results[0].DocumentVector.ID)
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+}
+
+// Test document processing
+func TestEmbeddingHandler_DocumentProcessing(t *testing.T) {
+	handler, mockService, _ := createTestHandler()
+	
+	t.Run("ProcessDocument", func(t *testing.T) {
+		docRequest := embeddings.ProcessDocumentRequest{
+			DocumentID:  "doc-1",
+			Content:     "This is a test document for processing.",
+			ContentType: "text/plain",
+			Dataset:     "test-dataset",
+			TenantID:    uuid.MustParse("test-tenant-id"),
+			Metadata: map[string]interface{}{
+				"source": "test",
+				"type":   "document",
+			},
+		}
+		
+		expectedResponse := &embeddings.ProcessDocumentResponse{
+			DocumentID:      "doc-1",
+			ChunksCreated:   3,
+			VectorsCreated:  3,
+			ProcessingTime:  150.5,
+			TotalTokens:     45,
+			EmbeddingCost:   0.001,
+			Status:          "completed",
+		}
+		
+		mockService.On("ProcessDocument", mock.Anything, mock.MatchedBy(func(req *embeddings.ProcessDocumentRequest) bool {
+			return req.DocumentID == "doc-1" && req.Content != ""
+		})).Return(expectedResponse, nil)
+		
+		req := createRequest("POST", "/api/v1/embeddings/documents", docRequest)
+		rr := httptest.NewRecorder()
+		
+		handler.ProcessDocument(rr, req)
+		
+		assert.Equal(t, http.StatusCreated, rr.Code)
+		
+		var response embeddings.ProcessDocumentResponse
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "doc-1", response.DocumentID)
+		assert.Equal(t, 3, response.ChunksCreated)
+		assert.Equal(t, "completed", response.Status)
+		
+		mockService.AssertExpectations(t)
+	})
+	
+	t.Run("ProcessChunks", func(t *testing.T) {
+		chunksRequest := embeddings.ProcessChunksRequest{
+			DocumentID: "doc-1",
+			Chunks: []embeddings.TextChunk{
+				{
+					ID:      "chunk-1",
+					Content: "First chunk of content",
+					Index:   0,
+				},
+				{
+					ID:      "chunk-2",
+					Content: "Second chunk of content",
+					Index:   1,
+				},
+			},
+			Dataset:  "test-dataset",
+			TenantID: uuid.MustParse("test-tenant-id"),
+		}
+		
+		expectedResponse := &embeddings.ProcessChunksResponse{
+			DocumentID:      "doc-1",
+			ChunksProcessed: 2,
+			VectorsCreated:  2,
+			ProcessingTime:  75.3,
+			Status:          "completed",
+		}
+		
+		mockService.On("ProcessChunks", mock.Anything, mock.MatchedBy(func(req *embeddings.ProcessChunksRequest) bool {
+			return req.DocumentID == "doc-1" && len(req.Chunks) == 2
+		})).Return(expectedResponse, nil)
+		
+		req := createRequest("POST", "/api/v1/embeddings/chunks", chunksRequest)
+		rr := httptest.NewRecorder()
+		
+		handler.ProcessChunks(rr, req)
+		
+		assert.Equal(t, http.StatusCreated, rr.Code)
+		
+		var response embeddings.ProcessChunksResponse
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "doc-1", response.DocumentID)
+		assert.Equal(t, 2, response.ChunksProcessed)
+		
+		mockService.AssertExpectations(t)
+	})
+	
+	t.Run("GetDocumentVectors", func(t *testing.T) {
+		expectedVectors := []*embeddings.DocumentVector{
+			{
+				ID:         "vec-1",
+				DocumentID: "doc-1",
+				ChunkID:    "chunk-1",
+				Content:    "First chunk content",
+				Vector:     []float32{0.1, 0.2, 0.3},
+			},
+			{
+				ID:         "vec-2",
+				DocumentID: "doc-1",
+				ChunkID:    "chunk-2",
+				Content:    "Second chunk content",
+				Vector:     []float32{0.4, 0.5, 0.6},
+			},
+		}
+		
+		mockService.On("GetDocumentVectors", mock.Anything, "doc-1").Return(expectedVectors, nil)
+		
+		req := createRequest("GET", "/api/v1/embeddings/documents/doc-1", nil)
+		req = mux.SetURLVars(req, map[string]string{"documentId": "doc-1"})
+		rr := httptest.NewRecorder()
+		
+		handler.GetDocumentVectors(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "doc-1", response["document_id"])
+		assert.Equal(t, float64(2), response["count"])
+		
+		vectors := response["vectors"].([]interface{})
+		assert.Len(t, vectors, 2)
+		
+		mockService.AssertExpectations(t)
+	})
+	
+	t.Run("DeleteDocument", func(t *testing.T) {
+		mockService.On("DeleteDocument", mock.Anything, "doc-1").Return(nil)
+		
+		req := createRequest("DELETE", "/api/v1/embeddings/documents/doc-1", nil)
+		req = mux.SetURLVars(req, map[string]string{"documentId": "doc-1"})
+		rr := httptest.NewRecorder()
+		
+		handler.DeleteDocument(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "document deleted successfully", response["message"])
+		assert.Equal(t, "doc-1", response["document_id"])
+		
+		mockService.AssertExpectations(t)
+	})
+}
+
+// Test service stats and health
+func TestEmbeddingHandler_ServiceOperations(t *testing.T) {
+	handler, mockService, _ := createTestHandler()
+	
+	t.Run("GetServiceStats", func(t *testing.T) {
+		expectedStats := &embeddings.ServiceStats{
+			RequestsProcessed:   1000,
+			DocumentsProcessed:  250,
+			VectorsCreated:      5000,
+			SearchesPerformed:   500,
+			TotalProcessingTime: 30000.5,
+			AverageProcessingTime: 30.0,
+			ErrorRate:           0.02,
+			CacheHitRate:        0.85,
+			Uptime:              time.Hour * 24,
+		}
+		
+		mockService.On("GetStats", mock.Anything).Return(expectedStats, nil)
+		
+		req := createRequest("GET", "/api/v1/embeddings/stats", nil)
+		rr := httptest.NewRecorder()
+		
+		handler.GetServiceStats(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response embeddings.ServiceStats
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, 1000, response.RequestsProcessed)
+		assert.Equal(t, 250, response.DocumentsProcessed)
+		
+		mockService.AssertExpectations(t)
+	})
+	
+	t.Run("HealthCheck", func(t *testing.T) {
+		req := createRequest("GET", "/api/v1/embeddings/health", nil)
+		rr := httptest.NewRecorder()
+		
+		handler.HealthCheck(rr, req)
+		
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "healthy", response["status"])
+		assert.Equal(t, "embeddings", response["service"])
+		assert.Equal(t, "1.0.0", response["version"])
+	})
+}
+
+// Test error handling
+func TestEmbeddingHandler_ErrorHandling(t *testing.T) {
+	handler, mockService, mockAPIClient := createTestHandler()
+	
+	t.Run("EmbeddingError", func(t *testing.T) {
+		embeddingError := &embeddings.EmbeddingError{
+			Type:    "dataset_not_found",
+			Message: "Dataset 'nonexistent' not found",
+			Code:    "DATASET_NOT_FOUND",
+			Details: map[string]interface{}{
+				"dataset_name": "nonexistent",
+			},
+		}
+		
+		mockAPIClient.On("GetDatasetInfo", mock.Anything, "nonexistent").Return((*embeddings.DatasetInfo)(nil), embeddingError)
+		
+		req := createRequest("GET", "/api/v1/embeddings/datasets/nonexistent", nil)
+		req = mux.SetURLVars(req, map[string]string{"datasetName": "nonexistent"})
+		rr := httptest.NewRecorder()
+		
+		handler.GetDatasetInfo(rr, req)
+		
+		assert.Equal(t, http.StatusNotFound, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		
+		errorInfo := response["error"].(map[string]interface{})
+		assert.Equal(t, "dataset_not_found", errorInfo["type"])
+		assert.Equal(t, "DATASET_NOT_FOUND", errorInfo["code"])
+		
+		mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("GenericError", func(t *testing.T) {
+		genericError := fmt.Errorf("something went wrong")
+		
+		mockService.On("GetStats", mock.Anything).Return((*embeddings.ServiceStats)(nil), genericError)
+		
+		req := createRequest("GET", "/api/v1/embeddings/stats", nil)
+		rr := httptest.NewRecorder()
+		
+		handler.GetServiceStats(rr, req)
+		
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+		
+		var response map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		
+		errorInfo := response["error"].(map[string]interface{})
+		assert.Equal(t, "internal_error", errorInfo["type"])
+		assert.Contains(t, errorInfo["message"], "something went wrong")
+	})
+}
+
+// Test tenant ID extraction
+func TestEmbeddingHandler_TenantIDExtraction(t *testing.T) {
+	handler, _, _ := createTestHandler()
+	
+	tests := []struct {
+		name           string
+		setupRequest   func() *http.Request
+		expectedTenant string
+		expectError    bool
+	}{
+		{
+			name: "From header",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest("GET", "/test", nil)
+				req.Header.Set("X-Tenant-ID", "header-tenant-id")
+				return req
+			},
+			expectedTenant: "header-tenant-id",
+			expectError:    false,
+		},
+		{
+			name: "From query parameter",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest("GET", "/test?tenant_id=query-tenant-id", nil)
+				return req
+			},
+			expectedTenant: "query-tenant-id",
+			expectError:    false,
+		},
+		{
+			name: "Default tenant",
+			setupRequest: func() *http.Request {
+				return httptest.NewRequest("GET", "/test", nil)
+			},
+			expectedTenant: "00000000-0000-0000-0000-000000000001",
+			expectError:    false,
+		},
+		{
+			name: "Invalid UUID format",
+			setupRequest: func() *http.Request {
+				req := httptest.NewRequest("GET", "/test", nil)
+				req.Header.Set("X-Tenant-ID", "invalid-uuid")
+				return req
+			},
+			expectError: true,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := tt.setupRequest()
+			tenantID, err := handler.extractTenantID(req)
+			
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedTenant, tenantID.String())
+			}
+		})
+	}
+}
+
+// Integration test with real router
+func TestEmbeddingHandler_Integration(t *testing.T) {
+	handler, mockService, mockAPIClient := createTestHandler()
+	
+	// Setup router
+	router := mux.NewRouter()
+	handler.RegisterRoutes(router)
+	
+	t.Run("FullWorkflow", func(t *testing.T) {
+		// Mock expectations for a full workflow
+		mockAPIClient.On("CreateDataset", mock.Anything, mock.Anything).Return(nil)
+		mockAPIClient.On("InsertVectors", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		mockAPIClient.On("GetDatasetInfo", mock.Anything, mock.Anything).Return(&embeddings.DatasetInfo{
+			Name:       "test-dataset",
+			Dimensions: 1536,
+		}, nil)
+		
+		// 1. Create dataset
+		datasetConfig := embeddings.DatasetConfig{
+			Name:       "test-dataset",
+			Dimensions: 1536,
+		}
+		
+		req := createRequest("POST", "/api/v1/embeddings/datasets", datasetConfig)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusCreated, rr.Code)
+		
+		// 2. Insert vector
+		vector := embeddings.DocumentVector{
+			ID:         "vec-1",
+			DocumentID: "doc-1",
+			Vector:     []float32{0.1, 0.2, 0.3},
+		}
+		
+		req = createRequest("POST", "/api/v1/embeddings/datasets/test-dataset/vectors", vector)
+		rr = httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusCreated, rr.Code)
+		
+		// 3. Get dataset info
+		req = createRequest("GET", "/api/v1/embeddings/datasets/test-dataset", nil)
+		rr = httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+		assert.Equal(t, http.StatusOK, rr.Code)
+		
+		mockService.AssertExpectations(t)
+		mockAPIClient.AssertExpectations(t)
+	})
+}

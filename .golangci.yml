@@ -1,0 +1,196 @@
+run:
+  timeout: 5m
+  issues-exit-code: 1
+  tests: true
+  skip-dirs:
+    - vendor
+    - bin
+    - .git
+  skip-files:
+    - ".*_generated.go$"
+    - ".*\\.pb\\.go$"
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  uniq-by-line: true
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+  
+  gocyclo:
+    min-complexity: 15
+  
+  goimports:
+    local-prefixes: github.com/jscharber/eAIIngest
+  
+  golint:
+    min-confidence: 0.8
+  
+  gomnd:
+    settings:
+      mnd:
+        checks:
+          - argument
+          - case
+          - condition
+          - operation
+          - return
+  
+  govet:
+    check-shadowing: true
+    settings:
+      printf:
+        funcs:
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
+          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
+  
+  lll:
+    line-length: 120
+  
+  maligned:
+    suggest-new: true
+  
+  misspell:
+    locale: US
+  
+  nolintlint:
+    allow-leading-space: true
+    allow-unused: false
+    require-explanation: false
+    require-specific: false
+  
+  revive:
+    min-confidence: 0.8
+    rules:
+      - name: var-naming
+        severity: warning
+        disabled: false
+        arguments:
+          - ["ID"] # Allow ID instead of Id
+      - name: exported
+        severity: warning
+        disabled: false
+        arguments:
+          - "checkPrivateReceivers"
+          - "sayRepetitiveInsteadOfStutters"
+
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - exportloopref
+    - exhaustive
+    - funlen
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - revive
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+
+issues:
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - dupl
+        - gosec
+        - lll
+    
+    # Exclude some linters from running on mock files
+    - path: mock_.*\.go
+      linters:
+        - gomnd
+        - funlen
+        - dupl
+        - gosec
+        - lll
+        - revive
+    
+    # Exclude some linters from running on generated files
+    - path: .*_generated\.go
+      linters:
+        - gomnd
+        - funlen
+        - dupl
+        - gosec
+        - lll
+        - revive
+    
+    # Exclude shadow checking on variables named 'err'
+    - text: "shadow: declaration of \"err\""
+      linters:
+        - govet
+    
+    # Exclude shadow checking on variables named 'ctx'
+    - text: "shadow: declaration of \"ctx\""
+      linters:
+        - govet
+  
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+
+severity:
+  default-severity: error
+  case-sensitive: false
+  rules:
+    - linters:
+        - dupl
+      severity: info
+    - linters:
+        - gomnd
+      severity: info

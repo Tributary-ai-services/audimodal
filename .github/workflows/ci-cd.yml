@@ -1,0 +1,318 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  GO_VERSION: '1.21'
+
+jobs:
+  # Lint and test
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eaiingest_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 3s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ env.GO_VERSION }}
+    
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+    
+    - name: Download dependencies
+      run: go mod download
+    
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: latest
+        args: --timeout=5m
+    
+    - name: Run security scan
+      uses: securecodewarrior/github-action-add-sarif@v1
+      with:
+        sarif-file: 'gosec-report.sarif'
+      continue-on-error: true
+    
+    - name: Run tests
+      run: |
+        go test -v -race -coverprofile=coverage.out ./...
+        go tool cover -html=coverage.out -o coverage.html
+      env:
+        EAI_DB_HOST: localhost
+        EAI_DB_PORT: 5432
+        EAI_DB_NAME: eaiingest_test
+        EAI_DB_USER: postgres
+        EAI_DB_PASSWORD: postgres
+        EAI_REDIS_HOST: localhost
+        EAI_REDIS_PORT: 6379
+        EAI_ENV: test
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: Run integration tests
+      run: |
+        go test -v -tags=integration ./tests/...
+      env:
+        EAI_DB_HOST: localhost
+        EAI_DB_PORT: 5432
+        EAI_DB_NAME: eaiingest_test
+        EAI_DB_USER: postgres
+        EAI_DB_PASSWORD: postgres
+        EAI_REDIS_HOST: localhost
+        EAI_REDIS_PORT: 6379
+        EAI_ENV: test
+
+  # Build and push Docker image
+  build:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=semver,pattern={{major}}
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+    
+    - name: Deploy to staging
+      run: |
+        ./scripts/deployment/deploy.sh \
+          --environment staging \
+          --namespace eaiingest-staging \
+          --registry ${{ env.REGISTRY }} \
+          --tag ${{ github.sha }} \
+          --verbose
+    
+    - name: Run smoke tests
+      run: |
+        kubectl wait --for=condition=available --timeout=300s deployment/eaiingest-app -n eaiingest-staging
+        kubectl port-forward service/eaiingest-service 8080:8080 -n eaiingest-staging &
+        sleep 10
+        curl -f http://localhost:8080/health || exit 1
+        curl -f http://localhost:8080/ready || exit 1
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+    
+    - name: Deploy to production
+      run: |
+        ./scripts/deployment/deploy.sh \
+          --environment production \
+          --namespace eaiingest \
+          --registry ${{ env.REGISTRY }} \
+          --tag ${GITHUB_REF#refs/tags/} \
+          --verbose
+    
+    - name: Run production health checks
+      run: |
+        kubectl wait --for=condition=available --timeout=600s deployment/eaiingest-app -n eaiingest
+        kubectl port-forward service/eaiingest-service 8080:8080 -n eaiingest &
+        sleep 15
+        curl -f http://localhost:8080/health || exit 1
+        curl -f http://localhost:8080/ready || exit 1
+        curl -f http://localhost:8080/metrics || exit 1
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        generate_release_notes: true
+        draft: false
+        prerelease: false
+
+  # Security scanning
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        gosec-version: latest
+    
+    - name: Run Nancy (dependency vulnerability scanner)
+      run: |
+        go list -json -m all | docker run --rm -i sonatypecommunity/nancy:latest sleuth
+    
+    - name: Run Semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >- 
+          p/security-audit
+          p/secrets
+          p/dockerfile
+          p/kubernetes
+
+  # Performance testing
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run load tests with k6
+      uses: grafana/k6-action@v0.3.0
+      with:
+        filename: tests/performance/load-test.js
+      env:
+        TARGET_URL: https://staging.eaiingest.example.com
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-results
+        path: performance-results.json

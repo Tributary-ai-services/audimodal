@@ -1,0 +1,848 @@
+package handlers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/gorilla/mux"
+	"github.com/google/uuid"
+	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// Integration test suite for embedding handlers
+// These tests use a real HTTP router and test the full request/response cycle
+type IntegrationTestSuite struct {
+	router        *mux.Router
+	handler       *EmbeddingHandler
+	mockService   *MockEmbeddingService
+	mockAPIClient *MockDeepLakeAPIClient
+	server        *httptest.Server
+}
+
+func setupIntegrationTestSuite() *IntegrationTestSuite {
+	suite := &IntegrationTestSuite{}
+	
+	// Create mocks
+	suite.mockService = &MockEmbeddingService{}
+	suite.mockAPIClient = &MockDeepLakeAPIClient{}
+	
+	// Create handler
+	suite.handler = &EmbeddingHandler{
+		service:   suite.mockService,
+		apiClient: suite.mockAPIClient,
+	}
+	
+	// Create router and register routes
+	suite.router = mux.NewRouter()
+	suite.registerRoutes()
+	
+	// Create test server
+	suite.server = httptest.NewServer(suite.router)
+	
+	return suite
+}
+
+func (suite *IntegrationTestSuite) registerRoutes() {
+	// Dataset operations
+	suite.router.HandleFunc("/api/v1/embeddings/datasets", suite.handler.CreateDataset).Methods("POST")
+	suite.router.HandleFunc("/api/v1/embeddings/datasets", suite.handler.ListDatasets).Methods("GET")
+	suite.router.HandleFunc("/api/v1/embeddings/datasets/{name}", suite.handler.GetDatasetInfo).Methods("GET")
+	suite.router.HandleFunc("/api/v1/embeddings/datasets/{name}/stats", suite.handler.GetDatasetStats).Methods("GET")
+	
+	// Document operations
+	suite.router.HandleFunc("/api/v1/embeddings/documents", suite.handler.ProcessDocument).Methods("POST")
+	suite.router.HandleFunc("/api/v1/embeddings/documents/{documentId}", suite.handler.GetDocumentVectors).Methods("GET")
+	suite.router.HandleFunc("/api/v1/embeddings/documents/{documentId}", suite.handler.DeleteDocument).Methods("DELETE")
+	
+	// Search operations
+	suite.router.HandleFunc("/api/v1/embeddings/search", suite.handler.SearchDocuments).Methods("POST")
+	
+	// DeepLake API proxy endpoints
+	suite.router.HandleFunc("/api/v1/deeplake/datasets/{name}/search/vector", suite.handler.SearchByVector).Methods("POST")
+	suite.router.HandleFunc("/api/v1/deeplake/datasets/{name}/search/text", suite.handler.SearchByText).Methods("POST")
+	suite.router.HandleFunc("/api/v1/deeplake/datasets/{name}/vectors", suite.handler.InsertVectors).Methods("POST")
+	suite.router.HandleFunc("/api/v1/deeplake/datasets/{name}/vectors/{vectorId}", suite.handler.GetVector).Methods("GET")
+	suite.router.HandleFunc("/api/v1/deeplake/datasets/{name}/vectors/{vectorId}", suite.handler.UpdateVector).Methods("PUT")
+	suite.router.HandleFunc("/api/v1/deeplake/datasets/{name}/vectors/{vectorId}", suite.handler.DeleteVector).Methods("DELETE")
+	suite.router.HandleFunc("/api/v1/deeplake/datasets/{name}/vectors/batch", suite.handler.BatchDeleteVectors).Methods("DELETE")
+}
+
+func (suite *IntegrationTestSuite) tearDown() {
+	suite.server.Close()
+}
+
+func (suite *IntegrationTestSuite) makeRequest(method, path string, body interface{}) (*http.Response, error) {
+	var bodyBytes []byte
+	if body != nil {
+		var err error
+		bodyBytes, err = json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+	}
+	
+	req, err := http.NewRequest(method, suite.server.URL+path, bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Tenant-ID", "test-tenant-id")
+	
+	return http.DefaultClient.Do(req)
+}
+
+// Test dataset lifecycle - create, list, get info, get stats
+func TestIntegration_DatasetLifecycle(t *testing.T) {
+	suite := setupIntegrationTestSuite()
+	defer suite.tearDown()
+	
+	ctx := context.Background()
+	
+	// Test dataset creation
+	t.Run("CreateDataset", func(t *testing.T) {
+		datasetConfig := embeddings.DatasetConfig{
+			Name:        "integration-test-dataset",
+			Description: "Integration test dataset",
+			Dimensions:  1536,
+			MetricType:  "cosine",
+			IndexType:   "hnsw",
+			Metadata: map[string]interface{}{
+				"test":        "integration",
+				"environment": "test",
+			},
+		}
+		
+		// Mock the API client call
+		suite.mockAPIClient.On("CreateDataset", ctx, &datasetConfig).Return(nil)
+		
+		resp, err := suite.makeRequest("POST", "/api/v1/embeddings/datasets", datasetConfig)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "dataset created successfully", response["message"])
+		assert.Equal(t, "integration-test-dataset", response["name"])
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	// Test dataset listing
+	t.Run("ListDatasets", func(t *testing.T) {
+		expectedDatasets := []*embeddings.DatasetInfo{
+			{
+				Name:        "integration-test-dataset",
+				Description: "Integration test dataset",
+				Dimensions:  1536,
+				MetricType:  "cosine",
+				IndexType:   "hnsw",
+				VectorCount: 0,
+				StorageSize: 0,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			{
+				Name:        "another-dataset",
+				Description: "Another test dataset",
+				Dimensions:  768,
+				MetricType:  "euclidean",
+				IndexType:   "flat",
+				VectorCount: 100,
+				StorageSize: 1024,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+		}
+		
+		suite.mockAPIClient.On("ListDatasets", ctx).Return(expectedDatasets, nil)
+		
+		resp, err := suite.makeRequest("GET", "/api/v1/embeddings/datasets", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var datasets []*embeddings.DatasetInfo
+		err = json.NewDecoder(resp.Body).Decode(&datasets)
+		require.NoError(t, err)
+		
+		assert.Len(t, datasets, 2)
+		assert.Equal(t, "integration-test-dataset", datasets[0].Name)
+		assert.Equal(t, "another-dataset", datasets[1].Name)
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	// Test dataset info retrieval
+	t.Run("GetDatasetInfo", func(t *testing.T) {
+		expectedInfo := &embeddings.DatasetInfo{
+			Name:        "integration-test-dataset",
+			Description: "Integration test dataset",
+			Dimensions:  1536,
+			MetricType:  "cosine",
+			IndexType:   "hnsw",
+			VectorCount: 10,
+			StorageSize: 2048,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Metadata: map[string]interface{}{
+				"test":        "integration",
+				"environment": "test",
+			},
+		}
+		
+		suite.mockAPIClient.On("GetDatasetInfo", ctx, "integration-test-dataset").Return(expectedInfo, nil)
+		
+		resp, err := suite.makeRequest("GET", "/api/v1/embeddings/datasets/integration-test-dataset", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var info embeddings.DatasetInfo
+		err = json.NewDecoder(resp.Body).Decode(&info)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "integration-test-dataset", info.Name)
+		assert.Equal(t, 1536, info.Dimensions)
+		assert.Equal(t, "cosine", info.MetricType)
+		assert.Equal(t, 10, info.VectorCount)
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	// Test dataset stats
+	t.Run("GetDatasetStats", func(t *testing.T) {
+		expectedStats := map[string]interface{}{
+			"name":         "integration-test-dataset",
+			"vector_count": 10,
+			"dimensions":   1536,
+			"storage_size": int64(2048),
+			"metric_type":  "cosine",
+			"index_type":   "hnsw",
+			"last_updated": time.Now().Format(time.RFC3339),
+		}
+		
+		suite.mockAPIClient.On("GetDatasetStats", ctx, "integration-test-dataset").Return(expectedStats, nil)
+		
+		resp, err := suite.makeRequest("GET", "/api/v1/embeddings/datasets/integration-test-dataset/stats", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var stats map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&stats)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "integration-test-dataset", stats["name"])
+		assert.EqualValues(t, 10, stats["vector_count"])
+		assert.EqualValues(t, 1536, stats["dimensions"])
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+}
+
+// Test document processing workflow
+func TestIntegration_DocumentProcessing(t *testing.T) {
+	suite := setupIntegrationTestSuite()
+	defer suite.tearDown()
+	
+	ctx := context.Background()
+	tenantID := uuid.MustParse("test-tenant-id")
+	
+	t.Run("ProcessDocument", func(t *testing.T) {
+		processRequest := embeddings.ProcessDocumentRequest{
+			DocumentID: "test-doc-1",
+			Content:    "This is a test document for integration testing.",
+			Metadata: map[string]interface{}{
+				"source":   "integration-test",
+				"category": "test-document",
+			},
+			TenantID: tenantID,
+			Dataset:  "integration-test-dataset",
+		}
+		
+		expectedResponse := &embeddings.ProcessDocumentResponse{
+			DocumentID:   "test-doc-1",
+			ChunkCount:   1,
+			VectorCount:  1,
+			ProcessedAt:  time.Now(),
+			ProcessingTime: 150.5,
+			Chunks: []*embeddings.ProcessedChunk{
+				{
+					ChunkID:   "chunk-1",
+					Content:   "This is a test document for integration testing.",
+					VectorID:  "vec-1",
+					StartChar: 0,
+					EndChar:   47,
+					Metadata: map[string]interface{}{
+						"chunk_index": 0,
+					},
+				},
+			},
+		}
+		
+		suite.mockService.On("ProcessDocument", ctx, &processRequest).Return(expectedResponse, nil)
+		
+		resp, err := suite.makeRequest("POST", "/api/v1/embeddings/documents", processRequest)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var response embeddings.ProcessDocumentResponse
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "test-doc-1", response.DocumentID)
+		assert.Equal(t, 1, response.ChunkCount)
+		assert.Equal(t, 1, response.VectorCount)
+		assert.Len(t, response.Chunks, 1)
+		
+		suite.mockService.AssertExpectations(t)
+	})
+	
+	t.Run("GetDocumentVectors", func(t *testing.T) {
+		expectedVectors := []*embeddings.DocumentVector{
+			{
+				ID:         "vec-1",
+				DocumentID: "test-doc-1",
+				ChunkID:    "chunk-1",
+				Content:    "This is a test document for integration testing.",
+				Vector:     []float32{0.1, 0.2, 0.3, 0.4, 0.5},
+				Metadata: map[string]interface{}{
+					"chunk_index": 0,
+					"source":      "integration-test",
+				},
+			},
+		}
+		
+		suite.mockService.On("GetDocumentVectors", ctx, "test-doc-1").Return(expectedVectors, nil)
+		
+		resp, err := suite.makeRequest("GET", "/api/v1/embeddings/documents/test-doc-1", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var vectors []*embeddings.DocumentVector
+		err = json.NewDecoder(resp.Body).Decode(&vectors)
+		require.NoError(t, err)
+		
+		assert.Len(t, vectors, 1)
+		assert.Equal(t, "vec-1", vectors[0].ID)
+		assert.Equal(t, "test-doc-1", vectors[0].DocumentID)
+		
+		suite.mockService.AssertExpectations(t)
+	})
+	
+	t.Run("DeleteDocument", func(t *testing.T) {
+		suite.mockService.On("DeleteDocument", ctx, "test-doc-1").Return(nil)
+		
+		resp, err := suite.makeRequest("DELETE", "/api/v1/embeddings/documents/test-doc-1", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "document deleted successfully", response["message"])
+		assert.Equal(t, "test-doc-1", response["document_id"])
+		
+		suite.mockService.AssertExpectations(t)
+	})
+}
+
+// Test search operations
+func TestIntegration_SearchOperations(t *testing.T) {
+	suite := setupIntegrationTestSuite()
+	defer suite.tearDown()
+	
+	ctx := context.Background()
+	tenantID := uuid.MustParse("test-tenant-id")
+	
+	t.Run("SearchDocuments", func(t *testing.T) {
+		searchRequest := embeddings.SearchRequest{
+			Query:    "integration testing",
+			Dataset:  "integration-test-dataset",
+			TenantID: tenantID,
+			Options: &embeddings.SearchOptions{
+				TopK:            5,
+				Threshold:       0.7,
+				MetricType:      "cosine",
+				IncludeContent:  true,
+				IncludeMetadata: true,
+			},
+		}
+		
+		expectedResponse := &embeddings.SearchResponse{
+			Results: []*embeddings.SimilarityResult{
+				{
+					DocumentVector: &embeddings.DocumentVector{
+						ID:         "vec-1",
+						DocumentID: "test-doc-1",
+						ChunkID:    "chunk-1",
+						Content:    "This is a test document for integration testing.",
+						Vector:     []float32{0.1, 0.2, 0.3, 0.4, 0.5},
+						Metadata: map[string]interface{}{
+							"source":      "integration-test",
+							"chunk_index": 0,
+						},
+					},
+					Score:    0.95,
+					Distance: 0.05,
+					Rank:     1,
+				},
+				{
+					DocumentVector: &embeddings.DocumentVector{
+						ID:         "vec-2",
+						DocumentID: "test-doc-2",
+						ChunkID:    "chunk-1",
+						Content:    "Another document about testing integration features.",
+						Vector:     []float32{0.2, 0.3, 0.4, 0.5, 0.6},
+						Metadata: map[string]interface{}{
+							"source":      "integration-test",
+							"chunk_index": 0,
+						},
+					},
+					Score:    0.88,
+					Distance: 0.12,
+					Rank:     2,
+				},
+			},
+			QueryTime:  35.2,
+			TotalFound: 2,
+			HasMore:    false,
+		}
+		
+		suite.mockService.On("SearchDocuments", ctx, &searchRequest).Return(expectedResponse, nil)
+		
+		resp, err := suite.makeRequest("POST", "/api/v1/embeddings/search", searchRequest)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var response embeddings.SearchResponse
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Len(t, response.Results, 2)
+		assert.Equal(t, 2, response.TotalFound)
+		assert.False(t, response.HasMore)
+		assert.Greater(t, response.QueryTime, float64(0))
+		
+		// Check first result
+		result1 := response.Results[0]
+		assert.Equal(t, "vec-1", result1.DocumentVector.ID)
+		assert.Equal(t, "test-doc-1", result1.DocumentVector.DocumentID)
+		assert.Equal(t, float32(0.95), result1.Score)
+		assert.Equal(t, 1, result1.Rank)
+		
+		suite.mockService.AssertExpectations(t)
+	})
+}
+
+// Test DeepLake API proxy endpoints
+func TestIntegration_DeepLakeAPIProxy(t *testing.T) {
+	suite := setupIntegrationTestSuite()
+	defer suite.tearDown()
+	
+	ctx := context.Background()
+	
+	t.Run("SearchByVector", func(t *testing.T) {
+		searchRequest := struct {
+			QueryVector []float32                 `json:"query_vector"`
+			Options     *embeddings.SearchOptions `json:"options,omitempty"`
+		}{
+			QueryVector: []float32{0.1, 0.2, 0.3, 0.4, 0.5},
+			Options: &embeddings.SearchOptions{
+				TopK:            3,
+				IncludeContent:  true,
+				IncludeMetadata: true,
+			},
+		}
+		
+		expectedResult := &embeddings.SearchResult{
+			Results: []*embeddings.SimilarityResult{
+				{
+					DocumentVector: &embeddings.DocumentVector{
+						ID:         "vec-1",
+						DocumentID: "doc-1",
+						Content:    "Vector search result",
+						Vector:     []float32{0.1, 0.2, 0.3, 0.4, 0.5},
+					},
+					Score:    0.98,
+					Distance: 0.02,
+					Rank:     1,
+				},
+			},
+			QueryTime:  15.3,
+			TotalFound: 1,
+			HasMore:    false,
+		}
+		
+		suite.mockAPIClient.On("SearchSimilar", ctx, "integration-test-dataset", searchRequest.QueryVector, searchRequest.Options).Return(expectedResult, nil)
+		
+		resp, err := suite.makeRequest("POST", "/api/v1/deeplake/datasets/integration-test-dataset/search/vector", searchRequest)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var result embeddings.SearchResult
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+		
+		assert.Len(t, result.Results, 1)
+		assert.Equal(t, "vec-1", result.Results[0].DocumentVector.ID)
+		assert.Equal(t, float32(0.98), result.Results[0].Score)
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("SearchByText", func(t *testing.T) {
+		searchRequest := struct {
+			QueryText string                    `json:"query_text"`
+			Options   *embeddings.SearchOptions `json:"options,omitempty"`
+		}{
+			QueryText: "integration testing features",
+			Options: &embeddings.SearchOptions{
+				TopK:            5,
+				IncludeContent:  true,
+				IncludeMetadata: true,
+			},
+		}
+		
+		expectedResult := &embeddings.SearchResult{
+			Results: []*embeddings.SimilarityResult{
+				{
+					DocumentVector: &embeddings.DocumentVector{
+						ID:         "vec-2",
+						DocumentID: "doc-2",
+						Content:    "Text about integration testing features",
+						Vector:     []float32{0.2, 0.3, 0.4, 0.5, 0.6},
+					},
+					Score:    0.92,
+					Distance: 0.08,
+					Rank:     1,
+				},
+			},
+			QueryTime:  22.7,
+			TotalFound: 1,
+			HasMore:    false,
+		}
+		
+		suite.mockAPIClient.On("SearchByText", ctx, "integration-test-dataset", searchRequest.QueryText, searchRequest.Options).Return(expectedResult, nil)
+		
+		resp, err := suite.makeRequest("POST", "/api/v1/deeplake/datasets/integration-test-dataset/search/text", searchRequest)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var result embeddings.SearchResult
+		err = json.NewDecoder(resp.Body).Decode(&result)
+		require.NoError(t, err)
+		
+		assert.Len(t, result.Results, 1)
+		assert.Equal(t, "vec-2", result.Results[0].DocumentVector.ID)
+		assert.Equal(t, float32(0.92), result.Results[0].Score)
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("InsertVectors", func(t *testing.T) {
+		vectors := []*embeddings.DocumentVector{
+			{
+				ID:         "vec-new-1",
+				DocumentID: "doc-new-1",
+				ChunkID:    "chunk-1",
+				Content:    "New vector content 1",
+				Vector:     []float32{0.1, 0.2, 0.3, 0.4, 0.5},
+				Metadata: map[string]interface{}{
+					"source": "integration-test",
+				},
+			},
+			{
+				ID:         "vec-new-2",
+				DocumentID: "doc-new-2",
+				ChunkID:    "chunk-1",
+				Content:    "New vector content 2",
+				Vector:     []float32{0.2, 0.3, 0.4, 0.5, 0.6},
+				Metadata: map[string]interface{}{
+					"source": "integration-test",
+				},
+			},
+		}
+		
+		suite.mockAPIClient.On("InsertVectors", ctx, "integration-test-dataset", vectors).Return(nil)
+		
+		resp, err := suite.makeRequest("POST", "/api/v1/deeplake/datasets/integration-test-dataset/vectors", vectors)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+		
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "vectors inserted successfully", response["message"])
+		assert.Equal(t, float64(2), response["count"])
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("GetVector", func(t *testing.T) {
+		expectedVector := &embeddings.DocumentVector{
+			ID:         "vec-1",
+			DocumentID: "doc-1",
+			ChunkID:    "chunk-1",
+			Content:    "Retrieved vector content",
+			Vector:     []float32{0.1, 0.2, 0.3, 0.4, 0.5},
+			Metadata: map[string]interface{}{
+				"source":      "integration-test",
+				"chunk_index": 0,
+			},
+		}
+		
+		suite.mockAPIClient.On("GetVector", ctx, "integration-test-dataset", "vec-1").Return(expectedVector, nil)
+		
+		resp, err := suite.makeRequest("GET", "/api/v1/deeplake/datasets/integration-test-dataset/vectors/vec-1", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var vector embeddings.DocumentVector
+		err = json.NewDecoder(resp.Body).Decode(&vector)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "vec-1", vector.ID)
+		assert.Equal(t, "doc-1", vector.DocumentID)
+		assert.Equal(t, "Retrieved vector content", vector.Content)
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("UpdateVector", func(t *testing.T) {
+		updateData := map[string]interface{}{
+			"updated": true,
+			"version": "2.0",
+			"category": "updated-integration-test",
+		}
+		
+		suite.mockAPIClient.On("UpdateVector", ctx, "integration-test-dataset", "vec-1", updateData).Return(nil)
+		
+		resp, err := suite.makeRequest("PUT", "/api/v1/deeplake/datasets/integration-test-dataset/vectors/vec-1", updateData)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "vector updated successfully", response["message"])
+		assert.Equal(t, "vec-1", response["vector_id"])
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("DeleteVector", func(t *testing.T) {
+		suite.mockAPIClient.On("DeleteVector", ctx, "integration-test-dataset", "vec-1").Return(nil)
+		
+		resp, err := suite.makeRequest("DELETE", "/api/v1/deeplake/datasets/integration-test-dataset/vectors/vec-1", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "vector deleted successfully", response["message"])
+		assert.Equal(t, "vec-1", response["vector_id"])
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+	
+	t.Run("BatchDeleteVectors", func(t *testing.T) {
+		deleteRequest := struct {
+			VectorIDs []string `json:"vector_ids"`
+		}{
+			VectorIDs: []string{"vec-1", "vec-2", "vec-3"},
+		}
+		
+		// Mock the individual delete calls
+		suite.mockAPIClient.On("DeleteVector", ctx, "integration-test-dataset", "vec-1").Return(nil)
+		suite.mockAPIClient.On("DeleteVector", ctx, "integration-test-dataset", "vec-2").Return(nil)
+		suite.mockAPIClient.On("DeleteVector", ctx, "integration-test-dataset", "vec-3").Return(nil)
+		
+		resp, err := suite.makeRequest("DELETE", "/api/v1/deeplake/datasets/integration-test-dataset/vectors/batch", deleteRequest)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+		
+		assert.Equal(t, "batch delete completed", response["message"])
+		assert.Equal(t, float64(3), response["deleted_count"])
+		assert.Equal(t, float64(3), response["total_count"])
+		
+		suite.mockAPIClient.AssertExpectations(t)
+	})
+}
+
+// Test error handling in integration scenarios
+func TestIntegration_ErrorHandling(t *testing.T) {
+	suite := setupIntegrationTestSuite()
+	defer suite.tearDown()
+	
+	ctx := context.Background()
+	
+	t.Run("DatasetNotFound", func(t *testing.T) {
+		apiError := &embeddings.EmbeddingError{
+			Type:    "dataset_not_found",
+			Message: "dataset 'nonexistent' not found",
+			Code:    "DATASET_NOT_FOUND",
+		}
+		
+		suite.mockAPIClient.On("GetDatasetInfo", ctx, "nonexistent").Return((*embeddings.DatasetInfo)(nil), apiError)
+		
+		resp, err := suite.makeRequest("GET", "/api/v1/embeddings/datasets/nonexistent", nil)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+		
+		var errorResponse map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&errorResponse)
+		require.NoError(t, err)
+		
+		assert.Contains(t, errorResponse["error"], "dataset 'nonexistent' not found")
+	})
+	
+	t.Run("InvalidJSON", func(t *testing.T) {
+		req, err := http.NewRequest("POST", suite.server.URL+"/api/v1/embeddings/datasets", bytes.NewBuffer([]byte("invalid json")))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+	
+	t.Run("MissingTenantID", func(t *testing.T) {
+		searchRequest := embeddings.SearchRequest{
+			Query:   "test query",
+			Dataset: "test-dataset",
+			// Missing TenantID
+		}
+		
+		req, err := http.NewRequest("POST", suite.server.URL+"/api/v1/embeddings/search", bytes.NewBuffer([]byte{}))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		// No X-Tenant-ID header
+		
+		bodyBytes, _ := json.Marshal(searchRequest)
+		req.Body = http.NoBody
+		req.ContentLength = 0
+		req.Body = http.NoBody
+		
+		// Create new request with proper body
+		req, err = http.NewRequest("POST", suite.server.URL+"/api/v1/embeddings/search", bytes.NewBuffer(bodyBytes))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+}
+
+// Benchmark integration tests
+func BenchmarkIntegration_SearchWorkflow(b *testing.B) {
+	suite := setupIntegrationTestSuite()
+	defer suite.tearDown()
+	
+	ctx := context.Background()
+	tenantID := uuid.MustParse("test-tenant-id")
+	
+	// Setup mock expectations
+	expectedResponse := &embeddings.SearchResponse{
+		Results: []*embeddings.SimilarityResult{
+			{
+				DocumentVector: &embeddings.DocumentVector{
+					ID:         "vec-1",
+					DocumentID: "doc-1",
+					Content:    "Benchmark test result",
+					Vector:     []float32{0.1, 0.2, 0.3, 0.4, 0.5},
+				},
+				Score:    0.95,
+				Distance: 0.05,
+				Rank:     1,
+			},
+		},
+		QueryTime:  25.5,
+		TotalFound: 1,
+		HasMore:    false,
+	}
+	
+	searchRequest := embeddings.SearchRequest{
+		Query:    "benchmark query",
+		Dataset:  "benchmark-dataset",
+		TenantID: tenantID,
+		Options: &embeddings.SearchOptions{
+			TopK:            5,
+			IncludeContent:  true,
+			IncludeMetadata: true,
+		},
+	}
+	
+	// Set up expectations that will be called multiple times
+	suite.mockService.On("SearchDocuments", ctx, &searchRequest).Return(expectedResponse, nil).Maybe()
+	
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			resp, err := suite.makeRequest("POST", "/api/v1/embeddings/search", searchRequest)
+			if err != nil {
+				b.Fatal(err)
+			}
+			resp.Body.Close()
+			
+			if resp.StatusCode != http.StatusOK {
+				b.Fatalf("Expected status 200, got %d", resp.StatusCode)
+			}
+		}
+	})
+}
