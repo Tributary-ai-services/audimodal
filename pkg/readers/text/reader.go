@@ -201,6 +201,9 @@ func (r *TextReader) EstimateSize(ctx context.Context, sourcePath string) (core.
 	// Estimate line count based on average line length (assume ~80 chars per line)
 	avgLineLength := int64(80)
 	estimatedLines := stat.Size() / avgLineLength
+	if estimatedLines == 0 && stat.Size() > 0 {
+		estimatedLines = 1 // At least 1 line for non-empty files
+	}
 
 	// Estimate chunks based on common chunk size (1000 characters)
 	chunkSize := int64(1000)

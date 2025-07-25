@@ -16,9 +16,7 @@ import (
 	"github.com/jscharber/eAIIngest/pkg/auth"
 	"github.com/jscharber/eAIIngest/pkg/classification"
 	"github.com/jscharber/eAIIngest/pkg/chunking"
-	"github.com/jscharber/eAIIngest/pkg/dlp"
 	"github.com/jscharber/eAIIngest/pkg/events"
-	"github.com/jscharber/eAIIngest/pkg/readers"
 	"github.com/jscharber/eAIIngest/pkg/workflow"
 )
 
@@ -147,7 +145,7 @@ func BenchmarkChunkingPerformance(b *testing.B) {
 
 func BenchmarkClassificationPerformance(b *testing.B) {
 	ctx := context.Background()
-	classifier := classification.NewService()
+	classifier := classification.NewService(&classification.ServiceConfig{})
 	
 	testTexts := []string{
 		"This is a short business document.",
@@ -160,7 +158,11 @@ func BenchmarkClassificationPerformance(b *testing.B) {
 		b.Run(fmt.Sprintf("Text_%d", i), func(b *testing.B) {
 			b.ResetTimer()
 			for j := 0; j < b.N; j++ {
-				_, err := classifier.Classify(ctx, text)
+				input := &classification.ClassificationInput{
+					Content:  text,
+					TenantID: uuid.New(),
+				}
+				_, err := classifier.Classify(ctx, input)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -176,7 +178,11 @@ func BenchmarkClassificationPerformance(b *testing.B) {
 		b.ResetTimer()
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
-				_, err := classifier.Classify(ctx, text)
+				input := &classification.ClassificationInput{
+					Content:  text,
+					TenantID: uuid.New(),
+				}
+				_, err := classifier.Classify(ctx, input)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -188,7 +194,7 @@ func BenchmarkClassificationPerformance(b *testing.B) {
 }
 
 func BenchmarkDLPPerformance(b *testing.B) {
-	dlpEngine := dlp.NewEngine()
+	dlpEngine := NewTestDLPEngine()
 	
 	// Generate content with embedded PII
 	testContent := generateContentWithPII(10000)
@@ -236,11 +242,10 @@ func BenchmarkDLPPerformance(b *testing.B) {
 }
 
 func BenchmarkEventSystemPerformance(b *testing.B) {
-	ctx := context.Background()
-	eventBus := events.NewInMemoryEventBus()
+	eventBus := events.NewInMemoryEventBus(events.EventBusConfig{})
 	
 	// Setup event handler
-	handlerFunc := func(ctx context.Context, event *events.Event) error {
+	handlerFunc := func(ctx context.Context, event interface{}) error {
 		// Simulate some processing
 		time.Sleep(1 * time.Microsecond)
 		return nil
@@ -250,23 +255,23 @@ func BenchmarkEventSystemPerformance(b *testing.B) {
 		HandlerFunc: handlerFunc,
 	}
 	
-	eventBus.Subscribe(events.EventTypeFileProcessed, handler)
+	eventBus.Subscribe(handler, "file_processed")
 	
 	b.Run("EventPublish", func(b *testing.B) {
 		event := &events.Event{
-			ID:        uuid.New(),
-			Type:      events.EventTypeFileProcessed,
-			Source:    "benchmark",
-			Timestamp: time.Now(),
-			Data: map[string]interface{}{
+			ID:       uuid.New(),
+			Type:     "file_processed",
+			TenantID: uuid.New(),
+			Payload: map[string]interface{}{
 				"file_path": "/test/file.txt",
 				"size":      1024,
 			},
+			CreatedAt: time.Now(),
 		}
 		
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			err := eventBus.Publish(ctx, event)
+			err := eventBus.Publish(event)
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -277,17 +282,17 @@ func BenchmarkEventSystemPerformance(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
 				event := &events.Event{
-					ID:        uuid.New(),
-					Type:      events.EventTypeFileProcessed,
-					Source:    "benchmark",
-					Timestamp: time.Now(),
-					Data: map[string]interface{}{
+					ID:       uuid.New(),
+					Type:     "file_processed",
+					TenantID: uuid.New(),
+					Payload: map[string]interface{}{
 						"file_path": "/test/file.txt",
 						"size":      1024,
 					},
+					CreatedAt: time.Now(),
 				}
 				
-				err := eventBus.Publish(ctx, event)
+				err := eventBus.Publish(event)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -298,7 +303,7 @@ func BenchmarkEventSystemPerformance(b *testing.B) {
 
 func BenchmarkWorkflowPerformance(b *testing.B) {
 	ctx := context.Background()
-	eventBus := events.NewInMemoryEventBus()
+	eventBus := events.NewInMemoryEventBus(events.EventBusConfig{})
 	workflowEngine := workflow.NewEngine(eventBus)
 	
 	// Create a simple workflow
@@ -368,12 +373,12 @@ func BenchmarkFileReadersPerformance(b *testing.B) {
 	writeTestFile(b, textFile, textData)
 	
 	readers := map[string]struct {
-		reader readers.Reader
+		reader *TestReader
 		file   string
 	}{
-		"CSV":  {readers.NewCSVReader(), csvFile},
-		"JSON": {readers.NewJSONReader(), jsonFile},
-		"Text": {readers.NewTextReader(), textFile},
+		"CSV":  {NewTestReader("csv"), csvFile},
+		"JSON": {NewTestReader("json"), jsonFile},
+		"Text": {NewTestReader("text"), textFile},
 	}
 	
 	for name, r := range readers {
@@ -473,12 +478,11 @@ func TestStressEventSystem(t *testing.T) {
 		t.Skip("Skipping stress test in short mode")
 	}
 	
-	ctx := context.Background()
-	eventBus := events.NewInMemoryEventBus()
+	eventBus := events.NewInMemoryEventBus(events.EventBusConfig{})
 	
 	// Setup handler that counts events
 	var eventCount int64
-	handlerFunc := func(ctx context.Context, event *events.Event) error {
+	handlerFunc := func(ctx context.Context, event interface{}) error {
 		eventCount++
 		return nil
 	}
@@ -487,7 +491,7 @@ func TestStressEventSystem(t *testing.T) {
 		HandlerFunc: handlerFunc,
 	}
 	
-	eventBus.Subscribe(events.EventTypeFileProcessed, handler)
+	eventBus.Subscribe(handler, "file_processed")
 	
 	const numGoroutines = 50
 	const eventsPerGoroutine = 1000
@@ -503,17 +507,17 @@ func TestStressEventSystem(t *testing.T) {
 			defer wg.Done()
 			for j := 0; j < eventsPerGoroutine; j++ {
 				event := &events.Event{
-					ID:        uuid.New(),
-					Type:      events.EventTypeFileProcessed,
-					Source:    fmt.Sprintf("goroutine-%d", goroutineID),
-					Timestamp: time.Now(),
-					Data: map[string]interface{}{
+					ID:       uuid.New(),
+					Type:     "file_processed",
+					TenantID: uuid.New(),
+					Payload: map[string]interface{}{
 						"event_number": j,
 						"goroutine_id": goroutineID,
 					},
+					CreatedAt: time.Now(),
 				}
 				
-				err := eventBus.Publish(ctx, event)
+				err := eventBus.Publish(event)
 				if err != nil {
 					errors <- err
 					return
@@ -564,8 +568,8 @@ func TestMemoryUsage(t *testing.T) {
 	tenantStore := auth.NewMemoryTenantStore()
 	authService := auth.NewService(jwtManager, userStore, tenantStore, nil)
 	
-	classifier := classification.NewService()
-	dlpEngine := dlp.NewEngine()
+	classifier := classification.NewService(&classification.ServiceConfig{})
+	dlpEngine := NewTestDLPEngine()
 	chunker := chunking.NewFixedSizeChunker(500, 50)
 	
 	// Process large amounts of data
@@ -581,7 +585,11 @@ func TestMemoryUsage(t *testing.T) {
 		
 		// Process content
 		content := generateTestContent(1000)
-		classifier.Classify(ctx, content)
+		input := &classification.ClassificationInput{
+			Content:  content,
+			TenantID: uuid.New(),
+		}
+		classifier.Classify(ctx, input)
 		dlpEngine.ScanText(content)
 		chunker.Chunk(content)
 	}

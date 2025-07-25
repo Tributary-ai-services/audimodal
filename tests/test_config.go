@@ -432,7 +432,7 @@ func createTestTenants(t *testing.T, ctx context.Context, authService auth.AuthS
 }
 
 func generateLargeTestContent() string {
-	baseContent := `This is a large test document designed to test the performance and scalability of the eAIIngest platform.
+	baseContent := `This is a large test document designed to test the performance and scalability of the Audimodal.ai platform.
 It contains multiple paragraphs with various types of content including business data, technical specifications,
 and embedded personally identifiable information (PII) for testing DLP capabilities.
 

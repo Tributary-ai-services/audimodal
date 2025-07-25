@@ -223,9 +223,9 @@ func (h *ChunkHandler) ListChunks(w http.ResponseWriter, r *http.Request, tenant
 	}
 
 	// Convert to response format
-	response := make([]ChunkResponse, len(chunks))
+	responseData := make([]ChunkResponse, len(chunks))
 	for i, chunk := range chunks {
-		response[i] = h.toChunkResponse(&chunk)
+		responseData[i] = h.toChunkResponse(&chunk)
 	}
 
 	// Get total count
@@ -240,7 +240,7 @@ func (h *ChunkHandler) ListChunks(w http.ResponseWriter, r *http.Request, tenant
 	// ... other filters
 	countQuery.Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // GetChunk handles GET /api/v1/tenants/{tenant_id}/chunks/{id}
@@ -259,8 +259,8 @@ func (h *ChunkHandler) GetChunk(w http.ResponseWriter, r *http.Request, tenantID
 		return
 	}
 
-	response := h.toChunkResponse(&chunk)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toChunkResponse(&chunk)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // UpdateChunk handles PUT /api/v1/tenants/{tenant_id}/chunks/{id}
@@ -330,8 +330,8 @@ func (h *ChunkHandler) UpdateChunk(w http.ResponseWriter, r *http.Request, tenan
 		return
 	}
 
-	response := h.toChunkResponse(&chunk)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toChunkResponse(&chunk)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // DeleteChunk handles DELETE /api/v1/tenants/{tenant_id}/chunks/{id}
@@ -421,15 +421,15 @@ func (h *ChunkHandler) SearchChunks(w http.ResponseWriter, r *http.Request, tena
 	}
 
 	// Convert to response format
-	response := make([]ChunkResponse, len(chunks))
+	responseData := make([]ChunkResponse, len(chunks))
 	for i, chunk := range chunks {
-		response[i] = h.toChunkResponse(&chunk)
+		responseData[i] = h.toChunkResponse(&chunk)
 	}
 
 	searchResult := map[string]interface{}{
 		"query":   req.Query,
-		"results": response,
-		"count":   len(response),
+		"results": responseData,
+		"count":   len(responseData),
 		"limit":   limit,
 	}
 

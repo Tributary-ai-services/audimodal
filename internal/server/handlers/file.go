@@ -195,9 +195,9 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request, tenantID
 	}
 
 	// Convert to response format
-	response := make([]FileResponse, len(files))
+	responseData := make([]FileResponse, len(files))
 	for i, file := range files {
-		response[i] = h.toFileResponse(&file)
+		responseData[i] = h.toFileResponse(&file)
 	}
 
 	// Get total count
@@ -213,7 +213,7 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request, tenantID
 	// ... other filters
 	countQuery.Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), response, page, pageSize, totalCount)
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // CreateFile handles POST /api/v1/tenants/{tenant_id}/files
@@ -271,8 +271,8 @@ func (h *FileHandler) CreateFile(w http.ResponseWriter, r *http.Request, tenantI
 		return
 	}
 
-	response := h.toFileResponse(file)
-	response.WriteCreated(w, getRequestID(r), response)
+	responseData := h.toFileResponse(file)
+	response.WriteCreated(w, getRequestID(r), responseData)
 }
 
 // GetFile handles GET /api/v1/tenants/{tenant_id}/files/{id}
@@ -291,8 +291,8 @@ func (h *FileHandler) GetFile(w http.ResponseWriter, r *http.Request, tenantID u
 		return
 	}
 
-	response := h.toFileResponse(&file)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toFileResponse(&file)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // UpdateFile handles PUT /api/v1/tenants/{tenant_id}/files/{id}
@@ -358,8 +358,8 @@ func (h *FileHandler) UpdateFile(w http.ResponseWriter, r *http.Request, tenantI
 		return
 	}
 
-	response := h.toFileResponse(&file)
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	responseData := h.toFileResponse(&file)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // DeleteFile handles DELETE /api/v1/tenants/{tenant_id}/files/{id}
@@ -471,14 +471,14 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 
 	// TODO: Trigger actual file processing pipeline
 
-	response := map[string]interface{}{
+	responseData := map[string]interface{}{
 		"message":  "File processing started",
 		"file_id":  fileID,
 		"status":   file.Status,
 		"strategy": file.ChunkingStrategy,
 	}
 
-	response.WriteSuccess(w, getRequestID(r), response, nil)
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
 
 // DownloadFile handles GET /api/v1/tenants/{tenant_id}/files/{id}/download
@@ -597,7 +597,7 @@ func (h *FileHandler) ListFileViolations(w http.ResponseWriter, r *http.Request,
 // Helper methods
 
 func (h *FileHandler) toFileResponse(file *models.File) FileResponse {
-	response := FileResponse{
+	responseData := FileResponse{
 		ID:                   file.ID,
 		TenantID:             file.TenantID,
 		DataSourceID:         file.DataSourceID,
@@ -634,8 +634,8 @@ func (h *FileHandler) toFileResponse(file *models.File) FileResponse {
 
 	if file.ProcessedAt != nil {
 		processedAt := file.ProcessedAt.Format("2006-01-02T15:04:05Z")
-		response.ProcessedAt = &processedAt
+		responseData.ProcessedAt = &processedAt
 	}
 
-	return response
+	return responseData
 }

@@ -20,7 +20,7 @@ import (
 	"github.com/jscharber/eAIIngest/pkg/workflow"
 )
 
-// Integration test suite for the eAIIngest platform
+// Integration test suite for the Audimodal.ai platform
 func TestIntegrationFullPipeline(t *testing.T) {
 	ctx := context.Background()
 	

@@ -11,29 +11,63 @@ import (
 
 	"github.com/jscharber/eAIIngest/internal/database"
 	"github.com/jscharber/eAIIngest/internal/server"
+	"github.com/jscharber/eAIIngest/pkg/config"
+	"github.com/jscharber/eAIIngest/pkg/logger"
 )
 
 func main() {
 	// Parse command line flags
 	var (
-		configFile = flag.String("config", "", "Path to configuration file")
-		host       = flag.String("host", "0.0.0.0", "Server host")
-		port       = flag.Int("port", 8080, "Server port")
-		dbHost     = flag.String("db-host", "localhost", "Database host")
-		dbPort     = flag.Int("db-port", 5432, "Database port")
-		dbUsername = flag.String("db-username", "postgres", "Database username")
-		dbPassword = flag.String("db-password", "", "Database password")
-		dbName     = flag.String("db-name", "eaiingest", "Database name")
-		dbSSLMode  = flag.String("db-ssl-mode", "disable", "Database SSL mode")
-		jwtSecret  = flag.String("jwt-secret", "", "JWT secret for authentication")
-		logLevel   = flag.String("log-level", "info", "Log level")
-		version    = flag.Bool("version", false, "Show version information")
+		configFile       = flag.String("config", "", "Path to configuration file")
+		generateConfig   = flag.String("generate-config", "", "Generate example configuration file at specified path")
+		validateConfig   = flag.Bool("validate-config", false, "Validate configuration and exit")
+		host            = flag.String("host", "0.0.0.0", "Server host")
+		port            = flag.Int("port", 8080, "Server port")
+		tlsEnabled      = flag.Bool("tls", false, "Enable TLS/HTTPS")
+		tlsCertFile     = flag.String("tls-cert", "", "TLS certificate file")
+		tlsKeyFile      = flag.String("tls-key", "", "TLS private key file")
+		dbHost          = flag.String("db-host", "localhost", "Database host")
+		dbPort          = flag.Int("db-port", 5432, "Database port")
+		dbUsername      = flag.String("db-username", "postgres", "Database username")
+		dbPassword      = flag.String("db-password", "", "Database password")
+		dbName          = flag.String("db-name", "audimodal", "Database name")
+		dbSSLMode       = flag.String("db-ssl-mode", "disable", "Database SSL mode")
+		jwtSecret       = flag.String("jwt-secret", "", "JWT secret for authentication")
+		logLevel        = flag.String("log-level", "info", "Log level")
+		version         = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
 
 	if *version {
 		fmt.Println("eAIIngest Server v1.0.0")
 		os.Exit(0)
+	}
+
+	// Handle config file generation
+	if *generateConfig != "" {
+		if err := config.ValidateConfigPath(*generateConfig); err != nil {
+			log.Fatalf("Invalid config path: %v", err)
+		}
+
+		// Create default configuration
+		defaultConfig := server.GetDefaultConfig()
+		defaultConfig.Database = database.GetDefaultConfig()
+
+		// Write example configuration
+		if err := defaultConfig.WriteExample(*generateConfig); err != nil {
+			log.Fatalf("Failed to generate config file: %v", err)
+		}
+
+		fmt.Printf("Example configuration file generated at: %s\n", *generateConfig)
+		fmt.Println("Edit the file to customize your configuration.")
+		os.Exit(0)
+	}
+
+	// Validate config file path if provided
+	if *configFile != "" {
+		if err := config.ValidateConfigPath(*configFile); err != nil {
+			log.Fatalf("Invalid config file: %v", err)
+		}
 	}
 
 	// Override with environment variables if available
@@ -65,67 +99,115 @@ func main() {
 	if envJWTSecret := os.Getenv("JWT_SECRET"); envJWTSecret != "" {
 		*jwtSecret = envJWTSecret
 	}
-
-	// Create database configuration
-	dbConfig := &database.Config{
-		Host:            *dbHost,
-		Port:            *dbPort,
-		Username:        *dbUsername,
-		Password:        *dbPassword,
-		Database:        *dbName,
-		SSLMode:         *dbSSLMode,
-		MaxOpenConns:    25,
-		MaxIdleConns:    5,
-		ConnMaxLifetime: time.Hour,
-		ConnMaxIdleTime: 30 * time.Minute,
-		LogLevel:        "warn",
-		SlowThreshold:   200 * time.Millisecond,
-		AutoMigrate:     false, // Don't auto-migrate in production
+	if envTLSEnabled := os.Getenv("TLS_ENABLED"); envTLSEnabled == "true" {
+		*tlsEnabled = true
+	}
+	if envTLSCert := os.Getenv("TLS_CERT_FILE"); envTLSCert != "" {
+		*tlsCertFile = envTLSCert
+	}
+	if envTLSKey := os.Getenv("TLS_KEY_FILE"); envTLSKey != "" {
+		*tlsKeyFile = envTLSKey
 	}
 
-	// Create server configuration
-	serverConfig := &server.Config{
-		Host:            *host,
-		Port:            *port,
-		TLSEnabled:      false, // TODO: Add TLS support
-		ReadTimeout:     30 * time.Second,
-		WriteTimeout:    30 * time.Second,
-		IdleTimeout:     120 * time.Second,
-		ShutdownTimeout: 30 * time.Second,
-		CORSEnabled:     true,
-		CORSAllowedOrigins: []string{"*"}, // TODO: Configure for production
-		CORSAllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"},
-		CORSAllowedHeaders: []string{"*"},
-		RateLimitEnabled: true,
-		RateLimitRPS:     100,
-		RateLimitBurst:   200,
-		AuthEnabled:      true,
-		JWTSecret:        *jwtSecret,
-		JWTExpiration:    24 * time.Hour,
-		APIKeyHeader:     "X-API-Key",
-		LogRequests:      true,
-		LogRequestBody:   false,
-		HealthCheckPath:  "/health",
-		MetricsEnabled:   true,
-		MetricsPath:      "/metrics",
-		APIPrefix:        "/api/v1",
-		MaxRequestSize:   10 * 1024 * 1024, // 10MB
-		RequestIDHeader:  "X-Request-ID",
-		DefaultPageSize:  20,
-		MaxPageSize:      100,
-		Database:         dbConfig,
+	// Create server configuration - start with defaults
+	serverConfig := server.GetDefaultConfig()
+	serverConfig.Database = database.GetDefaultConfig()
+
+	// Load configuration from file if specified
+	if *configFile != "" {
+		if err := serverConfig.Load(*configFile); err != nil {
+			log.Fatalf("Failed to load configuration from file: %v", err)
+		}
+	} else {
+		// Load from environment variables only if no config file
+		if err := serverConfig.LoadFromEnv(); err != nil {
+			log.Fatalf("Failed to load configuration from environment: %v", err)
+		}
 	}
+
+	// Override with command line flags (highest priority)
+	if *host != "0.0.0.0" {
+		serverConfig.Host = *host
+	}
+	if *port != 8080 {
+		serverConfig.Port = *port
+	}
+	if *tlsEnabled {
+		serverConfig.TLSEnabled = *tlsEnabled
+	}
+	if *tlsCertFile != "" {
+		serverConfig.TLSCertFile = *tlsCertFile
+	}
+	if *tlsKeyFile != "" {
+		serverConfig.TLSKeyFile = *tlsKeyFile
+	}
+	if *jwtSecret != "" {
+		serverConfig.JWTSecret = *jwtSecret
+	}
+	if *logLevel != "info" {
+		serverConfig.LogLevel = *logLevel
+	}
+
+	// Override database config with command line flags
+	if *dbHost != "localhost" {
+		serverConfig.Database.Host = *dbHost
+	}
+	if *dbPort != 5432 {
+		serverConfig.Database.Port = *dbPort
+	}
+	if *dbUsername != "postgres" {
+		serverConfig.Database.Username = *dbUsername
+	}
+	if *dbPassword != "" {
+		serverConfig.Database.Password = *dbPassword
+	}
+	if *dbName != "audimodal" {
+		serverConfig.Database.Database = *dbName
+	}
+	if *dbSSLMode != "disable" {
+		serverConfig.Database.SSLMode = *dbSSLMode
+	}
+
+	// Validate configuration if requested
+	if *validateConfig {
+		if err := serverConfig.Validate(); err != nil {
+			fmt.Printf("Configuration validation failed:\n%v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Configuration validation passed successfully.")
+		os.Exit(0)
+	}
+
+	// Initialize structured logging early
+	parsedLogLevel := logger.ParseLogLevel(serverConfig.LogLevel)
+	logFormat := logger.JSONFormat
+	if serverConfig.LogFormat == "text" {
+		logFormat = logger.TextFormat
+	}
+
+	appLogger := logger.NewLogger(&logger.Config{
+		Level:        parsedLogLevel,
+		Format:       logFormat,
+		Output:       os.Stdout,
+		Service:      "audimodal",
+		Version:      "1.0.0",
+		EnableCaller: serverConfig.IsDevelopment(),
+		Fields:       make(map[string]interface{}),
+	})
+
+	// Set as default logger
+	logger.SetDefault(appLogger)
 
 	// Validate JWT secret for production
 	if serverConfig.AuthEnabled && serverConfig.JWTSecret == "" {
-		log.Fatal("JWT secret is required when authentication is enabled. Set JWT_SECRET environment variable or use --jwt-secret flag.")
+		appLogger.Fatal("JWT secret is required when authentication is enabled. Set JWT_SECRET environment variable or use --jwt-secret flag.")
 	}
 
 	// Initialize database
-	fmt.Println("Connecting to database...")
-	db, err := database.New(dbConfig)
+	appLogger.Info("Connecting to database", "host", serverConfig.Database.Host, "port", serverConfig.Database.Port, "database", serverConfig.Database.Database)
+	db, err := database.New(serverConfig.Database)
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		appLogger.Fatal("Failed to initialize database: %v", err)
 	}
 	defer db.Close()
 
@@ -134,67 +216,85 @@ func main() {
 	defer cancel()
 
 	if err := db.Connect(ctx); err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		appLogger.Fatal("Failed to connect to database: %v", err)
 	}
 
 	// Check if we need to run migrations
 	migrator := db.Migrator()
 	pendingMigrations, err := migrator.GetPendingMigrations(ctx)
 	if err != nil {
-		log.Fatalf("Failed to check migrations: %v", err)
+		appLogger.Fatal("Failed to check migrations: %v", err)
 	}
 
 	if len(pendingMigrations) > 0 {
-		fmt.Printf("Found %d pending migrations. Please run migrations first:\n", len(pendingMigrations))
-		fmt.Println("  go run cmd/migrate/main.go -command migrate")
-		fmt.Println("Or set DB_AUTO_MIGRATE=true to run migrations automatically.")
+		appLogger.WithField("pending_count", len(pendingMigrations)).Warn("Found pending migrations")
+		appLogger.Info("Please run migrations first: go run cmd/migrate/main.go -command migrate")
+		appLogger.Info("Or set DB_AUTO_MIGRATE=true to run migrations automatically")
 
 		if os.Getenv("DB_AUTO_MIGRATE") == "true" {
-			fmt.Println("Running migrations automatically...")
+			appLogger.Info("Running migrations automatically")
 			if err := migrator.Migrate(ctx); err != nil {
-				log.Fatalf("Failed to run migrations: %v", err)
+				appLogger.Fatal("Failed to run migrations: %v", err)
 			}
-			fmt.Println("Migrations completed successfully.")
+			appLogger.Info("Migrations completed successfully")
 		} else {
 			os.Exit(1)
 		}
 	}
 
 	// Initialize server
-	fmt.Printf("Initializing server on %s:%d...\n", *host, *port)
+	appLogger.WithFields(map[string]interface{}{
+		"host": serverConfig.Host,
+		"port": serverConfig.Port,
+		"tls_enabled": serverConfig.TLSEnabled,
+	}).Info("Initializing server")
 	srv, err := server.New(serverConfig, db)
 	if err != nil {
-		log.Fatalf("Failed to initialize server: %v", err)
+		appLogger.Fatal("Failed to initialize server: %v", err)
 	}
 
-	// Print startup information
-	fmt.Println("=================================")
-	fmt.Println("eAIIngest Server")
-	fmt.Println("=================================")
-	fmt.Printf("Server URL: http://%s:%d\n", *host, *port)
-	fmt.Printf("API Prefix: %s\n", serverConfig.APIPrefix)
-	fmt.Printf("Health Check: http://%s:%d%s\n", *host, *port, serverConfig.HealthCheckPath)
-	if serverConfig.MetricsEnabled {
-		fmt.Printf("Metrics: http://%s:%d%s\n", *host, *port, serverConfig.MetricsPath)
+	// Log startup information
+	protocol := "http"
+	if serverConfig.TLSEnabled {
+		protocol = "https"
 	}
-	fmt.Printf("Documentation: http://%s:%d%s/docs\n", *host, *port, serverConfig.APIPrefix)
-	fmt.Printf("Authentication: %v\n", serverConfig.AuthEnabled)
-	fmt.Printf("Rate Limiting: %v (%d RPS)\n", serverConfig.RateLimitEnabled, serverConfig.RateLimitRPS)
-	fmt.Printf("CORS: %v\n", serverConfig.CORSEnabled)
-	fmt.Printf("Log Level: %s\n", *logLevel)
-	fmt.Println("=================================")
+
+	startupInfo := map[string]interface{}{
+		"server_url":       fmt.Sprintf("%s://%s:%d", protocol, serverConfig.Host, serverConfig.Port),
+		"api_prefix":       serverConfig.APIPrefix,
+		"health_check":     fmt.Sprintf("%s://%s:%d%s", protocol, serverConfig.Host, serverConfig.Port, serverConfig.HealthCheckPath),
+		"tls_enabled":      serverConfig.TLSEnabled,
+		"authentication":   serverConfig.AuthEnabled,
+		"rate_limiting":    serverConfig.RateLimitEnabled,
+		"rate_limit_rps":   serverConfig.RateLimitRPS,
+		"cors_enabled":     serverConfig.CORSEnabled,
+		"log_level":        serverConfig.LogLevel,
+		"log_format":       serverConfig.LogFormat,
+		"shutdown_timeout": serverConfig.ShutdownTimeout.String(),
+	}
+
+	if serverConfig.MetricsEnabled {
+		startupInfo["metrics"] = fmt.Sprintf("%s://%s:%d%s", protocol, serverConfig.Host, serverConfig.Port, serverConfig.MetricsPath)
+	}
+
+	if serverConfig.TLSEnabled {
+		startupInfo["tls_cert_file"] = serverConfig.TLSCertFile
+		startupInfo["tls_key_file"] = serverConfig.TLSKeyFile
+	}
+
+	appLogger.WithFields(startupInfo).Info("eAIIngest Server Configuration")
 
 	// Start server
-	fmt.Println("Starting server...")
+	appLogger.Info("Starting eAIIngest server")
 	if err := srv.Start(context.Background()); err != nil {
-		log.Fatalf("Server failed: %v", err)
+		appLogger.Fatal("Server failed: %v", err)
 	}
 }
 
-// TODO: Add configuration file support
-// TODO: Add TLS/HTTPS support
-// TODO: Add structured logging
-// TODO: Add metrics collection
-// TODO: Add graceful shutdown handling
-// TODO: Add health check dependencies
-// TODO: Add configuration validation
+// COMPLETED: Add configuration file support
+// COMPLETED: Add TLS/HTTPS support
+// COMPLETED: Add structured logging
+// COMPLETED: Add metrics collection
+// COMPLETED: Add graceful shutdown handling
+// COMPLETED: Add health check dependencies
+// COMPLETED: Add configuration validation

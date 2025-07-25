@@ -2,6 +2,7 @@ package chunking
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jscharber/eAIIngest/pkg/core"
@@ -50,8 +51,8 @@ func (c *FixedSizeChunker) Chunk(content string) ([]Chunk, error) {
 		ProcessedAt: time.Now(),
 		ProcessedBy: "fixed_size_chunker",
 		Context: map[string]string{
-			"chunk_size":   string(rune(c.chunkSize)),
-			"overlap_size": string(rune(c.overlapSize)),
+			"chunk_size":   fmt.Sprintf("%d", c.chunkSize),
+			"overlap_size": fmt.Sprintf("%d", c.overlapSize),
 		},
 	}
 	
@@ -107,8 +108,8 @@ func (c *SentenceChunker) Chunk(content string) ([]Chunk, error) {
 		ProcessedAt: time.Now(),
 		ProcessedBy: "sentence_chunker",
 		Context: map[string]string{
-			"chunk_size":         string(rune(c.maxChunkSize)),
-			"overlap_size":       string(rune(c.overlapSize)),
+			"chunk_size":         fmt.Sprintf("%d", c.maxChunkSize),
+			"overlap_size":       fmt.Sprintf("%d", c.overlapSize),
 			"split_on_sentences": "true",
 		},
 	}
@@ -165,8 +166,8 @@ func (c *SemanticChunker) Chunk(content string) ([]Chunk, error) {
 		ProcessedAt: time.Now(),
 		ProcessedBy: "semantic_chunker",
 		Context: map[string]string{
-			"max_chunk_size":        string(rune(c.maxChunkSize)),
-			"similarity_threshold":  string(rune(int(c.similarityThreshold * 100))),
+			"max_chunk_size":        fmt.Sprintf("%d", c.maxChunkSize),
+			"similarity_threshold":  fmt.Sprintf("%.2f", c.similarityThreshold),
 			"chunking_mode":         "semantic",
 		},
 	}

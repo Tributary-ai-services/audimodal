@@ -100,7 +100,7 @@ func (p *DLPProcessor) ProcessChunk(ctx context.Context, tenantID uuid.UUID, chu
 	
 	// Update chunk status to scanning
 	if p.config.UpdateChunkStatus {
-		p.updateChunkDLPStatus(ctx, tenantID, chunkID, models.DLPScanStatusScanning)
+		p.updateChunkDLPStatus(ctx, tenantID, chunkID, models.DLPScanStatusProcessing)
 	}
 	
 	// Prepare compliance rules
@@ -156,7 +156,7 @@ func (p *DLPProcessor) ProcessChunk(ctx context.Context, tenantID uuid.UUID, chu
 	if p.config.UpdateChunkStatus {
 		finalStatus := models.DLPScanStatusCompleted
 		if result.ScanResult.TotalMatches > 0 {
-			finalStatus = models.DLPScanStatusDetected
+			finalStatus = models.DLPScanStatusCompleted
 		}
 		p.updateChunkDLPStatus(ctx, tenantID, chunkID, finalStatus)
 	}
@@ -212,7 +212,7 @@ func (p *DLPProcessor) ProcessBatch(ctx context.Context, tenantID uuid.UUID, chu
 }
 
 // GetChunkDLPStatus returns the DLP scan status for a chunk
-func (p *DLPProcessor) GetChunkDLPStatus(ctx context.Context, tenantID uuid.UUID, chunkID uuid.UUID) (models.DLPScanStatus, error) {
+func (p *DLPProcessor) GetChunkDLPStatus(ctx context.Context, tenantID uuid.UUID, chunkID uuid.UUID) (string, error) {
 	chunk, err := p.getChunk(ctx, tenantID, chunkID)
 	if err != nil {
 		return models.DLPScanStatusPending, err
@@ -232,7 +232,7 @@ func (p *DLPProcessor) GetDLPSummary(ctx context.Context, tenantID uuid.UUID, fi
 	summary := &DLPSummary{
 		FileID:       fileID,
 		TotalChunks:  len(chunks),
-		ChunksByStatus: make(map[models.DLPScanStatus]int),
+		ChunksByStatus: make(map[string]int),
 		FindingsByType: make(map[types.PIIType]int),
 		FindingsByRisk: make(map[types.RiskLevel]int),
 	}
@@ -241,10 +241,10 @@ func (p *DLPProcessor) GetDLPSummary(ctx context.Context, tenantID uuid.UUID, fi
 	for _, chunk := range chunks {
 		summary.ChunksByStatus[chunk.DLPScanStatus]++
 		
-		if chunk.DLPScanStatus == models.DLPScanStatusDetected || chunk.DLPScanStatus == models.DLPScanStatusCompleted {
+		if chunk.DLPScanStatus == models.DLPScanStatusCompleted {
 			// Get DLP findings for this chunk (would need to store findings in database)
 			// For now, we'll use placeholder logic
-			summary.TotalFindings += chunk.DLPFindingCount
+			summary.TotalFindings += len(chunk.DLPViolations)
 		}
 	}
 	
@@ -283,7 +283,7 @@ func (p *DLPProcessor) getFileChunks(ctx context.Context, tenantID uuid.UUID, fi
 	return chunks, nil
 }
 
-func (p *DLPProcessor) updateChunkDLPStatus(ctx context.Context, tenantID uuid.UUID, chunkID uuid.UUID, status models.DLPScanStatus) error {
+func (p *DLPProcessor) updateChunkDLPStatus(ctx context.Context, tenantID uuid.UUID, chunkID uuid.UUID, status string) error {
 	tenantService := p.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(ctx, tenantID)
 	if err != nil {
@@ -294,7 +294,7 @@ func (p *DLPProcessor) updateChunkDLPStatus(ctx context.Context, tenantID uuid.U
 		"dlp_scan_status": status,
 	}
 	
-	if status == models.DLPScanStatusCompleted || status == models.DLPScanStatusDetected || status == models.DLPScanStatusFailed {
+	if status == models.DLPScanStatusCompleted || status == models.DLPScanStatusFailed {
 		now := time.Now()
 		updates["dlp_scanned_at"] = &now
 	}
@@ -401,7 +401,7 @@ type DLPSummary struct {
 	TotalChunks    int                                  `json:"total_chunks"`
 	TotalFindings  int                                  `json:"total_findings"`
 	AverageRisk    float64                              `json:"average_risk"`
-	ChunksByStatus map[models.DLPScanStatus]int         `json:"chunks_by_status"`
+	ChunksByStatus map[string]int         `json:"chunks_by_status"`
 	FindingsByType map[types.PIIType]int                `json:"findings_by_type"`
 	FindingsByRisk map[types.RiskLevel]int              `json:"findings_by_risk"`
 	IsCompliant    bool                                 `json:"is_compliant"`

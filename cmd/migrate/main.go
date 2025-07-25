@@ -18,7 +18,7 @@ func main() {
 		port     = flag.Int("port", 5432, "Database port")
 		username = flag.String("username", "postgres", "Database username")
 		password = flag.String("password", "", "Database password")
-		dbname   = flag.String("database", "eaiingest", "Database name")
+		dbname   = flag.String("database", "audimodal", "Database name")
 		sslmode  = flag.String("sslmode", "disable", "SSL mode")
 		command  = flag.String("command", "migrate", "Command to run: migrate, status, reset, up")
 		count    = flag.Int("count", 0, "Number of migrations to run (for 'up' command)")

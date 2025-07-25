@@ -104,17 +104,19 @@ func (sm *SessionManager) CreateSession(ctx context.Context, tenantID uuid.UUID,
 	dbSession := &models.ProcessingSession{
 		ID:                sessionID,
 		TenantID:          tenantID,
-		Status:            models.ProcessingSessionStatusPending,
-		Priority:          config.Priority,
-		MaxConcurrentJobs: config.MaxConcurrentFiles,
-		RetryAttempts:     config.RetryAttempts,
-		DLPScanEnabled:    config.DLPScanEnabled,
-		ComplianceRules:   config.ComplianceRules,
-		ProcessingOptions: config.ProcessingOptions,
+		Status:            models.SessionStatusPending,
+		MaxRetries:        config.RetryAttempts,
+		// Map config to ProcessingOptions structure
+		Options: models.ProcessingOptions{
+			DLPScanEnabled:     config.DLPScanEnabled,
+			ChunkingStrategy:   "fixed_size", // Default strategy
+			ParallelProcessing: true,         // Default to parallel
+			BatchSize:          100,          // Default batch size
+		},
 		Progress:          0.0,
-		FilesTotal:        0,
-		FilesProcessed:    0,
-		FilesFailed:       0,
+		TotalFiles:        0,
+		ProcessedFiles:    0,
+		FailedFiles:       0,
 	}
 
 	tenantService := sm.db.NewTenantService()
@@ -131,7 +133,7 @@ func (sm *SessionManager) CreateSession(ctx context.Context, tenantID uuid.UUID,
 	sessionCtx := &SessionContext{
 		SessionID:      sessionID,
 		TenantID:       tenantID,
-		Status:         models.ProcessingSessionStatusPending,
+		Status:         models.SessionStatusPending,
 		StartedAt:      time.Now(),
 		ProcessingJobs: make(map[uuid.UUID]*JobContext),
 		Config:         config,
@@ -189,7 +191,7 @@ func (sm *SessionManager) AddFilesToSession(ctx context.Context, sessionID uuid.
 
 	updates := map[string]interface{}{
 		"files_total": len(fileIDs),
-		"status":      models.ProcessingSessionStatusReady,
+		"status":      models.SessionStatusPending,
 	}
 
 	return tenantRepo.DB().Model(&dbSession).Updates(updates).Error
@@ -206,17 +208,17 @@ func (sm *SessionManager) StartSession(ctx context.Context, sessionID uuid.UUID)
 	}
 
 	sessionCtx.mutex.Lock()
-	if sessionCtx.Status != models.ProcessingSessionStatusPending && sessionCtx.Status != models.ProcessingSessionStatusReady {
+	if sessionCtx.Status != models.SessionStatusPending {
 		sessionCtx.mutex.Unlock()
 		return fmt.Errorf("session is not in a startable state: %s", sessionCtx.Status)
 	}
 
-	sessionCtx.Status = models.ProcessingSessionStatusRunning
+	sessionCtx.Status = models.SessionStatusRunning
 	sessionCtx.StartedAt = time.Now()
 	sessionCtx.mutex.Unlock()
 
 	// Update database status
-	if err := sm.updateSessionStatus(ctx, sessionID, models.ProcessingSessionStatusRunning); err != nil {
+	if err := sm.updateSessionStatus(ctx, sessionID, models.SessionStatusRunning); err != nil {
 		return fmt.Errorf("failed to update session status: %w", err)
 	}
 
@@ -274,7 +276,7 @@ func (sm *SessionManager) processFile(ctx context.Context, sessionCtx *SessionCo
 
 	// Get file information
 	var file models.File
-	if err := sm.db.GORM().Where("id = ?", jobCtx.FileID).First(&file).Error; err != nil {
+	if err := sm.db.DB().Where("id = ?", jobCtx.FileID).First(&file).Error; err != nil {
 		jobCtx.Status = "failed"
 		jobCtx.Error = fmt.Sprintf("failed to find file: %v", err)
 		sm.updateSessionProgress(sessionCtx)
@@ -381,13 +383,13 @@ func (sm *SessionManager) updateSessionProgress(sessionCtx *SessionContext) {
 // completeSession marks a session as completed
 func (sm *SessionManager) completeSession(ctx context.Context, sessionCtx *SessionContext) {
 	sessionCtx.mutex.Lock()
-	sessionCtx.Status = models.ProcessingSessionStatusCompleted
+	sessionCtx.Status = models.SessionStatusCompleted
 	now := time.Now()
 	sessionCtx.CompletedAt = &now
 	sessionCtx.mutex.Unlock()
 
 	// Update database
-	if err := sm.updateSessionStatus(ctx, sessionCtx.SessionID, models.ProcessingSessionStatusCompleted); err != nil {
+	if err := sm.updateSessionStatus(ctx, sessionCtx.SessionID, models.SessionStatusCompleted); err != nil {
 		// Log error in production
 	}
 
@@ -466,22 +468,22 @@ func (sm *SessionManager) StopSession(ctx context.Context, sessionID uuid.UUID) 
 	}
 
 	sessionCtx.mutex.Lock()
-	if sessionCtx.Status != models.ProcessingSessionStatusRunning {
+	if sessionCtx.Status != models.SessionStatusRunning {
 		sessionCtx.mutex.Unlock()
 		return fmt.Errorf("session is not running")
 	}
 
-	sessionCtx.Status = models.ProcessingSessionStatusStopped
+	sessionCtx.Status = models.SessionStatusCancelled
 	sessionCtx.mutex.Unlock()
 
-	return sm.updateSessionStatus(ctx, sessionID, models.ProcessingSessionStatusStopped)
+	return sm.updateSessionStatus(ctx, sessionID, models.SessionStatusCancelled)
 }
 
 // updateSessionStatus updates the session status in the database
 func (sm *SessionManager) updateSessionStatus(ctx context.Context, sessionID uuid.UUID, status string) error {
 	// Get session to find tenant
 	var dbSession models.ProcessingSession
-	if err := sm.db.GORM().Where("id = ?", sessionID).First(&dbSession).Error; err != nil {
+	if err := sm.db.DB().Where("id = ?", sessionID).First(&dbSession).Error; err != nil {
 		return fmt.Errorf("failed to find session: %w", err)
 	}
 
@@ -495,7 +497,7 @@ func (sm *SessionManager) updateSessionStatus(ctx context.Context, sessionID uui
 		"status": status,
 	}
 
-	if status == models.ProcessingSessionStatusCompleted || status == models.ProcessingSessionStatusStopped {
+	if status == models.SessionStatusCompleted || status == models.SessionStatusCancelled {
 		now := time.Now()
 		updates["completed_at"] = &now
 	}

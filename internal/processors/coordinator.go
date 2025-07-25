@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -108,7 +109,7 @@ func GetDefaultCoordinatorConfig() *CoordinatorConfig {
 func (c *Coordinator) ProcessSingleFile(ctx context.Context, tenantID uuid.UUID, fileID uuid.UUID, options map[string]any) (*ProcessingResult, error) {
 	// Get file information
 	var file models.File
-	if err := c.db.GORM().Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
+	if err := c.db.DB().Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
@@ -266,7 +267,7 @@ func (c *Coordinator) GetProcessingMetrics() *PipelineMetrics {
 // ValidateFileForProcessing checks if a file is ready for processing
 func (c *Coordinator) ValidateFileForProcessing(ctx context.Context, tenantID uuid.UUID, fileID uuid.UUID) error {
 	var file models.File
-	if err := c.db.GORM().Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
+	if err := c.db.DB().Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
 		return fmt.Errorf("file not found: %w", err)
 	}
 
@@ -293,7 +294,7 @@ func (c *Coordinator) ValidateFileForProcessing(ctx context.Context, tenantID uu
 // RecommendProcessingOptions returns recommended processing options for a file
 func (c *Coordinator) RecommendProcessingOptions(ctx context.Context, tenantID uuid.UUID, fileID uuid.UUID) (map[string]any, error) {
 	var file models.File
-	if err := c.db.GORM().Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
+	if err := c.db.DB().Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
 
@@ -410,7 +411,8 @@ func (c *Coordinator) startBackgroundJobs() {
 // performHealthCheck performs system health checks
 func (c *Coordinator) performHealthCheck() {
 	// Check database connectivity
-	if err := c.db.Health(); err != nil {
+	ctx := context.Background()
+	if err := c.db.HealthCheck(ctx); err != nil {
 		// Log error in production
 		return
 	}

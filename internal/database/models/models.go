@@ -1,4 +1,4 @@
-// Package models contains all database models for the eAIIngest platform.
+// Package models contains all database models for the Audimodal.ai platform.
 // These models represent the core entities in the system and provide
 // a foundation for multi-tenant document processing with compliance features.
 package models
