@@ -1,0 +1,276 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tenants.audimodal.ai
+  labels:
+    app: audimodal
+    component: crd
+spec:
+  group: audimodal.ai
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+            - name
+            - plan
+            properties:
+              name:
+                type: string
+                description: "Human-readable tenant name"
+                minLength: 1
+                maxLength: 100
+              slug:
+                type: string
+                description: "URL-safe tenant identifier"
+                pattern: "^[a-z0-9-]+$"
+                minLength: 1
+                maxLength: 50
+              plan:
+                type: string
+                description: "Subscription plan"
+                enum: ["free", "pro", "enterprise"]
+              status:
+                type: string
+                description: "Tenant status"
+                enum: ["active", "suspended", "pending", "deleted"]
+                default: "pending"
+              settings:
+                type: object
+                properties:
+                  maxStorageGB:
+                    type: integer
+                    description: "Maximum storage in GB"
+                    minimum: 1
+                    maximum: 10000
+                  maxUsers:
+                    type: integer
+                    description: "Maximum number of users"
+                    minimum: 1
+                    maximum: 1000
+                  maxDataSources:
+                    type: integer
+                    description: "Maximum number of data sources"
+                    minimum: 1
+                    maximum: 100
+                  retentionDays:
+                    type: integer
+                    description: "Data retention period in days"
+                    minimum: 30
+                    maximum: 2555
+                    default: 365
+                  enableDLP:
+                    type: boolean
+                    description: "Enable Data Loss Prevention"
+                    default: false
+                  enableAdvancedAnalytics:
+                    type: boolean
+                    description: "Enable advanced analytics features"
+                    default: false
+                  allowedRegions:
+                    type: array
+                    description: "Allowed regions for data processing"
+                    items:
+                      type: string
+                    default: ["us-east-1"]
+              resources:
+                type: object
+                description: "Kubernetes resource requirements"
+                properties:
+                  cpu:
+                    type: string
+                    description: "CPU limit (e.g., '2', '500m')"
+                    default: "1"
+                  memory:
+                    type: string
+                    description: "Memory limit (e.g., '2Gi', '512Mi')"
+                    default: "1Gi"
+                  storage:
+                    type: string
+                    description: "Storage limit (e.g., '10Gi', '1Ti')"
+                    default: "10Gi"
+                  gpuCount:
+                    type: integer
+                    description: "Number of GPUs (for ML processing)"
+                    minimum: 0
+                    maximum: 8
+                    default: 0
+              security:
+                type: object
+                properties:
+                  isolationLevel:
+                    type: string
+                    description: "Tenant isolation level"
+                    enum: ["namespace", "cluster", "node"]
+                    default: "namespace"
+                  encryptionAtRest:
+                    type: boolean
+                    description: "Enable encryption at rest"
+                    default: true
+                  encryptionInTransit:
+                    type: boolean
+                    description: "Enable encryption in transit"
+                    default: true
+                  networkPolicies:
+                    type: boolean
+                    description: "Enable network policies"
+                    default: true
+                  allowedIPs:
+                    type: array
+                    description: "Allowed IP ranges for access"
+                    items:
+                      type: string
+              billing:
+                type: object
+                properties:
+                  billingContact:
+                    type: string
+                    description: "Billing contact email"
+                    format: email
+                  costCenter:
+                    type: string
+                    description: "Cost center or department"
+                  paymentMethod:
+                    type: string
+                    description: "Payment method identifier"
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: "Current phase of tenant lifecycle"
+                enum: ["Pending", "Provisioning", "Active", "Suspended", "Terminating", "Failed"]
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: ["Ready", "Provisioned", "NetworkConfigured", "StorageConfigured", "DLPEnabled", "SecurityConfigured"]
+                    status:
+                      type: string
+                      enum: ["True", "False", "Unknown"]
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+              resources:
+                type: object
+                properties:
+                  namespace:
+                    type: string
+                    description: "Kubernetes namespace for this tenant"
+                  serviceAccount:
+                    type: string
+                    description: "Service account for tenant workloads"
+                  configMaps:
+                    type: array
+                    items:
+                      type: string
+                  secrets:
+                    type: array
+                    items:
+                      type: string
+                  persistentVolumeClaims:
+                    type: array
+                    items:
+                      type: string
+              usage:
+                type: object
+                properties:
+                  storageUsedGB:
+                    type: number
+                    format: float
+                    description: "Current storage usage in GB"
+                  documentsProcessed:
+                    type: integer
+                    description: "Total documents processed"
+                  apiCallsToday:
+                    type: integer
+                    description: "API calls made today"
+                  embeddingsGenerated:
+                    type: integer
+                    description: "Total embeddings generated"
+                  lastActivity:
+                    type: string
+                    format: date-time
+                    description: "Last tenant activity timestamp"
+              observedGeneration:
+                type: integer
+                description: "Generation of the spec that was last processed"
+    additionalPrinterColumns:
+    - name: Plan
+      type: string
+      description: Subscription plan
+      jsonPath: .spec.plan
+    - name: Status
+      type: string
+      description: Tenant status
+      jsonPath: .spec.status
+    - name: Phase
+      type: string
+      description: Current phase
+      jsonPath: .status.phase
+    - name: Storage Used
+      type: string
+      description: Storage usage
+      jsonPath: .status.usage.storageUsedGB
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    subresources:
+      status: {}
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
+  scope: Namespaced
+  names:
+    plural: tenants
+    singular: tenant
+    kind: Tenant
+    shortNames:
+    - tn
+    categories:
+    - audimodal
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: audimodal-system
+  labels:
+    app: audimodal
+    component: system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-tenant-manager
+  labels:
+    app: audimodal
+    component: rbac
+rules:
+- apiGroups: ["audimodal.ai"]
+  resources: ["tenants"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["namespaces", "serviceaccounts", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

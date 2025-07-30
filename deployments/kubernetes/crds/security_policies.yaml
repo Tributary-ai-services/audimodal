@@ -1,0 +1,349 @@
+---
+# NetworkPolicy for operator isolation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audimodal-operator-network-policy
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: security
+spec:
+  podSelector:
+    matchLabels:
+      app: audimodal
+      component: operator
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow webhook traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 9443
+  # Allow metrics scraping
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow Kubernetes API
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow external APIs (OpenAI, DeepLake, etc.)
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# NetworkPolicy template for tenant isolation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: audimodal-tenant-isolation-template
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: security
+    audimodal.ai/template: "true"
+  annotations:
+    audimodal.ai/description: "Template for tenant namespace isolation"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic from same namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          audimodal.ai/tenant: "{{ .TenantName }}"
+  # Allow traffic from operator
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: audimodal-system
+      podSelector:
+        matchLabels:
+          app: audimodal
+          component: operator
+  # Allow ingress controller traffic
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  egress:
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+  # Allow traffic to same namespace
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          audimodal.ai/tenant: "{{ .TenantName }}"
+  # Allow traffic to operator
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: audimodal-system
+  # Allow external APIs based on tenant configuration
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Secret for webhook TLS certificates
+apiVersion: v1
+kind: Secret
+metadata:
+  name: audimodal-webhook-certs
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: security
+type: kubernetes.io/tls
+data:
+  # These would be populated by cert-manager or manual certificate creation
+  tls.crt: ""
+  tls.key: ""
+
+---
+# ValidatingAdmissionWebhook for Tenant validation
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: audimodal-tenant-validator
+  labels:
+    app: audimodal
+    component: security
+webhooks:
+- name: validate.tenant.audimodal.ai
+  clientConfig:
+    service:
+      name: audimodal-operator-webhook
+      namespace: audimodal-system
+      path: "/validate-audimodal-ai-v1-tenant"
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["audimodal.ai"]
+    apiVersions: ["v1"]
+    resources: ["tenants"]
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+# ValidatingAdmissionWebhook for DataSource validation
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: audimodal-datasource-validator
+  labels:
+    app: audimodal
+    component: security
+webhooks:
+- name: validate.datasource.audimodal.ai
+  clientConfig:
+    service:
+      name: audimodal-operator-webhook
+      namespace: audimodal-system
+      path: "/validate-audimodal-ai-v1-datasource"
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["audimodal.ai"]
+    apiVersions: ["v1"]
+    resources: ["datasources"]
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+# MutatingAdmissionWebhook for resource defaulting
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionWebhook
+metadata:
+  name: audimodal-resource-defaulter
+  labels:
+    app: audimodal
+    component: security
+webhooks:
+- name: default.tenant.audimodal.ai
+  clientConfig:
+    service:
+      name: audimodal-operator-webhook
+      namespace: audimodal-system
+      path: "/mutate-audimodal-ai-v1-tenant"
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: ["audimodal.ai"]
+    apiVersions: ["v1"]
+    resources: ["tenants"]
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+
+---
+# ConfigMap for security policies and settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: audimodal-security-config
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: security
+data:
+  # Security policy enforcement levels
+  enforcement-level: "strict"
+  
+  # Allowed container registries
+  allowed-registries: |
+    - docker.io/audimodal/*
+    - ghcr.io/audimodal/*
+    - gcr.io/audimodal/*
+    - registry.k8s.io/*
+  
+  # Resource limits and requests
+  default-cpu-limit: "1"
+  default-memory-limit: "1Gi"
+  default-storage-limit: "10Gi"
+  
+  # Network security
+  enable-network-policies: "true"
+  enable-tls-only: "true"
+  
+  # RBAC settings
+  enable-rbac-enforcement: "true"
+  require-service-accounts: "true"
+  
+  # DLP and compliance
+  default-dlp-enabled: "false"
+  compliance-frameworks: |
+    - gdpr
+    - hipaa
+    - pci-dss
+    - sox
+  
+  # Audit settings
+  audit-level: "Metadata"
+  audit-retention-days: "90"
+  
+  # Encryption settings
+  encryption-at-rest-required: "true"
+  encryption-in-transit-required: "true"
+
+---
+# Secret for default encryption keys
+apiVersion: v1
+kind: Secret
+metadata:
+  name: audimodal-encryption-keys
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: security
+type: Opaque
+data:
+  # Base64 encoded encryption keys
+  # These would be managed by external secret management in production
+  data-encryption-key: ""
+  backup-encryption-key: ""
+
+---
+# ServiceMonitor for security monitoring (if Prometheus Operator is available)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: audimodal-security-metrics
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: security
+spec:
+  selector:
+    matchLabels:
+      app: audimodal
+      component: operator
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    tlsConfig:
+      insecureSkipVerify: true
+
+---
+# PrometheusRule for security alerting (if Prometheus Operator is available)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: audimodal-security-alerts
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: security
+spec:
+  groups:
+  - name: audimodal.security
+    rules:
+    - alert: AudiModalUnauthorizedAccess
+      expr: increase(audimodal_unauthorized_requests_total[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "High number of unauthorized requests to AudiModal API"
+        description: "{{ $value }} unauthorized requests in the last 5 minutes"
+    
+    - alert: AudiModalTenantQuotaExceeded
+      expr: audimodal_tenant_storage_usage_ratio > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "Tenant storage quota nearly exceeded"
+        description: "Tenant {{ $labels.tenant }} is using {{ $value | humanizePercentage }} of allocated storage"
+    
+    - alert: AudiModalDLPViolation
+      expr: increase(audimodal_dlp_violations_total[1m]) > 0
+      for: 0m
+      labels:
+        severity: critical
+        component: security
+      annotations:
+        summary: "DLP violation detected"
+        description: "{{ $value }} DLP violations detected for tenant {{ $labels.tenant }}"
+    
+    - alert: AudiModalOperatorDown
+      expr: up{job="audimodal-operator"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: operator
+      annotations:
+        summary: "AudiModal operator is down"
+        description: "The AudiModal operator has been down for more than 1 minute"

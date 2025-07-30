@@ -1,0 +1,441 @@
+# Example compression policies for different use cases
+
+# Policy 1: Text documents - high compression for storage efficiency
+text_documents_policy:
+  name: "Text Documents Compression"
+  description: "High compression for text files to maximize storage efficiency"
+  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+  enabled: true
+  priority: 100
+  
+  rules:
+    - name: "Large text files"
+      priority: 1
+      enabled: true
+      conditions:
+        - type: "file_extension"
+          operator: "in"
+          value: [".txt", ".md", ".log", ".json", ".xml", ".csv"]
+        - type: "file_size"
+          operator: "gt"
+          value: 10240  # 10KB
+      action:
+        strategy: "text"
+        compression_level: 9
+        store_original: false
+        cache_result: true
+        cache_ttl: "24h"
+        async_compression: true
+        
+    - name: "Small text files"
+      priority: 2
+      enabled: true
+      conditions:
+        - type: "file_extension"
+          operator: "in"
+          value: [".txt", ".md", ".log", ".json", ".xml", ".csv"]
+        - type: "file_size"
+          operator: "le"
+          value: 10240  # 10KB
+      action:
+        strategy: "adaptive"
+        compression_level: 6
+        store_original: false
+        cache_result: false
+        async_compression: false
+  
+  default_rule:
+    action:
+      strategy: "none"
+      compression_level: 0
+      store_original: true
+      cache_result: false
+
+  settings:
+    enable_metrics: true
+    enable_audit_log: true
+    max_concurrency: 4
+    default_cache_ttl: "1h"
+    error_handling: "skip"
+
+---
+
+# Policy 2: Binary documents - moderate compression
+binary_documents_policy:
+  name: "Binary Documents Compression"
+  description: "Moderate compression for binary files balancing space and speed"
+  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+  enabled: true
+  priority: 90
+  
+  rules:
+    - name: "Office documents"
+      priority: 1
+      enabled: true
+      conditions:
+        - type: "file_extension"
+          operator: "in"
+          value: [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"]
+        - type: "file_size"
+          operator: "gt"
+          value: 1048576  # 1MB
+      action:
+        strategy: "binary"
+        compression_level: 6
+        store_original: false
+        cache_result: true
+        cache_ttl: "12h"
+        async_compression: true
+        
+    - name: "Image files"
+      priority: 2
+      enabled: true
+      conditions:
+        - type: "file_extension"
+          operator: "in"
+          value: [".tiff", ".bmp", ".svg"]
+        - type: "file_size"
+          operator: "gt"
+          value: 524288  # 512KB
+      action:
+        strategy: "adaptive"
+        compression_level: 4
+        store_original: true  # Keep originals for images
+        cache_result: false
+        async_compression: true
+  
+  default_rule:
+    action:
+      strategy: "none"
+      compression_level: 0
+      store_original: true
+      cache_result: false
+
+---
+
+# Policy 3: Archive-aware policy - skip already compressed files
+archive_aware_policy:
+  name: "Archive-Aware Compression"
+  description: "Skip compression for already compressed files and archives"
+  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+  enabled: true
+  priority: 110  # Higher priority to run first
+  
+  rules:
+    - name: "Skip archives"
+      priority: 1
+      enabled: true
+      conditions:
+        - type: "file_extension"
+          operator: "in"
+          value: [".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz"]
+      action:
+        strategy: "none"
+        compression_level: 0
+        store_original: true
+        cache_result: false
+        
+    - name: "Skip compressed images"
+      priority: 2
+      enabled: true
+      conditions:
+        - type: "file_extension"
+          operator: "in"
+          value: [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+      action:
+        strategy: "none"
+        compression_level: 0
+        store_original: true
+        cache_result: true
+        cache_ttl: "6h"
+        
+    - name: "Skip compressed videos"
+      priority: 3
+      enabled: true
+      conditions:
+        - type: "file_extension"
+          operator: "in"
+          value: [".mp4", ".avi", ".mov", ".wmv", ".flv"]
+      action:
+        strategy: "none"
+        compression_level: 0
+        store_original: true
+        cache_result: false
+
+---
+
+# Policy 4: Size-based policy - aggressive compression for large files
+size_based_policy:
+  name: "Size-Based Compression"
+  description: "Aggressive compression for large files to save storage costs"
+  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+  enabled: true
+  priority: 80
+  
+  rules:
+    - name: "Very large files"
+      priority: 1
+      enabled: true
+      conditions:
+        - type: "file_size"
+          operator: "gt"
+          value: 104857600  # 100MB
+      action:
+        strategy: "aggressive"
+        compression_level: 9
+        store_original: false
+        cache_result: false  # Don't cache very large files
+        async_compression: true
+        batch_size: 1
+        
+    - name: "Large files"
+      priority: 2
+      enabled: true
+      conditions:
+        - type: "file_size"
+          operator: "gt"
+          value: 10485760  # 10MB
+        - type: "file_size"
+          operator: "le"
+          value: 104857600  # 100MB
+      action:
+        strategy: "adaptive"
+        compression_level: 7
+        store_original: false
+        cache_result: true
+        cache_ttl: "2h"
+        async_compression: true
+        
+    - name: "Medium files"
+      priority: 3
+      enabled: true
+      conditions:
+        - type: "file_size"
+          operator: "gt"
+          value: 1048576  # 1MB
+        - type: "file_size"
+          operator: "le"
+          value: 10485760  # 10MB
+      action:
+        strategy: "adaptive"
+        compression_level: 6
+        store_original: false
+        cache_result: true
+        cache_ttl: "4h"
+        async_compression: false
+
+  default_rule:
+    action:
+      strategy: "none"
+      compression_level: 0
+      store_original: true
+      cache_result: true
+      cache_ttl: "8h"
+
+---
+
+# Policy 5: Age-based policy - compress old files more aggressively
+age_based_policy:
+  name: "Age-Based Compression"
+  description: "More aggressive compression for older files"
+  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+  enabled: true
+  priority: 70
+  
+  rules:
+    - name: "Very old files"
+      priority: 1
+      enabled: true
+      conditions:
+        - type: "age"
+          operator: "gt"
+          value: "2160h"  # 90 days
+        - type: "file_size"
+          operator: "gt"
+          value: 1024  # 1KB
+      action:
+        strategy: "aggressive"
+        compression_level: 9
+        store_original: false
+        cache_result: false
+        async_compression: true
+        
+    - name: "Old files"
+      priority: 2
+      enabled: true
+      conditions:
+        - type: "age"
+          operator: "gt"
+          value: "720h"  # 30 days
+        - type: "age"
+          operator: "le"
+          value: "2160h"  # 90 days
+        - type: "file_size"
+          operator: "gt"
+          value: 1024  # 1KB
+      action:
+        strategy: "adaptive"
+        compression_level: 7
+        store_original: false
+        cache_result: true
+        cache_ttl: "1h"
+        async_compression: true
+        
+    - name: "Recent files"
+      priority: 3
+      enabled: true
+      conditions:
+        - type: "age"
+          operator: "le"
+          value: "720h"  # 30 days
+        - type: "file_size"
+          operator: "gt"
+          value: 10240  # 10KB
+      action:
+        strategy: "adaptive"
+        compression_level: 6
+        store_original: false
+        cache_result: true
+        cache_ttl: "6h"
+        async_compression: false
+
+---
+
+# Policy 6: Path-based policy - different compression for different directories
+path_based_policy:
+  name: "Path-Based Compression"
+  description: "Different compression strategies based on file location"
+  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+  enabled: true
+  priority: 85
+  
+  rules:
+    - name: "Archive directory"
+      priority: 1
+      enabled: true
+      conditions:
+        - type: "path"
+          operator: "contains"
+          value: "/archive/"
+      action:
+        strategy: "aggressive"
+        compression_level: 9
+        store_original: false
+        cache_result: false
+        async_compression: true
+        
+    - name: "Working directory"
+      priority: 2
+      enabled: true
+      conditions:
+        - type: "path"
+          operator: "contains"
+          value: "/working/"
+      action:
+        strategy: "adaptive"
+        compression_level: 4
+        store_original: true
+        cache_result: true
+        cache_ttl: "2h"
+        async_compression: false
+        
+    - name: "Backup directory"
+      priority: 3
+      enabled: true
+      conditions:
+        - type: "path"
+          operator: "contains"
+          value: "/backup/"
+      action:
+        strategy: "aggressive"
+        compression_level: 8
+        store_original: false
+        cache_result: false
+        async_compression: true
+        
+    - name: "Temp directory"
+      priority: 4
+      enabled: true
+      conditions:
+        - type: "path"
+          operator: "contains"
+          value: "/temp/"
+      action:
+        strategy: "text"
+        compression_level: 6
+        store_original: false
+        cache_result: false
+        async_compression: false
+
+---
+
+# Policy 7: Metadata-based policy - compression based on custom metadata
+metadata_based_policy:
+  name: "Metadata-Based Compression"
+  description: "Compression based on file metadata and classification"
+  tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+  enabled: true
+  priority: 95
+  
+  rules:
+    - name: "Confidential documents"
+      priority: 1
+      enabled: true
+      conditions:
+        - type: "metadata"
+          field: "classification"
+          operator: "eq"
+          value: "confidential"
+      action:
+        strategy: "aggressive"
+        compression_level: 9
+        store_original: false
+        cache_result: false  # Don't cache confidential data
+        async_compression: true
+        
+    - name: "Public documents"
+      priority: 2
+      enabled: true
+      conditions:
+        - type: "metadata"
+          field: "classification"
+          operator: "eq"
+          value: "public"
+      action:
+        strategy: "adaptive"
+        compression_level: 6
+        store_original: false
+        cache_result: true
+        cache_ttl: "12h"
+        async_compression: false
+        
+    - name: "Frequently accessed"
+      priority: 3
+      enabled: true
+      conditions:
+        - type: "metadata"
+          field: "access_frequency"
+          operator: "eq"
+          value: "high"
+      action:
+        strategy: "adaptive"
+        compression_level: 4
+        store_original: true
+        cache_result: true
+        cache_ttl: "24h"
+        async_compression: false
+        
+    - name: "Rarely accessed"
+      priority: 4
+      enabled: true
+      conditions:
+        - type: "metadata"
+          field: "access_frequency"
+          operator: "eq"
+          value: "low"
+      action:
+        strategy: "aggressive"
+        compression_level: 9
+        store_original: false
+        cache_result: false
+        async_compression: true

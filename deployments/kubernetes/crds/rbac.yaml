@@ -1,0 +1,276 @@
+---
+# ServiceAccount for the AudiModal operator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: audimodal-operator
+  namespace: audimodal-system
+  labels:
+    app: audimodal
+    component: operator
+---
+# ClusterRole for the AudiModal operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-operator
+  labels:
+    app: audimodal
+    component: operator
+rules:
+# AudiModal CRDs
+- apiGroups: ["audimodal.ai"]
+  resources: ["tenants", "datasources", "dlppolicies", "processingsessions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["audimodal.ai"]
+  resources: ["tenants/status", "datasources/status", "dlppolicies/status", "processingsessions/status"]
+  verbs: ["get", "update", "patch"]
+- apiGroups: ["audimodal.ai"]
+  resources: ["tenants/finalizers", "datasources/finalizers", "dlppolicies/finalizers", "processingsessions/finalizers"]
+  verbs: ["update"]
+
+# Core Kubernetes resources
+- apiGroups: [""]
+  resources: ["namespaces", "serviceaccounts", "configmaps", "secrets", "persistentvolumeclaims", "pods", "services"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+# Apps resources
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Batch resources
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# RBAC resources
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Networking resources
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Storage resources
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses", "volumeattachments"]
+  verbs: ["get", "list", "watch"]
+
+# Metrics and monitoring
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+
+# Admission controllers
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Custom Resource Definitions
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+
+---
+# ClusterRoleBinding for the AudiModal operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: audimodal-operator
+  labels:
+    app: audimodal
+    component: operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: audimodal-operator
+subjects:
+- kind: ServiceAccount
+  name: audimodal-operator
+  namespace: audimodal-system
+
+---
+# Role for tenant-specific operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-tenant-admin
+  labels:
+    app: audimodal
+    component: rbac
+    rbac.audimodal.ai/aggregate-to-tenant-admin: "true"
+rules:
+# AudiModal resources within tenant namespace
+- apiGroups: ["audimodal.ai"]
+  resources: ["datasources", "dlppolicies", "processingsessions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["audimodal.ai"]
+  resources: ["datasources/status", "dlppolicies/status", "processingsessions/status"]
+  verbs: ["get", "update", "patch"]
+
+# Core resources within tenant namespace
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+
+# Apps resources within tenant namespace
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Batch resources within tenant namespace
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# Role for tenant users (read-only access)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-tenant-user
+  labels:
+    app: audimodal
+    component: rbac
+    rbac.audimodal.ai/aggregate-to-tenant-user: "true"
+rules:
+# Read-only access to AudiModal resources
+- apiGroups: ["audimodal.ai"]
+  resources: ["datasources", "dlppolicies", "processingsessions"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["audimodal.ai"]
+  resources: ["datasources/status", "dlppolicies/status", "processingsessions/status"]
+  verbs: ["get"]
+
+# Read-only access to core resources
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "persistentvolumeclaims", "pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+
+# Read-only access to apps resources
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+
+# Read-only access to batch resources
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Role for viewing AudiModal resources across all namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-viewer
+  labels:
+    app: audimodal
+    component: rbac
+rules:
+# Read-only access to all AudiModal resources
+- apiGroups: ["audimodal.ai"]
+  resources: ["tenants", "datasources", "dlppolicies", "processingsessions"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["audimodal.ai"]
+  resources: ["tenants/status", "datasources/status", "dlppolicies/status", "processingsessions/status"]
+  verbs: ["get"]
+
+---
+# Role for managing AudiModal platform (admin)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-admin
+  labels:
+    app: audimodal
+    component: rbac
+rules:
+# Full access to all AudiModal resources
+- apiGroups: ["audimodal.ai"]
+  resources: ["*"]
+  verbs: ["*"]
+
+# Namespace management
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# RBAC management for tenants
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# PodSecurityPolicy for AudiModal workloads (if PSPs are enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: audimodal-workloads
+  labels:
+    app: audimodal
+    component: security
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: false
+
+---
+# ClusterRole to use the PodSecurityPolicy
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-psp-user
+  labels:
+    app: audimodal
+    component: security
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - audimodal-workloads
+
+---
+# Bind the PSP to all AudiModal service accounts
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: audimodal-psp-binding
+  labels:
+    app: audimodal
+    component: security
+roleRef:
+  kind: ClusterRole
+  name: audimodal-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: audimodal-operator
+  namespace: audimodal-system
+- kind: ServiceAccount
+  name: audimodal-tenant
+  namespace: audimodal-system
