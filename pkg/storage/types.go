@@ -212,3 +212,187 @@ func NewStorageError(code, message string, provider CloudProvider, url string, c
 		Cause:    cause,
 	}
 }
+
+// Extended types for connectors
+
+// FileType represents different types of files
+type FileType string
+
+const (
+	FileTypeDocument     FileType = "document"
+	FileTypeSpreadsheet  FileType = "spreadsheet"
+	FileTypePresentation FileType = "presentation"
+	FileTypePDF          FileType = "pdf"
+	FileTypeImage        FileType = "image"
+	FileTypeVideo        FileType = "video"
+	FileTypeAudio        FileType = "audio"
+	FileTypeArchive      FileType = "archive"
+	FileTypeOther        FileType = "other"
+)
+
+// FilePermissions represents file access permissions
+type FilePermissions struct {
+	CanRead   bool `json:"can_read"`
+	CanWrite  bool `json:"can_write"`
+	CanDelete bool `json:"can_delete"`
+	CanShare  bool `json:"can_share"`
+}
+
+// ConnectorFileInfo represents extended file info for connectors
+type ConnectorFileInfo struct {
+	ID           string                 `json:"id"`
+	Name         string                 `json:"name"`
+	Path         string                 `json:"path"`
+	URL          string                 `json:"url"`
+	DownloadURL  string                 `json:"download_url,omitempty"`
+	Size         int64                  `json:"size"`
+	Type         FileType               `json:"type"`
+	MimeType     string                 `json:"mime_type"`
+	CreatedAt    time.Time              `json:"created_at"`
+	ModifiedAt   time.Time              `json:"modified_at"`
+	LastAccessed time.Time              `json:"last_accessed"`
+	IsFolder     bool                   `json:"is_folder"`
+	Permissions  FilePermissions        `json:"permissions"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	Tags         map[string]string      `json:"tags,omitempty"`
+	Source       string                 `json:"source"`
+	Checksum     string                 `json:"checksum,omitempty"`
+	ChecksumType string                 `json:"checksum_type,omitempty"`
+}
+
+// ConnectorListOptions for file listing (extended)
+type ConnectorListOptions struct {
+	Prefix          string    `json:"prefix,omitempty"`
+	MaxResults      int       `json:"max_results,omitempty"`
+	PageToken       string    `json:"page_token,omitempty"`
+	Recursive       bool      `json:"recursive,omitempty"`
+	IncludeMetadata bool      `json:"include_metadata,omitempty"`
+	ModifiedSince   time.Time `json:"modified_since,omitempty"`
+	MaxSize         int64     `json:"max_size,omitempty"`
+	FileTypes       []string  `json:"file_types,omitempty"`
+}
+
+// SyncOptions for synchronization
+type SyncOptions struct {
+	FullSync     bool      `json:"full_sync"`
+	Since        time.Time `json:"since"`
+	Paths        []string  `json:"paths,omitempty"`
+	DryRun       bool      `json:"dry_run"`
+	MaxFiles     int64     `json:"max_files,omitempty"`
+	MaxSize      int64     `json:"max_size,omitempty"`
+}
+
+// SyncResult contains synchronization results
+type SyncResult struct {
+	StartTime     time.Time                    `json:"start_time"`
+	EndTime       time.Time                    `json:"end_time"`
+	Duration      time.Duration                `json:"duration"`
+	SyncType      string                       `json:"sync_type"` // full, incremental
+	TotalFiles    int                          `json:"total_files"`
+	SyncedFiles   int                          `json:"synced_files"`
+	FailedFiles   int                          `json:"failed_files"`
+	Files         map[string]*SyncFileResult   `json:"files"`
+	Error         string                       `json:"error,omitempty"`
+}
+
+// SyncFileResult contains results for a single file sync
+type SyncFileResult struct {
+	Path           string        `json:"path"`
+	StartTime      time.Time     `json:"start_time"`
+	EndTime        time.Time     `json:"end_time"`
+	Duration       time.Duration `json:"duration"`
+	Status         string        `json:"status"` // completed, failed, skipped
+	ProcessedBytes int64         `json:"processed_bytes"`
+	Error          string        `json:"error,omitempty"`
+}
+
+// SyncState tracks synchronization state
+type SyncState struct {
+	IsRunning        bool          `json:"is_running"`
+	LastSyncStart    time.Time     `json:"last_sync_start"`
+	LastSyncEnd      time.Time     `json:"last_sync_end"`
+	LastSyncDuration time.Duration `json:"last_sync_duration"`
+	TotalFiles       int64         `json:"total_files"`
+	ChangedFiles     int64         `json:"changed_files"`
+	ErrorCount       int64         `json:"error_count"`
+	LastError        string        `json:"last_error,omitempty"`
+}
+
+// ConnectorMetrics tracks connector performance
+type ConnectorMetrics struct {
+	ConnectorType      string        `json:"connector_type"`
+	IsConnected        bool          `json:"is_connected"`
+	LastConnectionTime time.Time     `json:"last_connection_time"`
+	FilesListed        int64         `json:"files_listed"`
+	FilesRetrieved     int64         `json:"files_retrieved"`
+	FilesDownloaded    int64         `json:"files_downloaded"`
+	BytesDownloaded    int64         `json:"bytes_downloaded"`
+	SyncCount          int64         `json:"sync_count"`
+	LastSyncTime       time.Time     `json:"last_sync_time"`
+	LastSyncDuration   time.Duration `json:"last_sync_duration"`
+	ErrorCount         int64         `json:"error_count"`
+	LastError          string        `json:"last_error,omitempty"`
+}
+
+// StorageConnector interface for external storage systems
+type StorageConnector interface {
+	// Connect establishes connection to the storage system
+	Connect(ctx context.Context, credentials map[string]interface{}) error
+	
+	// Disconnect closes the connection
+	Disconnect(ctx context.Context) error
+	
+	// IsConnected returns connection status
+	IsConnected() bool
+	
+	// ListFiles lists files in the storage system
+	ListFiles(ctx context.Context, path string, options *ConnectorListOptions) ([]*ConnectorFileInfo, error)
+	
+	// GetFile retrieves file metadata
+	GetFile(ctx context.Context, fileID string) (*ConnectorFileInfo, error)
+	
+	// DownloadFile downloads file content
+	DownloadFile(ctx context.Context, fileID string) (io.ReadCloser, error)
+	
+	// SyncFiles performs synchronization
+	SyncFiles(ctx context.Context, options *SyncOptions) (*SyncResult, error)
+	
+	// GetSyncState returns current sync state
+	GetSyncState(ctx context.Context) (*SyncState, error)
+	
+	// GetMetrics returns connector metrics
+	GetMetrics(ctx context.Context) (*ConnectorMetrics, error)
+}
+
+// LocalStore interface for local storage operations
+type LocalStore interface {
+	// SaveFile saves file content to local storage
+	SaveFile(ctx context.Context, path string, reader io.Reader) error
+	
+	// LoadFile loads file content from local storage
+	LoadFile(ctx context.Context, path string) (io.ReadCloser, error)
+	
+	// DeleteFile deletes a file from local storage
+	DeleteFile(ctx context.Context, path string) error
+	
+	// MoveFile moves a file to a new location
+	MoveFile(ctx context.Context, oldPath, newPath string) error
+	
+	// GetFileInfo gets file metadata
+	GetFileInfo(ctx context.Context, path string) (*ConnectorFileInfo, error)
+	
+	// ListFiles lists files in a directory
+	ListFiles(ctx context.Context, path string, options *ConnectorListOptions) ([]*ConnectorFileInfo, error)
+}
+
+// ConnectorStorageManager interface for managing storage operations
+type ConnectorStorageManager interface {
+	// GetLocalStore returns the local storage interface
+	GetLocalStore() LocalStore
+	
+	// GetConnector returns a connector for the specified type
+	GetConnector(connectorType string) (StorageConnector, error)
+	
+	// RegisterConnector registers a new connector
+	RegisterConnector(connectorType string, connector StorageConnector) error
+}
