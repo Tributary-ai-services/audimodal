@@ -1,0 +1,4321 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AudiModal.ai API",
+    "description": "Comprehensive AI-powered document processing and analytics platform with ML/AI classification, anomaly detection, unified sync framework, and enterprise integrations.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "AudiModal.ai",
+      "url": "https://audimodal.ai",
+      "email": "support@audimodal.ai"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.audimodal.ai/v1",
+      "description": "Production server"
+    },
+    {
+      "url": "https://staging-api.audimodal.ai/v1",
+      "description": "Staging server"
+    },
+    {
+      "url": "http://localhost:8080/v1",
+      "description": "Development server"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    },
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "paths": {
+    "/tenants": {
+      "get": {
+        "tags": ["Tenants"],
+        "summary": "List tenants",
+        "description": "Retrieve a list of tenants with optional filtering and pagination",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of tenants to return",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of tenants to skip",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tenants": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Tenant"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Tenants"],
+        "summary": "Create tenant",
+        "description": "Create a new tenant",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tenant created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tenant"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tenants/{tenantId}": {
+      "get": {
+        "tags": ["Tenants"],
+        "summary": "Get tenant",
+        "description": "Retrieve a specific tenant by ID",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tenant"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tenant not found"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Tenants"],
+        "summary": "Update tenant",
+        "description": "Update an existing tenant",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTenantRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tenant updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tenant"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Tenants"],
+        "summary": "Delete tenant",
+        "description": "Delete a tenant and all associated data",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Tenant deleted successfully"
+          }
+        }
+      }
+    },
+    "/datasources": {
+      "get": {
+        "tags": ["Data Sources"],
+        "summary": "List data sources",
+        "description": "Retrieve a list of data sources for the authenticated tenant",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by data source type",
+            "schema": {
+              "type": "string",
+              "enum": ["file_upload", "sharepoint", "google_drive", "box", "dropbox", "onedrive", "confluence", "slack", "notion"]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by sync status",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "inactive", "error", "syncing"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datasources": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DataSource"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Data Sources"],
+        "summary": "Create data source",
+        "description": "Create a new data source connection",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDataSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Data source created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSource"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasources/{datasourceId}": {
+      "get": {
+        "tags": ["Data Sources"],
+        "summary": "Get data source",
+        "description": "Retrieve a specific data source by ID",
+        "parameters": [
+          {
+            "name": "datasourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSource"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Data Sources"],
+        "summary": "Update data source",
+        "description": "Update an existing data source",
+        "parameters": [
+          {
+            "name": "datasourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDataSourceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data source updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataSource"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Data Sources"],
+        "summary": "Delete data source",
+        "description": "Delete a data source and stop all syncing",
+        "parameters": [
+          {
+            "name": "datasourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Data source deleted successfully"
+          }
+        }
+      }
+    },
+    "/datasources/{datasourceId}/sync": {
+      "post": {
+        "tags": ["Data Sources"],
+        "summary": "Trigger sync",
+        "description": "Manually trigger a sync for a data source",
+        "parameters": [
+          {
+            "name": "datasourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "full_sync": {
+                    "type": "boolean",
+                    "description": "Whether to perform a full sync or incremental",
+                    "default": false
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": ["urgent", "high", "normal", "low"],
+                    "default": "normal"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Sync triggered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sync_job_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["queued", "running"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "List files",
+        "description": "Retrieve a list of files with optional filtering and search",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search query for file content and metadata",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "datasource_id",
+            "in": "query",
+            "description": "Filter by data source ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "file_type",
+            "in": "query",
+            "description": "Filter by file type",
+            "schema": {
+              "type": "string",
+              "enum": ["pdf", "docx", "xlsx", "pptx", "txt", "html", "json", "xml", "csv", "image", "email", "archive"]
+            }
+          },
+          {
+            "name": "processing_status",
+            "in": "query",
+            "description": "Filter by processing status",
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "processing", "completed", "failed", "skipped"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/File"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Files"],
+        "summary": "Upload file",
+        "description": "Upload a new file for processing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to upload"
+                  },
+                  "datasource_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID of the data source to associate with this file"
+                  },
+                  "metadata": {
+                    "type": "string",
+                    "description": "JSON string containing additional metadata"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Tags to associate with the file"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{fileId}": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Get file",
+        "description": "Retrieve a specific file by ID",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Files"],
+        "summary": "Delete file",
+        "description": "Delete a file and all associated data",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "File deleted successfully"
+          }
+        }
+      }
+    },
+    "/files/{fileId}/download": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Download file",
+        "description": "Download the original file content",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/files/{fileId}/reprocess": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Reprocess file",
+        "description": "Trigger reprocessing of a file",
+        "parameters": [
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Reprocessing triggered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "processing_session_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["queued", "processing"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "post": {
+        "tags": ["Search"],
+        "summary": "Search documents",
+        "description": "Perform semantic search across documents",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search/suggestions": {
+      "get": {
+        "tags": ["Search"],
+        "summary": "Get search suggestions",
+        "description": "Get search query suggestions based on partial input",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Partial search query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of suggestions",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search suggestions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string"
+                          },
+                          "score": {
+                            "type": "number"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": ["completion", "correction", "related"]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/training/jobs": {
+      "get": {
+        "tags": ["ML/AI - Training"],
+        "summary": "List training jobs",
+        "description": "Retrieve a list of model training jobs",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by job status",
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "running", "completed", "failed", "cancelled"]
+            }
+          },
+          {
+            "name": "model_type",
+            "in": "query",
+            "description": "Filter by model type",
+            "schema": {
+              "type": "string",
+              "enum": ["classification", "regression", "clustering", "embedding", "anomaly_detection"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Training jobs retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TrainingJob"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["ML/AI - Training"],
+        "summary": "Create training job",
+        "description": "Start a new model training job",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTrainingJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Training job created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["started"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/training/jobs/{jobId}": {
+      "get": {
+        "tags": ["ML/AI - Training"],
+        "summary": "Get training job",
+        "description": "Retrieve details of a specific training job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Training job details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingJob"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/training/jobs/{jobId}/cancel": {
+      "post": {
+        "tags": ["ML/AI - Training"],
+        "summary": "Cancel training job",
+        "description": "Cancel a running training job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Training job cancelled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["cancelled"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/training/datasets": {
+      "get": {
+        "tags": ["ML/AI - Training"],
+        "summary": "List datasets",
+        "description": "Retrieve a list of training datasets",
+        "parameters": [
+          {
+            "name": "dataset_type",
+            "in": "query",
+            "description": "Filter by dataset type",
+            "schema": {
+              "type": "string",
+              "enum": ["text", "image", "audio", "video", "tabular", "time_series", "graph", "multimodal"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Datasets retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datasets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Dataset"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["ML/AI - Training"],
+        "summary": "Create dataset",
+        "description": "Create a new training dataset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDatasetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Dataset created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dataset"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/registry/models": {
+      "get": {
+        "tags": ["ML/AI - Registry"],
+        "summary": "List models",
+        "description": "Retrieve a list of registered models",
+        "responses": {
+          "200": {
+            "description": "Models retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Model"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["ML/AI - Registry"],
+        "summary": "Register model",
+        "description": "Register a new model in the registry",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterModelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Model registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/predictions/predict": {
+      "post": {
+        "tags": ["ML/AI - Predictions"],
+        "summary": "Make prediction",
+        "description": "Make a prediction using a registered model",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prediction result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/predictions/forecast": {
+      "post": {
+        "tags": ["ML/AI - Predictions"],
+        "summary": "Make forecast",
+        "description": "Generate time series forecast",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForecastRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Forecast result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/predictions/lifecycle": {
+      "post": {
+        "tags": ["ML/AI - Predictions"],
+        "summary": "Predict document lifecycle",
+        "description": "Predict document lifecycle events (archival, deletion timing)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "document_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "horizon": {
+                    "type": "string",
+                    "description": "Prediction horizon (e.g., '30d', '90d', '1y')",
+                    "default": "30d"
+                  }
+                },
+                "required": ["document_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Lifecycle prediction result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecyclePredictionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/knowledge-graph/entities": {
+      "get": {
+        "tags": ["ML/AI - Knowledge Graph"],
+        "summary": "List entities",
+        "description": "Retrieve entities from the knowledge graph",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by entity type",
+            "schema": {
+              "type": "string",
+              "enum": ["document", "person", "organization", "location", "concept", "topic", "keyword"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entities retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/KnowledgeGraphEntity"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["ML/AI - Knowledge Graph"],
+        "summary": "Create entity",
+        "description": "Create a new entity in the knowledge graph",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEntityRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Entity created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeGraphEntity"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/search/semantic": {
+      "post": {
+        "tags": ["ML/AI - Search"],
+        "summary": "Semantic search",
+        "description": "Perform semantic search with AI-powered understanding",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SemanticSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Semantic search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SemanticSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/search/index": {
+      "post": {
+        "tags": ["ML/AI - Search"],
+        "summary": "Index document",
+        "description": "Add a document to the semantic search index",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexDocumentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Document indexed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "document_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["indexed"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/insights/generate": {
+      "post": {
+        "tags": ["ML/AI - Insights"],
+        "summary": "Generate insights",
+        "description": "Generate ML-powered insights for documents and usage patterns",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "time_range": {
+                    "$ref": "#/components/schemas/TimeRange"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Insights generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "insights": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocumentInsight"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/insights": {
+      "get": {
+        "tags": ["ML/AI - Insights"],
+        "summary": "List insights",
+        "description": "Retrieve generated insights with filtering options",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by insight type",
+            "schema": {
+              "type": "string",
+              "enum": ["content", "usage", "trend", "anomaly", "recommendation", "prediction", "quality", "security", "compliance", "performance"]
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by insight category",
+            "schema": {
+              "type": "string",
+              "enum": ["document_health", "user_engagement", "content_quality", "access_patterns", "storage_optimization", "security_risk", "compliance_gap", "performance_issue"]
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "description": "Filter by severity level",
+            "schema": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "critical"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Insights retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "insights": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocumentInsight"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ml/insights/reports": {
+      "get": {
+        "tags": ["ML/AI - Insights"],
+        "summary": "List reports",
+        "description": "Retrieve generated reports",
+        "parameters": [
+          {
+            "name": "report_type",
+            "in": "query",
+            "description": "Filter by report type",
+            "schema": {
+              "type": "string",
+              "enum": ["document_summary", "usage_analysis", "content_analysis", "trend_analysis", "security_audit", "compliance_report", "performance_report", "custom"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reports retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DocumentReport"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["ML/AI - Insights"],
+        "summary": "Generate report",
+        "description": "Generate a comprehensive analytics report",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/anomalies": {
+      "get": {
+        "tags": ["Anomaly Detection"],
+        "summary": "List anomalies",
+        "description": "Retrieve detected anomalies with filtering options",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Filter by anomaly type",
+            "schema": {
+              "type": "string",
+              "enum": ["statistical", "content", "behavioral", "security"]
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "description": "Filter by severity level",
+            "schema": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "critical"]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by anomaly status",
+            "schema": {
+              "type": "string",
+              "enum": ["new", "investigating", "resolved", "false_positive"]
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "description": "Filter anomalies after this time",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "description": "Filter anomalies before this time",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Anomalies retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "anomalies": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Anomaly"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/anomalies/{anomalyId}": {
+      "get": {
+        "tags": ["Anomaly Detection"],
+        "summary": "Get anomaly",
+        "description": "Retrieve details of a specific anomaly",
+        "parameters": [
+          {
+            "name": "anomalyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Anomaly details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Anomaly"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Anomaly Detection"],
+        "summary": "Update anomaly status",
+        "description": "Update the status or add notes to an anomaly",
+        "parameters": [
+          {
+            "name": "anomalyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["new", "investigating", "resolved", "false_positive"]
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "assigned_to": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Anomaly updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Anomaly"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/jobs": {
+      "get": {
+        "tags": ["Sync Management"],
+        "summary": "List sync jobs",
+        "description": "Retrieve sync jobs with filtering and pagination",
+        "parameters": [
+          {
+            "name": "datasource_id",
+            "in": "query",
+            "description": "Filter by data source ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by sync status",
+            "schema": {
+              "type": "string",
+              "enum": ["queued", "running", "completed", "failed", "cancelled"]
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "description": "Filter by priority level",
+            "schema": {
+              "type": "string",
+              "enum": ["urgent", "high", "normal", "low"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync jobs retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SyncJob"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Sync Management"],
+        "summary": "Create sync job",
+        "description": "Create a new sync job for a data source",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSyncJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sync job created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncJob"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/jobs/{jobId}": {
+      "get": {
+        "tags": ["Sync Management"],
+        "summary": "Get sync job",
+        "description": "Retrieve details of a specific sync job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync job details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncJob"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/jobs/{jobId}/cancel": {
+      "post": {
+        "tags": ["Sync Management"],
+        "summary": "Cancel sync job",
+        "description": "Cancel a running or queued sync job",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync job cancelled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["cancelled"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/conflicts": {
+      "get": {
+        "tags": ["Sync Management"],
+        "summary": "List sync conflicts",
+        "description": "Retrieve sync conflicts that need resolution",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by conflict status",
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "resolved", "ignored"]
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "description": "Filter by conflict severity",
+            "schema": {
+              "type": "string",
+              "enum": ["low", "medium", "high", "critical"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync conflicts retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conflicts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SyncConflict"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync/conflicts/{conflictId}/resolve": {
+      "post": {
+        "tags": ["Sync Management"],
+        "summary": "Resolve sync conflict",
+        "description": "Resolve a sync conflict with a specified resolution strategy",
+        "parameters": [
+          {
+            "name": "conflictId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "resolution_strategy": {
+                    "type": "string",
+                    "enum": ["last_write_wins", "preserve_both", "source_priority", "merge", "manual"]
+                  },
+                  "resolution_data": {
+                    "type": "object",
+                    "description": "Additional data for resolution (e.g., manual resolution content)"
+                  }
+                },
+                "required": ["resolution_strategy"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conflict resolved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncConflict"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "tags": ["Webhooks"],
+        "summary": "List webhooks",
+        "description": "Retrieve configured webhooks",
+        "responses": {
+          "200": {
+            "description": "Webhooks retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "webhooks": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Webhooks"],
+        "summary": "Create webhook",
+        "description": "Create a new webhook subscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/{webhookId}": {
+      "get": {
+        "tags": ["Webhooks"],
+        "summary": "Get webhook",
+        "description": "Retrieve a specific webhook",
+        "parameters": [
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Webhooks"],
+        "summary": "Update webhook",
+        "description": "Update an existing webhook",
+        "parameters": [
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Webhooks"],
+        "summary": "Delete webhook",
+        "description": "Delete a webhook subscription",
+        "parameters": [
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Webhook deleted successfully"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "description": "Check the health status of the API",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["healthy"]
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "services": {
+                      "type": "object",
+                      "properties": {
+                        "database": {
+                          "type": "string",
+                          "enum": ["healthy", "unhealthy"]
+                        },
+                        "redis": {
+                          "type": "string",
+                          "enum": ["healthy", "unhealthy"]
+                        },
+                        "kafka": {
+                          "type": "string",
+                          "enum": ["healthy", "unhealthy"]
+                        },
+                        "deeplake": {
+                          "type": "string",
+                          "enum": ["healthy", "unhealthy"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "API is unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["unhealthy"]
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Get metrics",
+        "description": "Retrieve system and business metrics",
+        "responses": {
+          "200": {
+            "description": "Metrics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "system_metrics": {
+                      "type": "object",
+                      "properties": {
+                        "cpu_usage": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "memory_usage": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "disk_usage": {
+                          "type": "number",
+                          "format": "float"
+                        },
+                        "active_connections": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "business_metrics": {
+                      "type": "object",
+                      "properties": {
+                        "total_documents": {
+                          "type": "integer"
+                        },
+                        "documents_processed_today": {
+                          "type": "integer"
+                        },
+                        "active_data_sources": {
+                          "type": "integer"
+                        },
+                        "storage_used_bytes": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "Tenant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "inactive"]
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "max_storage_gb": {
+                "type": "integer"
+              },
+              "max_users": {
+                "type": "integer"
+              },
+              "retention_days": {
+                "type": "integer"
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateTenantRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "max_storage_gb": {
+                "type": "integer",
+                "default": 100
+              },
+              "max_users": {
+                "type": "integer",
+                "default": 50
+              },
+              "retention_days": {
+                "type": "integer",
+                "default": 365
+              }
+            }
+          }
+        },
+        "required": ["name", "domain"]
+      },
+      "UpdateTenantRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "inactive"]
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "max_storage_gb": {
+                "type": "integer"
+              },
+              "max_users": {
+                "type": "integer"
+              },
+              "retention_days": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "DataSource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["file_upload", "sharepoint", "google_drive", "box", "dropbox", "onedrive", "confluence", "slack", "notion"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive", "error", "syncing"]
+          },
+          "config": {
+            "type": "object",
+            "description": "Configuration specific to the data source type"
+          },
+          "sync_schedule": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "frequency": {
+                "type": "string",
+                "enum": ["hourly", "daily", "weekly", "monthly"]
+              },
+              "next_sync": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "last_sync": {
+            "type": "object",
+            "properties": {
+              "started_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "completed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["success", "failed", "partial"]
+              },
+              "files_processed": {
+                "type": "integer"
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateDataSourceRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["sharepoint", "google_drive", "box", "dropbox", "onedrive", "confluence", "slack", "notion"]
+          },
+          "config": {
+            "type": "object",
+            "description": "Configuration specific to the data source type"
+          },
+          "sync_schedule": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "frequency": {
+                "type": "string",
+                "enum": ["hourly", "daily", "weekly", "monthly"],
+                "default": "daily"
+              }
+            }
+          }
+        },
+        "required": ["name", "type", "config"]
+      },
+      "UpdateDataSourceRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "config": {
+            "type": "object"
+          },
+          "sync_schedule": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "frequency": {
+                "type": "string",
+                "enum": ["hourly", "daily", "weekly", "monthly"]
+              }
+            }
+          }
+        }
+      },
+      "File": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "datasource_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "file_type": {
+            "type": "string",
+            "enum": ["pdf", "docx", "xlsx", "pptx", "txt", "html", "json", "xml", "csv", "image", "email", "archive", "other"]
+          },
+          "checksum": {
+            "type": "string"
+          },
+          "processing_status": {
+            "type": "string",
+            "enum": ["pending", "processing", "completed", "failed", "skipped"]
+          },
+          "processing_tier": {
+            "type": "integer",
+            "enum": [1, 2, 3]
+          },
+          "chunk_count": {
+            "type": "integer"
+          },
+          "embedding_status": {
+            "type": "string",
+            "enum": ["pending", "processing", "completed", "failed"]
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "created_date": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "modified_date": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "language": {
+                "type": "string"
+              },
+              "page_count": {
+                "type": "integer"
+              },
+              "word_count": {
+                "type": "integer"
+              }
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query text"
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "datasource_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "file_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "date_range": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "end": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "authors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "sort": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": ["relevance", "date", "size", "title"],
+                "default": "relevance"
+              },
+              "order": {
+                "type": "string",
+                "enum": ["asc", "desc"],
+                "default": "desc"
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "offset": {
+            "type": "integer",
+            "default": 0,
+            "minimum": 0
+          },
+          "include_highlights": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": ["query"]
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {
+                  "$ref": "#/components/schemas/File"
+                },
+                "score": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "chunks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "content": {
+                        "type": "string"
+                      },
+                      "score": {
+                        "type": "number",
+                        "format": "float"
+                      },
+                      "highlights": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "total": {
+            "type": "integer"
+          },
+          "query_time_ms": {
+            "type": "integer"
+          },
+          "aggregations": {
+            "type": "object",
+            "properties": {
+              "file_types": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "datasources": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "authors": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TrainingJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": ["classification", "regression", "clustering", "embedding", "anomaly_detection"]
+          },
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "running", "completed", "failed", "cancelled"]
+          },
+          "progress": {
+            "type": "number",
+            "format": "float",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "accuracy": {
+                "type": "number",
+                "format": "float"
+              },
+              "loss": {
+                "type": "number",
+                "format": "float"
+              },
+              "f1_score": {
+                "type": "number",
+                "format": "float"
+              },
+              "precision": {
+                "type": "number",
+                "format": "float"
+              },
+              "recall": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error_message": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateTrainingJobRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": ["classification", "regression", "clustering", "embedding", "anomaly_detection"]
+          },
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "configuration": {
+            "type": "object",
+            "properties": {
+              "algorithm": {
+                "type": "string"
+              },
+              "hyperparameters": {
+                "type": "object"
+              }
+            }
+          },
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "learning_rate": {
+                "type": "number",
+                "format": "float"
+              },
+              "batch_size": {
+                "type": "integer"
+              },
+              "epochs": {
+                "type": "integer"
+              },
+              "validation_split": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["name", "model_type", "dataset_id"]
+      },
+      "Dataset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dataset_type": {
+            "type": "string",
+            "enum": ["text", "image", "audio", "video", "tabular", "time_series", "graph", "multimodal"]
+          },
+          "format": {
+            "type": "string",
+            "enum": ["csv", "json", "jsonl", "parquet", "avro", "tfrecord", "hdf5", "numpy", "pickle"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["creating", "processing", "ready", "error", "archived"]
+          },
+          "record_count": {
+            "type": "integer"
+          },
+          "feature_count": {
+            "type": "integer"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "quality_score": {
+            "type": "number",
+            "format": "float"
+          },
+          "version": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateDatasetRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "dataset_type": {
+            "type": "string",
+            "enum": ["text", "image", "audio", "video", "tabular", "time_series", "graph", "multimodal"]
+          },
+          "format": {
+            "type": "string",
+            "enum": ["csv", "json", "jsonl", "parquet", "avro", "tfrecord", "hdf5", "numpy", "pickle"]
+          },
+          "source_path": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["name", "dataset_type", "format", "source_path"]
+      },
+      "Model": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": ["classification", "regression", "clustering", "embedding", "anomaly_detection"]
+          },
+          "latest_version": {
+            "type": "string"
+          },
+          "production_version": {
+            "type": "string"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "deprecated", "archived"]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RegisterModelRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "model_type": {
+            "type": "string",
+            "enum": ["classification", "regression", "clustering", "embedding", "anomaly_detection"]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["name", "model_type"]
+      },
+      "PredictionRequest": {
+        "type": "object",
+        "properties": {
+          "model_name": {
+            "type": "string"
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object",
+            "description": "Input features for prediction"
+          },
+          "prediction_type": {
+            "type": "string",
+            "enum": ["classification", "regression", "anomaly_detection", "similarity", "clustering"]
+          }
+        },
+        "required": ["model_name", "input", "prediction_type"]
+      },
+      "PredictionResponse": {
+        "type": "object",
+        "properties": {
+          "prediction": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "probabilities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "prediction_time_ms": {
+            "type": "integer"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ForecastRequest": {
+        "type": "object",
+        "properties": {
+          "series_type": {
+            "type": "string",
+            "enum": ["document_creation", "user_activity", "storage_usage", "access_patterns"]
+          },
+          "historical_data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "value": {
+                  "type": "number",
+                  "format": "float"
+                }
+              }
+            }
+          },
+          "horizon": {
+            "type": "string",
+            "description": "Forecast horizon (e.g., '30d', '90d', '1y')"
+          },
+          "frequency": {
+            "type": "string",
+            "enum": ["daily", "hourly", "weekly", "monthly"]
+          }
+        },
+        "required": ["series_type", "historical_data", "horizon", "frequency"]
+      },
+      "ForecastResponse": {
+        "type": "object",
+        "properties": {
+          "forecast": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "value": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "lower_bound": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "upper_bound": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "confidence": {
+                  "type": "number",
+                  "format": "float"
+                }
+              }
+            }
+          },
+          "model_metrics": {
+            "type": "object",
+            "properties": {
+              "mae": {
+                "type": "number",
+                "format": "float"
+              },
+              "mse": {
+                "type": "number",
+                "format": "float"
+              },
+              "rmse": {
+                "type": "number",
+                "format": "float"
+              },
+              "mape": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "LifecyclePredictionResponse": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "predictions": {
+            "type": "object",
+            "properties": {
+              "archival_date": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "deletion_date": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "access_pattern": {
+                "type": "object",
+                "properties": {
+                  "predicted_views": {
+                    "type": "integer"
+                  },
+                  "peak_usage_period": {
+                    "type": "string"
+                  },
+                  "decline_start": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          },
+          "confidence_scores": {
+            "type": "object",
+            "properties": {
+              "archival": {
+                "type": "number",
+                "format": "float"
+              },
+              "deletion": {
+                "type": "number",
+                "format": "float"
+              },
+              "access_pattern": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": ["archive", "delete", "migrate", "optimize", "review"]
+                },
+                "recommended_date": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number",
+                  "format": "float"
+                }
+              }
+            }
+          }
+        }
+      },
+      "KnowledgeGraphEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["document", "person", "organization", "location", "concept", "topic", "keyword"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "weight": {
+            "type": "number",
+            "format": "float"
+          },
+          "synonyms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateEntityRequest": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["document", "person", "organization", "location", "concept", "topic", "keyword"]
+          },
+          "label": {
+            "type": "string"
+          },
+          "properties": {
+            "type": "object"
+          }
+        },
+        "required": ["type", "label"]
+      },
+      "SemanticSearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "search_mode": {
+            "type": "string",
+            "enum": ["exact", "fuzzy", "semantic", "hybrid", "conceptual"],
+            "default": "hybrid"
+          },
+          "filters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "operator": {
+                  "type": "string",
+                  "enum": ["eq", "ne", "gt", "lt", "gte", "lte", "in", "contains"]
+                },
+                "value": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "array"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "offset": {
+            "type": "integer",
+            "default": 0,
+            "minimum": 0
+          }
+        },
+        "required": ["query"]
+      },
+      "SemanticSearchResponse": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total_results": {
+            "type": "integer"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "document": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "content": {
+                      "type": "string"
+                    },
+                    "document_type": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "score": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "rank": {
+                  "type": "integer"
+                },
+                "highlights": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "field": {
+                        "type": "string"
+                      },
+                      "fragments": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "semantic_score": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "keyword_score": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "popularity_score": {
+                  "type": "number",
+                  "format": "float"
+                }
+              }
+            }
+          },
+          "facets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string"
+                      },
+                      "count": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["completion", "correction", "related"]
+                }
+              }
+            }
+          },
+          "execution_time": {
+            "type": "string"
+          }
+        }
+      },
+      "IndexDocumentRequest": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "document_type": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": ["document_id", "title", "content", "document_type"]
+      },
+      "DocumentInsight": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "insight_type": {
+            "type": "string",
+            "enum": ["content", "usage", "trend", "anomaly", "recommendation", "prediction", "quality", "security", "compliance", "performance"]
+          },
+          "category": {
+            "type": "string",
+            "enum": ["document_health", "user_engagement", "content_quality", "access_patterns", "storage_optimization", "security_risk", "compliance_gap", "performance_issue"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "data": {
+            "type": "object"
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "trend": {
+                  "type": "string",
+                  "enum": ["up", "down", "stable"]
+                }
+              }
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "urgent"]
+                },
+                "impact": {
+                  "type": "string"
+                },
+                "effort": {
+                  "type": "string"
+                },
+                "timeline": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "generated_by": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["new", "reviewed", "actioned", "dismissed", "resolved"]
+          }
+        }
+      },
+      "DocumentReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "report_type": {
+            "type": "string",
+            "enum": ["document_summary", "usage_analysis", "content_analysis", "trend_analysis", "security_audit", "compliance_report", "performance_report", "custom"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange"
+          },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "total_documents": {
+                "type": "integer"
+              },
+              "active_users": {
+                "type": "integer"
+              },
+              "total_views": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "total_downloads": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "storage_used": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "key_insights": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "insights": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DocumentInsight"
+            }
+          },
+          "charts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["line", "bar", "pie", "scatter", "heatmap"]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "format": {
+            "type": "string",
+            "enum": ["json", "pdf", "html", "csv"]
+          }
+        }
+      },
+      "GenerateReportRequest": {
+        "type": "object",
+        "properties": {
+          "report_type": {
+            "type": "string",
+            "enum": ["document_summary", "usage_analysis", "content_analysis", "trend_analysis", "security_audit", "compliance_report", "performance_report", "custom"]
+          },
+          "time_range": {
+            "$ref": "#/components/schemas/TimeRange"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": ["report_type", "time_range"]
+      },
+      "TimeRange": {
+        "type": "object",
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["start_time", "end_time"]
+      },
+      "Anomaly": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["statistical", "content", "behavioral", "security"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["new", "investigating", "resolved", "false_positive"]
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "float"
+          },
+          "score": {
+            "type": "number",
+            "format": "float"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "entity_id": {
+                "type": "string"
+              },
+              "entity_type": {
+                "type": "string"
+              },
+              "metrics": {
+                "type": "object"
+              },
+              "context": {
+                "type": "object"
+              }
+            }
+          },
+          "threshold": {
+            "type": "object",
+            "properties": {
+              "expected_value": {
+                "type": "number",
+                "format": "float"
+              },
+              "threshold_value": {
+                "type": "number",
+                "format": "float"
+              },
+              "deviation": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "assigned_to": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "related_entities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "entity_id": {
+                  "type": "string"
+                },
+                "entity_type": {
+                  "type": "string"
+                },
+                "relationship": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SyncJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "datasource_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sync_type": {
+            "type": "string",
+            "enum": ["full", "incremental", "delta"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["queued", "running", "completed", "failed", "cancelled"]
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["urgent", "high", "normal", "low"]
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "total_files": {
+                "type": "integer"
+              },
+              "processed_files": {
+                "type": "integer"
+              },
+              "failed_files": {
+                "type": "integer"
+              },
+              "percentage": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "properties": {
+              "files_added": {
+                "type": "integer"
+              },
+              "files_updated": {
+                "type": "integer"
+              },
+              "files_deleted": {
+                "type": "integer"
+              },
+              "files_failed": {
+                "type": "integer"
+              },
+              "bytes_transferred": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "error_message": {
+            "type": "string"
+          },
+          "retry_count": {
+            "type": "integer"
+          },
+          "next_retry_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateSyncJobRequest": {
+        "type": "object",
+        "properties": {
+          "datasource_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sync_type": {
+            "type": "string",
+            "enum": ["full", "incremental", "delta"],
+            "default": "incremental"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["urgent", "high", "normal", "low"],
+            "default": "normal"
+          },
+          "schedule_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Schedule the job for later execution"
+          }
+        },
+        "required": ["datasource_id"]
+      },
+      "SyncConflict": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sync_job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file_path": {
+            "type": "string"
+          },
+          "conflict_type": {
+            "type": "string",
+            "enum": ["content_modified", "metadata_modified", "file_moved", "file_deleted", "permission_changed"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "resolved", "ignored"]
+          },
+          "source_data": {
+            "type": "object",
+            "description": "Original file data from source"
+          },
+          "target_data": {
+            "type": "object",
+            "description": "Current file data in target"
+          },
+          "conflicting_changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "source_value": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                },
+                "target_value": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "resolution_strategy": {
+            "type": "string",
+            "enum": ["last_write_wins", "preserve_both", "source_priority", "merge", "manual"]
+          },
+          "resolution_data": {
+            "type": "object"
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolved_by": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "file.uploaded",
+                "file.processed",
+                "file.failed",
+                "sync.started",
+                "sync.completed",
+                "sync.failed",
+                "anomaly.detected",
+                "insight.generated",
+                "training.completed"
+              ]
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive", "failed"]
+          },
+          "secret": {
+            "type": "string",
+            "description": "Secret for HMAC signature verification"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "datasource_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "file_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "retry_policy": {
+            "type": "object",
+            "properties": {
+              "max_retries": {
+                "type": "integer",
+                "default": 3
+              },
+              "retry_delay_seconds": {
+                "type": "integer",
+                "default": 60
+              },
+              "exponential_backoff": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_triggered": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "success_count": {
+            "type": "integer"
+          },
+          "failure_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "CreateWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "file.uploaded",
+                "file.processed",
+                "file.failed",
+                "sync.started",
+                "sync.completed",
+                "sync.failed",
+                "anomaly.detected",
+                "insight.generated",
+                "training.completed"
+              ]
+            }
+          },
+          "secret": {
+            "type": "string"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "datasource_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "file_types": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "required": ["name", "url", "events"]
+      },
+      "UpdateWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "inactive"]
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "type": "object"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              },
+              "request_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": ["code", "message"]
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Tenants",
+      "description": "Multi-tenant management operations"
+    },
+    {
+      "name": "Data Sources",
+      "description": "Data source connections and sync management"
+    },
+    {
+      "name": "Files",
+      "description": "File upload, processing, and management"
+    },
+    {
+      "name": "Search",
+      "description": "Document search and discovery"
+    },
+    {
+      "name": "ML/AI - Training",
+      "description": "Machine learning model training and dataset management"
+    },
+    {
+      "name": "ML/AI - Registry",
+      "description": "Model registry and version management"
+    },
+    {
+      "name": "ML/AI - Predictions",
+      "description": "Predictions, forecasting, and lifecycle analysis"
+    },
+    {
+      "name": "ML/AI - Knowledge Graph",
+      "description": "Knowledge graph entities and relationships"
+    },
+    {
+      "name": "ML/AI - Search",
+      "description": "Semantic search and document indexing"
+    },
+    {
+      "name": "ML/AI - Insights",
+      "description": "AI-powered insights and analytics reporting"
+    },
+    {
+      "name": "Anomaly Detection",
+      "description": "Anomaly detection and security monitoring"
+    },
+    {
+      "name": "Sync Management",
+      "description": "Unified sync orchestration and conflict resolution"
+    },
+    {
+      "name": "Webhooks",
+      "description": "Webhook management and event notifications"
+    },
+    {
+      "name": "System",
+      "description": "System health, metrics, and monitoring"
+    }
+  ]
+}

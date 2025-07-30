@@ -1,0 +1,436 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: datasources.audimodal.ai
+  labels:
+    app: audimodal
+    component: crd
+spec:
+  group: audimodal.ai
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+            - name
+            - type
+            - config
+            properties:
+              name:
+                type: string
+                description: "Data source name"
+                minLength: 1
+                maxLength: 100
+              description:
+                type: string
+                description: "Data source description"
+                maxLength: 500
+              type:
+                type: string
+                description: "Data source type"
+                enum: 
+                - "filesystem"
+                - "s3"
+                - "gcs"
+                - "azure_blob"
+                - "sharepoint"
+                - "google_drive"
+                - "box"
+                - "dropbox"
+                - "onedrive"
+                - "confluence"
+                - "jira"
+                - "slack"
+                - "notion"
+                - "database"
+                - "api"
+                - "ftp"
+                - "sftp"
+                - "webdav"
+              priority:
+                type: string
+                description: "Processing priority"
+                enum: ["low", "normal", "high", "critical"]
+                default: "normal"
+              enabled:
+                type: boolean
+                description: "Whether the data source is enabled"
+                default: true
+              config:
+                type: object
+                description: "Type-specific configuration"
+                properties:
+                  # Common configuration
+                  path:
+                    type: string
+                    description: "Base path or URL for the data source"
+                  credentials:
+                    type: object
+                    properties:
+                      secretRef:
+                        type: object
+                        description: "Reference to Kubernetes secret containing credentials"
+                        properties:
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                  # File filtering
+                  includes:
+                    type: array
+                    description: "File patterns to include"
+                    items:
+                      type: string
+                    default: ["**/*"]
+                  excludes:
+                    type: array
+                    description: "File patterns to exclude"
+                    items:
+                      type: string
+                    default: [".git/**", "node_modules/**", ".tmp/**"]
+                  maxFileSize:
+                    type: string
+                    description: "Maximum file size (e.g., '100MB', '1GB')"
+                    default: "100MB"
+                  supportedExtensions:
+                    type: array
+                    description: "Supported file extensions"
+                    items:
+                      type: string
+                    default: [".pdf", ".docx", ".txt", ".md", ".html"]
+                  # S3/Cloud storage specific
+                  bucket:
+                    type: string
+                    description: "Bucket name for cloud storage"
+                  region:
+                    type: string
+                    description: "Cloud region"
+                  # SharePoint/Office 365 specific
+                  tenantId:
+                    type: string
+                    description: "Office 365 tenant ID"
+                  siteUrl:
+                    type: string
+                    description: "SharePoint site URL"
+                  libraryNames:
+                    type: array
+                    description: "Document library names to sync"
+                    items:
+                      type: string
+                  # Database specific
+                  connectionString:
+                    type: string
+                    description: "Database connection string (stored in secret)"
+                  tables:
+                    type: array
+                    description: "Database tables to process"
+                    items:
+                      type: string
+                  # API specific
+                  endpoint:
+                    type: string
+                    description: "API endpoint URL"
+                  headers:
+                    type: object
+                    description: "HTTP headers for API calls"
+                    additionalProperties:
+                      type: string
+                  rateLimit:
+                    type: object
+                    properties:
+                      requestsPerSecond:
+                        type: number
+                        minimum: 0.1
+                        maximum: 1000
+                        default: 10
+                      maxConcurrent:
+                        type: integer
+                        minimum: 1
+                        maximum: 100
+                        default: 5
+              sync:
+                type: object
+                description: "Synchronization settings"
+                properties:
+                  mode:
+                    type: string
+                    description: "Sync mode"
+                    enum: ["manual", "scheduled", "realtime", "webhook"]
+                    default: "scheduled"
+                  schedule:
+                    type: string
+                    description: "Cron schedule for periodic sync"
+                    pattern: "^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\\d+(ns|us|µs|ms|s|m|h))+)|((((\\d+,)+\\d+|(\\d+([\/\\-])\\d+)|\\d+|\\*) ?){5,7})$"
+                    default: "0 */6 * * *"
+                  fullSyncSchedule:
+                    type: string
+                    description: "Schedule for full synchronization"
+                    pattern: "^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\\d+(ns|us|µs|ms|s|m|h))+)|((((\\d+,)+\\d+|(\\d+([\/\\-])\\d+)|\\d+|\\*) ?){5,7})$"
+                    default: "0 2 * * 0"
+                  batchSize:
+                    type: integer
+                    description: "Number of files to process in each batch"
+                    minimum: 1
+                    maximum: 1000
+                    default: 100
+                  parallelWorkers:
+                    type: integer
+                    description: "Number of parallel workers for processing"
+                    minimum: 1
+                    maximum: 50
+                    default: 5
+                  retryPolicy:
+                    type: object
+                    properties:
+                      maxRetries:
+                        type: integer
+                        minimum: 0
+                        maximum: 10
+                        default: 3
+                      backoffStrategy:
+                        type: string
+                        enum: ["linear", "exponential", "fixed"]
+                        default: "exponential"
+                      initialDelay:
+                        type: string
+                        default: "30s"
+                      maxDelay:
+                        type: string
+                        default: "10m"
+              processing:
+                type: object
+                description: "Processing configuration"
+                properties:
+                  chunkingStrategy:
+                    type: string
+                    description: "Text chunking strategy"
+                    enum: ["fixed_size", "semantic", "adaptive", "structured"]
+                    default: "semantic"
+                  chunkSize:
+                    type: integer
+                    description: "Chunk size in tokens"
+                    minimum: 100
+                    maximum: 8000
+                    default: 1000
+                  chunkOverlap:
+                    type: integer
+                    description: "Overlap between chunks in tokens"
+                    minimum: 0
+                    maximum: 500
+                    default: 100
+                  enableOCR:
+                    type: boolean
+                    description: "Enable OCR for image files"
+                    default: false
+                  enableAnalysis:
+                    type: boolean
+                    description: "Enable content analysis (classification, extraction)"
+                    default: true
+                  enableDLP:
+                    type: boolean
+                    description: "Enable Data Loss Prevention scanning"
+                    default: false
+                  customProcessors:
+                    type: array
+                    description: "Custom processing pipeline steps"
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        type:
+                          type: string
+                        config:
+                          type: object
+                          additionalProperties: true
+              monitoring:
+                type: object
+                description: "Monitoring and alerting configuration"
+                properties:
+                  healthCheck:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: true
+                      interval:
+                        type: string
+                        default: "5m"
+                      timeout:
+                        type: string
+                        default: "30s"
+                  alerts:
+                    type: array
+                    description: "Alert rules for this data source"
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        condition:
+                          type: string
+                        threshold:
+                          type: number
+                        severity:
+                          type: string
+                          enum: ["info", "warning", "critical"]
+                  metrics:
+                    type: object
+                    properties:
+                      collectMetrics:
+                        type: boolean
+                        default: true
+                      customLabels:
+                        type: object
+                        additionalProperties:
+                          type: string
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: "Current lifecycle phase"
+                enum: ["Pending", "Configuring", "Active", "Syncing", "Error", "Suspended", "Terminating"]
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: ["Ready", "Connected", "Configured", "Syncing", "Healthy", "CredentialsValid"]
+                    status:
+                      type: string
+                      enum: ["True", "False", "Unknown"]
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+              lastSync:
+                type: object
+                properties:
+                  startTime:
+                    type: string
+                    format: date-time
+                  endTime:
+                    type: string
+                    format: date-time
+                  status:
+                    type: string
+                    enum: ["success", "partial", "failed", "running"]
+                  filesProcessed:
+                    type: integer
+                  filesSkipped:
+                    type: integer
+                  filesErrored:
+                    type: integer
+                  totalSize:
+                    type: string
+                  errorMessage:
+                    type: string
+              nextSync:
+                type: string
+                format: date-time
+                description: "Next scheduled sync time"
+              statistics:
+                type: object
+                properties:
+                  totalFiles:
+                    type: integer
+                    description: "Total files discovered"
+                  processedFiles:
+                    type: integer
+                    description: "Successfully processed files"
+                  erroredFiles:
+                    type: integer
+                    description: "Files with processing errors"
+                  totalSizeBytes:
+                    type: integer
+                    description: "Total size of all files in bytes"
+                  averageProcessingTime:
+                    type: string
+                    description: "Average processing time per file"
+                  lastSuccessfulSync:
+                    type: string
+                    format: date-time
+              health:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["healthy", "degraded", "unhealthy", "unknown"]
+                  lastCheck:
+                    type: string
+                    format: date-time
+                  message:
+                    type: string
+                  responseTime:
+                    type: string
+              observedGeneration:
+                type: integer
+                description: "Generation of the spec that was last processed"
+    additionalPrinterColumns:
+    - name: Type
+      type: string
+      description: Data source type
+      jsonPath: .spec.type
+    - name: Phase
+      type: string
+      description: Current phase
+      jsonPath: .status.phase
+    - name: Health
+      type: string
+      description: Health status
+      jsonPath: .status.health.status
+    - name: Last Sync
+      type: string
+      description: Last sync status
+      jsonPath: .status.lastSync.status
+    - name: Files
+      type: integer
+      description: Total files
+      jsonPath: .status.statistics.totalFiles
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    subresources:
+      status: {}
+  scope: Namespaced
+  names:
+    plural: datasources
+    singular: datasource
+    kind: DataSource
+    shortNames:
+    - ds
+    categories:
+    - audimodal
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-datasource-manager
+  labels:
+    app: audimodal
+    component: rbac
+rules:
+- apiGroups: ["audimodal.ai"]
+  resources: ["datasources"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["secrets", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "update", "patch"]
