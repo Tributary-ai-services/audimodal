@@ -9,23 +9,27 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/eAIIngest/pkg/preprocessing"
 )
 
-// JSONReader implements DataSourceReader for JSON files
+// JSONReader implements DataSourceReader for JSON files with nested object handling
 type JSONReader struct {
-	name    string
-	version string
+	name             string
+	version          string
+	encodingDetector *preprocessing.EncodingDetector
 }
 
 // NewJSONReader creates a new JSON file reader
 func NewJSONReader() *JSONReader {
 	return &JSONReader{
-		name:    "json_reader",
-		version: "1.0.0",
+		name:             "json_reader",
+		version:          "1.0.0",
+		encodingDetector: preprocessing.NewEncodingDetector(),
 	}
 }
 
@@ -54,9 +58,9 @@ func (r *JSONReader) GetConfigSpec() []core.ConfigSpec {
 			Name:        "encoding",
 			Type:        "string",
 			Required:    false,
-			Default:     "utf-8",
-			Description: "File encoding",
-			Enum:        []string{"utf-8", "ascii"},
+			Default:     "auto",
+			Description: "File encoding (auto-detect if 'auto')",
+			Enum:        []string{"auto", "utf-8", "utf-16", "iso-8859-1", "windows-1252"},
 		},
 		{
 			Name:        "strict_mode",
@@ -79,6 +83,51 @@ func (r *JSONReader) GetConfigSpec() []core.ConfigSpec {
 			Default:     "",
 			Description: "JSONPath to extract array elements (for nested arrays)",
 			Examples:    []string{"$.data", "$.results", "$.items"},
+		},
+		{
+			Name:        "max_nesting_depth",
+			Type:        "int",
+			Required:    false,
+			Default:     10,
+			Description: "Maximum depth for nested object flattening",
+			MinValue:    ptr(1.0),
+			MaxValue:    ptr(50.0),
+		},
+		{
+			Name:        "flatten_arrays",
+			Type:        "bool",
+			Required:    false,
+			Default:     false,
+			Description: "Flatten nested arrays into separate chunks",
+		},
+		{
+			Name:        "extract_keys",
+			Type:        "array",
+			Required:    false,
+			Default:     []string{},
+			Description: "Specific JSON keys to extract (empty = all)",
+		},
+		{
+			Name:        "skip_keys",
+			Type:        "array",
+			Required:    false,
+			Default:     []string{},
+			Description: "JSON keys to skip during processing",
+		},
+		{
+			Name:        "preserve_structure",
+			Type:        "bool",
+			Required:    false,
+			Default:     true,
+			Description: "Preserve original JSON structure in chunks",
+		},
+		{
+			Name:        "null_handling",
+			Type:        "string",
+			Required:    false,
+			Default:     "keep",
+			Description: "How to handle null values",
+			Enum:        []string{"keep", "skip", "convert_empty"},
 		},
 	}
 }
@@ -108,14 +157,41 @@ func (r *JSONReader) ValidateConfig(config map[string]any) error {
 
 	if encoding, ok := config["encoding"]; ok {
 		if str, ok := encoding.(string); ok {
-			validEncodings := []string{"utf-8", "ascii"}
+			validEncodings := []string{"auto", "utf-8", "utf-16", "iso-8859-1", "windows-1252"}
+			found := false
 			for _, valid := range validEncodings {
 				if str == valid {
-					goto encodingOK
+					found = true
+					break
 				}
 			}
-			return fmt.Errorf("invalid encoding: %s", str)
-		encodingOK:
+			if !found {
+				return fmt.Errorf("invalid encoding: %s", str)
+			}
+		}
+	}
+
+	if maxDepth, ok := config["max_nesting_depth"]; ok {
+		if num, ok := maxDepth.(float64); ok {
+			if num < 1 || num > 50 {
+				return fmt.Errorf("max_nesting_depth must be between 1 and 50")
+			}
+		}
+	}
+
+	if nullHandling, ok := config["null_handling"]; ok {
+		if str, ok := nullHandling.(string); ok {
+			validModes := []string{"keep", "skip", "convert_empty"}
+			found := false
+			for _, valid := range validModes {
+				if str == valid {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("invalid null_handling mode: %s", str)
+			}
 		}
 	}
 
@@ -318,8 +394,46 @@ func (r *JSONReader) EstimateSize(ctx context.Context, sourcePath string) (core.
 
 // CreateIterator creates a chunk iterator for the JSON file
 func (r *JSONReader) CreateIterator(ctx context.Context, sourcePath string, strategyConfig map[string]any) (core.ChunkIterator, error) {
-	file, err := os.Open(sourcePath)
+	// Detect and handle encoding
+	var filePath string
+	var cleanupPath string
+	
+	if encoding, ok := strategyConfig["encoding"].(string); ok && encoding != "auto" {
+		// Use specified encoding
+		if encoding != "utf-8" {
+			convertedPath, err := r.encodingDetector.ConvertToUTF8(sourcePath, encoding)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert from %s encoding: %w", encoding, err)
+			}
+			filePath = convertedPath
+			cleanupPath = convertedPath
+		} else {
+			filePath = sourcePath
+		}
+	} else {
+		// Auto-detect encoding
+		encodingInfo, err := r.encodingDetector.DetectEncoding(sourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect encoding: %w", err)
+		}
+		
+		if encodingInfo.Name != "utf-8" {
+			convertedPath, err := r.encodingDetector.ConvertToUTF8(sourcePath, encodingInfo.Name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert from %s encoding: %w", encodingInfo.Name, err)
+			}
+			filePath = convertedPath
+			cleanupPath = convertedPath
+		} else {
+			filePath = sourcePath
+		}
+	}
+
+	file, err := os.Open(filePath)
 	if err != nil {
+		if cleanupPath != "" {
+			os.Remove(cleanupPath)
+		}
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 
@@ -338,11 +452,14 @@ func (r *JSONReader) CreateIterator(ctx context.Context, sourcePath string, stra
 	}
 
 	iterator := &JSONIterator{
-		file:       file,
-		sourcePath: sourcePath,
-		config:     strategyConfig,
-		format:     format,
-		objectNum:  0,
+		file:        file,
+		sourcePath:  sourcePath,
+		actualPath:  filePath,
+		cleanupPath: cleanupPath,
+		config:      strategyConfig,
+		format:      format,
+		objectNum:   0,
+		reader:      r,
 	}
 
 	// Initialize based on format
@@ -461,16 +578,19 @@ func (r *JSONReader) inferJSONFieldType(value any) string {
 
 // JSONIterator implements ChunkIterator for JSON files
 type JSONIterator struct {
-	file       *os.File
-	sourcePath string
-	config     map[string]any
-	format     string
-	decoder    *json.Decoder
-	scanner    *bufio.Scanner
-	objectNum  int
-	totalSize  int64
-	readBytes  int64
-	arrayDone  bool
+	file        *os.File
+	sourcePath  string
+	actualPath  string
+	cleanupPath string
+	config      map[string]any
+	format      string
+	decoder     *json.Decoder
+	scanner     *bufio.Scanner
+	objectNum   int
+	totalSize   int64
+	readBytes   int64
+	arrayDone   bool
+	reader      *JSONReader
 }
 
 // Next returns the next JSON object as a chunk
@@ -544,6 +664,14 @@ func (it *JSONIterator) Next(ctx context.Context) (core.Chunk, error) {
 
 	it.objectNum++
 
+	// Process nested objects if flattening is enabled
+	if flattenNested, ok := it.config["flatten_nested"].(bool); ok && flattenNested {
+		return it.processNestedObject(data, rawBytes)
+	}
+
+	// Apply data filtering
+	data = it.filterJSONData(data)
+
 	// Calculate chunk size
 	chunkSize := int64(len(rawBytes))
 	if chunkSize == 0 {
@@ -562,9 +690,10 @@ func (it *JSONIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "json_reader",
 			Context: map[string]string{
-				"object_number": fmt.Sprintf("%d", it.objectNum),
+				"object_number": strconv.Itoa(it.objectNum),
 				"json_format":   it.format,
 				"file_type":     "json",
+				"nesting_depth": strconv.Itoa(it.calculateDepth(data)),
 			},
 			SchemaInfo: map[string]any{
 				"format": it.format,
@@ -576,12 +705,251 @@ func (it *JSONIterator) Next(ctx context.Context) (core.Chunk, error) {
 	return chunk, nil
 }
 
+// processNestedObject handles flattening of nested objects
+func (it *JSONIterator) processNestedObject(data any, rawBytes []byte) (core.Chunk, error) {
+	// For now, return the first chunk and store nested data for future iterations
+	// This is a simplified implementation - a full version would require 
+	// maintaining state for nested object iteration
+	
+	flattened := it.flattenObject(data, "", 0)
+	if len(flattened) > 0 {
+		// Return the first flattened object
+		firstKey := ""
+		for key := range flattened {
+			firstKey = key
+			break
+		}
+		
+		chunkSize := int64(len(rawBytes))
+		if chunkSize == 0 {
+			if jsonBytes, err := json.Marshal(flattened[firstKey]); err == nil {
+				chunkSize = int64(len(jsonBytes))
+			}
+		}
+		
+		chunk := core.Chunk{
+			Data: flattened[firstKey],
+			Metadata: core.ChunkMetadata{
+				SourcePath:  it.sourcePath,
+				ChunkID:     fmt.Sprintf("%s:nested:%d:%s", filepath.Base(it.sourcePath), it.objectNum, firstKey),
+				ChunkType:   "structured_nested",
+				SizeBytes:   chunkSize,
+				ProcessedAt: time.Now(),
+				ProcessedBy: "json_reader",
+				Context: map[string]string{
+					"object_number": strconv.Itoa(it.objectNum),
+					"json_format":   it.format,
+					"file_type":     "json",
+					"nested_path":   firstKey,
+					"is_flattened":  "true",
+				},
+			},
+		}
+		
+		return chunk, nil
+	}
+	
+	// Fallback to regular processing
+	return it.createRegularChunk(data, rawBytes)
+}
+
+// flattenObject recursively flattens a JSON object
+func (it *JSONIterator) flattenObject(obj any, prefix string, depth int) map[string]any {
+	result := make(map[string]any)
+	
+	maxDepth := 10
+	if md, ok := it.config["max_nesting_depth"].(float64); ok {
+		maxDepth = int(md)
+	}
+	
+	if depth >= maxDepth {
+		result[prefix] = obj
+		return result
+	}
+	
+	switch v := obj.(type) {
+	case map[string]any:
+		for key, value := range v {
+			newKey := key
+			if prefix != "" {
+				newKey = prefix + "." + key
+			}
+			
+			if it.shouldSkipKey(key) {
+				continue
+			}
+			
+			nested := it.flattenObject(value, newKey, depth+1)
+			for k, val := range nested {
+				result[k] = val
+			}
+		}
+	case []any:
+		if flattenArrays, ok := it.config["flatten_arrays"].(bool); ok && flattenArrays {
+			for i, value := range v {
+				newKey := prefix + "[" + strconv.Itoa(i) + "]"
+				nested := it.flattenObject(value, newKey, depth+1)
+				for k, val := range nested {
+					result[k] = val
+				}
+			}
+		} else {
+			result[prefix] = obj
+		}
+	default:
+		result[prefix] = obj
+	}
+	
+	return result
+}
+
+// filterJSONData filters JSON data based on configuration
+func (it *JSONIterator) filterJSONData(data any) any {
+	switch v := data.(type) {
+	case map[string]any:
+		filtered := make(map[string]any)
+		
+		for key, value := range v {
+			if it.shouldSkipKey(key) {
+				continue
+			}
+			
+			if it.shouldExtractKey(key) {
+				filtered[key] = it.processValue(value)
+			}
+		}
+		
+		return filtered
+	case []any:
+		var filtered []any
+		for _, item := range v {
+			filtered = append(filtered, it.filterJSONData(item))
+		}
+		return filtered
+	default:
+		return it.processValue(data)
+	}
+}
+
+// shouldSkipKey determines if a key should be skipped
+func (it *JSONIterator) shouldSkipKey(key string) bool {
+	if skipKeys, ok := it.config["skip_keys"].([]string); ok {
+		for _, skip := range skipKeys {
+			if key == skip {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// shouldExtractKey determines if a key should be extracted
+func (it *JSONIterator) shouldExtractKey(key string) bool {
+	if extractKeys, ok := it.config["extract_keys"].([]string); ok && len(extractKeys) > 0 {
+		for _, extract := range extractKeys {
+			if key == extract {
+				return true
+			}
+		}
+		return false
+	}
+	return true // Extract all keys if no specific keys specified
+}
+
+// processValue processes a JSON value based on configuration
+func (it *JSONIterator) processValue(value any) any {
+	if value == nil {
+		nullHandling := "keep"
+		if nh, ok := it.config["null_handling"].(string); ok {
+			nullHandling = nh
+		}
+		
+		switch nullHandling {
+		case "skip":
+			return nil
+		case "convert_empty":
+			return ""
+		default:
+			return nil
+		}
+	}
+	
+	return value
+}
+
+// calculateDepth calculates the nesting depth of a JSON object
+func (it *JSONIterator) calculateDepth(obj any) int {
+	return it.calculateDepthRecursive(obj, 0)
+}
+
+// calculateDepthRecursive recursively calculates depth
+func (it *JSONIterator) calculateDepthRecursive(obj any, currentDepth int) int {
+	switch v := obj.(type) {
+	case map[string]any:
+		maxDepth := currentDepth
+		for _, value := range v {
+			depth := it.calculateDepthRecursive(value, currentDepth+1)
+			if depth > maxDepth {
+				maxDepth = depth
+			}
+		}
+		return maxDepth
+	case []any:
+		maxDepth := currentDepth
+		for _, item := range v {
+			depth := it.calculateDepthRecursive(item, currentDepth+1)
+			if depth > maxDepth {
+				maxDepth = depth
+			}
+		}
+		return maxDepth
+	default:
+		return currentDepth
+	}
+}
+
+// createRegularChunk creates a regular chunk without nested processing
+func (it *JSONIterator) createRegularChunk(data any, rawBytes []byte) (core.Chunk, error) {
+	chunkSize := int64(len(rawBytes))
+	if chunkSize == 0 {
+		if jsonBytes, err := json.Marshal(data); err == nil {
+			chunkSize = int64(len(jsonBytes))
+		}
+	}
+
+	chunk := core.Chunk{
+		Data: data,
+		Metadata: core.ChunkMetadata{
+			SourcePath:  it.sourcePath,
+			ChunkID:     fmt.Sprintf("%s:object:%d", filepath.Base(it.sourcePath), it.objectNum),
+			ChunkType:   "structured",
+			SizeBytes:   chunkSize,
+			ProcessedAt: time.Now(),
+			ProcessedBy: "json_reader",
+			Context: map[string]string{
+				"object_number": strconv.Itoa(it.objectNum),
+				"json_format":   it.format,
+				"file_type":     "json",
+			},
+		},
+	}
+
+	return chunk, nil
+}
+
 // Close releases file resources
 func (it *JSONIterator) Close() error {
+	var err error
 	if it.file != nil {
-		return it.file.Close()
+		err = it.file.Close()
 	}
-	return nil
+	
+	// Clean up temporary encoding conversion file
+	if it.cleanupPath != "" {
+		os.Remove(it.cleanupPath)
+	}
+	
+	return err
 }
 
 // Reset restarts iteration from the beginning

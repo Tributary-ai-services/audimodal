@@ -1,0 +1,567 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: processingsessions.audimodal.ai
+  labels:
+    app: audimodal
+    component: crd
+spec:
+  group: audimodal.ai
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+            - name
+            - dataSource
+            - pipeline
+            properties:
+              name:
+                type: string
+                description: "Processing session name"
+                minLength: 1
+                maxLength: 100
+              description:
+                type: string
+                description: "Session description"
+                maxLength: 500
+              dataSource:
+                type: object
+                description: "Data source configuration"
+                required:
+                - name
+                properties:
+                  name:
+                    type: string
+                    description: "Data source name (reference to DataSource CRD)"
+                  filters:
+                    type: object
+                    description: "Additional filters for this session"
+                    properties:
+                      paths:
+                        type: array
+                        description: "Specific paths to process"
+                        items:
+                          type: string
+                      dateRange:
+                        type: object
+                        properties:
+                          from:
+                            type: string
+                            format: date-time
+                          to:
+                            type: string
+                            format: date-time
+                      fileTypes:
+                        type: array
+                        description: "File types to include"
+                        items:
+                          type: string
+                      maxFiles:
+                        type: integer
+                        description: "Maximum number of files to process"
+                        minimum: 1
+                        maximum: 1000000
+              pipeline:
+                type: object
+                description: "Processing pipeline configuration"
+                required:
+                - stages
+                properties:
+                  strategy:
+                    type: string
+                    description: "Processing strategy"
+                    enum: ["sequential", "parallel", "adaptive", "streaming"]
+                    default: "adaptive"
+                  batchSize:
+                    type: integer
+                    description: "Batch size for processing"
+                    minimum: 1
+                    maximum: 1000
+                    default: 50
+                  maxParallelism:
+                    type: integer
+                    description: "Maximum parallel workers"
+                    minimum: 1
+                    maximum: 100
+                    default: 10
+                  stages:
+                    type: array
+                    description: "Processing pipeline stages"
+                    minItems: 1
+                    items:
+                      type: object
+                      required:
+                      - name
+                      - type
+                      properties:
+                        name:
+                          type: string
+                          description: "Stage name"
+                        type:
+                          type: string
+                          description: "Stage type"
+                          enum:
+                          - "file_discovery"
+                          - "content_extraction"
+                          - "preprocessing"
+                          - "chunking"
+                          - "embedding_generation"
+                          - "vector_storage"
+                          - "classification"
+                          - "analysis"
+                          - "dlp_scanning"
+                          - "custom"
+                        enabled:
+                          type: boolean
+                          default: true
+                        config:
+                          type: object
+                          description: "Stage-specific configuration"
+                          properties:
+                            # Content extraction config
+                            enableOCR:
+                              type: boolean
+                              default: false
+                            ocrEngine:
+                              type: string
+                              enum: ["tesseract", "textract", "vision_api"]
+                              default: "tesseract"
+                            # Preprocessing config
+                            normalizeText:
+                              type: boolean
+                              default: true
+                            removeMarkup:
+                              type: boolean
+                              default: true
+                            languageDetection:
+                              type: boolean
+                              default: true
+                            # Chunking config
+                            strategy:
+                              type: string
+                              enum: ["fixed_size", "semantic", "adaptive", "structured"]
+                              default: "semantic"
+                            chunkSize:
+                              type: integer
+                              minimum: 100
+                              maximum: 8000
+                              default: 1000
+                            overlap:
+                              type: integer
+                              minimum: 0
+                              maximum: 500
+                              default: 100
+                            # Embedding config
+                            provider:
+                              type: string
+                              enum: ["openai", "cohere", "huggingface", "sentence_transformers"]
+                              default: "openai"
+                            model:
+                              type: string
+                              default: "text-embedding-ada-002"
+                            batchSize:
+                              type: integer
+                              minimum: 1
+                              maximum: 100
+                              default: 20
+                            # Vector storage config
+                            vectorStore:
+                              type: string
+                              enum: ["deeplake", "pinecone", "qdrant", "weaviate", "chroma"]
+                              default: "deeplake"
+                            indexName:
+                              type: string
+                            # Classification config
+                            classifiers:
+                              type: array
+                              items:
+                                type: string
+                            confidenceThreshold:
+                              type: number
+                              minimum: 0.0
+                              maximum: 1.0
+                              default: 0.8
+                            # Analysis config
+                            enableSentiment:
+                              type: boolean
+                              default: false
+                            enableEntities:
+                              type: boolean
+                              default: false
+                            enableKeywords:
+                              type: boolean
+                              default: false
+                            enableTopics:
+                              type: boolean
+                              default: false
+                            # DLP config
+                            policies:
+                              type: array
+                              description: "DLP policies to apply"
+                              items:
+                                type: string
+                            scanMode:
+                              type: string
+                              enum: ["blocking", "non_blocking", "audit_only"]
+                              default: "non_blocking"
+                            # Custom stage config
+                            customFunction:
+                              type: string
+                            customParams:
+                              type: object
+                              additionalProperties: true
+                        retryPolicy:
+                          type: object
+                          properties:
+                            maxRetries:
+                              type: integer
+                              minimum: 0
+                              maximum: 10
+                              default: 3
+                            backoffStrategy:
+                              type: string
+                              enum: ["linear", "exponential", "fixed"]
+                              default: "exponential"
+                            retryDelay:
+                              type: string
+                              default: "30s"
+                        timeout:
+                          type: string
+                          description: "Stage timeout duration"
+                          default: "5m"
+              schedule:
+                type: object
+                description: "Session scheduling"
+                properties:
+                  mode:
+                    type: string
+                    description: "Scheduling mode"
+                    enum: ["immediate", "scheduled", "manual", "triggered"]
+                    default: "immediate"
+                  startTime:
+                    type: string
+                    format: date-time
+                    description: "Scheduled start time"
+                  cronSchedule:
+                    type: string
+                    description: "Cron schedule for recurring sessions"
+                    pattern: "^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every (\\d+(ns|us|µs|ms|s|m|h))+)|((((\\d+,)+\\d+|(\\d+([\/\\-])\\d+)|\\d+|\\*) ?){5,7})$"
+                  maxDuration:
+                    type: string
+                    description: "Maximum session duration"
+                    default: "24h"
+                  priority:
+                    type: string
+                    enum: ["low", "normal", "high", "critical"]
+                    default: "normal"
+              resources:
+                type: object
+                description: "Resource requirements"
+                properties:
+                  cpu:
+                    type: string
+                    description: "CPU request/limit"
+                    default: "500m"
+                  memory:
+                    type: string
+                    description: "Memory request/limit"
+                    default: "1Gi"
+                  storage:
+                    type: string
+                    description: "Temporary storage requirement"
+                    default: "5Gi"
+                  gpuCount:
+                    type: integer
+                    description: "Number of GPUs required"
+                    minimum: 0
+                    maximum: 8
+                    default: 0
+                  nodeSelector:
+                    type: object
+                    description: "Node selector labels"
+                    additionalProperties:
+                      type: string
+                  tolerations:
+                    type: array
+                    description: "Pod tolerations"
+                    items:
+                      type: object
+                      properties:
+                        key:
+                          type: string
+                        operator:
+                          type: string
+                        value:
+                          type: string
+                        effect:
+                          type: string
+              monitoring:
+                type: object
+                description: "Monitoring and alerting"
+                properties:
+                  metricsEnabled:
+                    type: boolean
+                    default: true
+                  logsEnabled:
+                    type: boolean
+                    default: true
+                  alerting:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: true
+                      onFailure:
+                        type: boolean
+                        default: true
+                      onCompletion:
+                        type: boolean
+                        default: false
+                      onLongRunning:
+                        type: boolean
+                        default: true
+                      longRunningThreshold:
+                        type: string
+                        default: "2h"
+                  healthChecks:
+                    type: object
+                    properties:
+                      enabled:
+                        type: boolean
+                        default: true
+                      interval:
+                        type: string
+                        default: "30s"
+              errorHandling:
+                type: object
+                description: "Error handling configuration"
+                properties:
+                  onError:
+                    type: string
+                    enum: ["stop", "continue", "retry", "skip"]
+                    default: "retry"
+                  maxErrors:
+                    type: integer
+                    description: "Maximum errors before stopping"
+                    minimum: 1
+                    maximum: 1000
+                    default: 100
+                  errorThreshold:
+                    type: number
+                    description: "Error rate threshold (0.0-1.0)"
+                    minimum: 0.0
+                    maximum: 1.0
+                    default: 0.1
+                  deadLetterQueue:
+                    type: boolean
+                    description: "Enable dead letter queue for failed items"
+                    default: true
+          status:
+            type: object
+            properties:
+              phase:
+                type: string
+                description: "Current session phase"
+                enum: ["Pending", "Scheduled", "Running", "Paused", "Completed", "Failed", "Cancelled", "Expired"]
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      enum: ["Ready", "Scheduled", "Running", "Completed", "Failed", "ResourcesAvailable"]
+                    status:
+                      type: string
+                      enum: ["True", "False", "Unknown"]
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+              startTime:
+                type: string
+                format: date-time
+                description: "Session start time"
+              endTime:
+                type: string
+                format: date-time
+                description: "Session end time"
+              duration:
+                type: string
+                description: "Session duration"
+              progress:
+                type: object
+                properties:
+                  currentStage:
+                    type: string
+                    description: "Currently executing stage"
+                  stageProgress:
+                    type: array
+                    description: "Progress of each stage"
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        status:
+                          type: string
+                          enum: ["pending", "running", "completed", "failed", "skipped"]
+                        startTime:
+                          type: string
+                          format: date-time
+                        endTime:
+                          type: string
+                          format: date-time
+                        itemsProcessed:
+                          type: integer
+                        itemsTotal:
+                          type: integer
+                        errors:
+                          type: integer
+                  totalItems:
+                    type: integer
+                    description: "Total items to process"
+                  processedItems:
+                    type: integer
+                    description: "Items successfully processed"
+                  failedItems:
+                    type: integer
+                    description: "Items that failed processing"
+                  skippedItems:
+                    type: integer
+                    description: "Items that were skipped"
+                  progressPercentage:
+                    type: number
+                    format: float
+                    description: "Overall progress percentage"
+              statistics:
+                type: object
+                properties:
+                  filesDiscovered:
+                    type: integer
+                  filesProcessed:
+                    type: integer
+                  filesFailed:
+                    type: integer
+                  totalSizeBytes:
+                    type: integer
+                  chunksGenerated:
+                    type: integer
+                  embeddingsCreated:
+                    type: integer
+                  dlpViolations:
+                    type: integer
+                  averageProcessingTime:
+                    type: string
+                  throughputFilesPerSecond:
+                    type: number
+                    format: float
+              resources:
+                type: object
+                properties:
+                  podName:
+                    type: string
+                  nodeName:
+                    type: string
+                  actualCPU:
+                    type: string
+                  actualMemory:
+                    type: string
+                  actualStorage:
+                    type: string
+              logs:
+                type: object
+                properties:
+                  logLevel:
+                    type: string
+                  recentErrors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp:
+                          type: string
+                          format: date-time
+                        stage:
+                          type: string
+                        message:
+                          type: string
+                        severity:
+                          type: string
+              observedGeneration:
+                type: integer
+                description: "Generation of the spec that was last processed"
+    additionalPrinterColumns:
+    - name: Phase
+      type: string
+      description: Session phase
+      jsonPath: .status.phase
+    - name: DataSource
+      type: string
+      description: Data source
+      jsonPath: .spec.dataSource.name
+    - name: Progress
+      type: string
+      description: Progress percentage
+      jsonPath: .status.progress.progressPercentage
+    - name: Duration
+      type: string
+      description: Session duration
+      jsonPath: .status.duration
+    - name: Files
+      type: integer
+      description: Files processed
+      jsonPath: .status.statistics.filesProcessed
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    subresources:
+      status: {}
+      scale:
+        specReplicasPath: .spec.pipeline.maxParallelism
+        statusReplicasPath: .status.resources.replicas
+  scope: Namespaced
+  names:
+    plural: processingsessions
+    singular: processingsession
+    kind: ProcessingSession
+    shortNames:
+    - ps
+    - session
+    categories:
+    - audimodal
+    - processing
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: audimodal-session-manager
+  labels:
+    app: audimodal
+    component: rbac
+rules:
+- apiGroups: ["audimodal.ai"]
+  resources: ["processingsessions", "datasources"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["pods", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
