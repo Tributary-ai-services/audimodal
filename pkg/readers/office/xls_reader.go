@@ -138,9 +138,9 @@ func (r *XLSReader) TestConnection(ctx context.Context, config map[string]any) c
 		Message: "XLS reader ready",
 		Latency: time.Since(start),
 		Details: map[string]any{
-			"extract_all_sheets":   config["extract_all_sheets"],
-			"include_formulas":     config["include_formulas"],
-			"detect_data_types":    config["detect_data_types"],
+			"extract_all_sheets": config["extract_all_sheets"],
+			"include_formulas":   config["include_formulas"],
+			"detect_data_types":  config["detect_data_types"],
 		},
 	}
 }
@@ -219,19 +219,19 @@ func (r *XLSReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 			},
 		},
 		Metadata: map[string]any{
-			"sheet_count":     metadata.SheetCount,
-			"total_rows":      metadata.TotalRows,
-			"total_cells":     metadata.TotalCells,
-			"has_formulas":    metadata.HasFormulas,
-			"has_charts":      metadata.HasCharts,
-			"has_macros":      metadata.HasMacros,
-			"created_date":    metadata.CreatedDate,
-			"modified_date":   metadata.ModifiedDate,
-			"author":          metadata.Author,
-			"company":         metadata.Company,
-			"excel_version":   metadata.ExcelVersion,
-			"is_encrypted":    metadata.IsEncrypted,
-			"sheet_names":     metadata.SheetNames,
+			"sheet_count":   metadata.SheetCount,
+			"total_rows":    metadata.TotalRows,
+			"total_cells":   metadata.TotalCells,
+			"has_formulas":  metadata.HasFormulas,
+			"has_charts":    metadata.HasCharts,
+			"has_macros":    metadata.HasMacros,
+			"created_date":  metadata.CreatedDate,
+			"modified_date": metadata.ModifiedDate,
+			"author":        metadata.Author,
+			"company":       metadata.Company,
+			"excel_version": metadata.ExcelVersion,
+			"is_encrypted":  metadata.IsEncrypted,
+			"sheet_names":   metadata.SheetNames,
 		},
 	}
 
@@ -324,19 +324,19 @@ func (r *XLSReader) GetSupportedFormats() []string {
 
 // XLSMetadata contains extracted XLS metadata
 type XLSMetadata struct {
-	SheetCount    int
-	TotalRows     int
-	TotalCells    int
-	HasFormulas   bool
-	HasCharts     bool
-	HasMacros     bool
-	CreatedDate   string
-	ModifiedDate  string
-	Author        string
-	Company       string
-	ExcelVersion  string
-	IsEncrypted   bool
-	SheetNames    []string
+	SheetCount   int
+	TotalRows    int
+	TotalCells   int
+	HasFormulas  bool
+	HasCharts    bool
+	HasMacros    bool
+	CreatedDate  string
+	ModifiedDate string
+	Author       string
+	Company      string
+	ExcelVersion string
+	IsEncrypted  bool
+	SheetNames   []string
 }
 
 // XLSWorkbook represents a parsed XLS workbook
@@ -362,14 +362,14 @@ type XLSRow struct {
 
 // XLSCell represents a single cell
 type XLSCell struct {
-	Address   string
-	Row       int
-	Column    int
-	Value     string
-	Formula   string
-	DataType  string
-	Style     XLSCellStyle
-	Comment   string
+	Address  string
+	Row      int
+	Column   int
+	Value    string
+	Formula  string
+	DataType string
+	Style    XLSCellStyle
+	Comment  string
 }
 
 // XLSCellStyle represents cell formatting
@@ -436,7 +436,7 @@ func (r *XLSReader) extractXLSMetadata(sourcePath string) (XLSMetadata, error) {
 
 	// Estimate sheet and data size based on file size
 	sizeCategory := stat.Size() / (1024) // Size in KB
-	
+
 	switch {
 	case sizeCategory < 50: // < 50KB
 		metadata.SheetCount = 1
@@ -468,7 +468,7 @@ func (r *XLSReader) extractXLSMetadata(sourcePath string) (XLSMetadata, error) {
 	}
 
 	content := string(buffer[:n])
-	
+
 	// Look for formula indicators
 	if strings.Contains(content, "=") {
 		metadata.HasFormulas = true
@@ -542,7 +542,7 @@ func (r *XLSReader) parseWorkbook(sourcePath string, config map[string]any) (*XL
 
 	// Mock workbook structure for demonstration
 	worksheets := make([]XLSWorksheet, metadata.SheetCount)
-	
+
 	for i := 0; i < metadata.SheetCount; i++ {
 		sheetName := fmt.Sprintf("Sheet%d", i+1)
 		if i < len(metadata.SheetNames) {
@@ -556,10 +556,10 @@ func (r *XLSReader) parseWorkbook(sourcePath string, config map[string]any) (*XL
 			for colIdx := 0; colIdx < 5; colIdx++ {
 				columnName := string(rune('A' + colIdx))
 				address := fmt.Sprintf("%s%d", columnName, rowIdx+1)
-				
+
 				var value string
 				var dataType string
-				
+
 				// Generate sample data based on position
 				if rowIdx == 0 {
 					value = fmt.Sprintf("Header %s", columnName)
@@ -585,7 +585,7 @@ func (r *XLSReader) parseWorkbook(sourcePath string, config map[string]any) (*XL
 					},
 				}
 			}
-			
+
 			rows[rowIdx] = XLSRow{
 				Number: rowIdx + 1,
 				Cells:  cells,
@@ -626,22 +626,22 @@ func (it *XLSIterator) Next(ctx context.Context) (core.Chunk, error) {
 	// Find next non-empty row
 	for it.currentSheet < len(it.workbook.Worksheets) {
 		sheet := it.workbook.Worksheets[it.currentSheet]
-		
+
 		if it.currentRow < len(sheet.Rows) {
 			row := sheet.Rows[it.currentRow]
 			it.currentRow++
-			
+
 			// Skip empty rows if configured
 			if skipEmpty, ok := it.config["skip_empty_rows"].(bool); ok && skipEmpty {
 				if it.isEmptyRow(row) {
 					continue
 				}
 			}
-			
+
 			// Create chunk for this row
 			return it.createRowChunk(it.sourcePath, sheet, row), nil
 		}
-		
+
 		// Move to next sheet
 		it.currentSheet++
 		it.currentRow = 0
@@ -703,7 +703,7 @@ func (it *XLSIterator) createRowChunk(sourcePath string, sheet XLSWorksheet, row
 			cellValues = append(cellValues, fmt.Sprintf("%s=%s", cell.Address, cell.Value))
 		}
 	}
-	
+
 	content := fmt.Sprintf("Sheet: %s, Row %d: %s", sheet.Name, row.Number, strings.Join(cellValues, ", "))
 
 	return core.Chunk{
@@ -716,13 +716,12 @@ func (it *XLSIterator) createRowChunk(sourcePath string, sheet XLSWorksheet, row
 			ProcessedAt: time.Now(),
 			ProcessedBy: "xls_reader",
 			Context: map[string]string{
-				"sheet_name":   sheet.Name,
-				"sheet_index":  strconv.Itoa(sheet.Index),
-				"row_number":   strconv.Itoa(row.Number),
-				"cell_count":   strconv.Itoa(len(row.Cells)),
-				"file_type":    "xls",
+				"sheet_name":  sheet.Name,
+				"sheet_index": strconv.Itoa(sheet.Index),
+				"row_number":  strconv.Itoa(row.Number),
+				"cell_count":  strconv.Itoa(len(row.Cells)),
+				"file_type":   "xls",
 			},
 		},
 	}
 }
-

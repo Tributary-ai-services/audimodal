@@ -237,11 +237,11 @@ func (r *PPTReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 		if err == nil {
 			schema.SampleData = []map[string]any{
 				{
-					"content":       sampleText,
-					"slide_number":  1,
-					"slide_title":   "Sample Slide Title",
-					"content_type":  "slide",
-					"layout":        "Title and Content",
+					"content":      sampleText,
+					"slide_number": 1,
+					"slide_title":  "Sample Slide Title",
+					"content_type": "slide",
+					"layout":       "Title and Content",
 				},
 			}
 		}
@@ -327,21 +327,21 @@ func (r *PPTReader) GetSupportedFormats() []string {
 
 // PPTMetadata contains extracted PPT metadata
 type PPTMetadata struct {
-	SlideCount         int
-	Title              string
-	Author             string
-	Subject            string
-	Keywords           string
-	Comments           string
-	CreatedDate        string
-	ModifiedDate       string
-	PresentationMode   string
-	HasAnimations      bool
-	HasTransitions     bool
-	HasEmbeddedMedia   bool
-	PowerPointVersion  string
-	IsEncrypted        bool
-	TotalWords         int
+	SlideCount        int
+	Title             string
+	Author            string
+	Subject           string
+	Keywords          string
+	Comments          string
+	CreatedDate       string
+	ModifiedDate      string
+	PresentationMode  string
+	HasAnimations     bool
+	HasTransitions    bool
+	HasEmbeddedMedia  bool
+	PowerPointVersion string
+	IsEncrypted       bool
+	TotalWords        int
 }
 
 // PPTPresentation represents a parsed PPT presentation
@@ -353,25 +353,25 @@ type PPTPresentation struct {
 
 // PPTSlide represents a presentation slide
 type PPTSlide struct {
-	Number       int
-	Title        string
-	Content      string
-	Notes        string
-	Layout       string
-	Hidden       bool
-	Shapes       []PPTShape
-	Animations   []PPTAnimation
-	Transition   PPTTransition
-	Comments     []PPTComment
+	Number     int
+	Title      string
+	Content    string
+	Notes      string
+	Layout     string
+	Hidden     bool
+	Shapes     []PPTShape
+	Animations []PPTAnimation
+	Transition PPTTransition
+	Comments   []PPTComment
 }
 
 // PPTShape represents a shape on a slide
 type PPTShape struct {
-	Type      string
-	Text      string
-	Position  PPTPosition
-	Size      PPTSize
-	Style     PPTShapeStyle
+	Type     string
+	Text     string
+	Position PPTPosition
+	Size     PPTSize
+	Style    PPTShapeStyle
 }
 
 // PPTPosition represents shape position
@@ -398,10 +398,10 @@ type PPTShapeStyle struct {
 
 // PPTAnimation represents slide animation
 type PPTAnimation struct {
-	Type      string
-	Target    string
-	Timing    string
-	Duration  float64
+	Type     string
+	Target   string
+	Timing   string
+	Duration float64
 }
 
 // PPTTransition represents slide transition
@@ -478,7 +478,7 @@ func (r *PPTReader) extractPPTMetadata(sourcePath string) (PPTMetadata, error) {
 
 	// Estimate presentation size based on file size
 	sizeCategory := stat.Size() / (1024) // Size in KB
-	
+
 	switch {
 	case sizeCategory < 100: // < 100KB
 		metadata.SlideCount = 5
@@ -551,12 +551,12 @@ func (r *PPTReader) parsePresentation(sourcePath string, config map[string]any) 
 	slides := make([]PPTSlide, metadata.SlideCount)
 	for i := 0; i < metadata.SlideCount; i++ {
 		slideNumber := i + 1
-		
+
 		// Generate sample content based on slide position
 		var content string
 		var title string
 		var layout string
-		
+
 		if i == 0 {
 			title = "Presentation Title"
 			content = "Welcome to this presentation. This is the title slide with an overview of what we'll cover."
@@ -574,10 +574,10 @@ func (r *PPTReader) parsePresentation(sourcePath string, config map[string]any) 
 		// Create sample shapes
 		shapes := []PPTShape{
 			{
-				Type: "title",
-				Text: title,
+				Type:     "title",
+				Text:     title,
 				Position: PPTPosition{X: 100, Y: 50},
-				Size: PPTSize{Width: 800, Height: 100},
+				Size:     PPTSize{Width: 800, Height: 100},
 				Style: PPTShapeStyle{
 					FontName: "Arial",
 					FontSize: 24,
@@ -586,10 +586,10 @@ func (r *PPTReader) parsePresentation(sourcePath string, config map[string]any) 
 				},
 			},
 			{
-				Type: "content",
-				Text: content,
+				Type:     "content",
+				Text:     content,
 				Position: PPTPosition{X: 100, Y: 200},
-				Size: PPTSize{Width: 800, Height: 400},
+				Size:     PPTSize{Width: 800, Height: 400},
 				Style: PPTShapeStyle{
 					FontName: "Arial",
 					FontSize: 16,
@@ -603,13 +603,13 @@ func (r *PPTReader) parsePresentation(sourcePath string, config map[string]any) 
 		notes := fmt.Sprintf("Speaker notes for slide %d. These are private notes for the presenter.", slideNumber)
 
 		slides[i] = PPTSlide{
-			Number:  slideNumber,
-			Title:   title,
-			Content: content,
-			Notes:   notes,
-			Layout:  layout,
-			Hidden:  false,
-			Shapes:  shapes,
+			Number:     slideNumber,
+			Title:      title,
+			Content:    content,
+			Notes:      notes,
+			Layout:     layout,
+			Hidden:     false,
+			Shapes:     shapes,
 			Animations: []PPTAnimation{},
 			Transition: PPTTransition{
 				Type:     "Fade",
@@ -668,15 +668,15 @@ func (it *PPTIterator) Next(ctx context.Context) (core.Chunk, error) {
 
 	// Build slide content
 	var contentParts []string
-	
+
 	if slide.Title != "" {
 		contentParts = append(contentParts, fmt.Sprintf("Title: %s", slide.Title))
 	}
-	
+
 	if slide.Content != "" {
 		contentParts = append(contentParts, fmt.Sprintf("Content: %s", slide.Content))
 	}
-	
+
 	// Include speaker notes if configured
 	if extractNotes, ok := it.config["extract_notes"]; (!ok || extractNotes.(bool)) && slide.Notes != "" {
 		contentParts = append(contentParts, fmt.Sprintf("Speaker Notes: %s", slide.Notes))
@@ -694,16 +694,16 @@ func (it *PPTIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "ppt_reader",
 			Context: map[string]string{
-				"slide_number":    strconv.Itoa(slide.Number),
-				"slide_title":     slide.Title,
-				"layout":          slide.Layout,
-				"total_slides":    strconv.Itoa(len(it.presentation.Slides)),
-				"file_type":       "ppt",
-				"presentation_title": it.presentation.Metadata.Title,
+				"slide_number":        strconv.Itoa(slide.Number),
+				"slide_title":         slide.Title,
+				"layout":              slide.Layout,
+				"total_slides":        strconv.Itoa(len(it.presentation.Slides)),
+				"file_type":           "ppt",
+				"presentation_title":  it.presentation.Metadata.Title,
 				"presentation_author": it.presentation.Metadata.Author,
-				"shape_count":     strconv.Itoa(len(slide.Shapes)),
-				"has_animations":  strconv.FormatBool(len(slide.Animations) > 0),
-				"has_notes":       strconv.FormatBool(slide.Notes != ""),
+				"shape_count":         strconv.Itoa(len(slide.Shapes)),
+				"has_animations":      strconv.FormatBool(len(slide.Animations) > 0),
+				"has_notes":           strconv.FormatBool(slide.Notes != ""),
 			},
 		},
 	}

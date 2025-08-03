@@ -67,7 +67,7 @@ func (m *HeuristicSentimentModel) AnalyzeSentiment(ctx context.Context, text str
 	// Determine sentiment
 	netScore := positiveScore - negativeScore
 	magnitude := math.Abs(netScore)
-	
+
 	var label string
 	var confidence float64
 
@@ -120,7 +120,7 @@ func (m *HeuristicTopicModel) ExtractTopics(ctx context.Context, text string, ma
 
 	topicScores := make(map[string]float64)
 	wordSet := make(map[string]bool)
-	
+
 	// Create word set for faster lookup
 	for _, word := range words {
 		cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
@@ -133,19 +133,19 @@ func (m *HeuristicTopicModel) ExtractTopics(ctx context.Context, text string, ma
 	for topic, keywords := range m.topicKeywords {
 		score := 0.0
 		matchedKeywords := []string{}
-		
+
 		for _, keyword := range keywords {
 			if wordSet[keyword] {
 				score += 1.0
 				matchedKeywords = append(matchedKeywords, keyword)
 			}
 		}
-		
+
 		if score > 0 {
 			// Normalize by topic keyword count and text length
 			probability := score / float64(len(keywords))
 			coherence := score / math.Sqrt(float64(len(words)))
-			
+
 			topicScores[topic] = probability * coherence
 		}
 	}
@@ -202,7 +202,7 @@ func (m *HeuristicEntityModel) ExtractEntities(ctx context.Context, text string)
 		matches := pattern.FindAllStringIndex(text, -1)
 		for _, match := range matches {
 			entityText := text[match[0]:match[1]]
-			
+
 			// Skip very short entities
 			if len(entityText) < 2 {
 				continue
@@ -288,11 +288,11 @@ func (m *HeuristicSummaryModel) GenerateSummary(ctx context.Context, text string
 
 	if len(sentences) == 1 {
 		return SummaryResult{
-			ExtractiveSummary: sentences[0],
+			ExtractiveSummary:  sentences[0],
 			AbstractiveSummary: sentences[0],
-			KeySentences:      sentences,
-			SummaryRatio:      1.0,
-			CompressionScore:  0.0,
+			KeySentences:       sentences,
+			SummaryRatio:       1.0,
+			CompressionScore:   0.0,
 		}, nil
 	}
 
@@ -312,11 +312,11 @@ func (m *HeuristicSummaryModel) GenerateSummary(ctx context.Context, text string
 	compressionScore := 1.0 - float64(len(extractiveSummary))/float64(len(text))
 
 	return SummaryResult{
-		ExtractiveSummary: extractiveSummary,
+		ExtractiveSummary:  extractiveSummary,
 		AbstractiveSummary: abstractiveSummary,
-		KeySentences:      topSentences,
-		SummaryRatio:      float64(len(topSentences)) / float64(len(sentences)),
-		CompressionScore:  compressionScore,
+		KeySentences:       topSentences,
+		SummaryRatio:       float64(len(topSentences)) / float64(len(sentences)),
+		CompressionScore:   compressionScore,
 	}, nil
 }
 
@@ -324,20 +324,20 @@ func (m *HeuristicSummaryModel) splitIntoSentences(text string) []string {
 	// Simple sentence splitting
 	sentences := regexp.MustCompile(`[.!?]+\s+`).Split(text, -1)
 	var result []string
-	
+
 	for _, sentence := range sentences {
 		sentence = strings.TrimSpace(sentence)
 		if len(sentence) > 10 { // Minimum sentence length
 			result = append(result, sentence)
 		}
 	}
-	
+
 	return result
 }
 
 func (m *HeuristicSummaryModel) scoreSentences(sentences []string, fullText string) []float64 {
 	scores := make([]float64, len(sentences))
-	
+
 	// Calculate word frequencies in the full text
 	wordFreq := make(map[string]int)
 	words := strings.Fields(strings.ToLower(fullText))
@@ -352,25 +352,25 @@ func (m *HeuristicSummaryModel) scoreSentences(sentences []string, fullText stri
 	for i, sentence := range sentences {
 		sentenceWords := strings.Fields(strings.ToLower(sentence))
 		score := 0.0
-		
+
 		for _, word := range sentenceWords {
 			cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
 			if freq, exists := wordFreq[cleaned]; exists && len(cleaned) > 2 {
 				score += float64(freq)
 			}
 		}
-		
+
 		// Normalize by sentence length
 		if len(sentenceWords) > 0 {
 			scores[i] = score / float64(len(sentenceWords))
 		}
-		
+
 		// Boost score for sentences at the beginning or end
 		if i == 0 || i == len(sentences)-1 {
 			scores[i] *= 1.2
 		}
 	}
-	
+
 	return scores
 }
 
@@ -380,7 +380,7 @@ func (m *HeuristicSummaryModel) selectTopSentences(sentences []string, scores []
 		score    float64
 		index    int
 	}
-	
+
 	var scored []sentenceScore
 	for i, sentence := range sentences {
 		scored = append(scored, sentenceScore{
@@ -389,25 +389,25 @@ func (m *HeuristicSummaryModel) selectTopSentences(sentences []string, scores []
 			index:    i,
 		})
 	}
-	
+
 	// Sort by score
 	sort.Slice(scored, func(i, j int) bool {
 		return scored[i].score > scored[j].score
 	})
-	
+
 	// Take top sentences
 	selected := scored[:min(numSentences, len(scored))]
-	
+
 	// Sort by original order
 	sort.Slice(selected, func(i, j int) bool {
 		return selected[i].index < selected[j].index
 	})
-	
+
 	var result []string
 	for _, s := range selected {
 		result = append(result, s.sentence)
 	}
-	
+
 	return result
 }
 
@@ -416,13 +416,13 @@ func (m *HeuristicSummaryModel) createAbstractiveSummary(sentences []string) str
 	if len(sentences) == 0 {
 		return ""
 	}
-	
+
 	summary := strings.Join(sentences, " ")
-	
+
 	// Basic simplification rules
 	summary = regexp.MustCompile(`\s+`).ReplaceAllString(summary, " ")
 	summary = strings.TrimSpace(summary)
-	
+
 	// Ensure it doesn't exceed a reasonable length
 	if len(summary) > 500 {
 		words := strings.Fields(summary)
@@ -430,7 +430,7 @@ func (m *HeuristicSummaryModel) createAbstractiveSummary(sentences []string) str
 			summary = strings.Join(words[:80], " ") + "..."
 		}
 	}
-	
+
 	return summary
 }
 
@@ -458,7 +458,7 @@ func (m *HeuristicQualityModel) AssessQuality(ctx context.Context, text string) 
 
 	sentences := regexp.MustCompile(`[.!?]+`).Split(text, -1)
 	words := strings.Fields(text)
-	
+
 	// Calculate various quality metrics
 	coherence := m.assessCoherence(sentences)
 	clarity := m.assessClarity(text, words)
@@ -466,11 +466,11 @@ func (m *HeuristicQualityModel) AssessQuality(ctx context.Context, text string) 
 	informativeness := m.assessInformativeness(words)
 	redundancy := m.assessRedundancy(sentences)
 	structuralQuality := m.assessStructuralQuality(text)
-	
+
 	issues := m.identifyIssues(text, words, sentences)
-	
+
 	// Calculate overall score
-	scores := []float64{coherence, clarity, completeness, informativeness, 1.0-redundancy, structuralQuality}
+	scores := []float64{coherence, clarity, completeness, informativeness, 1.0 - redundancy, structuralQuality}
 	overallScore := 0.0
 	for _, score := range scores {
 		overallScore += score
@@ -493,7 +493,7 @@ func (m *HeuristicQualityModel) assessCoherence(sentences []string) float64 {
 	if len(sentences) < 2 {
 		return 1.0
 	}
-	
+
 	// Simple coherence based on sentence length variation
 	lengths := make([]int, 0, len(sentences))
 	for _, sentence := range sentences {
@@ -501,27 +501,27 @@ func (m *HeuristicQualityModel) assessCoherence(sentences []string) float64 {
 			lengths = append(lengths, len(strings.Fields(sentence)))
 		}
 	}
-	
+
 	if len(lengths) == 0 {
 		return 0.0
 	}
-	
+
 	// Calculate coefficient of variation
 	mean := 0.0
 	for _, length := range lengths {
 		mean += float64(length)
 	}
 	mean /= float64(len(lengths))
-	
+
 	variance := 0.0
 	for _, length := range lengths {
 		variance += math.Pow(float64(length)-mean, 2)
 	}
 	variance /= float64(len(lengths))
-	
+
 	stdDev := math.Sqrt(variance)
 	cv := stdDev / mean
-	
+
 	// Lower coefficient of variation indicates better coherence
 	coherence := 1.0 - math.Min(cv/2.0, 1.0)
 	return coherence
@@ -531,7 +531,7 @@ func (m *HeuristicQualityModel) assessClarity(text string, words []string) float
 	if len(words) == 0 {
 		return 0.0
 	}
-	
+
 	// Assess clarity based on word complexity and sentence structure
 	complexWords := 0
 	for _, word := range words {
@@ -539,17 +539,17 @@ func (m *HeuristicQualityModel) assessClarity(text string, words []string) float
 			complexWords++
 		}
 	}
-	
+
 	complexityRatio := float64(complexWords) / float64(len(words))
 	clarity := 1.0 - math.Min(complexityRatio*2, 1.0)
-	
+
 	return clarity
 }
 
 func (m *HeuristicQualityModel) assessCompleteness(text string) float64 {
 	// Simple completeness based on text length and structure indicators
 	score := 0.0
-	
+
 	// Length indicator
 	if len(text) > 100 {
 		score += 0.3
@@ -557,7 +557,7 @@ func (m *HeuristicQualityModel) assessCompleteness(text string) float64 {
 	if len(text) > 500 {
 		score += 0.2
 	}
-	
+
 	// Structure indicators
 	if strings.Contains(text, ".") {
 		score += 0.2
@@ -568,7 +568,7 @@ func (m *HeuristicQualityModel) assessCompleteness(text string) float64 {
 	if regexp.MustCompile(`[A-Z][a-z]+`).MatchString(text) {
 		score += 0.2
 	}
-	
+
 	return math.Min(score, 1.0)
 }
 
@@ -576,7 +576,7 @@ func (m *HeuristicQualityModel) assessInformativeness(words []string) float64 {
 	if len(words) == 0 {
 		return 0.0
 	}
-	
+
 	// Assess based on vocabulary diversity
 	uniqueWords := make(map[string]bool)
 	for _, word := range words {
@@ -585,7 +585,7 @@ func (m *HeuristicQualityModel) assessInformativeness(words []string) float64 {
 			uniqueWords[cleaned] = true
 		}
 	}
-	
+
 	diversity := float64(len(uniqueWords)) / float64(len(words))
 	return math.Min(diversity*2, 1.0)
 }
@@ -594,11 +594,11 @@ func (m *HeuristicQualityModel) assessRedundancy(sentences []string) float64 {
 	if len(sentences) < 2 {
 		return 0.0
 	}
-	
+
 	// Simple redundancy detection based on sentence similarity
 	redundantPairs := 0
 	totalPairs := 0
-	
+
 	for i := 0; i < len(sentences); i++ {
 		for j := i + 1; j < len(sentences); j++ {
 			if len(sentences[i]) > 10 && len(sentences[j]) > 10 {
@@ -610,32 +610,32 @@ func (m *HeuristicQualityModel) assessRedundancy(sentences []string) float64 {
 			}
 		}
 	}
-	
+
 	if totalPairs == 0 {
 		return 0.0
 	}
-	
+
 	return float64(redundantPairs) / float64(totalPairs)
 }
 
 func (m *HeuristicQualityModel) assessStructuralQuality(text string) float64 {
 	score := 0.0
-	
+
 	// Check for proper capitalization
 	if regexp.MustCompile(`^[A-Z]`).MatchString(text) {
 		score += 0.2
 	}
-	
+
 	// Check for proper punctuation
 	if regexp.MustCompile(`[.!?]$`).MatchString(strings.TrimSpace(text)) {
 		score += 0.2
 	}
-	
+
 	// Check for paragraph structure
 	if strings.Contains(text, "\n\n") {
 		score += 0.3
 	}
-	
+
 	// Check for reasonable sentence length distribution
 	sentences := regexp.MustCompile(`[.!?]+`).Split(text, -1)
 	reasonableLengths := 0
@@ -645,26 +645,26 @@ func (m *HeuristicQualityModel) assessStructuralQuality(text string) float64 {
 			reasonableLengths++
 		}
 	}
-	
+
 	if len(sentences) > 0 {
 		score += 0.3 * float64(reasonableLengths) / float64(len(sentences))
 	}
-	
+
 	return math.Min(score, 1.0)
 }
 
 func (m *HeuristicQualityModel) identifyIssues(text string, words []string, sentences []string) []string {
 	var issues []string
-	
+
 	// Check for common issues
 	if len(text) < 50 {
 		issues = append(issues, "Text too short")
 	}
-	
+
 	if len(sentences) == 1 && len(words) > 50 {
 		issues = append(issues, "Single long sentence")
 	}
-	
+
 	// Check for excessive repetition
 	wordCount := make(map[string]int)
 	for _, word := range words {
@@ -673,47 +673,47 @@ func (m *HeuristicQualityModel) identifyIssues(text string, words []string, sent
 			wordCount[cleaned]++
 		}
 	}
-	
+
 	for word, count := range wordCount {
 		if count > len(words)/10 && count > 3 {
 			issues = append(issues, fmt.Sprintf("Excessive repetition of '%s'", word))
 		}
 	}
-	
+
 	// Check for missing punctuation
 	if !regexp.MustCompile(`[.!?]`).MatchString(text) {
 		issues = append(issues, "Missing punctuation")
 	}
-	
+
 	return issues
 }
 
 func (m *HeuristicQualityModel) calculateSimilarity(s1, s2 string) float64 {
 	words1 := strings.Fields(strings.ToLower(s1))
 	words2 := strings.Fields(strings.ToLower(s2))
-	
+
 	set1 := make(map[string]bool)
 	set2 := make(map[string]bool)
-	
+
 	for _, word := range words1 {
 		set1[word] = true
 	}
 	for _, word := range words2 {
 		set2[word] = true
 	}
-	
+
 	intersection := 0
 	for word := range set1 {
 		if set2[word] {
 			intersection++
 		}
 	}
-	
+
 	union := len(set1) + len(set2) - intersection
 	if union == 0 {
 		return 0.0
 	}
-	
+
 	return float64(intersection) / float64(union)
 }
 
@@ -722,7 +722,7 @@ func (m *HeuristicQualityModel) countSyllables(word string) int {
 	vowels := "aeiouy"
 	syllables := 0
 	previousWasVowel := false
-	
+
 	for _, char := range word {
 		isVowel := strings.ContainsRune(vowels, char)
 		if isVowel && !previousWasVowel {
@@ -730,16 +730,16 @@ func (m *HeuristicQualityModel) countSyllables(word string) int {
 		}
 		previousWasVowel = isVowel
 	}
-	
+
 	// Adjust for silent e
 	if strings.HasSuffix(word, "e") && syllables > 1 {
 		syllables--
 	}
-	
+
 	if syllables == 0 {
 		syllables = 1
 	}
-	
+
 	return syllables
 }
 
@@ -831,7 +831,7 @@ func (m *HeuristicLanguageModel) hasCyrillicCharacters(text string) bool {
 
 func (m *HeuristicLanguageModel) detectLatinLanguage(text string) (string, float64) {
 	text = strings.ToLower(text)
-	
+
 	// Common words for different languages
 	englishWords := []string{"the", "and", "is", "in", "to", "of", "a", "that", "it", "with"}
 	spanishWords := []string{"el", "la", "de", "que", "y", "a", "en", "un", "es", "se"}
@@ -844,7 +844,7 @@ func (m *HeuristicLanguageModel) detectLatinLanguage(text string) (string, float
 	germanScore := m.countCommonWords(text, germanWords)
 
 	maxScore := math.Max(math.Max(englishScore, spanishScore), math.Max(frenchScore, germanScore))
-	
+
 	if maxScore == 0 {
 		return "en", 0.5 // Default to English with low confidence
 	}
@@ -867,7 +867,7 @@ func (m *HeuristicLanguageModel) detectLatinLanguage(text string) (string, float
 func (m *HeuristicLanguageModel) countCommonWords(text string, commonWords []string) float64 {
 	words := strings.Fields(text)
 	matches := 0.0
-	
+
 	for _, word := range words {
 		for _, common := range commonWords {
 			if word == common {
@@ -876,7 +876,7 @@ func (m *HeuristicLanguageModel) countCommonWords(text string, commonWords []str
 			}
 		}
 	}
-	
+
 	return matches
 }
 
@@ -994,24 +994,24 @@ func getPositiveWords() map[string]float64 {
 
 func getNegativeWords() map[string]float64 {
 	return map[string]float64{
-		"bad":        1.0,
-		"terrible":   1.4,
-		"awful":      1.3,
-		"horrible":   1.3,
-		"worst":      1.4,
-		"hate":       1.2,
-		"negative":   1.0,
-		"problem":    0.8,
-		"issue":      0.7,
-		"error":      0.9,
-		"fail":       1.1,
-		"failure":    1.2,
-		"wrong":      0.8,
-		"difficult":  0.7,
-		"hard":       0.6,
-		"impossible": 1.1,
-		"sad":        1.0,
-		"angry":      1.1,
+		"bad":          1.0,
+		"terrible":     1.4,
+		"awful":        1.3,
+		"horrible":     1.3,
+		"worst":        1.4,
+		"hate":         1.2,
+		"negative":     1.0,
+		"problem":      0.8,
+		"issue":        0.7,
+		"error":        0.9,
+		"fail":         1.1,
+		"failure":      1.2,
+		"wrong":        0.8,
+		"difficult":    0.7,
+		"hard":         0.6,
+		"impossible":   1.1,
+		"sad":          1.0,
+		"angry":        1.1,
 		"disappointed": 1.0,
 		"frustrating":  0.9,
 	}
@@ -1088,14 +1088,14 @@ func getEmotionWords() map[string]map[string]float64 {
 			"despair":    1.0,
 		},
 		"analytical": {
-			"analyze":    1.0,
-			"research":   0.9,
-			"study":      0.8,
-			"examine":    0.9,
+			"analyze":     1.0,
+			"research":    0.9,
+			"study":       0.8,
+			"examine":     0.9,
 			"investigate": 0.9,
-			"logical":    0.8,
-			"systematic": 0.9,
-			"methodical": 0.8,
+			"logical":     0.8,
+			"systematic":  0.9,
+			"methodical":  0.8,
 		},
 		"confident": {
 			"confident":  1.0,
@@ -1108,14 +1108,14 @@ func getEmotionWords() map[string]map[string]float64 {
 			"decisive":   0.9,
 		},
 		"tentative": {
-			"maybe":      0.8,
-			"perhaps":    0.7,
-			"possibly":   0.7,
-			"uncertain":  0.9,
-			"doubtful":   0.8,
-			"hesitant":   0.9,
-			"unsure":     0.8,
-			"tentative":  1.0,
+			"maybe":     0.8,
+			"perhaps":   0.7,
+			"possibly":  0.7,
+			"uncertain": 0.9,
+			"doubtful":  0.8,
+			"hesitant":  0.9,
+			"unsure":    0.8,
+			"tentative": 1.0,
 		},
 		"openness": {
 			"open":       0.8,

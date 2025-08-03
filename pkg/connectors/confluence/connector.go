@@ -21,37 +21,37 @@ import (
 
 // ConfluenceConnector implements storage.StorageConnector for Atlassian Confluence
 type ConfluenceConnector struct {
-	config       *ConfluenceConfig
-	httpClient   *http.Client
-	tracer       trace.Tracer
-	
+	config     *ConfluenceConfig
+	httpClient *http.Client
+	tracer     trace.Tracer
+
 	// Connection state
-	isConnected  bool
-	lastSync     time.Time
-	baseURL      string
-	
+	isConnected bool
+	lastSync    time.Time
+	baseURL     string
+
 	// Authentication
-	authMethod   string // "basic", "oauth2", "pat"
-	credentials  map[string]string
-	
+	authMethod  string // "basic", "oauth2", "pat"
+	credentials map[string]string
+
 	// Rate limiting and throttling
-	rateLimiter  *RateLimiter
-	
+	rateLimiter *RateLimiter
+
 	// Caching
 	contentCache map[string]*Content
 	spaceCache   map[string]*Space
 	cacheMu      sync.RWMutex
-	
+
 	// Sync state
-	syncState    *SyncState
-	syncMu       sync.RWMutex
-	
+	syncState *SyncState
+	syncMu    sync.RWMutex
+
 	// Metrics
-	metrics      *ConnectorMetrics
-	
+	metrics *ConnectorMetrics
+
 	// Error handling
-	retryPolicy  *RetryPolicy
-	
+	retryPolicy *RetryPolicy
+
 	// Confluence-specific
 	includedSpaces []string
 	excludedSpaces []string
@@ -60,99 +60,99 @@ type ConfluenceConnector struct {
 // ConfluenceConfig contains configuration for Confluence connector
 type ConfluenceConfig struct {
 	// Connection configuration
-	BaseURL            string   `yaml:"base_url"`
-	CloudInstance      bool     `yaml:"cloud_instance"`
-	
+	BaseURL       string `yaml:"base_url"`
+	CloudInstance bool   `yaml:"cloud_instance"`
+
 	// Authentication configuration
-	AuthMethod         string   `yaml:"auth_method"` // "basic", "oauth2", "pat"
-	Username           string   `yaml:"username"`
-	Password           string   `yaml:"password"`
-	APIToken           string   `yaml:"api_token"`
-	PersonalAccessToken string  `yaml:"personal_access_token"`
-	
+	AuthMethod          string `yaml:"auth_method"` // "basic", "oauth2", "pat"
+	Username            string `yaml:"username"`
+	Password            string `yaml:"password"`
+	APIToken            string `yaml:"api_token"`
+	PersonalAccessToken string `yaml:"personal_access_token"`
+
 	// OAuth2 configuration (for OAuth2 auth method)
-	ClientID           string   `yaml:"client_id"`
-	ClientSecret       string   `yaml:"client_secret"`
-	RedirectURL        string   `yaml:"redirect_url"`
-	
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURL  string `yaml:"redirect_url"`
+
 	// Sync configuration
-	SyncInterval       time.Duration `yaml:"sync_interval"`
-	FullSyncInterval   time.Duration `yaml:"full_sync_interval"`
-	BatchSize          int           `yaml:"batch_size"`
-	MaxConcurrentReqs  int           `yaml:"max_concurrent_requests"`
-	
+	SyncInterval      time.Duration `yaml:"sync_interval"`
+	FullSyncInterval  time.Duration `yaml:"full_sync_interval"`
+	BatchSize         int           `yaml:"batch_size"`
+	MaxConcurrentReqs int           `yaml:"max_concurrent_requests"`
+
 	// Content filtering
-	IncludeSpaces      []string      `yaml:"include_spaces"`
-	ExcludeSpaces      []string      `yaml:"exclude_spaces"`
-	IncludeContentTypes []string     `yaml:"include_content_types"`
-	ExcludeContentTypes []string     `yaml:"exclude_content_types"`
-	IncludeStatuses    []string      `yaml:"include_statuses"`
-	ExcludeStatuses    []string      `yaml:"exclude_statuses"`
-	MaxContentSize     int64         `yaml:"max_content_size"`
-	SyncAttachments    bool          `yaml:"sync_attachments"`
-	SyncComments       bool          `yaml:"sync_comments"`
-	SyncDrafts         bool          `yaml:"sync_drafts"`
-	SyncArchived       bool          `yaml:"sync_archived"`
-	
+	IncludeSpaces       []string `yaml:"include_spaces"`
+	ExcludeSpaces       []string `yaml:"exclude_spaces"`
+	IncludeContentTypes []string `yaml:"include_content_types"`
+	ExcludeContentTypes []string `yaml:"exclude_content_types"`
+	IncludeStatuses     []string `yaml:"include_statuses"`
+	ExcludeStatuses     []string `yaml:"exclude_statuses"`
+	MaxContentSize      int64    `yaml:"max_content_size"`
+	SyncAttachments     bool     `yaml:"sync_attachments"`
+	SyncComments        bool     `yaml:"sync_comments"`
+	SyncDrafts          bool     `yaml:"sync_drafts"`
+	SyncArchived        bool     `yaml:"sync_archived"`
+
 	// Rate limiting
-	RequestsPerSecond  float64       `yaml:"requests_per_second"`
-	BurstLimit         int           `yaml:"burst_limit"`
-	
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	BurstLimit        int     `yaml:"burst_limit"`
+
 	// Retry configuration
 	MaxRetries         int           `yaml:"max_retries"`
 	RetryDelay         time.Duration `yaml:"retry_delay"`
 	ExponentialBackoff bool          `yaml:"exponential_backoff"`
-	
+
 	// Cache configuration
-	CacheEnabled       bool          `yaml:"cache_enabled"`
-	CacheTTL           time.Duration `yaml:"cache_ttl"`
-	CacheSize          int           `yaml:"cache_size"`
-	
+	CacheEnabled bool          `yaml:"cache_enabled"`
+	CacheTTL     time.Duration `yaml:"cache_ttl"`
+	CacheSize    int           `yaml:"cache_size"`
+
 	// Confluence-specific features
-	ExpandContent      []string      `yaml:"expand_content"`
-	IncludeMetadata    bool          `yaml:"include_metadata"`
-	IncludeVersions    bool          `yaml:"include_versions"`
-	IncludeRestrictions bool         `yaml:"include_restrictions"`
-	UseStorage         bool          `yaml:"use_storage"` // Use storage format instead of view
-	
+	ExpandContent       []string `yaml:"expand_content"`
+	IncludeMetadata     bool     `yaml:"include_metadata"`
+	IncludeVersions     bool     `yaml:"include_versions"`
+	IncludeRestrictions bool     `yaml:"include_restrictions"`
+	UseStorage          bool     `yaml:"use_storage"` // Use storage format instead of view
+
 	// Export configuration
-	ExportFormat       string        `yaml:"export_format"` // "view", "storage", "export_view"
-	IncludeLabels      bool          `yaml:"include_labels"`
-	IncludeBreadcrumbs bool          `yaml:"include_breadcrumbs"`
+	ExportFormat       string `yaml:"export_format"` // "view", "storage", "export_view"
+	IncludeLabels      bool   `yaml:"include_labels"`
+	IncludeBreadcrumbs bool   `yaml:"include_breadcrumbs"`
 }
 
 // DefaultConfluenceConfig returns default configuration
 func DefaultConfluenceConfig() *ConfluenceConfig {
 	return &ConfluenceConfig{
-		CloudInstance:      true,
-		AuthMethod:         "basic",
-		SyncInterval:       15 * time.Minute,
-		FullSyncInterval:   24 * time.Hour,
-		BatchSize:          50, // Confluence typically supports smaller batches
-		MaxConcurrentReqs:  5,
+		CloudInstance:       true,
+		AuthMethod:          "basic",
+		SyncInterval:        15 * time.Minute,
+		FullSyncInterval:    24 * time.Hour,
+		BatchSize:           50, // Confluence typically supports smaller batches
+		MaxConcurrentReqs:   5,
 		IncludeContentTypes: []string{"page", "blogpost"},
-		IncludeStatuses:    []string{"current"},
-		MaxContentSize:     50 * 1024 * 1024, // 50MB
-		SyncAttachments:    true,
-		SyncComments:       false,
-		SyncDrafts:         false,
-		SyncArchived:       false,
-		RequestsPerSecond:  5.0, // Conservative rate limit for Confluence
-		BurstLimit:         20,
-		MaxRetries:         3,
-		RetryDelay:         2 * time.Second,
-		ExponentialBackoff: true,
-		CacheEnabled:       true,
-		CacheTTL:           1 * time.Hour,
-		CacheSize:          5000,
-		ExpandContent:      []string{"body.storage", "version", "space"},
-		IncludeMetadata:    true,
-		IncludeVersions:    false,
+		IncludeStatuses:     []string{"current"},
+		MaxContentSize:      50 * 1024 * 1024, // 50MB
+		SyncAttachments:     true,
+		SyncComments:        false,
+		SyncDrafts:          false,
+		SyncArchived:        false,
+		RequestsPerSecond:   5.0, // Conservative rate limit for Confluence
+		BurstLimit:          20,
+		MaxRetries:          3,
+		RetryDelay:          2 * time.Second,
+		ExponentialBackoff:  true,
+		CacheEnabled:        true,
+		CacheTTL:            1 * time.Hour,
+		CacheSize:           5000,
+		ExpandContent:       []string{"body.storage", "version", "space"},
+		IncludeMetadata:     true,
+		IncludeVersions:     false,
 		IncludeRestrictions: false,
-		UseStorage:         true,
-		ExportFormat:       "storage",
-		IncludeLabels:      true,
-		IncludeBreadcrumbs: true,
+		UseStorage:          true,
+		ExportFormat:        "storage",
+		IncludeLabels:       true,
+		IncludeBreadcrumbs:  true,
 	}
 }
 
@@ -163,16 +163,16 @@ func NewConfluenceConnector(config *ConfluenceConfig) *ConfluenceConnector {
 	}
 
 	connector := &ConfluenceConnector{
-		config:        config,
-		httpClient:    &http.Client{Timeout: 60 * time.Second},
-		tracer:        otel.Tracer("confluence-connector"),
-		baseURL:       strings.TrimSuffix(config.BaseURL, "/"),
-		authMethod:    config.AuthMethod,
-		contentCache:  make(map[string]*Content),
-		spaceCache:    make(map[string]*Space),
-		syncState:     &SyncState{},
-		metrics:       &ConnectorMetrics{},
-		rateLimiter:   NewRateLimiter(config.RequestsPerSecond, config.BurstLimit),
+		config:       config,
+		httpClient:   &http.Client{Timeout: 60 * time.Second},
+		tracer:       otel.Tracer("confluence-connector"),
+		baseURL:      strings.TrimSuffix(config.BaseURL, "/"),
+		authMethod:   config.AuthMethod,
+		contentCache: make(map[string]*Content),
+		spaceCache:   make(map[string]*Space),
+		syncState:    &SyncState{},
+		metrics:      &ConnectorMetrics{},
+		rateLimiter:  NewRateLimiter(config.RequestsPerSecond, config.BurstLimit),
 		retryPolicy: &RetryPolicy{
 			MaxRetries:         config.MaxRetries,
 			InitialDelay:       config.RetryDelay,
@@ -241,7 +241,7 @@ func (c *ConfluenceConnector) Disconnect(ctx context.Context) error {
 	defer span.End()
 
 	c.isConnected = false
-	
+
 	// Clear caches
 	c.cacheMu.Lock()
 	c.contentCache = make(map[string]*Content)
@@ -310,7 +310,7 @@ func (c *ConfluenceConnector) GetFile(ctx context.Context, fileID string) (*stor
 
 	// Build API URL
 	apiURL := fmt.Sprintf("%s/rest/api/content/%s", c.baseURL, fileID)
-	
+
 	// Add expand parameters
 	if len(c.config.ExpandContent) > 0 {
 		params := url.Values{}
@@ -330,7 +330,7 @@ func (c *ConfluenceConnector) GetFile(ctx context.Context, fileID string) (*stor
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to parse API response: %w", err)
 	}
-	
+
 	// Cache content
 	if c.config.CacheEnabled {
 		c.cacheContent(&content)
@@ -372,7 +372,7 @@ func (c *ConfluenceConnector) DownloadFile(ctx context.Context, fileID string) (
 	}
 
 	var downloadURL string
-	
+
 	if content.Type == "attachment" {
 		// For attachments, use the download URL
 		downloadURL = fmt.Sprintf("%s/rest/api/content/%s/download", c.baseURL, fileID)
@@ -387,10 +387,10 @@ func (c *ConfluenceConnector) DownloadFile(ctx context.Context, fileID string) (
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add authentication
 		c.addAuthHeaders(req)
-		
+
 		return c.httpClient.Do(req)
 	})
 
@@ -545,14 +545,14 @@ func (c *ConfluenceConnector) testConnection(ctx context.Context) error {
 	if err := json.Unmarshal(response, &user); err != nil {
 		return fmt.Errorf("failed to parse user info: %w", err)
 	}
-	
+
 	c.metrics.LastConnectionTime = time.Now()
 	return nil
 }
 
 func (c *ConfluenceConnector) listAllContent(ctx context.Context) ([]*storage.ConnectorFileInfo, error) {
 	var files []*storage.ConnectorFileInfo
-	
+
 	// First get all spaces
 	spaces, err := c.listSpaces(ctx)
 	if err != nil {
@@ -633,21 +633,21 @@ func (c *ConfluenceConnector) listSpaceContent(ctx context.Context, spaceKey str
 		params.Set("spaceKey", spaceKey)
 		params.Set("start", fmt.Sprintf("%d", start))
 		params.Set("limit", fmt.Sprintf("%d", limit))
-		
+
 		if len(c.config.ExpandContent) > 0 {
 			params.Set("expand", strings.Join(c.config.ExpandContent, ","))
 		}
-		
+
 		// Filter by content types
 		if len(c.config.IncludeContentTypes) > 0 {
 			params.Set("type", strings.Join(c.config.IncludeContentTypes, ","))
 		}
-		
+
 		// Filter by status
 		if len(c.config.IncludeStatuses) > 0 {
 			params.Set("status", strings.Join(c.config.IncludeStatuses, ","))
 		}
-		
+
 		apiURL += "?" + params.Encode()
 
 		// Execute API call
@@ -666,12 +666,12 @@ func (c *ConfluenceConnector) listSpaceContent(ctx context.Context, spaceKey str
 			if c.shouldIncludeContent(&content) {
 				fileInfo := c.convertToFileInfo(&content)
 				files = append(files, fileInfo)
-				
+
 				// Cache content
 				if c.config.CacheEnabled {
 					c.cacheContent(&content)
 				}
-				
+
 				// Get attachments if enabled
 				if c.config.SyncAttachments {
 					attachments, err := c.listContentAttachments(ctx, content.ID)
@@ -719,7 +719,7 @@ func (c *ConfluenceConnector) listContentAttachments(ctx context.Context, conten
 	for _, attachment := range contentCollection.Results {
 		fileInfo := c.convertToFileInfo(&attachment)
 		files = append(files, fileInfo)
-		
+
 		// Cache attachment
 		if c.config.CacheEnabled {
 			c.cacheContent(&attachment)
@@ -874,10 +874,10 @@ func (c *ConfluenceConnector) convertToFileInfo(content *Content) *storage.Conne
 			CanDelete: false,
 		},
 		Metadata: map[string]interface{}{
-			"confluence_id":   content.ID,
-			"content_type":    content.Type,
-			"status":          content.Status,
-			"space_key":       "",
+			"confluence_id": content.ID,
+			"content_type":  content.Type,
+			"status":        content.Status,
+			"space_key":     "",
 		},
 		Tags: map[string]string{
 			"source":       "confluence",
@@ -912,7 +912,7 @@ func (c *ConfluenceConnector) cacheContent(content *Content) {
 	defer c.cacheMu.Unlock()
 
 	c.contentCache[content.ID] = content
-	
+
 	// Simple cache size management
 	if len(c.contentCache) > c.config.CacheSize {
 		// Remove oldest entries (simple FIFO)
@@ -952,10 +952,10 @@ func (c *ConfluenceConnector) executeFullSync(ctx context.Context, options *stor
 	if err != nil {
 		return err
 	}
-	
+
 	result.FilesFound = int64(len(files))
 	result.FilesChanged = int64(len(files)) // For full sync, consider all content as changed
-	
+
 	return nil
 }
 
@@ -976,24 +976,24 @@ func (c *ConfluenceConnector) executeConfluenceAPICall(ctx context.Context, meth
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add authentication headers
 		c.addAuthHeaders(req)
-		
+
 		// Add content type header
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
-		
+
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 		}
-		
+
 		return io.ReadAll(resp.Body)
 	})
 }
@@ -1020,7 +1020,7 @@ func (c *ConfluenceConnector) addAuthHeaders(req *http.Request) {
 
 func (c *ConfluenceConnector) executeWithRetry(ctx context.Context, operation func() (interface{}, error)) (interface{}, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -1028,7 +1028,7 @@ func (c *ConfluenceConnector) executeWithRetry(ctx context.Context, operation fu
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -1042,7 +1042,7 @@ func (c *ConfluenceConnector) executeWithRetry(ctx context.Context, operation fu
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -1051,13 +1051,13 @@ func (c *ConfluenceConnector) executeWithRetry(ctx context.Context, operation fu
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 
 func (c *ConfluenceConnector) executeWithRetryBytes(ctx context.Context, operation func() ([]byte, error)) ([]byte, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -1065,7 +1065,7 @@ func (c *ConfluenceConnector) executeWithRetryBytes(ctx context.Context, operati
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -1079,7 +1079,7 @@ func (c *ConfluenceConnector) executeWithRetryBytes(ctx context.Context, operati
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -1088,7 +1088,7 @@ func (c *ConfluenceConnector) executeWithRetryBytes(ctx context.Context, operati
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 

@@ -43,8 +43,8 @@ func TestPDFReader_ValidateConfig(t *testing.T) {
 		expectError bool
 	}{
 		{
-			name:        "valid config",
-			config:      map[string]any{
+			name: "valid config",
+			config: map[string]any{
 				"extract_mode": "auto",
 				"ocr_language": "eng",
 				"ocr_dpi":      300.0,
@@ -52,22 +52,22 @@ func TestPDFReader_ValidateConfig(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:        "invalid extract_mode",
-			config:      map[string]any{
+			name: "invalid extract_mode",
+			config: map[string]any{
 				"extract_mode": "invalid",
 			},
 			expectError: true,
 		},
 		{
-			name:        "invalid ocr_language",
-			config:      map[string]any{
+			name: "invalid ocr_language",
+			config: map[string]any{
 				"ocr_language": "invalid",
 			},
 			expectError: true,
 		},
 		{
-			name:        "invalid ocr_dpi",
-			config:      map[string]any{
+			name: "invalid ocr_dpi",
+			config: map[string]any{
 				"ocr_dpi": 100.0, // Too low
 			},
 			expectError: true,
@@ -140,7 +140,7 @@ func TestPDFReader_GetBasicInfo(t *testing.T) {
 
 func TestPDFMetadata_MockExtraction(t *testing.T) {
 	reader := &PDFReader{}
-	
+
 	// Test with mock file path
 	metadata, err := reader.extractPDFMetadata("/mock/path/test.pdf")
 	if err != nil {
@@ -158,7 +158,7 @@ func TestPDFMetadata_MockExtraction(t *testing.T) {
 
 func TestPDFReader_ExtractPageText(t *testing.T) {
 	reader := &PDFReader{}
-	
+
 	config := map[string]any{
 		"extract_mode": "auto",
 	}

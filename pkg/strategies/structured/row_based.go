@@ -161,7 +161,7 @@ func (s *RowBasedStrategy) ConfigureReader(readerConfig map[string]any) (map[str
 	for k, v := range readerConfig {
 		configured[k] = v
 	}
-	
+
 	// Ensure headers are available if needed
 	configured["has_header"] = true
 	return configured, nil
@@ -195,7 +195,7 @@ func (s *RowBasedStrategy) ProcessChunk(ctx context.Context, rawData any, metada
 func (s *RowBasedStrategy) GetOptimalChunkSize(sourceSchema core.SchemaInfo) int {
 	// Calculate based on estimated row size and column count
 	rowSize := 100 // Default estimate
-	
+
 	if len(sourceSchema.Fields) > 0 {
 		// Estimate row size based on field types
 		rowSize = 0
@@ -218,18 +218,18 @@ func (s *RowBasedStrategy) GetOptimalChunkSize(sourceSchema core.SchemaInfo) int
 			}
 		}
 	}
-	
+
 	// Target 1MB chunks
 	targetSize := 1024 * 1024
 	optimalRows := targetSize / rowSize
-	
+
 	// Clamp to reasonable range
 	if optimalRows < 10 {
 		optimalRows = 10
 	} else if optimalRows > 1000 {
 		optimalRows = 1000
 	}
-	
+
 	return optimalRows
 }
 
@@ -241,22 +241,22 @@ func (s *RowBasedStrategy) SupportsParallelProcessing() bool {
 // Internal types and methods
 
 type rowBasedConfig struct {
-	RowsPerChunk         int
-	IncludeHeaders       bool
+	RowsPerChunk          int
+	IncludeHeaders        bool
 	PreserveRelationships bool
-	GroupByColumn        string
-	MaxChunkSizeMB       int
-	OutputFormat         string
+	GroupByColumn         string
+	MaxChunkSizeMB        int
+	OutputFormat          string
 }
 
 func (s *RowBasedStrategy) getDefaultConfig() *rowBasedConfig {
 	return &rowBasedConfig{
-		RowsPerChunk:         100,
-		IncludeHeaders:       true,
+		RowsPerChunk:          100,
+		IncludeHeaders:        true,
 		PreserveRelationships: false,
-		GroupByColumn:        "",
-		MaxChunkSizeMB:       10,
-		OutputFormat:         "records",
+		GroupByColumn:         "",
+		MaxChunkSizeMB:        10,
+		OutputFormat:          "records",
 	}
 }
 
@@ -287,9 +287,9 @@ func (s *RowBasedStrategy) updateConfigFromContext(config *rowBasedConfig, conte
 
 func (s *RowBasedStrategy) processSingleRecord(record map[string]any, config *rowBasedConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	chunkData := s.formatChunkData([]map[string]any{record}, config)
-	
+
 	chunk := core.Chunk{
 		Data: chunkData,
 		Metadata: core.ChunkMetadata{
@@ -313,37 +313,37 @@ func (s *RowBasedStrategy) processSingleRecord(record map[string]any, config *ro
 			},
 		},
 	}
-	
+
 	chunks = append(chunks, chunk)
 	return chunks
 }
 
 func (s *RowBasedStrategy) processMultipleRecords(records []map[string]any, config *rowBasedConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	if len(records) == 0 {
 		return chunks
 	}
-	
+
 	// Group records if needed
 	if config.GroupByColumn != "" {
 		records = s.groupRecordsByColumn(records, config.GroupByColumn)
 	}
-	
+
 	// Split into chunks
 	chunkNumber := 1
 	maxSizeBytes := config.MaxChunkSizeMB * 1024 * 1024
-	
+
 	for i := 0; i < len(records); i += config.RowsPerChunk {
 		end := i + config.RowsPerChunk
 		if end > len(records) {
 			end = len(records)
 		}
-		
+
 		chunkRecords := records[i:end]
 		chunkData := s.formatChunkData(chunkRecords, config)
 		chunkSize := s.estimateSize(chunkData)
-		
+
 		// Split further if chunk is too large
 		if chunkSize > maxSizeBytes && len(chunkRecords) > 1 {
 			subChunks := s.splitLargeChunk(chunkRecords, maxSizeBytes, config, metadata, &chunkNumber)
@@ -377,12 +377,12 @@ func (s *RowBasedStrategy) processMultipleRecords(records []map[string]any, conf
 			chunkNumber++
 		}
 	}
-	
+
 	// Update total chunks in context
 	for i := range chunks {
 		chunks[i].Metadata.Context["total_chunks"] = fmt.Sprintf("%d", len(chunks))
 	}
-	
+
 	return chunks
 }
 
@@ -390,11 +390,11 @@ func (s *RowBasedStrategy) processTableData(table [][]string, config *rowBasedCo
 	if len(table) == 0 {
 		return []core.Chunk{}
 	}
-	
+
 	// Convert table to records
 	var headers []string
 	var records []map[string]any
-	
+
 	if config.IncludeHeaders && len(table) > 0 {
 		headers = table[0]
 		for _, row := range table[1:] {
@@ -415,7 +415,7 @@ func (s *RowBasedStrategy) processTableData(table [][]string, config *rowBasedCo
 				headers = append(headers, fmt.Sprintf("col_%d", i))
 			}
 		}
-		
+
 		for _, row := range table {
 			record := make(map[string]any)
 			for i, value := range row {
@@ -426,7 +426,7 @@ func (s *RowBasedStrategy) processTableData(table [][]string, config *rowBasedCo
 			records = append(records, record)
 		}
 	}
-	
+
 	return s.processMultipleRecords(records, config, metadata)
 }
 
@@ -450,13 +450,13 @@ func (s *RowBasedStrategy) convertToTable(records []map[string]any) map[string]a
 			"rows":    [][]any{},
 		}
 	}
-	
+
 	// Extract headers from first record
 	var headers []string
 	for key := range records[0] {
 		headers = append(headers, key)
 	}
-	
+
 	// Convert records to rows
 	var rows [][]any
 	for _, record := range records {
@@ -466,7 +466,7 @@ func (s *RowBasedStrategy) convertToTable(records []map[string]any) map[string]a
 		}
 		rows = append(rows, row)
 	}
-	
+
 	return map[string]any{
 		"headers": headers,
 		"rows":    rows,
@@ -489,24 +489,24 @@ func (s *RowBasedStrategy) convertToJSON(records []map[string]any) string {
 func (s *RowBasedStrategy) groupRecordsByColumn(records []map[string]any, columnName string) []map[string]any {
 	// Group records by the specified column value
 	groups := make(map[string][]map[string]any)
-	
+
 	for _, record := range records {
 		key := fmt.Sprintf("%v", record[columnName])
 		groups[key] = append(groups[key], record)
 	}
-	
+
 	// Flatten groups back to a single slice
 	var result []map[string]any
 	for _, group := range groups {
 		result = append(result, group...)
 	}
-	
+
 	return result
 }
 
 func (s *RowBasedStrategy) splitLargeChunk(records []map[string]any, maxSize int, config *rowBasedConfig, metadata core.ChunkMetadata, chunkNumber *int) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	// Binary search for optimal chunk size
 	left, right := 1, len(records)
 	for left < right {
@@ -518,22 +518,22 @@ func (s *RowBasedStrategy) splitLargeChunk(records []map[string]any, maxSize int
 			right = mid - 1
 		}
 	}
-	
+
 	optimalSize := left
 	if optimalSize < 1 {
 		optimalSize = 1
 	}
-	
+
 	// Create chunks of optimal size
 	for i := 0; i < len(records); i += optimalSize {
 		end := i + optimalSize
 		if end > len(records) {
 			end = len(records)
 		}
-		
+
 		chunkRecords := records[i:end]
 		chunkData := s.formatChunkData(chunkRecords, config)
-		
+
 		chunk := core.Chunk{
 			Data: chunkData,
 			Metadata: core.ChunkMetadata{
@@ -557,11 +557,11 @@ func (s *RowBasedStrategy) splitLargeChunk(records []map[string]any, maxSize int
 				},
 			},
 		}
-		
+
 		chunks = append(chunks, chunk)
 		*chunkNumber++
 	}
-	
+
 	return chunks
 }
 
@@ -626,11 +626,11 @@ func (s *RowBasedStrategy) calculateStructuredQuality(records []map[string]any) 
 			Uniqueness:   0.0,
 		}
 	}
-	
+
 	// Calculate completeness (non-null values)
 	totalFields := 0
 	nonNullFields := 0
-	
+
 	for _, record := range records {
 		for _, value := range record {
 			totalFields++
@@ -639,12 +639,12 @@ func (s *RowBasedStrategy) calculateStructuredQuality(records []map[string]any) 
 			}
 		}
 	}
-	
+
 	completeness := 0.0
 	if totalFields > 0 {
 		completeness = float64(nonNullFields) / float64(totalFields)
 	}
-	
+
 	// Coherence: consistent field types across records
 	coherence := 1.0
 	if len(records) > 1 {
@@ -662,7 +662,7 @@ func (s *RowBasedStrategy) calculateStructuredQuality(records []map[string]any) 
 			coherence = 0
 		}
 	}
-	
+
 	// Uniqueness: unique records
 	uniqueness := 1.0
 	if len(records) > 1 {
@@ -673,7 +673,7 @@ func (s *RowBasedStrategy) calculateStructuredQuality(records []map[string]any) 
 		}
 		uniqueness = float64(len(unique)) / float64(len(records))
 	}
-	
+
 	return &core.QualityMetrics{
 		Completeness: completeness,
 		Coherence:    coherence,

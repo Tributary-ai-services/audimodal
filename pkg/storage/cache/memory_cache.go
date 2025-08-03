@@ -17,22 +17,22 @@ import (
 // MemoryCacheConfig contains configuration for in-memory caching
 type MemoryCacheConfig struct {
 	// Size limits
-	MaxSize      int64 `yaml:"max_size"`       // Maximum total memory size
-	MaxItems     int   `yaml:"max_items"`      // Maximum number of items
-	MaxItemSize  int64 `yaml:"max_item_size"`  // Maximum size per item
-	
+	MaxSize     int64 `yaml:"max_size"`      // Maximum total memory size
+	MaxItems    int   `yaml:"max_items"`     // Maximum number of items
+	MaxItemSize int64 `yaml:"max_item_size"` // Maximum size per item
+
 	// TTL settings
-	DefaultTTL   time.Duration `yaml:"default_ttl"`
+	DefaultTTL      time.Duration `yaml:"default_ttl"`
 	CleanupInterval time.Duration `yaml:"cleanup_interval"`
-	
+
 	// Eviction policy
 	EvictionPolicy string `yaml:"eviction_policy"` // lru, lfu, ttl, random
-	
+
 	// Performance settings
 	EnableCompression bool `yaml:"enable_compression"`
 	CompressionLevel  int  `yaml:"compression_level"`
 	EnableMetrics     bool `yaml:"enable_metrics"`
-	
+
 	// Concurrency
 	Shards int `yaml:"shards"` // Number of shards for concurrent access
 }
@@ -42,14 +42,14 @@ func DefaultMemoryCacheConfig() *MemoryCacheConfig {
 	return &MemoryCacheConfig{
 		MaxSize:           100 * 1024 * 1024, // 100MB
 		MaxItems:          10000,
-		MaxItemSize:       10 * 1024 * 1024,  // 10MB
+		MaxItemSize:       10 * 1024 * 1024, // 10MB
 		DefaultTTL:        1 * time.Hour,
 		CleanupInterval:   5 * time.Minute,
 		EvictionPolicy:    "lru",
 		EnableCompression: true,
 		CompressionLevel:  6,
 		EnableMetrics:     true,
-		Shards:           16,
+		Shards:            16,
 	}
 }
 
@@ -82,9 +82,9 @@ type LRUList struct {
 
 // LRUNode represents a node in the LRU list
 type LRUNode struct {
-	key   string
-	prev  *LRUNode
-	next  *LRUNode
+	key  string
+	prev *LRUNode
+	next *LRUNode
 }
 
 // NewMemoryCache creates a new in-memory cache
@@ -110,7 +110,7 @@ func NewMemoryCache(config *MemoryCacheConfig) (*MemoryCache, error) {
 	// Create shards
 	shards := make([]*CacheShard, config.Shards)
 	shardMaxSize := config.MaxSize / int64(config.Shards)
-	
+
 	for i := 0; i < config.Shards; i++ {
 		shards[i] = &CacheShard{
 			items:   make(map[string]*CacheEntry),
@@ -141,7 +141,7 @@ func NewLRUList() *LRUList {
 	tail := &LRUNode{}
 	head.next = tail
 	tail.prev = head
-	
+
 	return &LRUList{
 		head: head,
 		tail: tail,
@@ -480,7 +480,7 @@ func (c *MemoryCache) Expire(ctx context.Context, key string, ttl time.Duration)
 // BatchGet retrieves multiple items from cache
 func (c *MemoryCache) BatchGet(ctx context.Context, keys []string) (map[string][]byte, error) {
 	result := make(map[string][]byte)
-	
+
 	for _, key := range keys {
 		shard := c.getShard(key)
 		if entry, hit := shard.get(key); hit && !entry.IsExpired() {
@@ -489,7 +489,7 @@ func (c *MemoryCache) BatchGet(ctx context.Context, keys []string) (map[string][
 			shard.moveToFront(key)
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -497,7 +497,7 @@ func (c *MemoryCache) BatchGet(ctx context.Context, keys []string) (map[string][
 func (c *MemoryCache) BatchSet(ctx context.Context, items map[string][]byte, ttl time.Duration) error {
 	for key, value := range items {
 		shard := c.getShard(key)
-		
+
 		entry := &CacheEntry{
 			Key:         key,
 			Value:       value,
@@ -516,14 +516,14 @@ func (c *MemoryCache) BatchSet(ctx context.Context, items map[string][]byte, ttl
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
 // GetStats returns cache statistics
 func (c *MemoryCache) GetStats(ctx context.Context) (*CacheStats, error) {
 	var totalSize, totalKeys int64
-	
+
 	for _, shard := range c.shards {
 		shard.mu.RLock()
 		totalKeys += int64(len(shard.items))
@@ -581,7 +581,7 @@ func (c *MemoryCache) hashKey(key string) uint32 {
 // cleanupLoop periodically removes expired entries
 func (c *MemoryCache) cleanupLoop() {
 	defer c.wg.Done()
-	
+
 	ticker := time.NewTicker(c.config.CleanupInterval)
 	defer ticker.Stop()
 
@@ -608,7 +608,7 @@ func (c *MemoryCache) cleanup() {
 func (s *CacheShard) get(key string) (*CacheEntry, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	entry, exists := s.items[key]
 	return entry, exists
 }
@@ -652,7 +652,7 @@ func (s *CacheShard) delete(key string) {
 func (s *CacheShard) exists(key string) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	_, exists := s.items[key]
 	return exists
 }
@@ -744,13 +744,13 @@ func (l *LRUList) removeTail() string {
 	if l.size == 0 {
 		return ""
 	}
-	
+
 	lastNode := l.tail.prev
 	key := lastNode.key
 	lastNode.prev.next = l.tail
 	l.tail.prev = lastNode.prev
 	l.size--
-	
+
 	return key
 }
 

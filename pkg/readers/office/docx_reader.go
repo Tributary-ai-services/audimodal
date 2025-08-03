@@ -252,8 +252,8 @@ func (r *DOCXReader) CreateIterator(ctx context.Context, sourcePath string, stra
 
 	iterator := &DOCXIterator{
 		sourcePath:       sourcePath,
-		config:          strategyConfig,
-		document:        document,
+		config:           strategyConfig,
+		document:         document,
 		currentParagraph: 0,
 	}
 
@@ -296,15 +296,15 @@ type DOCXDocument struct {
 
 // DOCXParagraph represents a document paragraph
 type DOCXParagraph struct {
-	Text      string
-	Number    int
-	Section   string
+	Text       string
+	Number     int
+	Section    string
 	Formatting map[string]any
 }
 
 // DOCXTable represents a document table
 type DOCXTable struct {
-	Rows [][]string
+	Rows    [][]string
 	Headers []string
 }
 

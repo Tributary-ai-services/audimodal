@@ -254,8 +254,8 @@ func (r *TextReader) DiscoverSchema(ctx context.Context, sourcePath string) (cor
 			},
 		},
 		Metadata: map[string]any{
-			"detected_encoding":    encodingInfo.Name,
-			"encoding_confidence":  encodingInfo.Confidence,
+			"detected_encoding":   encodingInfo.Name,
+			"encoding_confidence": encodingInfo.Confidence,
 			"has_bom":             len(encodingInfo.BOM) > 0,
 			"sample_lines":        len(lines),
 			"avg_line_length":     docInfo.AvgLineLength,
@@ -334,41 +334,41 @@ func (r *TextReader) EstimateSize(ctx context.Context, sourcePath string) (core.
 
 // DocumentInfo contains analyzed document structure information
 type DocumentInfo struct {
-	Format          string
-	AvgLineLength   float64
-	MaxLineLength   int
-	HasHeaders      bool
-	HasLists        bool
-	HasCodeBlocks   bool
-	ParagraphCount  int
-	EmptyLineRatio  float64
+	Format         string
+	AvgLineLength  float64
+	MaxLineLength  int
+	HasHeaders     bool
+	HasLists       bool
+	HasCodeBlocks  bool
+	ParagraphCount int
+	EmptyLineRatio float64
 }
 
 // analyzeDocumentStructure analyzes the document structure patterns
 func (r *TextReader) analyzeDocumentStructure(content string) DocumentInfo {
 	lines := strings.Split(content, "\n")
-	
+
 	info := DocumentInfo{
 		Format: "plain_text",
 	}
-	
+
 	if len(lines) == 0 {
 		return info
 	}
-	
+
 	totalLength := 0
 	emptyLines := 0
 	paragraphs := 0
 	inParagraph := false
-	
+
 	for _, line := range lines {
 		lineLen := len(line)
 		totalLength += lineLen
-		
+
 		if lineLen > info.MaxLineLength {
 			info.MaxLineLength = lineLen
 		}
-		
+
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			emptyLines++
@@ -378,41 +378,41 @@ func (r *TextReader) analyzeDocumentStructure(content string) DocumentInfo {
 				paragraphs++
 				inParagraph = true
 			}
-			
+
 			// Check for headers (# prefix or all caps short lines)
-			if strings.HasPrefix(trimmed, "#") || 
-			   (len(trimmed) < 60 && strings.ToUpper(trimmed) == trimmed && len(trimmed) > 5) {
+			if strings.HasPrefix(trimmed, "#") ||
+				(len(trimmed) < 60 && strings.ToUpper(trimmed) == trimmed && len(trimmed) > 5) {
 				info.HasHeaders = true
 			}
-			
+
 			// Check for lists
-			if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") || 
-			   strings.HasPrefix(trimmed, "+ ") {
+			if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") ||
+				strings.HasPrefix(trimmed, "+ ") {
 				info.HasLists = true
 			}
-			
+
 			// Check for numbered lists
 			if len(trimmed) > 3 && trimmed[1] == '.' && trimmed[2] == ' ' {
 				if c := trimmed[0]; c >= '0' && c <= '9' {
 					info.HasLists = true
 				}
 			}
-			
+
 			// Check for code blocks (indented lines or fenced)
 			if strings.HasPrefix(line, "    ") || strings.HasPrefix(trimmed, "```") ||
-			   strings.HasPrefix(trimmed, "~~~") {
+				strings.HasPrefix(trimmed, "~~~") {
 				info.HasCodeBlocks = true
 			}
 		}
 	}
-	
+
 	if len(lines) > 0 {
 		info.AvgLineLength = float64(totalLength) / float64(len(lines))
 		info.EmptyLineRatio = float64(emptyLines) / float64(len(lines))
 	}
-	
+
 	info.ParagraphCount = paragraphs
-	
+
 	// Determine document format
 	if info.HasHeaders && info.HasLists {
 		info.Format = "structured_text"
@@ -421,54 +421,54 @@ func (r *TextReader) analyzeDocumentStructure(content string) DocumentInfo {
 	} else if info.EmptyLineRatio < 0.1 && info.AvgLineLength > 60 {
 		info.Format = "continuous_text"
 	}
-	
+
 	return info
 }
 
 // classifyLine determines the type of a line of text
 func (r *TextReader) classifyLine(line string) string {
 	trimmed := strings.TrimSpace(line)
-	
+
 	if trimmed == "" {
 		return "empty"
 	}
-	
+
 	// Headers
 	if strings.HasPrefix(trimmed, "#") {
 		return "header"
 	}
-	
+
 	// All caps short lines (potential headers)
 	if len(trimmed) < 60 && strings.ToUpper(trimmed) == trimmed && len(trimmed) > 5 {
 		return "header"
 	}
-	
+
 	// Lists
-	if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") || 
-	   strings.HasPrefix(trimmed, "+ ") {
+	if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") ||
+		strings.HasPrefix(trimmed, "+ ") {
 		return "list_item"
 	}
-	
+
 	// Numbered lists
 	if len(trimmed) > 3 && trimmed[1] == '.' && trimmed[2] == ' ' {
 		if c := trimmed[0]; c >= '0' && c <= '9' {
 			return "list_item"
 		}
 	}
-	
+
 	// Code blocks
 	if strings.HasPrefix(line, "    ") || strings.HasPrefix(trimmed, "```") ||
-	   strings.HasPrefix(trimmed, "~~~") {
+		strings.HasPrefix(trimmed, "~~~") {
 		return "code"
 	}
-	
+
 	return "paragraph"
 }
 
 // getHeaderLevel determines the header level (1-6 for markdown-style headers)
 func (r *TextReader) getHeaderLevel(line string) int {
 	trimmed := strings.TrimSpace(line)
-	
+
 	if strings.HasPrefix(trimmed, "#") {
 		level := 0
 		for i, c := range trimmed {
@@ -482,7 +482,7 @@ func (r *TextReader) getHeaderLevel(line string) int {
 			return level
 		}
 	}
-	
+
 	return 0
 }
 
@@ -491,7 +491,7 @@ func (r *TextReader) CreateIterator(ctx context.Context, sourcePath string, stra
 	// Detect and handle encoding
 	var filePath string
 	var cleanupPath string
-	
+
 	if encoding, ok := strategyConfig["encoding"].(string); ok && encoding != "auto" {
 		// Use specified encoding
 		if encoding != "utf-8" {
@@ -510,7 +510,7 @@ func (r *TextReader) CreateIterator(ctx context.Context, sourcePath string, stra
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect encoding: %w", err)
 		}
-		
+
 		if encodingInfo.Name != "utf-8" {
 			convertedPath, err := r.encodingDetector.ConvertToUTF8(sourcePath, encodingInfo.Name)
 			if err != nil {
@@ -583,7 +583,7 @@ func (it *TextIterator) Next(ctx context.Context) (core.Chunk, error) {
 		if stat, err := it.file.Stat(); err == nil {
 			it.totalSize = stat.Size()
 		}
-		
+
 		// Determine chunking mode
 		if chunkBy, ok := it.config["chunk_by"].(string); ok {
 			it.chunkMode = chunkBy
@@ -606,13 +606,13 @@ func (it *TextIterator) Next(ctx context.Context) (core.Chunk, error) {
 func (it *TextIterator) nextLine(ctx context.Context) (core.Chunk, error) {
 	buffer := make([]byte, 1024)
 	line := strings.Builder{}
-	
+
 	for {
 		n, err := it.file.Read(buffer)
 		if n > 0 {
 			it.readBytes += int64(n)
 			content := string(buffer[:n])
-			
+
 			// Look for newline
 			if idx := strings.Index(content, "\n"); idx >= 0 {
 				line.WriteString(content[:idx])
@@ -627,7 +627,7 @@ func (it *TextIterator) nextLine(ctx context.Context) (core.Chunk, error) {
 				line.WriteString(content)
 			}
 		}
-		
+
 		if err == io.EOF {
 			if line.Len() == 0 {
 				return core.Chunk{}, core.ErrIteratorExhausted
@@ -656,7 +656,7 @@ func (it *TextIterator) nextLine(ctx context.Context) (core.Chunk, error) {
 
 	chunkType := "text"
 	structureLevel := 0
-	
+
 	if detect, ok := it.config["detect_structure"].(bool); !ok || detect {
 		chunkType = it.reader.classifyLine(content)
 		structureLevel = it.reader.getHeaderLevel(content)
@@ -672,10 +672,10 @@ func (it *TextIterator) nextLine(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "text_reader",
 			Context: map[string]string{
-				"line_number":      strconv.Itoa(it.lineNumber),
-				"chunk_type":       chunkType,
-				"structure_level":  strconv.Itoa(structureLevel),
-				"chunking_mode":    it.chunkMode,
+				"line_number":     strconv.Itoa(it.lineNumber),
+				"chunk_type":      chunkType,
+				"structure_level": strconv.Itoa(structureLevel),
+				"chunking_mode":   it.chunkMode,
 			},
 		},
 	}
@@ -687,18 +687,18 @@ func (it *TextIterator) nextLine(ctx context.Context) (core.Chunk, error) {
 func (it *TextIterator) nextParagraph(ctx context.Context) (core.Chunk, error) {
 	var paragraphLines []string
 	startLine := it.lineNumber + 1
-	
+
 	for {
 		// Read next line
 		buffer := make([]byte, 1024)
 		line := strings.Builder{}
-		
+
 		for {
 			n, err := it.file.Read(buffer)
 			if n > 0 {
 				it.readBytes += int64(n)
 				content := string(buffer[:n])
-				
+
 				if idx := strings.Index(content, "\n"); idx >= 0 {
 					line.WriteString(content[:idx])
 					remaining := int64(len(content) - idx - 1)
@@ -711,7 +711,7 @@ func (it *TextIterator) nextParagraph(ctx context.Context) (core.Chunk, error) {
 					line.WriteString(content)
 				}
 			}
-			
+
 			if err == io.EOF {
 				if line.Len() == 0 && len(paragraphLines) == 0 {
 					return core.Chunk{}, core.ErrIteratorExhausted
@@ -722,10 +722,10 @@ func (it *TextIterator) nextParagraph(ctx context.Context) (core.Chunk, error) {
 				return core.Chunk{}, fmt.Errorf("failed to read file: %w", err)
 			}
 		}
-		
+
 		it.lineNumber++
 		currentLine := line.String()
-		
+
 		// Check if line is empty (end of paragraph)
 		if strings.TrimSpace(currentLine) == "" {
 			if len(paragraphLines) > 0 {
@@ -734,16 +734,16 @@ func (it *TextIterator) nextParagraph(ctx context.Context) (core.Chunk, error) {
 			// Skip empty lines between paragraphs
 			continue
 		}
-		
+
 		paragraphLines = append(paragraphLines, currentLine)
 	}
-	
+
 	if len(paragraphLines) == 0 {
 		return core.Chunk{}, core.ErrIteratorExhausted
 	}
-	
+
 	content := strings.Join(paragraphLines, "\n")
-	
+
 	chunk := core.Chunk{
 		Data: content,
 		Metadata: core.ChunkMetadata{
@@ -754,14 +754,14 @@ func (it *TextIterator) nextParagraph(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "text_reader",
 			Context: map[string]string{
-				"start_line":      strconv.Itoa(startLine),
-				"end_line":        strconv.Itoa(it.lineNumber),
-				"line_count":      strconv.Itoa(len(paragraphLines)),
-				"chunking_mode":   it.chunkMode,
+				"start_line":    strconv.Itoa(startLine),
+				"end_line":      strconv.Itoa(it.lineNumber),
+				"line_count":    strconv.Itoa(len(paragraphLines)),
+				"chunking_mode": it.chunkMode,
 			},
 		},
 	}
-	
+
 	return chunk, nil
 }
 
@@ -771,24 +771,24 @@ func (it *TextIterator) nextFixedSize(ctx context.Context) (core.Chunk, error) {
 	if size, ok := it.config["chunk_size"].(float64); ok {
 		chunkSize = int(size)
 	}
-	
+
 	buffer := make([]byte, chunkSize)
 	n, err := it.file.Read(buffer)
-	
+
 	if n == 0 {
 		if err == io.EOF {
 			return core.Chunk{}, core.ErrIteratorExhausted
 		}
 		return core.Chunk{}, fmt.Errorf("failed to read file: %w", err)
 	}
-	
+
 	it.readBytes += int64(n)
 	content := string(buffer[:n])
-	
+
 	// Count lines for metadata
 	lineCount := strings.Count(content, "\n")
 	it.lineNumber += lineCount
-	
+
 	chunk := core.Chunk{
 		Data: content,
 		Metadata: core.ChunkMetadata{
@@ -799,14 +799,14 @@ func (it *TextIterator) nextFixedSize(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "text_reader",
 			Context: map[string]string{
-				"chunk_size":     strconv.Itoa(chunkSize),
-				"bytes_read":     strconv.FormatInt(it.readBytes, 10),
-				"line_count":     strconv.Itoa(lineCount),
-				"chunking_mode":  it.chunkMode,
+				"chunk_size":    strconv.Itoa(chunkSize),
+				"bytes_read":    strconv.FormatInt(it.readBytes, 10),
+				"line_count":    strconv.Itoa(lineCount),
+				"chunking_mode": it.chunkMode,
 			},
 		},
 	}
-	
+
 	return chunk, nil
 }
 
@@ -816,12 +816,12 @@ func (it *TextIterator) Close() error {
 	if it.file != nil {
 		err = it.file.Close()
 	}
-	
+
 	// Clean up temporary encoding conversion file
 	if it.cleanupPath != "" {
 		os.Remove(it.cleanupPath)
 	}
-	
+
 	return err
 }
 

@@ -318,22 +318,22 @@ func (pm *PolicyManager) evaluateCondition(condition PolicyCondition, fileInfo *
 	switch condition.Type {
 	case ConditionFileType:
 		return pm.evaluateStringCondition(fileInfo.ContentType, condition)
-		
+
 	case ConditionFileSize:
 		return pm.evaluateNumericCondition(float64(fileInfo.Size), condition)
-		
+
 	case ConditionPath:
 		return pm.evaluateStringCondition(fileInfo.URL, condition)
-		
+
 	case ConditionTenant:
 		return pm.evaluateStringCondition(tenantID.String(), condition)
-		
+
 	case ConditionClassification:
 		if classification, ok := fileInfo.Metadata["classification"]; ok {
 			return pm.evaluateStringCondition(classification, condition)
 		}
 		return false
-		
+
 	case ConditionMetadata:
 		if condition.Field == "" {
 			return false
@@ -342,7 +342,7 @@ func (pm *PolicyManager) evaluateCondition(condition PolicyCondition, fileInfo *
 			return pm.evaluateStringCondition(value, condition)
 		}
 		return false
-		
+
 	default:
 		return false
 	}
@@ -468,7 +468,7 @@ func (pm *PolicyManager) validateCondition(condition PolicyCondition) error {
 		ConditionFileType, ConditionFileSize, ConditionDataSource,
 		ConditionClassification, ConditionTenant, ConditionPath, ConditionMetadata,
 	}
-	
+
 	validType := false
 	for _, vt := range validTypes {
 		if condition.Type == vt {
@@ -476,7 +476,7 @@ func (pm *PolicyManager) validateCondition(condition PolicyCondition) error {
 			break
 		}
 	}
-	
+
 	if !validType {
 		return fmt.Errorf("invalid condition type: %s", condition.Type)
 	}
@@ -487,7 +487,7 @@ func (pm *PolicyManager) validateCondition(condition PolicyCondition) error {
 		"lt", "less_than", "ge", "greater_equal", "le", "less_equal",
 		"contains", "starts_with", "ends_with", "in", "not_in",
 	}
-	
+
 	validOperator := false
 	for _, vo := range validOperators {
 		if condition.Operator == vo {
@@ -495,7 +495,7 @@ func (pm *PolicyManager) validateCondition(condition PolicyCondition) error {
 			break
 		}
 	}
-	
+
 	if !validOperator {
 		return fmt.Errorf("invalid operator: %s", condition.Operator)
 	}
@@ -510,7 +510,7 @@ func (pm *PolicyManager) validateAction(action EncryptionAction) error {
 			AlgorithmAES256GCM, AlgorithmAES256CBC,
 			AlgorithmChaCha20, AlgorithmXChaCha20,
 		}
-		
+
 		validAlgorithm := false
 		for _, va := range validAlgorithms {
 			if action.Algorithm == va {
@@ -518,7 +518,7 @@ func (pm *PolicyManager) validateAction(action EncryptionAction) error {
 				break
 			}
 		}
-		
+
 		if !validAlgorithm {
 			return fmt.Errorf("invalid encryption algorithm: %s", action.Algorithm)
 		}
@@ -528,7 +528,7 @@ func (pm *PolicyManager) validateAction(action EncryptionAction) error {
 			KeyTypeMaster, KeyTypeData, KeyTypeWrapping,
 			KeyTypeBackup, KeyTypeTransit,
 		}
-		
+
 		validKeyType := false
 		for _, vk := range validKeyTypes {
 			if action.KeyType == vk {
@@ -536,7 +536,7 @@ func (pm *PolicyManager) validateAction(action EncryptionAction) error {
 				break
 			}
 		}
-		
+
 		if !validKeyType {
 			return fmt.Errorf("invalid key type: %s", action.KeyType)
 		}

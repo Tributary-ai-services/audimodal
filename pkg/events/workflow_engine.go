@@ -14,33 +14,33 @@ import (
 
 // WorkflowEngine orchestrates processing workflows based on events
 type WorkflowEngine struct {
-	producer     *Producer
-	consumer     *Consumer
-	workflows    map[uuid.UUID]*WorkflowDefinition
-	executions   map[uuid.UUID]*WorkflowExecution
-	handlers     map[string]WorkflowStepHandler
-	tracer       trace.Tracer
-	mu           sync.RWMutex
-	
+	producer   *Producer
+	consumer   *Consumer
+	workflows  map[uuid.UUID]*WorkflowDefinition
+	executions map[uuid.UUID]*WorkflowExecution
+	handlers   map[string]WorkflowStepHandler
+	tracer     trace.Tracer
+	mu         sync.RWMutex
+
 	// Configuration
-	config       WorkflowEngineConfig
-	
+	config WorkflowEngineConfig
+
 	// Lifecycle
-	running      bool
-	stopChan     chan struct{}
-	wg           sync.WaitGroup
+	running  bool
+	stopChan chan struct{}
+	wg       sync.WaitGroup
 }
 
 // WorkflowEngineConfig contains configuration for the workflow engine
 type WorkflowEngineConfig struct {
 	MaxConcurrentWorkflows int           `yaml:"max_concurrent_workflows"`
 	ExecutionTimeout       time.Duration `yaml:"execution_timeout"`
-	StepTimeout           time.Duration `yaml:"step_timeout"`
-	RetryDelay            time.Duration `yaml:"retry_delay"`
-	CleanupInterval       time.Duration `yaml:"cleanup_interval"`
-	MaxRetentionDays      int           `yaml:"max_retention_days"`
-	EnableMetrics         bool          `yaml:"enable_metrics"`
-	EnableTracing         bool          `yaml:"enable_tracing"`
+	StepTimeout            time.Duration `yaml:"step_timeout"`
+	RetryDelay             time.Duration `yaml:"retry_delay"`
+	CleanupInterval        time.Duration `yaml:"cleanup_interval"`
+	MaxRetentionDays       int           `yaml:"max_retention_days"`
+	EnableMetrics          bool          `yaml:"enable_metrics"`
+	EnableTracing          bool          `yaml:"enable_tracing"`
 }
 
 // DefaultWorkflowEngineConfig returns default configuration
@@ -48,12 +48,12 @@ func DefaultWorkflowEngineConfig() WorkflowEngineConfig {
 	return WorkflowEngineConfig{
 		MaxConcurrentWorkflows: 100,
 		ExecutionTimeout:       30 * time.Minute,
-		StepTimeout:           5 * time.Minute,
-		RetryDelay:            30 * time.Second,
-		CleanupInterval:       1 * time.Hour,
-		MaxRetentionDays:      7,
-		EnableMetrics:         true,
-		EnableTracing:         true,
+		StepTimeout:            5 * time.Minute,
+		RetryDelay:             30 * time.Second,
+		CleanupInterval:        1 * time.Hour,
+		MaxRetentionDays:       7,
+		EnableMetrics:          true,
+		EnableTracing:          true,
 	}
 }
 
@@ -61,10 +61,10 @@ func DefaultWorkflowEngineConfig() WorkflowEngineConfig {
 type WorkflowStepHandler interface {
 	// ExecuteStep executes a workflow step
 	ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error
-	
+
 	// GetStepType returns the step type this handler can execute
 	GetStepType() string
-	
+
 	// GetName returns the handler name
 	GetName() string
 }
@@ -81,12 +81,12 @@ func NewWorkflowEngine(producer *Producer, consumer *Consumer, config WorkflowEn
 		config:     config,
 		stopChan:   make(chan struct{}),
 	}
-	
+
 	// Register the engine as an event handler if consumer is provided
 	if consumer != nil {
 		consumer.RegisterHandler(engine)
 	}
-	
+
 	return engine
 }
 
@@ -94,12 +94,12 @@ func NewWorkflowEngine(producer *Producer, consumer *Consumer, config WorkflowEn
 func (e *WorkflowEngine) RegisterWorkflow(workflow *WorkflowDefinition) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	// Validate workflow
 	if err := e.validateWorkflow(workflow); err != nil {
 		return fmt.Errorf("invalid workflow: %w", err)
 	}
-	
+
 	e.workflows[workflow.ID] = workflow
 	return nil
 }
@@ -115,36 +115,36 @@ func (e *WorkflowEngine) RegisterStepHandler(handler WorkflowStepHandler) {
 func (e *WorkflowEngine) StartWorkflow(ctx context.Context, workflowID, tenantID uuid.UUID, triggerEvent interface{}, context map[string]interface{}) (*WorkflowExecution, error) {
 	ctx, span := e.tracer.Start(ctx, "start_workflow")
 	defer span.End()
-	
+
 	e.mu.RLock()
 	workflow, exists := e.workflows[workflowID]
 	e.mu.RUnlock()
-	
+
 	if !exists {
 		return nil, fmt.Errorf("workflow not found: %s", workflowID)
 	}
-	
+
 	// Create execution
 	execution := &WorkflowExecution{
-		ID:            uuid.New(),
-		WorkflowID:    workflowID,
-		TenantID:      tenantID,
-		Status:        "pending",
-		Progress:      0,
+		ID:             uuid.New(),
+		WorkflowID:     workflowID,
+		TenantID:       tenantID,
+		Status:         "pending",
+		Progress:       0,
 		StepExecutions: make(map[string]*StepExecution),
-		Context:       context,
-		Results:       make(map[string]interface{}),
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		Context:        context,
+		Results:        make(map[string]interface{}),
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}
-	
+
 	// Set trigger event if provided
 	if triggerEvent != nil {
 		if event, ok := triggerEvent.(*Event); ok {
 			execution.TriggerEvent = event
 		}
 	}
-	
+
 	// Initialize step executions
 	for _, step := range workflow.Steps {
 		execution.StepExecutions[step.Name] = &StepExecution{
@@ -153,21 +153,21 @@ func (e *WorkflowEngine) StartWorkflow(ctx context.Context, workflowID, tenantID
 			Results:  make(map[string]interface{}),
 		}
 	}
-	
+
 	// Store execution
 	e.mu.Lock()
 	e.executions[execution.ID] = execution
 	e.mu.Unlock()
-	
+
 	// Start execution asynchronously
 	go e.executeWorkflow(ctx, execution, workflow)
-	
+
 	span.SetAttributes(
 		attribute.String("workflow.id", workflowID.String()),
 		attribute.String("execution.id", execution.ID.String()),
 		attribute.String("tenant.id", tenantID.String()),
 	)
-	
+
 	return execution, nil
 }
 
@@ -175,27 +175,27 @@ func (e *WorkflowEngine) StartWorkflow(ctx context.Context, workflowID, tenantID
 func (e *WorkflowEngine) executeWorkflow(ctx context.Context, execution *WorkflowExecution, workflow *WorkflowDefinition) {
 	ctx, span := e.tracer.Start(ctx, "execute_workflow")
 	defer span.End()
-	
+
 	// Apply timeout
 	if workflow.Config.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, workflow.Config.Timeout)
 		defer cancel()
 	}
-	
+
 	execution.Status = "running"
 	execution.StartedAt = &[]time.Time{time.Now()}[0]
 	execution.UpdatedAt = time.Now()
-	
+
 	// Create dependency graph
 	dependencies := e.buildDependencyGraph(workflow.Steps)
-	
+
 	// Execute steps based on dependencies
 	if err := e.executeStepsWithDependencies(ctx, execution, workflow, dependencies); err != nil {
 		execution.Status = "failed"
 		execution.LastError = &[]string{err.Error()}[0]
 		execution.ErrorCount++
-		
+
 		// Publish failure event
 		e.publishWorkflowEvent(ctx, execution, "workflow.failed", map[string]interface{}{
 			"error": err.Error(),
@@ -203,15 +203,15 @@ func (e *WorkflowEngine) executeWorkflow(ctx context.Context, execution *Workflo
 	} else {
 		execution.Status = "completed"
 		execution.Progress = 100
-		
+
 		// Publish success event
 		e.publishWorkflowEvent(ctx, execution, "workflow.completed", execution.Results)
 	}
-	
+
 	now := time.Now()
 	execution.CompletedAt = &now
 	execution.UpdatedAt = now
-	
+
 	span.SetAttributes(
 		attribute.String("execution.status", execution.Status),
 		attribute.Int("execution.progress", execution.Progress),
@@ -222,7 +222,7 @@ func (e *WorkflowEngine) executeWorkflow(ctx context.Context, execution *Workflo
 func (e *WorkflowEngine) executeStepsWithDependencies(ctx context.Context, execution *WorkflowExecution, workflow *WorkflowDefinition, dependencies map[string][]string) error {
 	completed := make(map[string]bool)
 	totalSteps := len(workflow.Steps)
-	
+
 	for len(completed) < totalSteps {
 		// Find ready steps (dependencies satisfied)
 		var readySteps []*WorkflowStep
@@ -230,7 +230,7 @@ func (e *WorkflowEngine) executeStepsWithDependencies(ctx context.Context, execu
 			if completed[step.Name] {
 				continue
 			}
-			
+
 			// Check if all dependencies are completed
 			allDepsSatisfied := true
 			for _, dep := range step.Dependencies {
@@ -239,21 +239,21 @@ func (e *WorkflowEngine) executeStepsWithDependencies(ctx context.Context, execu
 					break
 				}
 			}
-			
+
 			if allDepsSatisfied {
 				readySteps = append(readySteps, step)
 			}
 		}
-		
+
 		if len(readySteps) == 0 {
 			return fmt.Errorf("workflow deadlock: no steps ready to execute")
 		}
-		
+
 		// Execute ready steps
 		if err := e.executeStepsParallel(ctx, execution, readySteps); err != nil {
 			return err
 		}
-		
+
 		// Mark completed steps
 		for _, step := range readySteps {
 			stepExec := execution.StepExecutions[step.Name]
@@ -265,7 +265,7 @@ func (e *WorkflowEngine) executeStepsWithDependencies(ctx context.Context, execu
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -273,37 +273,37 @@ func (e *WorkflowEngine) executeStepsWithDependencies(ctx context.Context, execu
 func (e *WorkflowEngine) executeStepsParallel(ctx context.Context, execution *WorkflowExecution, steps []*WorkflowStep) error {
 	var wg sync.WaitGroup
 	errors := make(chan error, len(steps))
-	
+
 	// Limit parallelism
 	semaphore := make(chan struct{}, e.config.MaxConcurrentWorkflows)
-	
+
 	for _, step := range steps {
 		wg.Add(1)
 		go func(s *WorkflowStep) {
 			defer wg.Done()
-			
-			semaphore <- struct{}{} // Acquire
+
+			semaphore <- struct{}{}        // Acquire
 			defer func() { <-semaphore }() // Release
-			
+
 			if err := e.executeStep(ctx, execution, s); err != nil {
 				errors <- err
 			}
 		}(step)
 	}
-	
+
 	// Wait for all steps to complete
 	go func() {
 		wg.Wait()
 		close(errors)
 	}()
-	
+
 	// Check for errors
 	for err := range errors {
 		if err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -311,25 +311,25 @@ func (e *WorkflowEngine) executeStepsParallel(ctx context.Context, execution *Wo
 func (e *WorkflowEngine) executeStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep) error {
 	ctx, span := e.tracer.Start(ctx, "execute_step")
 	defer span.End()
-	
+
 	stepExecution := execution.StepExecutions[step.Name]
 	stepExecution.Status = "running"
 	stepExecution.StartedAt = &[]time.Time{time.Now()}[0]
-	
+
 	// Apply step timeout
 	if step.Timeout != nil {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *step.Timeout)
 		defer cancel()
 	}
-	
+
 	span.SetAttributes(
 		attribute.String("step.name", step.Name),
 		attribute.String("step.type", step.Type),
 	)
-	
+
 	var err error
-	
+
 	// Handle different step types
 	switch step.Type {
 	case "handler":
@@ -343,7 +343,7 @@ func (e *WorkflowEngine) executeStep(ctx context.Context, execution *WorkflowExe
 	default:
 		err = fmt.Errorf("unknown step type: %s", step.Type)
 	}
-	
+
 	// Handle step completion
 	now := time.Now()
 	stepExecution.CompletedAt = &now
@@ -351,22 +351,22 @@ func (e *WorkflowEngine) executeStep(ctx context.Context, execution *WorkflowExe
 		duration := now.Sub(*stepExecution.StartedAt)
 		stepExecution.Duration = &duration
 	}
-	
+
 	if err != nil {
 		stepExecution.Status = "failed"
 		stepExecution.LastError = &[]string{err.Error()}[0]
 		stepExecution.RetryCount++
-		
+
 		// Check if we should retry
 		if stepExecution.RetryCount < step.Retries {
 			time.Sleep(e.config.RetryDelay)
 			return e.executeStep(ctx, execution, step)
 		}
-		
+
 		span.RecordError(err)
 		return err
 	}
-	
+
 	stepExecution.Status = "completed"
 	return nil
 }
@@ -376,11 +376,11 @@ func (e *WorkflowEngine) executeHandlerStep(ctx context.Context, execution *Work
 	e.mu.RLock()
 	handler, exists := e.handlers[step.Handler]
 	e.mu.RUnlock()
-	
+
 	if !exists {
 		return fmt.Errorf("handler not found: %s", step.Handler)
 	}
-	
+
 	return handler.ExecuteStep(ctx, execution, step, stepExecution)
 }
 
@@ -389,13 +389,13 @@ func (e *WorkflowEngine) executeConditionalStep(ctx context.Context, execution *
 	if step.Condition == nil {
 		return fmt.Errorf("conditional step requires condition")
 	}
-	
+
 	// Evaluate condition (simplified implementation)
 	result, err := e.evaluateCondition(step.Condition, execution.Context)
 	if err != nil {
 		return fmt.Errorf("failed to evaluate condition: %w", err)
 	}
-	
+
 	stepExecution.Results["condition_result"] = result
 	return nil
 }
@@ -450,7 +450,7 @@ func (e *WorkflowEngine) publishWorkflowEvent(ctx context.Context, execution *Wo
 		"progress":     execution.Progress,
 		"data":         data,
 	}
-	
+
 	// In a real implementation, this would create proper event objects
 	// For now, we'll just log it
 	_ = event
@@ -461,15 +461,15 @@ func (e *WorkflowEngine) validateWorkflow(workflow *WorkflowDefinition) error {
 	if workflow.ID == uuid.Nil {
 		return fmt.Errorf("workflow ID is required")
 	}
-	
+
 	if workflow.Name == "" {
 		return fmt.Errorf("workflow name is required")
 	}
-	
+
 	if len(workflow.Steps) == 0 {
 		return fmt.Errorf("workflow must have at least one step")
 	}
-	
+
 	// Validate step names are unique
 	stepNames := make(map[string]bool)
 	for _, step := range workflow.Steps {
@@ -477,7 +477,7 @@ func (e *WorkflowEngine) validateWorkflow(workflow *WorkflowDefinition) error {
 			return fmt.Errorf("duplicate step name: %s", step.Name)
 		}
 		stepNames[step.Name] = true
-		
+
 		// Validate step dependencies exist
 		for _, dep := range step.Dependencies {
 			if !stepNames[dep] && dep != step.Name {
@@ -495,7 +495,7 @@ func (e *WorkflowEngine) validateWorkflow(workflow *WorkflowDefinition) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -534,25 +534,25 @@ func (e *WorkflowEngine) handleFileDiscoveredEvent(ctx context.Context, event *F
 	// Find workflows that should be triggered by file discovery
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	for _, workflow := range e.workflows {
 		// Check if this workflow should be triggered by file discovery
 		if e.shouldTriggerWorkflow(workflow, "file.discovered", event.TenantID) {
 			tenantID, _ := uuid.Parse(event.TenantID)
-			
+
 			// Start workflow execution
 			_, err := e.StartWorkflow(ctx, workflow.ID, tenantID, event, map[string]interface{}{
-				"file_url": event.Data.URL,
-				"source_id": event.Data.SourceID,
+				"file_url":      event.Data.URL,
+				"source_id":     event.Data.SourceID,
 				"trigger_event": "file.discovered",
 			})
-			
+
 			if err != nil {
 				return fmt.Errorf("failed to start workflow %s: %w", workflow.Name, err)
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -561,24 +561,24 @@ func (e *WorkflowEngine) handleFileClassifiedEvent(ctx context.Context, event *F
 	// Handle file classification events
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	for _, workflow := range e.workflows {
 		if e.shouldTriggerWorkflow(workflow, "file.classified", event.TenantID) {
 			tenantID, _ := uuid.Parse(event.TenantID)
-			
+
 			_, err := e.StartWorkflow(ctx, workflow.ID, tenantID, event, map[string]interface{}{
-				"file_url": event.Data.URL,
-				"data_class": event.Data.DataClass,
-				"pii_types": event.Data.PIITypes,
+				"file_url":      event.Data.URL,
+				"data_class":    event.Data.DataClass,
+				"pii_types":     event.Data.PIITypes,
 				"trigger_event": "file.classified",
 			})
-			
+
 			if err != nil {
 				return fmt.Errorf("failed to start workflow %s: %w", workflow.Name, err)
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -587,24 +587,24 @@ func (e *WorkflowEngine) handleDLPViolationEvent(ctx context.Context, event *DLP
 	// Handle DLP violation events (high priority)
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	for _, workflow := range e.workflows {
 		if e.shouldTriggerWorkflow(workflow, "dlp.violation", event.TenantID) {
 			tenantID, _ := uuid.Parse(event.TenantID)
-			
+
 			_, err := e.StartWorkflow(ctx, workflow.ID, tenantID, event, map[string]interface{}{
-				"file_url": event.Data.URL,
+				"file_url":       event.Data.URL,
 				"violation_type": event.Data.ViolationType,
-				"severity": event.Data.Severity,
-				"trigger_event": "dlp.violation",
+				"severity":       event.Data.Severity,
+				"trigger_event":  "dlp.violation",
 			})
-			
+
 			if err != nil {
 				return fmt.Errorf("failed to start workflow %s: %w", workflow.Name, err)
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -614,12 +614,12 @@ func (e *WorkflowEngine) shouldTriggerWorkflow(workflow *WorkflowDefinition, eve
 	if workflow.TenantID.String() != tenantID {
 		return false
 	}
-	
+
 	// Check if workflow is active
 	if workflow.Status != "active" {
 		return false
 	}
-	
+
 	// Check if workflow has any trigger configuration
 	// For now, assume all active workflows can be triggered by any event
 	// In a real implementation, this would check workflow trigger configuration
@@ -630,12 +630,12 @@ func (e *WorkflowEngine) shouldTriggerWorkflow(workflow *WorkflowDefinition, eve
 func (e *WorkflowEngine) GetExecution(id uuid.UUID) (*WorkflowExecution, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	execution, exists := e.executions[id]
 	if !exists {
 		return nil, fmt.Errorf("execution not found: %s", id)
 	}
-	
+
 	return execution, nil
 }
 
@@ -643,14 +643,14 @@ func (e *WorkflowEngine) GetExecution(id uuid.UUID) (*WorkflowExecution, error) 
 func (e *WorkflowEngine) ListExecutions(tenantID uuid.UUID) ([]*WorkflowExecution, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	var executions []*WorkflowExecution
 	for _, execution := range e.executions {
 		if execution.TenantID == tenantID {
 			executions = append(executions, execution)
 		}
 	}
-	
+
 	return executions, nil
 }
 
@@ -658,19 +658,19 @@ func (e *WorkflowEngine) ListExecutions(tenantID uuid.UUID) ([]*WorkflowExecutio
 func (e *WorkflowEngine) CancelExecution(ctx context.Context, id uuid.UUID) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	execution, exists := e.executions[id]
 	if !exists {
 		return fmt.Errorf("execution not found: %s", id)
 	}
-	
+
 	if execution.Status != "running" {
 		return fmt.Errorf("execution is not running: %s", execution.Status)
 	}
-	
+
 	execution.Status = "cancelled"
 	execution.UpdatedAt = time.Now()
-	
+
 	return nil
 }
 
@@ -679,16 +679,16 @@ func (e *WorkflowEngine) Start(ctx context.Context) error {
 	if e.running {
 		return fmt.Errorf("workflow engine is already running")
 	}
-	
+
 	e.running = true
-	
+
 	// Start cleanup routine
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
 		e.cleanupRoutine(ctx)
 	}()
-	
+
 	return nil
 }
 
@@ -697,13 +697,13 @@ func (e *WorkflowEngine) Stop(ctx context.Context) error {
 	if !e.running {
 		return nil
 	}
-	
+
 	close(e.stopChan)
 	e.running = false
-	
+
 	// Wait for routines to finish
 	e.wg.Wait()
-	
+
 	return nil
 }
 
@@ -711,7 +711,7 @@ func (e *WorkflowEngine) Stop(ctx context.Context) error {
 func (e *WorkflowEngine) cleanupRoutine(ctx context.Context) {
 	ticker := time.NewTicker(e.config.CleanupInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -728,9 +728,9 @@ func (e *WorkflowEngine) cleanupRoutine(ctx context.Context) {
 func (e *WorkflowEngine) cleanupOldExecutions() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	
+
 	cutoff := time.Now().AddDate(0, 0, -e.config.MaxRetentionDays)
-	
+
 	for id, execution := range e.executions {
 		if execution.CompletedAt != nil && execution.CompletedAt.Before(cutoff) {
 			delete(e.executions, id)
@@ -742,9 +742,9 @@ func (e *WorkflowEngine) cleanupOldExecutions() {
 func (e *WorkflowEngine) GetMetrics() map[string]interface{} {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	
+
 	var pendingCount, runningCount, completedCount, failedCount int
-	
+
 	for _, execution := range e.executions {
 		switch execution.Status {
 		case "pending":
@@ -757,14 +757,14 @@ func (e *WorkflowEngine) GetMetrics() map[string]interface{} {
 			failedCount++
 		}
 	}
-	
+
 	return map[string]interface{}{
-		"total_workflows":     len(e.workflows),
-		"total_executions":    len(e.executions),
-		"pending_executions":  pendingCount,
-		"running_executions":  runningCount,
+		"total_workflows":      len(e.workflows),
+		"total_executions":     len(e.executions),
+		"pending_executions":   pendingCount,
+		"running_executions":   runningCount,
 		"completed_executions": completedCount,
-		"failed_executions":   failedCount,
-		"running":            e.running,
+		"failed_executions":    failedCount,
+		"running":              e.running,
 	}
 }

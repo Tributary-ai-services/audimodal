@@ -3,7 +3,6 @@ package backup
 import (
 	"context"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -23,14 +22,14 @@ type BackupExecutor struct {
 	tracer         trace.Tracer
 
 	// Worker pool
-	workers        []BackupWorker
-	workerPool     chan BackupWorker
-	jobQueue       chan *BackupJob
+	workers    []BackupWorker
+	workerPool chan BackupWorker
+	jobQueue   chan *BackupJob
 
 	// State
-	isRunning      bool
-	stopCh         chan struct{}
-	mu             sync.RWMutex
+	isRunning bool
+	stopCh    chan struct{}
+	mu        sync.RWMutex
 }
 
 // BackupWorker interface for executing backup operations
@@ -49,14 +48,14 @@ type RestoreExecutor struct {
 	tracer         trace.Tracer
 
 	// Worker pool
-	workers        []RestoreWorker
-	workerPool     chan RestoreWorker
-	jobQueue       chan *RestoreJob
+	workers    []RestoreWorker
+	workerPool chan RestoreWorker
+	jobQueue   chan *RestoreJob
 
 	// State
-	isRunning      bool
-	stopCh         chan struct{}
-	mu             sync.RWMutex
+	isRunning bool
+	stopCh    chan struct{}
+	mu        sync.RWMutex
 }
 
 // RestoreWorker interface for executing restore operations
@@ -145,7 +144,7 @@ func (be *BackupExecutor) executeBackupJob(ctx context.Context, job *BackupJob) 
 
 	// Execute backup
 	backup, err := worker.ExecuteBackup(ctx, job)
-	
+
 	// Update job completion
 	completedAt := time.Now()
 	job.CompletedAt = &completedAt
@@ -246,7 +245,7 @@ func (re *RestoreExecutor) executeRestoreJob(ctx context.Context, job *RestoreJo
 
 	// Execute restore
 	err := worker.ExecuteRestore(ctx, job)
-	
+
 	// Update job completion
 	completedAt := time.Now()
 	job.CompletedAt = &completedAt
@@ -413,105 +412,105 @@ func (w *DefaultBackupWorker) IsAvailable() bool {
 func (w *DefaultBackupWorker) discoverFiles(ctx context.Context, job *BackupJob, backup *Backup) error {
 	// Discover files to be backed up
 	// This would traverse the source paths and apply include/exclude patterns
-	
+
 	// Placeholder implementation
 	backup.TotalFiles = 1500
 	backup.TotalSize = 2 * 1024 * 1024 * 1024 // 2GB
-	
+
 	job.Progress.TotalFiles = backup.TotalFiles
 	job.Progress.TotalBytes = backup.TotalSize
 	job.Progress.LastUpdate = time.Now()
-	
+
 	return nil
 }
 
 func (w *DefaultBackupWorker) executeFullBackup(ctx context.Context, job *BackupJob, backup *Backup) error {
 	// Execute full backup
 	// This would copy all source files to backup location
-	
+
 	return w.simulateBackupProcess(ctx, job, backup)
 }
 
 func (w *DefaultBackupWorker) executeIncrementalBackup(ctx context.Context, job *BackupJob, backup *Backup) error {
 	// Execute incremental backup
 	// This would only backup files changed since the last backup
-	
+
 	// For incremental, typically fewer files and smaller size
-	backup.TotalFiles = backup.TotalFiles / 10  // ~10% of files changed
-	backup.TotalSize = backup.TotalSize / 10    // ~10% of data changed
-	
+	backup.TotalFiles = backup.TotalFiles / 10 // ~10% of files changed
+	backup.TotalSize = backup.TotalSize / 10   // ~10% of data changed
+
 	if job.Config.ParentBackupID != nil {
 		backup.ParentBackupID = job.Config.ParentBackupID
 	}
-	
+
 	return w.simulateBackupProcess(ctx, job, backup)
 }
 
 func (w *DefaultBackupWorker) executeDifferentialBackup(ctx context.Context, job *BackupJob, backup *Backup) error {
 	// Execute differential backup
 	// This would backup files changed since the last full backup
-	
+
 	// For differential, typically more files than incremental but less than full
-	backup.TotalFiles = backup.TotalFiles / 5   // ~20% of files changed since full
-	backup.TotalSize = backup.TotalSize / 5     // ~20% of data changed since full
-	
+	backup.TotalFiles = backup.TotalFiles / 5 // ~20% of files changed since full
+	backup.TotalSize = backup.TotalSize / 5   // ~20% of data changed since full
+
 	if job.Config.ParentBackupID != nil {
 		backup.ParentBackupID = job.Config.ParentBackupID
 	}
-	
+
 	return w.simulateBackupProcess(ctx, job, backup)
 }
 
 func (w *DefaultBackupWorker) executeSnapshotBackup(ctx context.Context, job *BackupJob, backup *Backup) error {
 	// Execute snapshot backup
 	// This would create a point-in-time snapshot
-	
+
 	return w.simulateBackupProcess(ctx, job, backup)
 }
 
 func (w *DefaultBackupWorker) simulateBackupProcess(ctx context.Context, job *BackupJob, backup *Backup) error {
 	// Simulate the backup process with progress updates
-	
+
 	totalFiles := backup.TotalFiles
 	totalBytes := backup.TotalSize
-	
+
 	// Process files in batches
 	batchSize := int64(100)
 	processedFiles := int64(0)
 	processedBytes := int64(0)
-	
+
 	for processedFiles < totalFiles {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		
+
 		// Process a batch of files
 		currentBatch := batchSize
-		if processedFiles + currentBatch > totalFiles {
+		if processedFiles+currentBatch > totalFiles {
 			currentBatch = totalFiles - processedFiles
 		}
-		
+
 		// Simulate processing time
 		time.Sleep(time.Millisecond * 100)
-		
+
 		processedFiles += currentBatch
 		bytesInBatch := (totalBytes * currentBatch) / totalFiles
 		processedBytes += bytesInBatch
-		
+
 		// Update progress
 		job.Progress.ProcessedFiles = processedFiles
 		job.Progress.ProcessedBytes = processedBytes
 		job.Progress.LastUpdate = time.Now()
-		
+
 		// Calculate performance metrics
 		elapsed := time.Since(job.Progress.StartTime).Seconds()
 		if elapsed > 0 {
 			job.Progress.ThroughputMBps = float64(processedBytes) / (1024 * 1024) / elapsed
 			job.Progress.FilesPerSecond = float64(processedFiles) / elapsed
 		}
-		
+
 		// Estimate ETA
 		if processedFiles > 0 {
 			remainingFiles := totalFiles - processedFiles
@@ -521,33 +520,33 @@ func (w *DefaultBackupWorker) simulateBackupProcess(ctx context.Context, job *Ba
 			job.Progress.EstimatedETA = &eta
 		}
 	}
-	
+
 	// Set backup results
 	backup.ProcessedFiles = processedFiles
 	backup.ProcessedSize = processedBytes
 	backup.BackupSize = processedBytes
-	
+
 	// Simulate compression if enabled
 	if job.Config.CompressionEnabled {
 		backup.CompressedSize = int64(float64(backup.BackupSize) * 0.7) // 30% compression
 	} else {
 		backup.CompressedSize = backup.BackupSize
 	}
-	
+
 	// Set backup location
 	backup.BackupLocation = fmt.Sprintf("/backups/%s/%s", job.TenantID.String(), backup.ID.String())
-	
+
 	return nil
 }
 
 func (w *DefaultBackupWorker) validateBackup(ctx context.Context, backup *Backup) error {
 	// Validate backup integrity
 	// This would verify checksums and file integrity
-	
+
 	// Simulate checksum calculation
 	backup.ChecksumAlgorithm = w.config.ChecksumAlgorithm
 	backup.Checksum = fmt.Sprintf("%s_%s", w.config.ChecksumAlgorithm, backup.ID.String())
-	
+
 	return nil
 }
 
@@ -650,64 +649,64 @@ func (w *DefaultRestoreWorker) IsAvailable() bool {
 func (w *DefaultRestoreWorker) prepareRestore(ctx context.Context, job *RestoreJob) error {
 	// Prepare for restore operation
 	// This would validate the target path, check permissions, etc.
-	
+
 	// Simulate getting backup information
 	job.Progress.TotalFiles = 1500
 	job.Progress.TotalBytes = 2 * 1024 * 1024 * 1024 // 2GB
 	job.Progress.LastUpdate = time.Now()
-	
+
 	return nil
 }
 
 func (w *DefaultRestoreWorker) executeRestore(ctx context.Context, job *RestoreJob) error {
 	// Execute the actual restore operation
-	
+
 	return w.simulateRestoreProcess(ctx, job)
 }
 
 func (w *DefaultRestoreWorker) simulateRestoreProcess(ctx context.Context, job *RestoreJob) error {
 	// Simulate the restore process with progress updates
-	
+
 	totalFiles := job.Progress.TotalFiles
 	totalBytes := job.Progress.TotalBytes
-	
+
 	// Process files in batches
 	batchSize := int64(50) // Restore is typically slower than backup
 	processedFiles := int64(0)
 	processedBytes := int64(0)
-	
+
 	for processedFiles < totalFiles {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
-		
+
 		// Process a batch of files
 		currentBatch := batchSize
-		if processedFiles + currentBatch > totalFiles {
+		if processedFiles+currentBatch > totalFiles {
 			currentBatch = totalFiles - processedFiles
 		}
-		
+
 		// Simulate processing time (restore is typically slower)
 		time.Sleep(time.Millisecond * 200)
-		
+
 		processedFiles += currentBatch
 		bytesInBatch := (totalBytes * currentBatch) / totalFiles
 		processedBytes += bytesInBatch
-		
+
 		// Update progress
 		job.Progress.ProcessedFiles = processedFiles
 		job.Progress.ProcessedBytes = processedBytes
 		job.Progress.LastUpdate = time.Now()
-		
+
 		// Calculate performance metrics
 		elapsed := time.Since(job.Progress.StartTime).Seconds()
 		if elapsed > 0 {
 			job.Progress.ThroughputMBps = float64(processedBytes) / (1024 * 1024) / elapsed
 			job.Progress.FilesPerSecond = float64(processedFiles) / elapsed
 		}
-		
+
 		// Estimate ETA
 		if processedFiles > 0 {
 			remainingFiles := totalFiles - processedFiles
@@ -717,33 +716,33 @@ func (w *DefaultRestoreWorker) simulateRestoreProcess(ctx context.Context, job *
 			job.Progress.EstimatedETA = &eta
 		}
 	}
-	
+
 	return nil
 }
 
 func (w *DefaultRestoreWorker) validateRestore(ctx context.Context, job *RestoreJob) error {
 	// Validate restored files
 	// This would verify checksums and file integrity
-	
+
 	// Simulate validation
 	time.Sleep(time.Second * 2)
-	
+
 	return nil
 }
 
 func (w *DefaultRestoreWorker) finalizeRestore(ctx context.Context, job *RestoreJob) error {
 	// Finalize restore operation
 	// This would set permissions, timestamps, etc.
-	
+
 	if job.Config.RestorePermissions {
 		// Simulate setting permissions
 		time.Sleep(time.Millisecond * 500)
 	}
-	
+
 	if job.Config.RestoreTimestamps {
 		// Simulate setting timestamps
 		time.Sleep(time.Millisecond * 500)
 	}
-	
+
 	return nil
 }

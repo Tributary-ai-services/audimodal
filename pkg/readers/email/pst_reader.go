@@ -251,14 +251,14 @@ func (r *PSTReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 	if pstInfo.EmailCount > 0 {
 		schema.SampleData = []map[string]any{
 			{
-				"content":      "Sample email content extracted from PST archive",
-				"item_type":    "email",
-				"folder_path":  "Inbox",
-				"from":         "sender@example.com",
-				"to":           "recipient@example.com",
-				"subject":      "Sample PST Email Subject",
-				"date":         time.Now().Format("2006-01-02 15:04:05"),
-				"message_id":   "sample-message-id@example.com",
+				"content":     "Sample email content extracted from PST archive",
+				"item_type":   "email",
+				"folder_path": "Inbox",
+				"from":        "sender@example.com",
+				"to":          "recipient@example.com",
+				"subject":     "Sample PST Email Subject",
+				"date":        time.Now().Format("2006-01-02 15:04:05"),
+				"message_id":  "sample-message-id@example.com",
 			},
 		}
 	}
@@ -433,10 +433,10 @@ func (r *PSTReader) extractPSTInfo(filePath string) (PSTInfo, error) {
 		}
 	}
 
-	// Mock item counts based on file size (in a real implementation, 
+	// Mock item counts based on file size (in a real implementation,
 	// you would parse the PST structure to get actual counts)
 	sizeCategory := stat.Size() / (1024 * 1024) // Size in MB
-	
+
 	// Estimate items based on file size
 	switch {
 	case sizeCategory < 10: // < 10MB
@@ -511,19 +511,19 @@ func (r *PSTReader) parsePSTItems(filePath string, config map[string]any) ([]PST
 // createMockEmailItems creates mock email items for demonstration
 func (r *PSTReader) createMockEmailItems(count int, config map[string]any) []PSTItem {
 	var items []PSTItem
-	
+
 	folders := []string{"Inbox", "Sent Items", "Drafts", "Deleted Items", "Junk Email"}
-	
+
 	for i := 0; i < count; i++ {
 		folder := folders[i%len(folders)]
-		
+
 		// Skip deleted items unless configured
 		if folder == "Deleted Items" {
 			if extractDeleted, ok := config["extract_deleted_items"]; !ok || !extractDeleted.(bool) {
 				continue
 			}
 		}
-		
+
 		item := PSTItem{
 			ItemType:   "email",
 			Content:    fmt.Sprintf("This is the content of email %d from the PST archive. It contains the message body text.", i+1),
@@ -534,32 +534,32 @@ func (r *PSTReader) createMockEmailItems(count int, config map[string]any) []PST
 			Date:       time.Now().AddDate(0, 0, -i).Format("2006-01-02 15:04:05"),
 			MessageID:  fmt.Sprintf("msg-%d@example.com", i+1),
 			Properties: map[string]string{
-				"PR_MESSAGE_CLASS":        "IPM.Note",
-				"PR_IMPORTANCE":          "Normal",
-				"PR_SENSITIVITY":         "Normal",
-				"PR_MESSAGE_FLAGS":       "1",
-				"PR_CLIENT_SUBMIT_TIME":  time.Now().AddDate(0, 0, -i).Format("2006-01-02 15:04:05"),
+				"PR_MESSAGE_CLASS":      "IPM.Note",
+				"PR_IMPORTANCE":         "Normal",
+				"PR_SENSITIVITY":        "Normal",
+				"PR_MESSAGE_FLAGS":      "1",
+				"PR_CLIENT_SUBMIT_TIME": time.Now().AddDate(0, 0, -i).Format("2006-01-02 15:04:05"),
 			},
 			Size: int64(len(fmt.Sprintf("Email content %d", i+1)) + 200), // Estimated size
 		}
-		
+
 		items = append(items, item)
 	}
-	
+
 	return items
 }
 
 // createMockContactItems creates mock contact items for demonstration
 func (r *PSTReader) createMockContactItems(count int) []PSTItem {
 	var items []PSTItem
-	
+
 	for i := 0; i < count; i++ {
 		content := fmt.Sprintf(`Contact: Contact Person %d
 Email: contact%d@example.com
 Phone: +1-555-0%03d
 Company: Company %d
 Address: %d Main Street, City, State`, i+1, i+1, 100+i, (i%10)+1, (i*10)+100)
-		
+
 		item := PSTItem{
 			ItemType:   "contact",
 			Content:    content,
@@ -567,29 +567,29 @@ Address: %d Main Street, City, State`, i+1, i+1, 100+i, (i%10)+1, (i*10)+100)
 			Subject:    fmt.Sprintf("Contact Person %d", i+1),
 			Date:       time.Now().AddDate(0, 0, -i*2).Format("2006-01-02 15:04:05"),
 			Properties: map[string]string{
-				"PR_MESSAGE_CLASS":     "IPM.Contact",
-				"PR_DISPLAY_NAME":      fmt.Sprintf("Contact Person %d", i+1),
-				"PR_EMAIL_ADDRESS":     fmt.Sprintf("contact%d@example.com", i+1),
+				"PR_MESSAGE_CLASS":             "IPM.Contact",
+				"PR_DISPLAY_NAME":              fmt.Sprintf("Contact Person %d", i+1),
+				"PR_EMAIL_ADDRESS":             fmt.Sprintf("contact%d@example.com", i+1),
 				"PR_BUSINESS_TELEPHONE_NUMBER": fmt.Sprintf("+1-555-0%03d", 100+i),
-				"PR_COMPANY_NAME":      fmt.Sprintf("Company %d", (i%10)+1),
+				"PR_COMPANY_NAME":              fmt.Sprintf("Company %d", (i%10)+1),
 			},
 			Size: int64(len(content)),
 		}
-		
+
 		items = append(items, item)
 	}
-	
+
 	return items
 }
 
 // createMockCalendarItems creates mock calendar items for demonstration
 func (r *PSTReader) createMockCalendarItems(count int) []PSTItem {
 	var items []PSTItem
-	
+
 	for i := 0; i < count; i++ {
 		startTime := time.Now().AddDate(0, 0, i-30) // Events from past month to future
 		endTime := startTime.Add(time.Hour)
-		
+
 		content := fmt.Sprintf(`Meeting: %s
 Start: %s
 End: %s
@@ -600,7 +600,7 @@ Description: This is the description for calendar event %d from the PST archive.
 			startTime.Format("2006-01-02 15:04:05"),
 			endTime.Format("2006-01-02 15:04:05"),
 			(i%5)+1, (i%3)+1, (i%3)+2, i+1)
-		
+
 		item := PSTItem{
 			ItemType:   "calendar",
 			Content:    content,
@@ -608,27 +608,27 @@ Description: This is the description for calendar event %d from the PST archive.
 			Subject:    fmt.Sprintf("Meeting %d", i+1),
 			Date:       startTime.Format("2006-01-02 15:04:05"),
 			Properties: map[string]string{
-				"PR_MESSAGE_CLASS":    "IPM.Appointment",
-				"PR_START_DATE":       startTime.Format("2006-01-02 15:04:05"),
-				"PR_END_DATE":         endTime.Format("2006-01-02 15:04:05"),
-				"PR_LOCATION":         fmt.Sprintf("Conference Room %d", (i%5)+1),
-				"PR_MEETING_TYPE":     "1",
+				"PR_MESSAGE_CLASS": "IPM.Appointment",
+				"PR_START_DATE":    startTime.Format("2006-01-02 15:04:05"),
+				"PR_END_DATE":      endTime.Format("2006-01-02 15:04:05"),
+				"PR_LOCATION":      fmt.Sprintf("Conference Room %d", (i%5)+1),
+				"PR_MEETING_TYPE":  "1",
 			},
 			Size: int64(len(content)),
 		}
-		
+
 		items = append(items, item)
 	}
-	
+
 	return items
 }
 
 // createMockAttachmentItems creates mock attachment items for demonstration
 func (r *PSTReader) createMockAttachmentItems(count int, config map[string]any) []PSTItem {
 	var items []PSTItem
-	
+
 	attachmentTypes := []string{".pdf", ".docx", ".xlsx", ".pptx", ".jpg", ".png", ".zip", ".txt"}
-	
+
 	// Get max attachment size from config
 	maxSizeMB := 100
 	if maxSize, ok := config["max_attachment_size_mb"]; ok {
@@ -636,21 +636,21 @@ func (r *PSTReader) createMockAttachmentItems(count int, config map[string]any) 
 			maxSizeMB = int(size)
 		}
 	}
-	
+
 	for i := 0; i < count; i++ {
 		fileType := attachmentTypes[i%len(attachmentTypes)]
 		fileName := fmt.Sprintf("attachment_%d%s", i+1, fileType)
-		
+
 		// Mock attachment size (KB to MB range)
 		attachmentSize := int64((i%1000 + 1) * 1024) // 1KB to 1MB
-		
+
 		// Skip if over size limit
 		if attachmentSize > int64(maxSizeMB*1024*1024) {
 			continue
 		}
-		
+
 		content := fmt.Sprintf("[Binary attachment data for %s - Size: %d bytes]", fileName, attachmentSize)
-		
+
 		item := PSTItem{
 			ItemType:       "attachment",
 			Content:        content,
@@ -660,17 +660,17 @@ func (r *PSTReader) createMockAttachmentItems(count int, config map[string]any) 
 			AttachmentType: strings.TrimPrefix(fileType, "."),
 			Date:           time.Now().AddDate(0, 0, -i).Format("2006-01-02 15:04:05"),
 			Properties: map[string]string{
-				"PR_ATTACH_FILENAME":    fileName,
-				"PR_ATTACH_EXTENSION":   fileType,
-				"PR_ATTACH_SIZE":        strconv.FormatInt(attachmentSize, 10),
-				"PR_ATTACH_METHOD":      "1",
+				"PR_ATTACH_FILENAME":  fileName,
+				"PR_ATTACH_EXTENSION": fileType,
+				"PR_ATTACH_SIZE":      strconv.FormatInt(attachmentSize, 10),
+				"PR_ATTACH_METHOD":    "1",
 			},
 			Size: attachmentSize,
 		}
-		
+
 		items = append(items, item)
 	}
-	
+
 	return items
 }
 
@@ -708,11 +708,11 @@ func (it *PSTIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "pst_reader",
 			Context: map[string]string{
-				"item_type":    item.ItemType,
-				"folder_path":  item.FolderPath,
-				"item_number":  strconv.Itoa(it.currentItem),
-				"total_items":  strconv.Itoa(len(it.items)),
-				"file_type":    "pst",
+				"item_type":   item.ItemType,
+				"folder_path": item.FolderPath,
+				"item_number": strconv.Itoa(it.currentItem),
+				"total_items": strconv.Itoa(len(it.items)),
+				"file_type":   "pst",
 			},
 		},
 	}
@@ -771,4 +771,3 @@ func (it *PSTIterator) Progress() float64 {
 	}
 	return float64(it.currentItem) / float64(len(it.items))
 }
-

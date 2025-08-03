@@ -196,7 +196,7 @@ func (r *JPGReader) TestConnection(ctx context.Context, config map[string]any) c
 
 	// Check OCR dependencies
 	dependencies := r.checkOCRDependencies()
-	
+
 	return core.ConnectionTestResult{
 		Success: len(dependencies) == 0,
 		Message: func() string {
@@ -218,22 +218,22 @@ func (r *JPGReader) TestConnection(ctx context.Context, config map[string]any) c
 // checkOCRDependencies verifies OCR tools are available
 func (r *JPGReader) checkOCRDependencies() []string {
 	var missing []string
-	
+
 	// Check for tesseract (OCR engine)
 	if !r.commandExists("tesseract") {
 		missing = append(missing, "tesseract (install tesseract-ocr)")
 	}
-	
+
 	// Check for ImageMagick (image processing)
 	if !r.commandExists("convert") {
 		missing = append(missing, "convert (install imagemagick)")
 	}
-	
+
 	// Check for exiftool (EXIF metadata extraction)
 	if !r.commandExists("exiftool") {
 		missing = append(missing, "exiftool (install libimage-exiftool-perl)")
 	}
-	
+
 	return missing
 }
 
@@ -324,22 +324,22 @@ func (r *JPGReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 			},
 		},
 		Metadata: map[string]any{
-			"file_size":       stat.Size(),
-			"width":           width,
-			"height":          height,
-			"color_model":     r.getColorModelName(img.ColorModel()),
-			"aspect_ratio":    float64(width) / float64(height),
-			"pixel_count":     width * height,
-			"quality":         jpegInfo.Quality,
-			"orientation":     jpegInfo.Orientation,
-			"camera_make":     jpegInfo.CameraMake,
-			"camera_model":    jpegInfo.CameraModel,
-			"creation_time":   jpegInfo.CreationTime,
-			"gps_latitude":    jpegInfo.GPSLatitude,
-			"gps_longitude":   jpegInfo.GPSLongitude,
-			"software":        jpegInfo.Software,
-			"has_text":        jpegInfo.HasText,
-			"is_progressive":  jpegInfo.IsProgressive,
+			"file_size":      stat.Size(),
+			"width":          width,
+			"height":         height,
+			"color_model":    r.getColorModelName(img.ColorModel()),
+			"aspect_ratio":   float64(width) / float64(height),
+			"pixel_count":    width * height,
+			"quality":        jpegInfo.Quality,
+			"orientation":    jpegInfo.Orientation,
+			"camera_make":    jpegInfo.CameraMake,
+			"camera_model":   jpegInfo.CameraModel,
+			"creation_time":  jpegInfo.CreationTime,
+			"gps_latitude":   jpegInfo.GPSLatitude,
+			"gps_longitude":  jpegInfo.GPSLongitude,
+			"software":       jpegInfo.Software,
+			"has_text":       jpegInfo.HasText,
+			"is_progressive": jpegInfo.IsProgressive,
 		},
 	}
 
@@ -433,27 +433,26 @@ func (r *JPGReader) GetSupportedFormats() []string {
 
 // JPEGInfo contains extracted JPEG metadata
 type JPEGInfo struct {
-	Quality        int
-	Orientation    int
-	CameraMake     string
-	CameraModel    string
-	CreationTime   string
-	GPSLatitude    float64
-	GPSLongitude   float64
-	Software       string
-	HasText        bool
-	IsProgressive  bool
+	Quality       int
+	Orientation   int
+	CameraMake    string
+	CameraModel   string
+	CreationTime  string
+	GPSLatitude   float64
+	GPSLongitude  float64
+	Software      string
+	HasText       bool
+	IsProgressive bool
 }
-
 
 // extractJPEGInfo extracts metadata from JPEG file
 func (r *JPGReader) extractJPEGInfo(sourcePath string) JPEGInfo {
 	// This is a simplified JPEG metadata extractor
 	// In production, you'd parse EXIF data using a library like github.com/rwcarlsen/goexif/exif
-	
+
 	info := JPEGInfo{
-		Quality:       85, // Common default
-		Orientation:   1,  // Normal orientation
+		Quality:       85,   // Common default
+		Orientation:   1,    // Normal orientation
 		HasText:       true, // Assume images may contain text
 		IsProgressive: false,
 	}
@@ -508,9 +507,9 @@ func (r *JPGReader) performOCR(sourcePath string, config map[string]any) (string
 	ocrText := fmt.Sprintf("This is sample OCR text extracted from the JPEG image. " +
 		"In a production implementation, this would be the actual text recognized by Tesseract OCR " +
 		"from the image content. JPEG images often contain photos with embedded text, signs, documents, etc.")
-	
+
 	confidence := 0.82 // Mock confidence score
-	
+
 	// Mock text regions
 	regions := []TextRegion{
 		{
@@ -570,7 +569,7 @@ func (it *JPGIterator) Next(ctx context.Context) (core.Chunk, error) {
 	var content string
 	var confidence float64
 	var regions []TextRegion
-	
+
 	if ocrEnabled, ok := it.config["ocr_enabled"]; !ok || ocrEnabled.(bool) {
 		var err error
 		content, confidence, regions, err = it.reader.performOCR(it.sourcePath, it.config)
@@ -662,4 +661,3 @@ func (it *JPGIterator) Progress() float64 {
 	}
 	return 0.0
 }
-

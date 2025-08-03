@@ -419,46 +419,46 @@ func (v *EventValidator) validateBaseEvent(base BaseEvent) error {
 
 // EventBusMetrics represents metrics for the event bus
 type EventBusMetrics struct {
-	EventsPublished   int64             `json:"events_published"`
-	EventsProcessed   int64             `json:"events_processed"`
-	EventsFailed      int64             `json:"events_failed"`
-	HandlersActive    int               `json:"handlers_active"`
-	QueueDepth        int               `json:"queue_depth"`
-	ProcessingTime    time.Duration     `json:"avg_processing_time"`
-	LastProcessedAt   *time.Time        `json:"last_processed_at"`
-	ErrorRate         float64           `json:"error_rate"`
-	ThroughputPerSec  float64           `json:"throughput_per_sec"`
-	HandlerMetrics    map[string]*HandlerMetrics `json:"handler_metrics"`
+	EventsPublished  int64                      `json:"events_published"`
+	EventsProcessed  int64                      `json:"events_processed"`
+	EventsFailed     int64                      `json:"events_failed"`
+	HandlersActive   int                        `json:"handlers_active"`
+	QueueDepth       int                        `json:"queue_depth"`
+	ProcessingTime   time.Duration              `json:"avg_processing_time"`
+	LastProcessedAt  *time.Time                 `json:"last_processed_at"`
+	ErrorRate        float64                    `json:"error_rate"`
+	ThroughputPerSec float64                    `json:"throughput_per_sec"`
+	HandlerMetrics   map[string]*HandlerMetrics `json:"handler_metrics"`
 }
 
 // HandlerMetrics represents metrics for individual event handlers
 type HandlerMetrics struct {
-	EventsHandled    int64         `json:"events_handled"`
-	EventsFailed     int64         `json:"events_failed"`
+	EventsHandled     int64         `json:"events_handled"`
+	EventsFailed      int64         `json:"events_failed"`
 	AvgProcessingTime time.Duration `json:"avg_processing_time"`
-	LastHandledAt    *time.Time    `json:"last_handled_at"`
-	ErrorRate        float64       `json:"error_rate"`
+	LastHandledAt     *time.Time    `json:"last_handled_at"`
+	ErrorRate         float64       `json:"error_rate"`
 }
 
 // WorkflowDefinition represents a processing workflow
 type WorkflowDefinition struct {
-	ID          uuid.UUID           `json:"id"`
-	Name        string              `json:"name"`
-	Version     string              `json:"version"`
-	Description string              `json:"description"`
-	TenantID    uuid.UUID           `json:"tenant_id"`
-	
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Version     string    `json:"version"`
+	Description string    `json:"description"`
+	TenantID    uuid.UUID `json:"tenant_id"`
+
 	// Workflow steps
-	Steps       []*WorkflowStep     `json:"steps"`
-	
+	Steps []*WorkflowStep `json:"steps"`
+
 	// Configuration
-	Config      WorkflowConfig      `json:"config"`
-	
+	Config WorkflowConfig `json:"config"`
+
 	// Metadata
-	CreatedAt   time.Time           `json:"created_at"`
-	UpdatedAt   time.Time           `json:"updated_at"`
-	CreatedBy   string              `json:"created_by"`
-	Status      string              `json:"status"` // active, inactive, draft
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	CreatedBy string    `json:"created_by"`
+	Status    string    `json:"status"` // active, inactive, draft
 }
 
 // WorkflowStep represents a step in a processing workflow
@@ -495,42 +495,42 @@ type WorkflowConfig struct {
 
 // WorkflowExecution represents an execution of a workflow
 type WorkflowExecution struct {
-	ID           uuid.UUID              `json:"id"`
-	WorkflowID   uuid.UUID              `json:"workflow_id"`
-	TenantID     uuid.UUID              `json:"tenant_id"`
-	SessionID    *uuid.UUID             `json:"session_id,omitempty"`
-	TriggerEvent interface{}            `json:"trigger_event,omitempty"`
-	
-	Status       string                 `json:"status"` // pending, running, completed, failed, cancelled
-	Progress     int                    `json:"progress"` // percentage
-	
+	ID           uuid.UUID   `json:"id"`
+	WorkflowID   uuid.UUID   `json:"workflow_id"`
+	TenantID     uuid.UUID   `json:"tenant_id"`
+	SessionID    *uuid.UUID  `json:"session_id,omitempty"`
+	TriggerEvent interface{} `json:"trigger_event,omitempty"`
+
+	Status   string `json:"status"`   // pending, running, completed, failed, cancelled
+	Progress int    `json:"progress"` // percentage
+
 	// Step execution tracking
 	StepExecutions map[string]*StepExecution `json:"step_executions"`
-	
+
 	// Context and results
-	Context      map[string]interface{} `json:"context"`
-	Results      map[string]interface{} `json:"results"`
-	
+	Context map[string]interface{} `json:"context"`
+	Results map[string]interface{} `json:"results"`
+
 	// Timestamps
-	StartedAt    *time.Time             `json:"started_at,omitempty"`
-	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
-	
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+
 	// Error tracking
-	LastError    *string                `json:"last_error,omitempty"`
-	ErrorCount   int                    `json:"error_count"`
+	LastError  *string `json:"last_error,omitempty"`
+	ErrorCount int     `json:"error_count"`
 }
 
 // StepExecution represents the execution of a workflow step
 type StepExecution struct {
-	StepName     string                 `json:"step_name"`
-	Status       string                 `json:"status"`
-	StartedAt    *time.Time             `json:"started_at,omitempty"`
-	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
-	Duration     *time.Duration         `json:"duration,omitempty"`
-	RetryCount   int                    `json:"retry_count"`
-	LastError    *string                `json:"last_error,omitempty"`
-	Results      map[string]interface{} `json:"results,omitempty"`
-	EventsEmitted []interface{}         `json:"events_emitted,omitempty"`
+	StepName      string                 `json:"step_name"`
+	Status        string                 `json:"status"`
+	StartedAt     *time.Time             `json:"started_at,omitempty"`
+	CompletedAt   *time.Time             `json:"completed_at,omitempty"`
+	Duration      *time.Duration         `json:"duration,omitempty"`
+	RetryCount    int                    `json:"retry_count"`
+	LastError     *string                `json:"last_error,omitempty"`
+	Results       map[string]interface{} `json:"results,omitempty"`
+	EventsEmitted []interface{}          `json:"events_emitted,omitempty"`
 }

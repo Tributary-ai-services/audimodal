@@ -40,38 +40,38 @@ type WebhookConfig struct {
 
 // WebhookSubscription represents a webhook subscription
 type WebhookSubscription struct {
-	ID             string                 `json:"id"`
-	ConnectorType  string                 `json:"connector_type"`
-	DataSourceID   uuid.UUID             `json:"data_source_id"`
-	URL            string                 `json:"url"`
-	EventTypes     []WebhookEventType    `json:"event_types"`
-	Secret         string                 `json:"secret"`
-	Headers        map[string]string     `json:"headers"`
-	IsActive       bool                  `json:"is_active"`
-	CreatedAt      time.Time             `json:"created_at"`
-	UpdatedAt      time.Time             `json:"updated_at"`
-	LastEventAt    *time.Time            `json:"last_event_at,omitempty"`
-	ExpiresAt      *time.Time            `json:"expires_at,omitempty"`
-	Metadata       map[string]interface{} `json:"metadata"`
+	ID            string                 `json:"id"`
+	ConnectorType string                 `json:"connector_type"`
+	DataSourceID  uuid.UUID              `json:"data_source_id"`
+	URL           string                 `json:"url"`
+	EventTypes    []WebhookEventType     `json:"event_types"`
+	Secret        string                 `json:"secret"`
+	Headers       map[string]string      `json:"headers"`
+	IsActive      bool                   `json:"is_active"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
+	LastEventAt   *time.Time             `json:"last_event_at,omitempty"`
+	ExpiresAt     *time.Time             `json:"expires_at,omitempty"`
+	Metadata      map[string]interface{} `json:"metadata"`
 }
 
 // WebhookEventType defines types of webhook events
 type WebhookEventType string
 
 const (
-	WebhookEventTypeFileCreated  WebhookEventType = "file.created"
-	WebhookEventTypeFileUpdated  WebhookEventType = "file.updated"
-	WebhookEventTypeFileDeleted  WebhookEventType = "file.deleted"
-	WebhookEventTypeFileMoved    WebhookEventType = "file.moved"
-	WebhookEventTypeFileRenamed  WebhookEventType = "file.renamed"
-	WebhookEventTypeFolderCreated WebhookEventType = "folder.created"
-	WebhookEventTypeFolderUpdated WebhookEventType = "folder.updated"
-	WebhookEventTypeFolderDeleted WebhookEventType = "folder.deleted"
-	WebhookEventTypeSyncStarted  WebhookEventType = "sync.started"
-	WebhookEventTypeSyncCompleted WebhookEventType = "sync.completed"
-	WebhookEventTypeSyncFailed   WebhookEventType = "sync.failed"
+	WebhookEventTypeFileCreated       WebhookEventType = "file.created"
+	WebhookEventTypeFileUpdated       WebhookEventType = "file.updated"
+	WebhookEventTypeFileDeleted       WebhookEventType = "file.deleted"
+	WebhookEventTypeFileMoved         WebhookEventType = "file.moved"
+	WebhookEventTypeFileRenamed       WebhookEventType = "file.renamed"
+	WebhookEventTypeFolderCreated     WebhookEventType = "folder.created"
+	WebhookEventTypeFolderUpdated     WebhookEventType = "folder.updated"
+	WebhookEventTypeFolderDeleted     WebhookEventType = "folder.deleted"
+	WebhookEventTypeSyncStarted       WebhookEventType = "sync.started"
+	WebhookEventTypeSyncCompleted     WebhookEventType = "sync.completed"
+	WebhookEventTypeSyncFailed        WebhookEventType = "sync.failed"
 	WebhookEventTypePermissionChanged WebhookEventType = "permission.changed"
-	WebhookEventTypeSharedUpdated WebhookEventType = "share.updated"
+	WebhookEventTypeSharedUpdated     WebhookEventType = "share.updated"
 )
 
 // StandardWebhookEvent represents a standardized webhook event
@@ -79,28 +79,28 @@ type StandardWebhookEvent struct {
 	ID            string                 `json:"id"`
 	EventType     WebhookEventType       `json:"event_type"`
 	ConnectorType string                 `json:"connector_type"`
-	DataSourceID  uuid.UUID             `json:"data_source_id"`
-	Timestamp     time.Time             `json:"timestamp"`
-	Resource      WebhookResource       `json:"resource"`
-	Changes       []WebhookChange       `json:"changes,omitempty"`
-	Actor         *WebhookActor         `json:"actor,omitempty"`
+	DataSourceID  uuid.UUID              `json:"data_source_id"`
+	Timestamp     time.Time              `json:"timestamp"`
+	Resource      WebhookResource        `json:"resource"`
+	Changes       []WebhookChange        `json:"changes,omitempty"`
+	Actor         *WebhookActor          `json:"actor,omitempty"`
 	Metadata      map[string]interface{} `json:"metadata"`
-	OriginalEvent json.RawMessage       `json:"original_event,omitempty"`
+	OriginalEvent json.RawMessage        `json:"original_event,omitempty"`
 }
 
 // WebhookResource represents the resource affected by the event
 type WebhookResource struct {
-	Type         string                 `json:"type"` // file, folder, sync_job, etc.
-	ID           string                 `json:"id"`
-	Name         string                 `json:"name"`
-	Path         string                 `json:"path"`
-	URL          string                 `json:"url,omitempty"`
-	Size         *int64                 `json:"size,omitempty"`
-	MimeType     string                 `json:"mime_type,omitempty"`
-	CreatedAt    *time.Time            `json:"created_at,omitempty"`
-	ModifiedAt   *time.Time            `json:"modified_at,omitempty"`
-	Checksum     string                 `json:"checksum,omitempty"`
-	Properties   map[string]interface{} `json:"properties,omitempty"`
+	Type       string                 `json:"type"` // file, folder, sync_job, etc.
+	ID         string                 `json:"id"`
+	Name       string                 `json:"name"`
+	Path       string                 `json:"path"`
+	URL        string                 `json:"url,omitempty"`
+	Size       *int64                 `json:"size,omitempty"`
+	MimeType   string                 `json:"mime_type,omitempty"`
+	CreatedAt  *time.Time             `json:"created_at,omitempty"`
+	ModifiedAt *time.Time             `json:"modified_at,omitempty"`
+	Checksum   string                 `json:"checksum,omitempty"`
+	Properties map[string]interface{} `json:"properties,omitempty"`
 }
 
 // WebhookChange represents a specific change within an event
@@ -113,11 +113,11 @@ type WebhookChange struct {
 
 // WebhookActor represents who or what triggered the event
 type WebhookActor struct {
-	Type      string                 `json:"type"` // user, application, system
-	ID        string                 `json:"id"`
-	Name      string                 `json:"name"`
-	Email     string                 `json:"email,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Type     string                 `json:"type"` // user, application, system
+	ID       string                 `json:"id"`
+	Name     string                 `json:"name"`
+	Email    string                 `json:"email,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // WebhookEventHandler defines how to handle webhook events
@@ -435,7 +435,7 @@ func (wm *WebhookManager) notifyWebhook(ctx context.Context, subscription *Webho
 
 	// Execute webhook with retries
 	client := &http.Client{Timeout: wm.config.TimeoutDuration}
-	
+
 	var lastErr error
 	for attempt := 0; attempt <= wm.config.MaxRetries; attempt++ {
 		if attempt > 0 {
@@ -519,10 +519,10 @@ func (wm *WebhookManager) GetWebhookStats(ctx context.Context) (*WebhookStats, e
 	defer wm.mutex.RUnlock()
 
 	stats := &WebhookStats{
-		TotalSubscriptions: len(wm.subscriptions),
-		ActiveSubscriptions: 0,
+		TotalSubscriptions:       len(wm.subscriptions),
+		ActiveSubscriptions:      0,
 		SubscriptionsByConnector: make(map[string]int),
-		RecentEvents: 0, // Would track recent events in a production system
+		RecentEvents:             0, // Would track recent events in a production system
 	}
 
 	now := time.Now()
@@ -538,9 +538,9 @@ func (wm *WebhookManager) GetWebhookStats(ctx context.Context) (*WebhookStats, e
 
 // WebhookSubscriptionFilters contains filters for listing subscriptions
 type WebhookSubscriptionFilters struct {
-	ConnectorType string     `json:"connector_type,omitempty"`
-	DataSourceID  uuid.UUID  `json:"data_source_id,omitempty"`
-	IsActive      *bool      `json:"is_active,omitempty"`
+	ConnectorType string           `json:"connector_type,omitempty"`
+	DataSourceID  uuid.UUID        `json:"data_source_id,omitempty"`
+	IsActive      *bool            `json:"is_active,omitempty"`
 	EventType     WebhookEventType `json:"event_type,omitempty"`
 }
 

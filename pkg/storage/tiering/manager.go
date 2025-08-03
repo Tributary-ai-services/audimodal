@@ -3,7 +3,6 @@ package tiering
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -18,35 +17,35 @@ import (
 
 // TieringManager manages multi-tier storage operations and policies
 type TieringManager struct {
-	config            *TieringConfig
-	policyStore       PolicyStore
-	jobStore          JobStore
-	metricsStore      MetricsStore
+	config              *TieringConfig
+	policyStore         PolicyStore
+	jobStore            JobStore
+	metricsStore        MetricsStore
 	recommendationStore RecommendationStore
-	storageManager    storage.StorageManager
-	
+	storageManager      storage.StorageManager
+
 	// Analysis and optimization
-	accessAnalyzer    *AccessAnalyzer
-	costOptimizer     *CostOptimizer
-	transitionEngine  *TransitionEngine
-	
+	accessAnalyzer   *AccessAnalyzer
+	costOptimizer    *CostOptimizer
+	transitionEngine *TransitionEngine
+
 	// Scheduling and execution
-	scheduler         *cron.Cron
-	jobExecutor       *TieringJobExecutor
-	
+	scheduler   *cron.Cron
+	jobExecutor *TieringJobExecutor
+
 	// Monitoring
-	tracer            trace.Tracer
-	metrics           *TieringMetrics
-	
+	tracer  trace.Tracer
+	metrics *TieringMetrics
+
 	// Runtime state
-	activePolicies    map[uuid.UUID]*TieringPolicy
-	activeJobs        map[uuid.UUID]*TieringJob
-	
+	activePolicies map[uuid.UUID]*TieringPolicy
+	activeJobs     map[uuid.UUID]*TieringJob
+
 	// Channels and synchronization
-	jobQueue          chan *TieringJob
-	stopCh            chan struct{}
-	wg                sync.WaitGroup
-	mu                sync.RWMutex
+	jobQueue chan *TieringJob
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
+	mu       sync.RWMutex
 }
 
 // Store interfaces
@@ -85,15 +84,15 @@ type RecommendationStore interface {
 
 // Filter types
 type TieringJobFilters struct {
-	TenantID   *uuid.UUID   `json:"tenant_id,omitempty"`
-	PolicyID   *uuid.UUID   `json:"policy_id,omitempty"`
-	Status     *TierStatus  `json:"status,omitempty"`
-	FromTier   *StorageTier `json:"from_tier,omitempty"`
-	ToTier     *StorageTier `json:"to_tier,omitempty"`
-	StartTime  *time.Time   `json:"start_time,omitempty"`
-	EndTime    *time.Time   `json:"end_time,omitempty"`
-	Limit      int          `json:"limit,omitempty"`
-	Offset     int          `json:"offset,omitempty"`
+	TenantID  *uuid.UUID   `json:"tenant_id,omitempty"`
+	PolicyID  *uuid.UUID   `json:"policy_id,omitempty"`
+	Status    *TierStatus  `json:"status,omitempty"`
+	FromTier  *StorageTier `json:"from_tier,omitempty"`
+	ToTier    *StorageTier `json:"to_tier,omitempty"`
+	StartTime *time.Time   `json:"start_time,omitempty"`
+	EndTime   *time.Time   `json:"end_time,omitempty"`
+	Limit     int          `json:"limit,omitempty"`
+	Offset    int          `json:"offset,omitempty"`
 }
 
 type RecommendationFilters struct {
@@ -520,12 +519,12 @@ func (tm *TieringManager) scheduleAccessAnalysis() {
 	// Schedule access pattern analysis
 	_, err := tm.scheduler.AddFunc("@every 6h", func() {
 		ctx := context.Background()
-		
+
 		// Get all tenants and analyze their access patterns
 		// This would be implemented to iterate through tenants
 		tm.runAccessAnalysis(ctx)
 	})
-	
+
 	if err != nil {
 		// Log error
 	}
@@ -730,9 +729,9 @@ func (tm *TieringManager) updateJobStatuses(ctx context.Context) {
 		tm.mu.Unlock()
 
 		// Remove completed jobs from active list
-		if updatedJob.Status == StatusCompleted || 
-		   updatedJob.Status == StatusFailed || 
-		   updatedJob.Status == StatusCancelled {
+		if updatedJob.Status == StatusCompleted ||
+			updatedJob.Status == StatusFailed ||
+			updatedJob.Status == StatusCancelled {
 			tm.mu.Lock()
 			delete(tm.activeJobs, job.ID)
 			tm.mu.Unlock()
@@ -786,13 +785,13 @@ type TransitionRequest struct {
 
 // CostOptimizationResult contains the results of cost optimization analysis
 type CostOptimizationResult struct {
-	TenantID                uuid.UUID                  `json:"tenant_id"`
-	AnalysisDate            time.Time                  `json:"analysis_date"`
-	CurrentMonthlyCost      float64                    `json:"current_monthly_cost"`
-	OptimizedMonthlyCost    float64                    `json:"optimized_monthly_cost"`
-	PotentialMonthlySavings float64                    `json:"potential_monthly_savings"`
-	PotentialAnnualSavings  float64                    `json:"potential_annual_savings"`
-	Recommendations         []*TieringRecommendation   `json:"recommendations"`
-	TierDistribution        map[StorageTier]TierStats  `json:"tier_distribution"`
-	OptimizationScore       float64                    `json:"optimization_score"` // 0-100
+	TenantID                uuid.UUID                 `json:"tenant_id"`
+	AnalysisDate            time.Time                 `json:"analysis_date"`
+	CurrentMonthlyCost      float64                   `json:"current_monthly_cost"`
+	OptimizedMonthlyCost    float64                   `json:"optimized_monthly_cost"`
+	PotentialMonthlySavings float64                   `json:"potential_monthly_savings"`
+	PotentialAnnualSavings  float64                   `json:"potential_annual_savings"`
+	Recommendations         []*TieringRecommendation  `json:"recommendations"`
+	TierDistribution        map[StorageTier]TierStats `json:"tier_distribution"`
+	OptimizationScore       float64                   `json:"optimization_score"` // 0-100
 }

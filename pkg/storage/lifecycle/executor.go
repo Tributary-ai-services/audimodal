@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"context"
 	"fmt"
-	"io"
 	"sync"
 	"time"
 
@@ -17,17 +16,17 @@ import (
 
 // JobExecutor executes lifecycle jobs
 type JobExecutor struct {
-	config         *LifecycleConfig
-	storageManager storage.StorageManager
+	config           *LifecycleConfig
+	storageManager   storage.StorageManager
 	lifecycleManager *LifecycleManager
-	tracer         trace.Tracer
-	
+	tracer           trace.Tracer
+
 	// Worker pool
-	workers        []Worker
-	workerPool     chan Worker
-	
+	workers    []Worker
+	workerPool chan Worker
+
 	// Metrics
-	metrics        *ExecutorMetrics
+	metrics *ExecutorMetrics
 }
 
 // Worker represents a worker that can execute lifecycle actions
@@ -39,12 +38,12 @@ type Worker interface {
 
 // ExecutorMetrics tracks executor performance
 type ExecutorMetrics struct {
-	ActiveWorkers     int           `json:"active_workers"`
-	QueuedJobs        int           `json:"queued_jobs"`
-	ProcessingJobs    int           `json:"processing_jobs"`
-	AverageJobTime    time.Duration `json:"average_job_time"`
-	ThroughputPerSec  float64       `json:"throughput_per_sec"`
-	ErrorRate         float64       `json:"error_rate"`
+	ActiveWorkers    int           `json:"active_workers"`
+	QueuedJobs       int           `json:"queued_jobs"`
+	ProcessingJobs   int           `json:"processing_jobs"`
+	AverageJobTime   time.Duration `json:"average_job_time"`
+	ThroughputPerSec float64       `json:"throughput_per_sec"`
+	ErrorRate        float64       `json:"error_rate"`
 }
 
 // NewJobExecutor creates a new job executor
@@ -53,9 +52,9 @@ func NewJobExecutor(config *LifecycleConfig, storageManager storage.StorageManag
 		config:           config,
 		storageManager:   storageManager,
 		lifecycleManager: lifecycleManager,
-		tracer:          otel.Tracer("lifecycle-job-executor"),
-		workerPool:      make(chan Worker, config.MaxConcurrentJobs),
-		metrics:         &ExecutorMetrics{},
+		tracer:           otel.Tracer("lifecycle-job-executor"),
+		workerPool:       make(chan Worker, config.MaxConcurrentJobs),
+		metrics:          &ExecutorMetrics{},
 	}
 
 	// Initialize workers
@@ -80,7 +79,7 @@ func (je *JobExecutor) Start(ctx context.Context, jobQueue <-chan *LifecycleJob,
 			if job == nil {
 				return // Channel closed
 			}
-			
+
 			// Execute job in goroutine
 			go je.executeJob(ctx, job)
 		}
@@ -117,7 +116,7 @@ func (je *JobExecutor) executeJob(ctx context.Context, job *LifecycleJob) {
 
 	// Execute job actions
 	err := je.executeJobActions(ctx, job, worker)
-	
+
 	// Update job status
 	completedAt := time.Now()
 	job.CompletedAt = &completedAt
@@ -342,7 +341,7 @@ func (je *JobExecutor) evaluateCondition(condition LifecycleCondition, file stor
 				return age <= duration
 			}
 		}
-		
+
 	case ConditionFileSize:
 		if size, ok := condition.Value.(int64); ok {
 			switch condition.Operator {
@@ -358,7 +357,7 @@ func (je *JobExecutor) evaluateCondition(condition LifecycleCondition, file stor
 				return file.Size == size
 			}
 		}
-		
+
 	case ConditionFileType:
 		if fileType, ok := condition.Value.(string); ok {
 			switch condition.Operator {
@@ -372,7 +371,7 @@ func (je *JobExecutor) evaluateCondition(condition LifecycleCondition, file stor
 				return endsWith(file.ContentType, fileType)
 			}
 		}
-		
+
 	case ConditionPath:
 		if path, ok := condition.Value.(string); ok {
 			switch condition.Operator {
@@ -386,14 +385,14 @@ func (je *JobExecutor) evaluateCondition(condition LifecycleCondition, file stor
 				return endsWith(file.URL, path)
 			}
 		}
-		
+
 	case ConditionTags:
 		if tag, ok := condition.Value.(string); ok {
 			if tagValue, exists := file.Tags[tag]; exists {
 				return tagValue != ""
 			}
 		}
-		
+
 	case ConditionMetadata:
 		if condition.Field != "" {
 			if value, exists := file.Metadata[condition.Field]; exists {
@@ -426,7 +425,7 @@ func (je *JobExecutor) isEligibleForDeletion(file storage.FileInfo) bool {
 
 func (je *JobExecutor) isEligibleForCompression(file storage.FileInfo) bool {
 	// Don't compress already compressed files
-	return !file.Metadata["compressed"] == "true"
+	return file.Metadata["compressed"] != "true"
 }
 
 // Helper methods
@@ -457,13 +456,13 @@ func (je *JobExecutor) updateJobProgress(job *LifecycleJob, action LifecycleActi
 	// Update results
 	if success {
 		job.Progress.SuccessfulFiles += int64(len(files))
-		
+
 		// Update action-specific counters
 		if job.Results.ActionsPerformed == nil {
 			job.Results.ActionsPerformed = make(map[string]int64)
 		}
 		job.Results.ActionsPerformed[string(action.Action)] += int64(len(files))
-		
+
 		// Update processed bytes
 		for _, file := range files {
 			job.Results.TotalBytesProcessed += file.Size
@@ -504,7 +503,7 @@ func NewDefaultWorker(id string, storageManager storage.StorageManager, config *
 		storageManager: storageManager,
 		config:         config,
 		available:      true,
-		tracer:        otel.Tracer("lifecycle-worker"),
+		tracer:         otel.Tracer("lifecycle-worker"),
 	}
 }
 
@@ -555,12 +554,12 @@ func (w *DefaultWorker) IsAvailable() bool {
 // Action implementations
 func (w *DefaultWorker) executeArchive(ctx context.Context, job *LifecycleJob, files []storage.FileInfo) error {
 	// Archive files to cold storage
-	for _, file := range files {
+	for range files {
 		if w.config.DryRun || job.Config.DryRun {
 			// Just log what would be done
 			continue
 		}
-		
+
 		// TODO: Implement actual archival
 		// This would involve moving files to archive storage class
 	}
@@ -569,12 +568,12 @@ func (w *DefaultWorker) executeArchive(ctx context.Context, job *LifecycleJob, f
 
 func (w *DefaultWorker) executeDelete(ctx context.Context, job *LifecycleJob, files []storage.FileInfo) error {
 	// Delete files
-	for _, file := range files {
+	for range files {
 		if w.config.DryRun || job.Config.DryRun {
 			// Just log what would be done
 			continue
 		}
-		
+
 		// TODO: Implement actual deletion
 		// This would involve calling storage manager to delete files
 	}
@@ -583,12 +582,12 @@ func (w *DefaultWorker) executeDelete(ctx context.Context, job *LifecycleJob, fi
 
 func (w *DefaultWorker) executeCompress(ctx context.Context, job *LifecycleJob, files []storage.FileInfo) error {
 	// Compress files
-	for _, file := range files {
+	for range files {
 		if w.config.DryRun || job.Config.DryRun {
 			// Just log what would be done
 			continue
 		}
-		
+
 		// TODO: Implement actual compression
 		// This would involve downloading, compressing, and re-uploading files
 	}
@@ -601,13 +600,13 @@ func (w *DefaultWorker) executeMove(ctx context.Context, job *LifecycleJob, acti
 	if !ok {
 		return fmt.Errorf("move action requires destination parameter")
 	}
-	
-	for _, file := range files {
+
+	for range files {
 		if w.config.DryRun || job.Config.DryRun {
 			// Just log what would be done
 			continue
 		}
-		
+
 		// TODO: Implement actual move
 		_ = destination
 	}
@@ -626,13 +625,14 @@ func (w *DefaultWorker) executeTag(ctx context.Context, job *LifecycleJob, actio
 	if !ok {
 		return fmt.Errorf("tag action requires tags parameter")
 	}
-	
+
 	for _, file := range files {
+		_ = file // Variable is used in the iteration
 		if w.config.DryRun || job.Config.DryRun {
 			// Just log what would be done
 			continue
 		}
-		
+
 		// TODO: Implement actual tagging
 		_ = tags
 	}

@@ -157,10 +157,10 @@ func (p *OpenAIProvider) GenerateEmbedding(ctx context.Context, text string) (*e
 		Model:      response.Model,
 		CreatedAt:  time.Now(),
 		Metadata: map[string]interface{}{
-			"provider":      "openai",
-			"tokens_used":   response.Usage.PromptTokens,
-			"total_tokens":  response.Usage.TotalTokens,
-			"input_length":  len(text),
+			"provider":     "openai",
+			"tokens_used":  response.Usage.PromptTokens,
+			"total_tokens": response.Usage.TotalTokens,
+			"input_length": len(text),
 		},
 	}
 
@@ -180,7 +180,7 @@ func (p *OpenAIProvider) GenerateBatchEmbeddings(ctx context.Context, texts []st
 	// Filter out empty texts
 	validTexts := make([]string, 0, len(texts))
 	textIndexMap := make(map[int]int) // maps result index to original index
-	
+
 	for i, text := range texts {
 		if strings.TrimSpace(text) != "" {
 			textIndexMap[len(validTexts)] = i
@@ -382,7 +382,7 @@ func ValidateConfig(config *OpenAIConfig) error {
 			"text-embedding-3-large",
 			"text-embedding-ada-002",
 		}
-		
+
 		isValid := false
 		for _, validModel := range validModels {
 			if config.Model == validModel {
@@ -390,7 +390,7 @@ func ValidateConfig(config *OpenAIConfig) error {
 				break
 			}
 		}
-		
+
 		if !isValid {
 			return &embeddings.EmbeddingError{
 				Type:    "invalid_configuration",

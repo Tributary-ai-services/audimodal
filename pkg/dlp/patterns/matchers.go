@@ -27,14 +27,14 @@ func NewPatternRegistry() *PatternRegistry {
 	registry := &PatternRegistry{
 		matchers: make(map[types.PIIType]PatternMatcher),
 	}
-	
+
 	// Register built-in matchers
 	registry.RegisterMatcher(NewSSNMatcher())
 	registry.RegisterMatcher(NewCreditCardMatcher())
 	registry.RegisterMatcher(NewEmailMatcher())
 	registry.RegisterMatcher(NewPhoneNumberMatcher())
 	registry.RegisterMatcher(NewIPAddressMatcher())
-	
+
 	return registry
 }
 
@@ -78,20 +78,20 @@ func (m *SSNMatcher) GetType() types.PIIType {
 
 func (m *SSNMatcher) Match(content string) []types.Match {
 	var matches []types.Match
-	
+
 	found := m.pattern.FindAllStringSubmatch(content, -1)
 	indices := m.pattern.FindAllStringIndex(content, -1)
-	
+
 	for i, match := range found {
 		if len(match) > 0 {
 			value := strings.ReplaceAll(strings.ReplaceAll(match[0], "-", ""), " ", "")
-			
+
 			// Basic validation: should be 9 digits
 			if len(value) == 9 && m.isValidSSN(value) {
 				start := indices[i][0]
 				end := indices[i][1]
 				context := extractContext(content, start, end, 20)
-				
+
 				matches = append(matches, types.Match{
 					Value:      match[0],
 					StartPos:   start,
@@ -102,28 +102,28 @@ func (m *SSNMatcher) Match(content string) []types.Match {
 			}
 		}
 	}
-	
+
 	return matches
 }
 
 func (m *SSNMatcher) GetConfidenceScore(match string) float64 {
 	// Remove formatting
 	digits := strings.ReplaceAll(strings.ReplaceAll(match, "-", ""), " ", "")
-	
+
 	// Basic validation
 	if len(digits) != 9 {
 		return 0.0
 	}
-	
+
 	if !m.isValidSSN(digits) {
 		return 0.3
 	}
-	
+
 	// Check formatting
 	if strings.Contains(match, "-") || strings.Contains(match, " ") {
 		return 0.9
 	}
-	
+
 	return 0.7
 }
 
@@ -136,22 +136,22 @@ func (m *SSNMatcher) isValidSSN(ssn string) bool {
 	if len(ssn) != 9 {
 		return false
 	}
-	
+
 	first3 := ssn[:3]
 	if first3 == "000" || first3 == "666" || first3[0] == '9' {
 		return false
 	}
-	
+
 	// Middle 2 digits cannot be 00
 	if ssn[3:5] == "00" {
 		return false
 	}
-	
+
 	// Last 4 digits cannot be 0000
 	if ssn[5:] == "0000" {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -180,20 +180,20 @@ func (m *CreditCardMatcher) GetType() types.PIIType {
 
 func (m *CreditCardMatcher) Match(content string) []types.Match {
 	var matches []types.Match
-	
+
 	found := m.pattern.FindAllStringSubmatch(content, -1)
 	indices := m.pattern.FindAllStringIndex(content, -1)
-	
+
 	for i, match := range found {
 		if len(match) > 0 {
 			// Remove formatting for validation
 			digits := strings.ReplaceAll(strings.ReplaceAll(match[0], "-", ""), " ", "")
-			
+
 			if m.isValidCreditCard(digits) {
 				start := indices[i][0]
 				end := indices[i][1]
 				context := extractContext(content, start, end, 20)
-				
+
 				matches = append(matches, types.Match{
 					Value:      match[0],
 					StartPos:   start,
@@ -204,22 +204,22 @@ func (m *CreditCardMatcher) Match(content string) []types.Match {
 			}
 		}
 	}
-	
+
 	return matches
 }
 
 func (m *CreditCardMatcher) GetConfidenceScore(match string) float64 {
 	digits := strings.ReplaceAll(strings.ReplaceAll(match, "-", ""), " ", "")
-	
+
 	if !m.isValidCreditCard(digits) {
 		return 0.0
 	}
-	
+
 	// Higher confidence for formatted numbers
 	if strings.Contains(match, "-") || strings.Contains(match, " ") {
 		return 0.9
 	}
-	
+
 	return 0.8
 }
 
@@ -231,24 +231,24 @@ func (m *CreditCardMatcher) isValidCreditCard(number string) bool {
 	// Luhn algorithm validation
 	sum := 0
 	alternate := false
-	
+
 	for i := len(number) - 1; i >= 0; i-- {
 		digit, err := strconv.Atoi(string(number[i]))
 		if err != nil {
 			return false
 		}
-		
+
 		if alternate {
 			digit *= 2
 			if digit > 9 {
 				digit = (digit % 10) + 1
 			}
 		}
-		
+
 		sum += digit
 		alternate = !alternate
 	}
-	
+
 	return sum%10 == 0
 }
 
@@ -276,16 +276,16 @@ func (m *EmailMatcher) GetType() types.PIIType {
 
 func (m *EmailMatcher) Match(content string) []types.Match {
 	var matches []types.Match
-	
+
 	found := m.pattern.FindAllStringSubmatch(content, -1)
 	indices := m.pattern.FindAllStringIndex(content, -1)
-	
+
 	for i, match := range found {
 		if len(match) > 0 {
 			start := indices[i][0]
 			end := indices[i][1]
 			context := extractContext(content, start, end, 20)
-			
+
 			matches = append(matches, types.Match{
 				Value:      match[0],
 				StartPos:   start,
@@ -295,7 +295,7 @@ func (m *EmailMatcher) Match(content string) []types.Match {
 			})
 		}
 	}
-	
+
 	return matches
 }
 
@@ -304,12 +304,12 @@ func (m *EmailMatcher) GetConfidenceScore(match string) float64 {
 	if !strings.Contains(match, "@") || !strings.Contains(match, ".") {
 		return 0.0
 	}
-	
+
 	parts := strings.Split(match, "@")
 	if len(parts) != 2 {
 		return 0.0
 	}
-	
+
 	return 0.9
 }
 
@@ -342,16 +342,16 @@ func (m *PhoneNumberMatcher) GetType() types.PIIType {
 
 func (m *PhoneNumberMatcher) Match(content string) []types.Match {
 	var matches []types.Match
-	
+
 	found := m.pattern.FindAllStringSubmatch(content, -1)
 	indices := m.pattern.FindAllStringIndex(content, -1)
-	
+
 	for i, match := range found {
 		if len(match) > 0 {
 			start := indices[i][0]
 			end := indices[i][1]
 			context := extractContext(content, start, end, 20)
-			
+
 			matches = append(matches, types.Match{
 				Value:      match[0],
 				StartPos:   start,
@@ -361,7 +361,7 @@ func (m *PhoneNumberMatcher) Match(content string) []types.Match {
 			})
 		}
 	}
-	
+
 	return matches
 }
 
@@ -404,16 +404,16 @@ func (m *IPAddressMatcher) GetType() types.PIIType {
 
 func (m *IPAddressMatcher) Match(content string) []types.Match {
 	var matches []types.Match
-	
+
 	found := m.pattern.FindAllStringSubmatch(content, -1)
 	indices := m.pattern.FindAllStringIndex(content, -1)
-	
+
 	for i, match := range found {
 		if len(match) > 0 && m.isValidIP(match[0]) {
 			start := indices[i][0]
 			end := indices[i][1]
 			context := extractContext(content, start, end, 20)
-			
+
 			matches = append(matches, types.Match{
 				Value:      match[0],
 				StartPos:   start,
@@ -423,7 +423,7 @@ func (m *IPAddressMatcher) Match(content string) []types.Match {
 			})
 		}
 	}
-	
+
 	return matches
 }
 
@@ -443,14 +443,14 @@ func (m *IPAddressMatcher) isValidIP(ip string) bool {
 	if len(parts) != 4 {
 		return false
 	}
-	
+
 	for _, part := range parts {
 		num, err := strconv.Atoi(part)
 		if err != nil || num < 0 || num > 255 {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -461,12 +461,12 @@ func extractContext(content string, start, end, windowSize int) string {
 	if contextStart < 0 {
 		contextStart = 0
 	}
-	
+
 	contextEnd := end + windowSize
 	if contextEnd > len(content) {
 		contextEnd = len(content)
 	}
-	
+
 	return content[contextStart:contextEnd]
 }
 
@@ -477,18 +477,18 @@ func isTypeEnabled(piiType types.PIIType, config *types.ScanConfig) bool {
 			return false
 		}
 	}
-	
+
 	// If enabled patterns is empty, all are enabled by default
 	if len(config.EnabledPatterns) == 0 {
 		return true
 	}
-	
+
 	// Check if explicitly enabled
 	for _, enabled := range config.EnabledPatterns {
 		if enabled == piiType {
 			return true
 		}
 	}
-	
+
 	return false
 }

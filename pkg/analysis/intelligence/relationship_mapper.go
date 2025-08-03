@@ -2,7 +2,6 @@ package intelligence
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -19,176 +18,176 @@ import (
 
 // RelationshipMapper provides advanced document relationship mapping
 type RelationshipMapper struct {
-	config         *RelationshipMapperConfig
-	knowledgeGraph *KnowledgeGraph
-	documentIndex  map[uuid.UUID]*DocumentMetadata
+	config            *RelationshipMapperConfig
+	knowledgeGraph    *KnowledgeGraph
+	documentIndex     map[uuid.UUID]*DocumentMetadata
 	relationshipCache map[string]*CachedRelationship
-	similarityEngine *SimilarityEngine
-	clusteringEngine *ClusteringEngine
-	tracer          trace.Tracer
-	mutex           sync.RWMutex
+	similarityEngine  *SimilarityEngine
+	clusteringEngine  *ClusteringEngine
+	tracer            trace.Tracer
+	mutex             sync.RWMutex
 }
 
 // RelationshipMapperConfig contains configuration for relationship mapping
 type RelationshipMapperConfig struct {
-	Enabled                    bool          `json:"enabled"`
-	SimilarityThreshold        float64       `json:"similarity_threshold"`
-	ContentSimilarityWeight    float64       `json:"content_similarity_weight"`
-	MetadataSimilarityWeight   float64       `json:"metadata_similarity_weight"`
-	TemporalSimilarityWeight   float64       `json:"temporal_similarity_weight"`
-	AuthorSimilarityWeight     float64       `json:"author_similarity_weight"`
-	TagSimilarityWeight        float64       `json:"tag_similarity_weight"`
-	MaxRelationshipsPerDoc     int           `json:"max_relationships_per_doc"`
-	EnableRealTimeMapping      bool          `json:"enable_real_time_mapping"`
-	BatchProcessingSize        int           `json:"batch_processing_size"`
-	CacheSize                  int           `json:"cache_size"`
-	CacheTTL                   time.Duration `json:"cache_ttl"`
-	EnableTemporalAnalysis     bool          `json:"enable_temporal_analysis"`
-	EnableAuthorAnalysis       bool          `json:"enable_author_analysis"`
-	EnableTopicAnalysis        bool          `json:"enable_topic_analysis"`
-	EnableCitationAnalysis     bool          `json:"enable_citation_analysis"`
-	EnableVersionTracking      bool          `json:"enable_version_tracking"`
-	MinRelationshipStrength    float64       `json:"min_relationship_strength"`
-	UpdateInterval             time.Duration `json:"update_interval"`
+	Enabled                  bool          `json:"enabled"`
+	SimilarityThreshold      float64       `json:"similarity_threshold"`
+	ContentSimilarityWeight  float64       `json:"content_similarity_weight"`
+	MetadataSimilarityWeight float64       `json:"metadata_similarity_weight"`
+	TemporalSimilarityWeight float64       `json:"temporal_similarity_weight"`
+	AuthorSimilarityWeight   float64       `json:"author_similarity_weight"`
+	TagSimilarityWeight      float64       `json:"tag_similarity_weight"`
+	MaxRelationshipsPerDoc   int           `json:"max_relationships_per_doc"`
+	EnableRealTimeMapping    bool          `json:"enable_real_time_mapping"`
+	BatchProcessingSize      int           `json:"batch_processing_size"`
+	CacheSize                int           `json:"cache_size"`
+	CacheTTL                 time.Duration `json:"cache_ttl"`
+	EnableTemporalAnalysis   bool          `json:"enable_temporal_analysis"`
+	EnableAuthorAnalysis     bool          `json:"enable_author_analysis"`
+	EnableTopicAnalysis      bool          `json:"enable_topic_analysis"`
+	EnableCitationAnalysis   bool          `json:"enable_citation_analysis"`
+	EnableVersionTracking    bool          `json:"enable_version_tracking"`
+	MinRelationshipStrength  float64       `json:"min_relationship_strength"`
+	UpdateInterval           time.Duration `json:"update_interval"`
 }
 
 // DocumentMetadata contains metadata about a document for relationship mapping
 type DocumentMetadata struct {
-	ID              uuid.UUID                 `json:"id"`
-	TenantID        uuid.UUID                 `json:"tenant_id"`
-	Title           string                    `json:"title"`
-	ContentHash     string                    `json:"content_hash"`
-	ContentType     string                    `json:"content_type"`
-	FileSize        int64                     `json:"file_size"`
-	Author          string                    `json:"author,omitempty"`
-	Authors         []string                  `json:"authors,omitempty"`
-	CreatedAt       time.Time                 `json:"created_at"`
-	ModifiedAt      time.Time                 `json:"modified_at"`
-	AccessedAt      *time.Time                `json:"accessed_at,omitempty"`
-	Tags            []string                  `json:"tags,omitempty"`
-	Categories      []string                  `json:"categories,omitempty"`
-	Topics          []string                  `json:"topics,omitempty"`
-	Keywords        []string                  `json:"keywords,omitempty"`
-	Language        string                    `json:"language,omitempty"`
-	
+	ID          uuid.UUID  `json:"id"`
+	TenantID    uuid.UUID  `json:"tenant_id"`
+	Title       string     `json:"title"`
+	ContentHash string     `json:"content_hash"`
+	ContentType string     `json:"content_type"`
+	FileSize    int64      `json:"file_size"`
+	Author      string     `json:"author,omitempty"`
+	Authors     []string   `json:"authors,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	ModifiedAt  time.Time  `json:"modified_at"`
+	AccessedAt  *time.Time `json:"accessed_at,omitempty"`
+	Tags        []string   `json:"tags,omitempty"`
+	Categories  []string   `json:"categories,omitempty"`
+	Topics      []string   `json:"topics,omitempty"`
+	Keywords    []string   `json:"keywords,omitempty"`
+	Language    string     `json:"language,omitempty"`
+
 	// Content analysis
-	WordCount       int                       `json:"word_count"`
-	ReadingTime     time.Duration             `json:"reading_time"`
-	SentimentScore  float64                   `json:"sentiment_score"`
-	ComplexityScore float64                   `json:"complexity_score"`
-	
+	WordCount       int           `json:"word_count"`
+	ReadingTime     time.Duration `json:"reading_time"`
+	SentimentScore  float64       `json:"sentiment_score"`
+	ComplexityScore float64       `json:"complexity_score"`
+
 	// Embeddings and features
-	ContentEmbedding []float64                `json:"content_embedding,omitempty"`
-	TitleEmbedding   []float64                `json:"title_embedding,omitempty"`
-	Features         map[string]float64       `json:"features,omitempty"`
-	
+	ContentEmbedding []float64          `json:"content_embedding,omitempty"`
+	TitleEmbedding   []float64          `json:"title_embedding,omitempty"`
+	Features         map[string]float64 `json:"features,omitempty"`
+
 	// Relationships
-	RelatedDocuments []RelatedDocument        `json:"related_documents,omitempty"`
-	Citations        []Citation               `json:"citations,omitempty"`
-	References       []Reference              `json:"references,omitempty"`
-	Versions         []DocumentVersion        `json:"versions,omitempty"`
-	
+	RelatedDocuments []RelatedDocument `json:"related_documents,omitempty"`
+	Citations        []Citation        `json:"citations,omitempty"`
+	References       []Reference       `json:"references,omitempty"`
+	Versions         []DocumentVersion `json:"versions,omitempty"`
+
 	// Graph connections
-	KnowledgeGraphNodes []uuid.UUID           `json:"knowledge_graph_nodes,omitempty"`
-	
+	KnowledgeGraphNodes []uuid.UUID `json:"knowledge_graph_nodes,omitempty"`
+
 	// Analysis metadata
-	LastAnalyzed    time.Time                 `json:"last_analyzed"`
-	AnalysisVersion string                    `json:"analysis_version"`
-	
+	LastAnalyzed    time.Time `json:"last_analyzed"`
+	AnalysisVersion string    `json:"analysis_version"`
+
 	// Custom metadata
-	Metadata        map[string]interface{}    `json:"metadata,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // RelatedDocument represents a relationship between documents
 type RelatedDocument struct {
-	DocumentID       uuid.UUID                 `json:"document_id"`
-	RelationshipType RelationshipType          `json:"relationship_type"`
-	Strength         float64                   `json:"strength"`
-	Confidence       float64                   `json:"confidence"`
-	Similarity       float64                   `json:"similarity"`
-	CreatedAt        time.Time                 `json:"created_at"`
-	UpdatedAt        time.Time                 `json:"updated_at"`
-	
+	DocumentID       uuid.UUID        `json:"document_id"`
+	RelationshipType RelationshipType `json:"relationship_type"`
+	Strength         float64          `json:"strength"`
+	Confidence       float64          `json:"confidence"`
+	Similarity       float64          `json:"similarity"`
+	CreatedAt        time.Time        `json:"created_at"`
+	UpdatedAt        time.Time        `json:"updated_at"`
+
 	// Relationship metadata
-	CommonElements   []string                  `json:"common_elements,omitempty"`
-	DifferenceScore  float64                   `json:"difference_score"`
-	TemporalDistance time.Duration             `json:"temporal_distance"`
-	
+	CommonElements   []string      `json:"common_elements,omitempty"`
+	DifferenceScore  float64       `json:"difference_score"`
+	TemporalDistance time.Duration `json:"temporal_distance"`
+
 	// Evidence and reasoning
-	Evidence         []RelationshipEvidence   `json:"evidence,omitempty"`
-	Reasoning        string                    `json:"reasoning,omitempty"`
-	
+	Evidence  []RelationshipEvidence `json:"evidence,omitempty"`
+	Reasoning string                 `json:"reasoning,omitempty"`
+
 	// Context
-	Context          map[string]interface{}    `json:"context,omitempty"`
+	Context map[string]interface{} `json:"context,omitempty"`
 }
 
 // Citation represents a citation relationship
 type Citation struct {
-	SourceDocumentID uuid.UUID                `json:"source_document_id"`
-	TargetDocumentID uuid.UUID                `json:"target_document_id"`
-	CitationType     CitationType             `json:"citation_type"`
-	Context          string                   `json:"context,omitempty"`
-	Position         *TextPosition            `json:"position,omitempty"`
-	Confidence       float64                  `json:"confidence"`
-	CreatedAt        time.Time                `json:"created_at"`
+	SourceDocumentID uuid.UUID     `json:"source_document_id"`
+	TargetDocumentID uuid.UUID     `json:"target_document_id"`
+	CitationType     CitationType  `json:"citation_type"`
+	Context          string        `json:"context,omitempty"`
+	Position         *TextPosition `json:"position,omitempty"`
+	Confidence       float64       `json:"confidence"`
+	CreatedAt        time.Time     `json:"created_at"`
 }
 
 // Reference represents a reference relationship
 type Reference struct {
-	ReferencedDocumentID uuid.UUID            `json:"referenced_document_id"`
-	ReferenceType        ReferenceType        `json:"reference_type"`
-	Title                string               `json:"title,omitempty"`
-	URL                  string               `json:"url,omitempty"`
+	ReferencedDocumentID uuid.UUID              `json:"referenced_document_id"`
+	ReferenceType        ReferenceType          `json:"reference_type"`
+	Title                string                 `json:"title,omitempty"`
+	URL                  string                 `json:"url,omitempty"`
 	Metadata             map[string]interface{} `json:"metadata,omitempty"`
-	CreatedAt            time.Time            `json:"created_at"`
+	CreatedAt            time.Time              `json:"created_at"`
 }
 
 // DocumentVersion represents a version relationship
 type DocumentVersion struct {
-	VersionID        uuid.UUID                `json:"version_id"`
-	Version          string                   `json:"version"`
-	PreviousVersion  *uuid.UUID               `json:"previous_version,omitempty"`
-	NextVersion      *uuid.UUID               `json:"next_version,omitempty"`
-	Changes          []VersionChange          `json:"changes,omitempty"`
-	ChangeType       VersionChangeType        `json:"change_type"`
-	CreatedAt        time.Time                `json:"created_at"`
-	CreatedBy        *uuid.UUID               `json:"created_by,omitempty"`
+	VersionID       uuid.UUID         `json:"version_id"`
+	Version         string            `json:"version"`
+	PreviousVersion *uuid.UUID        `json:"previous_version,omitempty"`
+	NextVersion     *uuid.UUID        `json:"next_version,omitempty"`
+	Changes         []VersionChange   `json:"changes,omitempty"`
+	ChangeType      VersionChangeType `json:"change_type"`
+	CreatedAt       time.Time         `json:"created_at"`
+	CreatedBy       *uuid.UUID        `json:"created_by,omitempty"`
 }
 
 // VersionChange represents a change between document versions
 type VersionChange struct {
-	Type         ChangeType                `json:"type"`
-	Description  string                    `json:"description"`
-	Position     *TextPosition             `json:"position,omitempty"`
-	OldContent   string                    `json:"old_content,omitempty"`
-	NewContent   string                    `json:"new_content,omitempty"`
-	Metadata     map[string]interface{}    `json:"metadata,omitempty"`
+	Type        ChangeType             `json:"type"`
+	Description string                 `json:"description"`
+	Position    *TextPosition          `json:"position,omitempty"`
+	OldContent  string                 `json:"old_content,omitempty"`
+	NewContent  string                 `json:"new_content,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // RelationshipEvidence provides evidence for a relationship
 type RelationshipEvidence struct {
-	Type         EvidenceType              `json:"type"`
-	Description  string                    `json:"description"`
-	Score        float64                   `json:"score"`
-	Source       string                    `json:"source"`
-	Context      string                    `json:"context,omitempty"`
-	Metadata     map[string]interface{}    `json:"metadata,omitempty"`
+	Type        EvidenceType           `json:"type"`
+	Description string                 `json:"description"`
+	Score       float64                `json:"score"`
+	Source      string                 `json:"source"`
+	Context     string                 `json:"context,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // CachedRelationship represents a cached relationship calculation
 type CachedRelationship struct {
-	Key          string                    `json:"key"`
-	Relationship *RelatedDocument          `json:"relationship"`
-	CreatedAt    time.Time                 `json:"created_at"`
-	ExpiresAt    time.Time                 `json:"expires_at"`
-	HitCount     int                       `json:"hit_count"`
+	Key          string           `json:"key"`
+	Relationship *RelatedDocument `json:"relationship"`
+	CreatedAt    time.Time        `json:"created_at"`
+	ExpiresAt    time.Time        `json:"expires_at"`
+	HitCount     int              `json:"hit_count"`
 }
 
 // SimilarityEngine handles similarity calculations
 type SimilarityEngine struct {
-	config          *SimilarityConfig
-	embeddingModel  EmbeddingModel
-	textSimilarity  TextSimilarityCalculator
+	config               *SimilarityConfig
+	embeddingModel       EmbeddingModel
+	textSimilarity       TextSimilarityCalculator
 	structuralSimilarity StructuralSimilarityCalculator
 }
 
@@ -205,46 +204,46 @@ type ClusteringEngine struct {
 type RelationshipType string
 
 const (
-	RelationshipTypeSimilar        RelationshipType = "similar"
-	RelationshipTypeRelated        RelationshipType = "related"
-	RelationshipTypeDuplicate      RelationshipType = "duplicate"
-	RelationshipTypeVersion        RelationshipType = "version"
-	RelationshipTypeCitation       RelationshipType = "citation"
-	RelationshipTypeReference      RelationshipType = "reference"
-	RelationshipTypeAuthor         RelationshipType = "author"
-	RelationshipTypeTopic          RelationshipType = "topic"
-	RelationshipTypeTemporal       RelationshipType = "temporal"
-	RelationshipTypeHierarchical   RelationshipType = "hierarchical"
-	RelationshipTypeSequential     RelationshipType = "sequential"
-	RelationshipTypeDependency     RelationshipType = "dependency"
-	RelationshipTypeContainment    RelationshipType = "containment"
+	RelationshipTypeSimilar      RelationshipType = "similar"
+	RelationshipTypeRelated      RelationshipType = "related"
+	RelationshipTypeDuplicate    RelationshipType = "duplicate"
+	RelationshipTypeVersion      RelationshipType = "version"
+	RelationshipTypeCitation     RelationshipType = "citation"
+	RelationshipTypeReference    RelationshipType = "reference"
+	RelationshipTypeAuthor       RelationshipType = "author"
+	RelationshipTypeTopic        RelationshipType = "topic"
+	RelationshipTypeTemporal     RelationshipType = "temporal"
+	RelationshipTypeHierarchical RelationshipType = "hierarchical"
+	RelationshipTypeSequential   RelationshipType = "sequential"
+	RelationshipTypeDependency   RelationshipType = "dependency"
+	RelationshipTypeContainment  RelationshipType = "containment"
 )
 
 type CitationType string
 
 const (
-	CitationTypeDirect     CitationType = "direct"
-	CitationTypeIndirect   CitationType = "indirect"
-	CitationTypeSelf       CitationType = "self"
-	CitationTypeCross      CitationType = "cross"
+	CitationTypeDirect   CitationType = "direct"
+	CitationTypeIndirect CitationType = "indirect"
+	CitationTypeSelf     CitationType = "self"
+	CitationTypeCross    CitationType = "cross"
 )
 
 type ReferenceType string
 
 const (
-	ReferenceTypeExternal  ReferenceType = "external"
-	ReferenceTypeInternal  ReferenceType = "internal"
+	ReferenceTypeExternal      ReferenceType = "external"
+	ReferenceTypeInternal      ReferenceType = "internal"
 	ReferenceTypeBibliographic ReferenceType = "bibliographic"
-	ReferenceTypeHyperlink ReferenceType = "hyperlink"
+	ReferenceTypeHyperlink     ReferenceType = "hyperlink"
 )
 
 type VersionChangeType string
 
 const (
-	VersionChangeTypeMajor      VersionChangeType = "major"
-	VersionChangeTypeMinor      VersionChangeType = "minor"
-	VersionChangeTypePatch      VersionChangeType = "patch"
-	VersionChangeTypeRevision   VersionChangeType = "revision"
+	VersionChangeTypeMajor    VersionChangeType = "major"
+	VersionChangeTypeMinor    VersionChangeType = "minor"
+	VersionChangeTypePatch    VersionChangeType = "patch"
+	VersionChangeTypeRevision VersionChangeType = "revision"
 )
 
 type ChangeType string
@@ -260,15 +259,15 @@ const (
 type EvidenceType string
 
 const (
-	EvidenceTypeContentSimilarity EvidenceType = "content_similarity"
-	EvidenceTypeMetadataSimilarity EvidenceType = "metadata_similarity"
+	EvidenceTypeContentSimilarity    EvidenceType = "content_similarity"
+	EvidenceTypeMetadataSimilarity   EvidenceType = "metadata_similarity"
 	EvidenceTypeStructuralSimilarity EvidenceType = "structural_similarity"
-	EvidenceTypeTemporalProximity  EvidenceType = "temporal_proximity"
-	EvidenceTypeAuthorMatch        EvidenceType = "author_match"
-	EvidenceTypeTagMatch           EvidenceType = "tag_match"
-	EvidenceTypeTopicMatch         EvidenceType = "topic_match"
-	EvidenceTypeCitationLink       EvidenceType = "citation_link"
-	EvidenceTypeSemanticSimilarity EvidenceType = "semantic_similarity"
+	EvidenceTypeTemporalProximity    EvidenceType = "temporal_proximity"
+	EvidenceTypeAuthorMatch          EvidenceType = "author_match"
+	EvidenceTypeTagMatch             EvidenceType = "tag_match"
+	EvidenceTypeTopicMatch           EvidenceType = "topic_match"
+	EvidenceTypeCitationLink         EvidenceType = "citation_link"
+	EvidenceTypeSemanticSimilarity   EvidenceType = "semantic_similarity"
 )
 
 // Configuration types
@@ -284,12 +283,12 @@ type SimilarityConfig struct {
 }
 
 type ClusteringConfig struct {
-	Enabled               bool    `json:"enabled"`
-	Algorithm             string  `json:"algorithm"` // kmeans, hierarchical, dbscan
-	MinClusterSize        int     `json:"min_cluster_size"`
-	MaxClusters           int     `json:"max_clusters"`
-	SimilarityThreshold   float64 `json:"similarity_threshold"`
-	UpdateInterval        time.Duration `json:"update_interval"`
+	Enabled             bool          `json:"enabled"`
+	Algorithm           string        `json:"algorithm"` // kmeans, hierarchical, dbscan
+	MinClusterSize      int           `json:"min_cluster_size"`
+	MaxClusters         int           `json:"max_clusters"`
+	SimilarityThreshold float64       `json:"similarity_threshold"`
+	UpdateInterval      time.Duration `json:"update_interval"`
 }
 
 // Interface definitions
@@ -316,26 +315,26 @@ type Clusterer interface {
 // Document cluster types
 
 type DocumentCluster struct {
-	ID            uuid.UUID                 `json:"id"`
-	Name          string                    `json:"name"`
-	Description   string                    `json:"description"`
-	Documents     []uuid.UUID               `json:"documents"`
-	Centroid      []float64                 `json:"centroid,omitempty"`
-	Size          int                       `json:"size"`
-	Cohesion      float64                   `json:"cohesion"`
-	Separation    float64                   `json:"separation"`
-	Quality       float64                   `json:"quality"`
-	CreatedAt     time.Time                 `json:"created_at"`
-	UpdatedAt     time.Time                 `json:"updated_at"`
-	
+	ID          uuid.UUID   `json:"id"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Documents   []uuid.UUID `json:"documents"`
+	Centroid    []float64   `json:"centroid,omitempty"`
+	Size        int         `json:"size"`
+	Cohesion    float64     `json:"cohesion"`
+	Separation  float64     `json:"separation"`
+	Quality     float64     `json:"quality"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+
 	// Cluster characteristics
-	CommonTopics  []string                  `json:"common_topics,omitempty"`
-	CommonTags    []string                  `json:"common_tags,omitempty"`
-	CommonAuthors []string                  `json:"common_authors,omitempty"`
-	TimeRange     *TimeRange                `json:"time_range,omitempty"`
-	
+	CommonTopics  []string   `json:"common_topics,omitempty"`
+	CommonTags    []string   `json:"common_tags,omitempty"`
+	CommonAuthors []string   `json:"common_authors,omitempty"`
+	TimeRange     *TimeRange `json:"time_range,omitempty"`
+
 	// Metadata
-	Metadata      map[string]interface{}    `json:"metadata,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 type TimeRange struct {
@@ -346,21 +345,21 @@ type TimeRange struct {
 // Analysis results
 
 type RelationshipAnalysisResult struct {
-	DocumentID           uuid.UUID              `json:"document_id"`
-	TenantID             uuid.UUID              `json:"tenant_id"`
-	AnalyzedAt           time.Time              `json:"analyzed_at"`
-	TotalRelationships   int                    `json:"total_relationships"`
-	RelationshipsByType  map[RelationshipType]int `json:"relationships_by_type"`
-	StrongestRelationships []RelatedDocument     `json:"strongest_relationships"`
-	WeakestRelationships   []RelatedDocument     `json:"weakest_relationships"`
-	ClusterAssignments   []ClusterAssignment    `json:"cluster_assignments,omitempty"`
-	
+	DocumentID             uuid.UUID                `json:"document_id"`
+	TenantID               uuid.UUID                `json:"tenant_id"`
+	AnalyzedAt             time.Time                `json:"analyzed_at"`
+	TotalRelationships     int                      `json:"total_relationships"`
+	RelationshipsByType    map[RelationshipType]int `json:"relationships_by_type"`
+	StrongestRelationships []RelatedDocument        `json:"strongest_relationships"`
+	WeakestRelationships   []RelatedDocument        `json:"weakest_relationships"`
+	ClusterAssignments     []ClusterAssignment      `json:"cluster_assignments,omitempty"`
+
 	// Analysis metrics
-	AnalysisMetrics      *AnalysisMetrics       `json:"analysis_metrics"`
-	
+	AnalysisMetrics *AnalysisMetrics `json:"analysis_metrics"`
+
 	// Processing information
-	ProcessingTime       time.Duration          `json:"processing_time"`
-	ProcessingVersion    string                 `json:"processing_version"`
+	ProcessingTime    time.Duration `json:"processing_time"`
+	ProcessingVersion string        `json:"processing_version"`
 }
 
 type ClusterAssignment struct {
@@ -371,110 +370,110 @@ type ClusterAssignment struct {
 }
 
 type AnalysisMetrics struct {
-	AverageSimilarity    float64   `json:"average_similarity"`
-	MaxSimilarity        float64   `json:"max_similarity"`
-	MinSimilarity        float64   `json:"min_similarity"`
-	SimilarityStdDev     float64   `json:"similarity_std_dev"`
-	RelationshipDensity  float64   `json:"relationship_density"`
-	ClusteringCoefficient float64  `json:"clustering_coefficient"`
+	AverageSimilarity          float64 `json:"average_similarity"`
+	MaxSimilarity              float64 `json:"max_similarity"`
+	MinSimilarity              float64 `json:"min_similarity"`
+	SimilarityStdDev           float64 `json:"similarity_std_dev"`
+	RelationshipDensity        float64 `json:"relationship_density"`
+	ClusteringCoefficient      float64 `json:"clustering_coefficient"`
 	LocalClusteringCoefficient float64 `json:"local_clustering_coefficient"`
 }
 
 // BatchAnalysisRequest represents a batch analysis request
 type BatchAnalysisRequest struct {
-	TenantID        uuid.UUID                 `json:"tenant_id"`
-	DocumentIDs     []uuid.UUID               `json:"document_ids"`
-	AnalysisTypes   []AnalysisType            `json:"analysis_types"`
-	Options         *BatchAnalysisOptions     `json:"options,omitempty"`
-	RequestedBy     uuid.UUID                 `json:"requested_by"`
-	RequestedAt     time.Time                 `json:"requested_at"`
+	TenantID      uuid.UUID             `json:"tenant_id"`
+	DocumentIDs   []uuid.UUID           `json:"document_ids"`
+	AnalysisTypes []AnalysisType        `json:"analysis_types"`
+	Options       *BatchAnalysisOptions `json:"options,omitempty"`
+	RequestedBy   uuid.UUID             `json:"requested_by"`
+	RequestedAt   time.Time             `json:"requested_at"`
 }
 
 type AnalysisType string
 
 const (
-	AnalysisTypeSimilarity   AnalysisType = "similarity"
-	AnalysisTypeClustering   AnalysisType = "clustering"
-	AnalysisTypeCitation     AnalysisType = "citation"
-	AnalysisTypeVersioning   AnalysisType = "versioning"
-	AnalysisTypeTemporal     AnalysisType = "temporal"
-	AnalysisTypeAuthor       AnalysisType = "author"
-	AnalysisTypeTopic        AnalysisType = "topic"
+	AnalysisTypeSimilarity AnalysisType = "similarity"
+	AnalysisTypeClustering AnalysisType = "clustering"
+	AnalysisTypeCitation   AnalysisType = "citation"
+	AnalysisTypeVersioning AnalysisType = "versioning"
+	AnalysisTypeTemporal   AnalysisType = "temporal"
+	AnalysisTypeAuthor     AnalysisType = "author"
+	AnalysisTypeTopic      AnalysisType = "topic"
 )
 
 type BatchAnalysisOptions struct {
-	SimilarityThreshold     float64   `json:"similarity_threshold,omitempty"`
-	MaxRelationships        int       `json:"max_relationships,omitempty"`
-	IncludeEvidence         bool      `json:"include_evidence"`
-	IncludeClustering       bool      `json:"include_clustering"`
-	RealTimeUpdates         bool      `json:"real_time_updates"`
-	Priority                int       `json:"priority"`
+	SimilarityThreshold float64 `json:"similarity_threshold,omitempty"`
+	MaxRelationships    int     `json:"max_relationships,omitempty"`
+	IncludeEvidence     bool    `json:"include_evidence"`
+	IncludeClustering   bool    `json:"include_clustering"`
+	RealTimeUpdates     bool    `json:"real_time_updates"`
+	Priority            int     `json:"priority"`
 }
 
 type BatchAnalysisResult struct {
-	RequestID       uuid.UUID                           `json:"request_id"`
-	TenantID        uuid.UUID                           `json:"tenant_id"`
-	Status          BatchAnalysisStatus                 `json:"status"`
-	Progress        float64                             `json:"progress"`
-	StartedAt       time.Time                           `json:"started_at"`
-	CompletedAt     *time.Time                          `json:"completed_at,omitempty"`
-	Results         map[uuid.UUID]*RelationshipAnalysisResult `json:"results"`
-	Clusters        []*DocumentCluster                  `json:"clusters,omitempty"`
-	Summary         *BatchAnalysisSummary               `json:"summary,omitempty"`
-	Errors          []string                            `json:"errors,omitempty"`
-	ProcessingTime  time.Duration                       `json:"processing_time"`
+	RequestID      uuid.UUID                                 `json:"request_id"`
+	TenantID       uuid.UUID                                 `json:"tenant_id"`
+	Status         BatchAnalysisStatus                       `json:"status"`
+	Progress       float64                                   `json:"progress"`
+	StartedAt      time.Time                                 `json:"started_at"`
+	CompletedAt    *time.Time                                `json:"completed_at,omitempty"`
+	Results        map[uuid.UUID]*RelationshipAnalysisResult `json:"results"`
+	Clusters       []*DocumentCluster                        `json:"clusters,omitempty"`
+	Summary        *BatchAnalysisSummary                     `json:"summary,omitempty"`
+	Errors         []string                                  `json:"errors,omitempty"`
+	ProcessingTime time.Duration                             `json:"processing_time"`
 }
 
 type BatchAnalysisStatus string
 
 const (
-	BatchAnalysisStatusPending    BatchAnalysisStatus = "pending"
-	BatchAnalysisStatusRunning    BatchAnalysisStatus = "running"
-	BatchAnalysisStatusCompleted  BatchAnalysisStatus = "completed"
-	BatchAnalysisStatusFailed     BatchAnalysisStatus = "failed"
-	BatchAnalysisStatusCancelled  BatchAnalysisStatus = "cancelled"
+	BatchAnalysisStatusPending   BatchAnalysisStatus = "pending"
+	BatchAnalysisStatusRunning   BatchAnalysisStatus = "running"
+	BatchAnalysisStatusCompleted BatchAnalysisStatus = "completed"
+	BatchAnalysisStatusFailed    BatchAnalysisStatus = "failed"
+	BatchAnalysisStatusCancelled BatchAnalysisStatus = "cancelled"
 )
 
 type BatchAnalysisSummary struct {
-	TotalDocuments       int                              `json:"total_documents"`
-	TotalRelationships   int                              `json:"total_relationships"`
-	AverageSimilarity    float64                          `json:"average_similarity"`
-	RelationshipsByType  map[RelationshipType]int         `json:"relationships_by_type"`
-	ClustersFound        int                              `json:"clusters_found"`
-	ProcessingStatistics *ProcessingStatistics            `json:"processing_statistics"`
+	TotalDocuments       int                      `json:"total_documents"`
+	TotalRelationships   int                      `json:"total_relationships"`
+	AverageSimilarity    float64                  `json:"average_similarity"`
+	RelationshipsByType  map[RelationshipType]int `json:"relationships_by_type"`
+	ClustersFound        int                      `json:"clusters_found"`
+	ProcessingStatistics *ProcessingStatistics    `json:"processing_statistics"`
 }
 
 type ProcessingStatistics struct {
-	DocumentsProcessed   int           `json:"documents_processed"`
-	RelationshipsFound   int           `json:"relationships_found"`
+	DocumentsProcessed    int           `json:"documents_processed"`
+	RelationshipsFound    int           `json:"relationships_found"`
 	AverageProcessingTime time.Duration `json:"average_processing_time"`
-	CacheHitRate        float64       `json:"cache_hit_rate"`
-	ErrorRate           float64       `json:"error_rate"`
+	CacheHitRate          float64       `json:"cache_hit_rate"`
+	ErrorRate             float64       `json:"error_rate"`
 }
 
 // NewRelationshipMapper creates a new relationship mapper
 func NewRelationshipMapper(config *RelationshipMapperConfig, knowledgeGraph *KnowledgeGraph) *RelationshipMapper {
 	if config == nil {
 		config = &RelationshipMapperConfig{
-			Enabled:                   true,
-			SimilarityThreshold:       0.7,
-			ContentSimilarityWeight:   0.4,
-			MetadataSimilarityWeight:  0.2,
-			TemporalSimilarityWeight:  0.1,
-			AuthorSimilarityWeight:    0.15,
-			TagSimilarityWeight:       0.15,
-			MaxRelationshipsPerDoc:    50,
-			EnableRealTimeMapping:     true,
-			BatchProcessingSize:       100,
-			CacheSize:                 10000,
-			CacheTTL:                  1 * time.Hour,
-			EnableTemporalAnalysis:    true,
-			EnableAuthorAnalysis:      true,
-			EnableTopicAnalysis:       true,
-			EnableCitationAnalysis:    true,
-			EnableVersionTracking:     true,
-			MinRelationshipStrength:   0.5,
-			UpdateInterval:            30 * time.Minute,
+			Enabled:                  true,
+			SimilarityThreshold:      0.7,
+			ContentSimilarityWeight:  0.4,
+			MetadataSimilarityWeight: 0.2,
+			TemporalSimilarityWeight: 0.1,
+			AuthorSimilarityWeight:   0.15,
+			TagSimilarityWeight:      0.15,
+			MaxRelationshipsPerDoc:   50,
+			EnableRealTimeMapping:    true,
+			BatchProcessingSize:      100,
+			CacheSize:                10000,
+			CacheTTL:                 1 * time.Hour,
+			EnableTemporalAnalysis:   true,
+			EnableAuthorAnalysis:     true,
+			EnableTopicAnalysis:      true,
+			EnableCitationAnalysis:   true,
+			EnableVersionTracking:    true,
+			MinRelationshipStrength:  0.5,
+			UpdateInterval:           30 * time.Minute,
 		}
 	}
 
@@ -484,7 +483,7 @@ func NewRelationshipMapper(config *RelationshipMapperConfig, knowledgeGraph *Kno
 		documentIndex:     make(map[uuid.UUID]*DocumentMetadata),
 		relationshipCache: make(map[string]*CachedRelationship),
 		tracer:            otel.Tracer("relationship-mapper"),
-		similarityEngine:  NewSimilarityEngine(&SimilarityConfig{
+		similarityEngine: NewSimilarityEngine(&SimilarityConfig{
 			ContentSimilarityEnabled:    true,
 			SemanticSimilarityEnabled:   true,
 			StructuralSimilarityEnabled: true,
@@ -560,10 +559,10 @@ func (rm *RelationshipMapper) AnalyzeDocument(ctx context.Context, documentID uu
 	}
 
 	result := &RelationshipAnalysisResult{
-		DocumentID:           documentID,
-		TenantID:             document.TenantID,
-		AnalyzedAt:           time.Now(),
-		RelationshipsByType:  make(map[RelationshipType]int),
+		DocumentID:             documentID,
+		TenantID:               document.TenantID,
+		AnalyzedAt:             time.Now(),
+		RelationshipsByType:    make(map[RelationshipType]int),
 		StrongestRelationships: make([]RelatedDocument, 0),
 		WeakestRelationships:   make([]RelatedDocument, 0),
 		ProcessingVersion:      "1.0.0",
@@ -644,12 +643,12 @@ func (rm *RelationshipMapper) BatchAnalyze(ctx context.Context, request *BatchAn
 	}
 
 	result := &BatchAnalysisResult{
-		RequestID:   uuid.New(),
-		TenantID:    request.TenantID,
-		Status:      BatchAnalysisStatusRunning,
-		StartedAt:   time.Now(),
-		Results:     make(map[uuid.UUID]*RelationshipAnalysisResult),
-		Errors:      make([]string, 0),
+		RequestID: uuid.New(),
+		TenantID:  request.TenantID,
+		Status:    BatchAnalysisStatusRunning,
+		StartedAt: time.Now(),
+		Results:   make(map[uuid.UUID]*RelationshipAnalysisResult),
+		Errors:    make([]string, 0),
 	}
 
 	// Process documents in batches
@@ -739,7 +738,7 @@ func (rm *RelationshipMapper) findRelatedDocuments(ctx context.Context, document
 
 		// Calculate relationship
 		relationship := rm.calculateRelationship(ctx, document, otherDocument)
-		
+
 		// Filter by minimum strength
 		if relationship.Strength >= rm.config.MinRelationshipStrength {
 			relationships = append(relationships, relationship)
@@ -770,11 +769,11 @@ func (rm *RelationshipMapper) findRelatedDocuments(ctx context.Context, document
 
 func (rm *RelationshipMapper) calculateRelationship(ctx context.Context, doc1, doc2 *DocumentMetadata) RelatedDocument {
 	relationship := RelatedDocument{
-		DocumentID:  doc2.ID,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Evidence:    make([]RelationshipEvidence, 0),
-		Context:     make(map[string]interface{}),
+		DocumentID: doc2.ID,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+		Evidence:   make([]RelationshipEvidence, 0),
+		Context:    make(map[string]interface{}),
 	}
 
 	var totalScore float64
@@ -786,7 +785,7 @@ func (rm *RelationshipMapper) calculateRelationship(ctx context.Context, doc1, d
 		if contentSim > 0.1 {
 			totalScore += contentSim * rm.config.ContentSimilarityWeight
 			evidenceCount++
-			
+
 			relationship.Evidence = append(relationship.Evidence, RelationshipEvidence{
 				Type:        EvidenceTypeContentSimilarity,
 				Description: fmt.Sprintf("Content similarity: %.2f", contentSim),
@@ -801,7 +800,7 @@ func (rm *RelationshipMapper) calculateRelationship(ctx context.Context, doc1, d
 	if metadataSim > 0.1 {
 		totalScore += metadataSim * rm.config.MetadataSimilarityWeight
 		evidenceCount++
-		
+
 		relationship.Evidence = append(relationship.Evidence, RelationshipEvidence{
 			Type:        EvidenceTypeMetadataSimilarity,
 			Description: fmt.Sprintf("Metadata similarity: %.2f", metadataSim),
@@ -816,7 +815,7 @@ func (rm *RelationshipMapper) calculateRelationship(ctx context.Context, doc1, d
 		if temporalSim > 0.1 {
 			totalScore += temporalSim * rm.config.TemporalSimilarityWeight
 			evidenceCount++
-			
+
 			relationship.Evidence = append(relationship.Evidence, RelationshipEvidence{
 				Type:        EvidenceTypeTemporalProximity,
 				Description: fmt.Sprintf("Temporal proximity: %.2f", temporalSim),
@@ -832,7 +831,7 @@ func (rm *RelationshipMapper) calculateRelationship(ctx context.Context, doc1, d
 		if authorSim > 0.1 {
 			totalScore += authorSim * rm.config.AuthorSimilarityWeight
 			evidenceCount++
-			
+
 			relationship.Evidence = append(relationship.Evidence, RelationshipEvidence{
 				Type:        EvidenceTypeAuthorMatch,
 				Description: fmt.Sprintf("Author similarity: %.2f", authorSim),
@@ -847,7 +846,7 @@ func (rm *RelationshipMapper) calculateRelationship(ctx context.Context, doc1, d
 	if tagSim > 0.1 {
 		totalScore += tagSim * rm.config.TagSimilarityWeight
 		evidenceCount++
-		
+
 		relationship.Evidence = append(relationship.Evidence, RelationshipEvidence{
 			Type:        EvidenceTypeTagMatch,
 			Description: fmt.Sprintf("Tag similarity: %.2f", tagSim),
@@ -943,12 +942,12 @@ func (rm *RelationshipMapper) calculateAuthorSimilarity(doc1, doc2 *DocumentMeta
 
 func (rm *RelationshipMapper) calculateTagSimilarity(doc1, doc2 *DocumentMetadata) float64 {
 	var allTags1, allTags2 []string
-	
+
 	allTags1 = append(allTags1, doc1.Tags...)
 	allTags1 = append(allTags1, doc1.Categories...)
 	allTags1 = append(allTags1, doc1.Topics...)
 	allTags1 = append(allTags1, doc1.Keywords...)
-	
+
 	allTags2 = append(allTags2, doc2.Tags...)
 	allTags2 = append(allTags2, doc2.Categories...)
 	allTags2 = append(allTags2, doc2.Topics...)
@@ -1020,11 +1019,11 @@ func (rm *RelationshipMapper) calculateAnalysisMetrics(relationships []RelatedDo
 	stdDev := math.Sqrt(variance / float64(len(relationships)))
 
 	return &AnalysisMetrics{
-		AverageSimilarity:    avgSimilarity,
-		MaxSimilarity:        maxSimilarity,
-		MinSimilarity:        minSimilarity,
-		SimilarityStdDev:     stdDev,
-		RelationshipDensity:  float64(len(relationships)) / float64(len(rm.documentIndex)),
+		AverageSimilarity:   avgSimilarity,
+		MaxSimilarity:       maxSimilarity,
+		MinSimilarity:       minSimilarity,
+		SimilarityStdDev:    stdDev,
+		RelationshipDensity: float64(len(relationships)) / float64(len(rm.documentIndex)),
 	}
 }
 
@@ -1059,7 +1058,7 @@ func (rm *RelationshipMapper) generateBatchAnalysisSummary(result *BatchAnalysis
 
 	for _, analysis := range result.Results {
 		totalRelationships += analysis.TotalRelationships
-		
+
 		for relType, count := range analysis.RelationshipsByType {
 			summary.RelationshipsByType[relType] += count
 		}
@@ -1166,7 +1165,7 @@ func (rm *RelationshipMapper) jaccardSimilarity(set1, set2 []string) float64 {
 func (rm *RelationshipMapper) generateSimulatedEmbedding(text string) []float64 {
 	// Generate a simple hash-based embedding for demo purposes
 	embedding := make([]float64, 384)
-	
+
 	// Simple hash-based feature generation
 	for i, char := range text {
 		if i >= len(embedding) {
@@ -1261,13 +1260,13 @@ type MockClusterer struct{}
 func (m *MockClusterer) Cluster(ctx context.Context, documents []*DocumentMetadata) ([]*DocumentCluster, error) {
 	// Simple mock clustering - group by content type
 	clusters := make(map[string]*DocumentCluster)
-	
+
 	for _, doc := range documents {
 		clusterKey := doc.ContentType
 		if clusterKey == "" {
 			clusterKey = "unknown"
 		}
-		
+
 		if cluster, exists := clusters[clusterKey]; exists {
 			cluster.Documents = append(cluster.Documents, doc.ID)
 			cluster.Size++
@@ -1286,12 +1285,12 @@ func (m *MockClusterer) Cluster(ctx context.Context, documents []*DocumentMetada
 			}
 		}
 	}
-	
+
 	var result []*DocumentCluster
 	for _, cluster := range clusters {
 		result = append(result, cluster)
 	}
-	
+
 	return result, nil
 }
 

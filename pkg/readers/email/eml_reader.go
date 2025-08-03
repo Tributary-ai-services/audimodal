@@ -283,7 +283,7 @@ func (r *EMLReader) EstimateSize(ctx context.Context, sourcePath string) (core.S
 	}
 
 	emailInfo := r.extractEmailInfo(msg)
-	
+
 	// Estimate chunks: headers + body parts + attachments
 	estimatedChunks := 1 // headers
 	if emailInfo.HasPlainContent {
@@ -360,30 +360,30 @@ func (r *EMLReader) GetSupportedFormats() []string {
 
 // EmailInfo contains extracted email information
 type EmailInfo struct {
-	From             string
-	To               string
-	CC               string
-	BCC              string
-	Subject          string
-	Date             string
-	MessageID        string
-	HasAttachments   bool
-	AttachmentCount  int
-	HasHTMLContent   bool
-	HasPlainContent  bool
-	ContentType      string
-	Charset          string
+	From            string
+	To              string
+	CC              string
+	BCC             string
+	Subject         string
+	Date            string
+	MessageID       string
+	HasAttachments  bool
+	AttachmentCount int
+	HasHTMLContent  bool
+	HasPlainContent bool
+	ContentType     string
+	Charset         string
 }
 
 // EmailPart represents a part of an email message
 type EmailPart struct {
-	ContentType     string
-	Content         string
-	Headers         map[string]string
-	IsAttachment    bool
-	AttachmentName  string
-	AttachmentType  string
-	Size            int64
+	ContentType    string
+	Content        string
+	Headers        map[string]string
+	IsAttachment   bool
+	AttachmentName string
+	AttachmentType string
+	Size           int64
 }
 
 // extractEmailInfo extracts basic information from email
@@ -476,10 +476,10 @@ func (r *EMLReader) parseEmailParts(msg *mail.Message, config map[string]any) ([
 // createHeadersPart creates a part containing email headers
 func (r *EMLReader) createHeadersPart(msg *mail.Message) EmailPart {
 	var headers []string
-	
+
 	// Common headers to extract
 	commonHeaders := []string{"From", "To", "Cc", "Bcc", "Subject", "Date", "Message-ID", "Reply-To", "Return-Path"}
-	
+
 	for _, header := range commonHeaders {
 		if value := msg.Header.Get(header); value != "" {
 			if decoded, err := r.decodeHeader(value); err == nil {
@@ -503,7 +503,7 @@ func (r *EMLReader) parseMultipartMessage(body interface{}, boundary string, con
 
 	// This is a simplified multipart parser
 	// In production, you'd want to use a more robust MIME parser
-	
+
 	// For now, create mock parts based on common email structure
 	extractPlain := true
 	extractHTML := true

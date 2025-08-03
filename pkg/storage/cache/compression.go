@@ -13,13 +13,13 @@ import (
 type Compressor interface {
 	// Compress compresses the input data
 	Compress(data []byte) ([]byte, error)
-	
+
 	// Decompress decompresses the input data
 	Decompress(data []byte) ([]byte, error)
-	
+
 	// GetType returns the compression type identifier
 	GetType() string
-	
+
 	// GetLevel returns the compression level
 	GetLevel() int
 }
@@ -169,7 +169,7 @@ func (c *SimpleCompressor) Decompress(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create simple decompressor reader: %w", err)
 	}
 	defer reader.Close()
-	
+
 	decompressed, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decompress simple data: %w", err)
@@ -224,7 +224,7 @@ func (r *CompressionRegistry) Get(name string, level int) (Compressor, error) {
 	if !exists {
 		return nil, fmt.Errorf("unknown compression algorithm: %s", name)
 	}
-	
+
 	return factory(level), nil
 }
 
@@ -245,10 +245,10 @@ type AdaptiveCompressor struct {
 	gzipCompressor   *GzipCompressor
 	simpleCompressor *SimpleCompressor
 	noopCompressor   *NoOpCompressor
-	
+
 	// Thresholds for algorithm selection
 	minSizeForCompression int
-	gzipThreshold        float64 // Use gzip if expected compression ratio is better than this
+	gzipThreshold         float64 // Use gzip if expected compression ratio is better than this
 }
 
 // NewAdaptiveCompressor creates a new adaptive compressor
@@ -257,8 +257,8 @@ func NewAdaptiveCompressor() *AdaptiveCompressor {
 		gzipCompressor:        NewGzipCompressor(gzip.DefaultCompression),
 		simpleCompressor:      NewSimpleCompressor(0),
 		noopCompressor:        NewNoOpCompressor(),
-		minSizeForCompression: 1024,    // 1KB minimum
-		gzipThreshold:        0.7,      // Use gzip if compression ratio > 70%
+		minSizeForCompression: 1024, // 1KB minimum
+		gzipThreshold:         0.7,  // Use gzip if compression ratio > 70%
 	}
 }
 
@@ -275,10 +275,10 @@ func (c *AdaptiveCompressor) Compress(data []byte) ([]byte, error) {
 
 	// Analyze data characteristics
 	entropy := c.calculateEntropy(data)
-	
+
 	var compressor Compressor
 	var typeIndicator byte
-	
+
 	// Select algorithm based on data characteristics
 	if entropy < 6.0 { // Low entropy, likely compressible
 		compressor = c.gzipCompressor
@@ -307,7 +307,7 @@ func (c *AdaptiveCompressor) Compress(data []byte) ([]byte, error) {
 	result := make([]byte, len(compressed)+1)
 	result[0] = typeIndicator
 	copy(result[1:], compressed)
-	
+
 	return result, nil
 }
 
@@ -361,7 +361,7 @@ func (c *AdaptiveCompressor) calculateEntropy(data []byte) float64 {
 	// Calculate entropy
 	var entropy float64
 	dataLen := float64(len(data))
-	
+
 	for _, freq := range frequencies {
 		if freq > 0 {
 			p := float64(freq) / dataLen
@@ -401,13 +401,13 @@ func NewCompressionBenchmark() *CompressionBenchmark {
 
 // BenchmarkResult contains the results of a compression benchmark
 type BenchmarkResult struct {
-	Algorithm      string        `json:"algorithm"`
-	OriginalSize   int           `json:"original_size"`
-	CompressedSize int           `json:"compressed_size"`
-	CompressionRatio float64     `json:"compression_ratio"`
-	CompressTime   time.Duration `json:"compress_time"`
-	DecompressTime time.Duration `json:"decompress_time"`
-	TotalTime      time.Duration `json:"total_time"`
+	Algorithm        string        `json:"algorithm"`
+	OriginalSize     int           `json:"original_size"`
+	CompressedSize   int           `json:"compressed_size"`
+	CompressionRatio float64       `json:"compression_ratio"`
+	CompressTime     time.Duration `json:"compress_time"`
+	DecompressTime   time.Duration `json:"decompress_time"`
+	TotalTime        time.Duration `json:"total_time"`
 }
 
 // Benchmark runs compression benchmarks on test data

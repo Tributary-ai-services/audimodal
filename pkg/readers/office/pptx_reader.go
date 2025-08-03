@@ -187,12 +187,12 @@ func (r *PPTXReader) DiscoverSchema(ctx context.Context, sourcePath string) (cor
 			},
 		},
 		Metadata: map[string]any{
-			"title":       metadata.Title,
-			"author":      metadata.Author,
-			"subject":     metadata.Subject,
-			"keywords":    metadata.Keywords,
-			"description": metadata.Description,
-			"creator":     metadata.Creator,
+			"title":           metadata.Title,
+			"author":          metadata.Author,
+			"subject":         metadata.Subject,
+			"keywords":        metadata.Keywords,
+			"description":     metadata.Description,
+			"creator":         metadata.Creator,
 			"created_date":    metadata.CreatedDate,
 			"modified_date":   metadata.ModifiedDate,
 			"slide_count":     metadata.SlideCount,
@@ -328,12 +328,12 @@ type PPTXSlide struct {
 
 // PPTXShape represents a shape or text box in a slide
 type PPTXShape struct {
-	Type    string
-	Text    string
-	X       float64
-	Y       float64
-	Width   float64
-	Height  float64
+	Type   string
+	Text   string
+	X      float64
+	Y      float64
+	Width  float64
+	Height float64
 }
 
 // PPTXTable represents a table in a slide
@@ -432,8 +432,8 @@ func (r *PPTXReader) parsePresentation(sourcePath string, config map[string]any)
 					Height: 100,
 				},
 			},
-			Tables: []PPTXTable{},
-			Hidden: false,
+			Tables:     []PPTXTable{},
+			Hidden:     false,
 			Animations: []string{"fadeIn", "slideFromLeft"},
 		}
 	}
@@ -486,17 +486,17 @@ func (it *PPTXIterator) Next(ctx context.Context) (core.Chunk, error) {
 
 	// Build slide content
 	var contentParts []string
-	
+
 	// Add title
 	if slide.Title != "" {
 		contentParts = append(contentParts, fmt.Sprintf("Title: %s", slide.Title))
 	}
-	
+
 	// Add main content
 	if slide.Content != "" {
 		contentParts = append(contentParts, slide.Content)
 	}
-	
+
 	// Add shape text if enabled
 	if extractShapes, ok := it.config["extract_shapes"].(bool); !ok || extractShapes {
 		for _, shape := range slide.Shapes {
@@ -505,7 +505,7 @@ func (it *PPTXIterator) Next(ctx context.Context) (core.Chunk, error) {
 			}
 		}
 	}
-	
+
 	// Add notes if enabled
 	if extractNotes, ok := it.config["extract_slide_notes"].(bool); !ok || extractNotes {
 		if slide.Notes != "" {
@@ -525,15 +525,15 @@ func (it *PPTXIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "pptx_reader",
 			Context: map[string]string{
-				"slide_number":     strconv.Itoa(slide.Number),
-				"slide_title":      slide.Title,
-				"slide_layout":     slide.Layout,
-				"total_slides":     strconv.Itoa(len(it.presentation.Slides)),
-				"file_type":        "pptx",
-				"presentation_title": it.presentation.Metadata.Title,
+				"slide_number":        strconv.Itoa(slide.Number),
+				"slide_title":         slide.Title,
+				"slide_layout":        slide.Layout,
+				"total_slides":        strconv.Itoa(len(it.presentation.Slides)),
+				"file_type":           "pptx",
+				"presentation_title":  it.presentation.Metadata.Title,
 				"presentation_author": it.presentation.Metadata.Author,
-				"has_animations":   strconv.FormatBool(len(slide.Animations) > 0),
-				"shape_count":      strconv.Itoa(len(slide.Shapes)),
+				"has_animations":      strconv.FormatBool(len(slide.Animations) > 0),
+				"shape_count":         strconv.Itoa(len(slide.Shapes)),
 			},
 		},
 	}
@@ -566,4 +566,3 @@ func (it *PPTXIterator) Progress() float64 {
 	}
 	return float64(it.currentSlide) / float64(totalSlides)
 }
-

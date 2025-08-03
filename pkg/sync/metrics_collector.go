@@ -18,52 +18,52 @@ import (
 type SyncMetricsCollector struct {
 	db     *sql.DB
 	config *MetricsConfig
-	
+
 	// In-memory metrics for real-time access
 	realtimeMetrics map[string]*RealtimeMetrics
 	metricsMutex    sync.RWMutex
-	
+
 	// Background aggregation
 	aggregationTicker *time.Ticker
 	stopChan          chan struct{}
-	
+
 	tracer trace.Tracer
 }
 
 // MetricsConfig contains metrics collection configuration
 type MetricsConfig struct {
-	RetentionDays        int           `json:"retention_days"`
-	AggregationInterval  time.Duration `json:"aggregation_interval"`
-	RealtimeWindowSize   time.Duration `json:"realtime_window_size"`
-	EnableDetailedMetrics bool         `json:"enable_detailed_metrics"`
-	EnablePredictiveAnalytics bool     `json:"enable_predictive_analytics"`
+	RetentionDays             int           `json:"retention_days"`
+	AggregationInterval       time.Duration `json:"aggregation_interval"`
+	RealtimeWindowSize        time.Duration `json:"realtime_window_size"`
+	EnableDetailedMetrics     bool          `json:"enable_detailed_metrics"`
+	EnablePredictiveAnalytics bool          `json:"enable_predictive_analytics"`
 }
 
 // RealtimeMetrics holds in-memory metrics for fast access
 type RealtimeMetrics struct {
-	DataSourceID    uuid.UUID                 `json:"data_source_id,omitempty"`
-	ConnectorType   string                    `json:"connector_type,omitempty"`
-	WindowStart     time.Time                 `json:"window_start"`
-	WindowEnd       time.Time                 `json:"window_end"`
-	ActiveSyncs     int                       `json:"active_syncs"`
-	CompletedSyncs  int                       `json:"completed_syncs"`
-	FailedSyncs     int                       `json:"failed_syncs"`
-	TotalFiles      int                       `json:"total_files"`
-	TotalBytes      int64                     `json:"total_bytes"`
-	AverageSpeed    float64                   `json:"average_speed_mbps"`
-	ErrorRate       float64                   `json:"error_rate"`
-	LastUpdated     time.Time                 `json:"last_updated"`
-	TrendData       *TrendAnalysis            `json:"trend_data,omitempty"`
+	DataSourceID   uuid.UUID      `json:"data_source_id,omitempty"`
+	ConnectorType  string         `json:"connector_type,omitempty"`
+	WindowStart    time.Time      `json:"window_start"`
+	WindowEnd      time.Time      `json:"window_end"`
+	ActiveSyncs    int            `json:"active_syncs"`
+	CompletedSyncs int            `json:"completed_syncs"`
+	FailedSyncs    int            `json:"failed_syncs"`
+	TotalFiles     int            `json:"total_files"`
+	TotalBytes     int64          `json:"total_bytes"`
+	AverageSpeed   float64        `json:"average_speed_mbps"`
+	ErrorRate      float64        `json:"error_rate"`
+	LastUpdated    time.Time      `json:"last_updated"`
+	TrendData      *TrendAnalysis `json:"trend_data,omitempty"`
 }
 
 // TrendAnalysis provides trend analysis for metrics
 type TrendAnalysis struct {
-	SyncRateTrend       TrendDirection `json:"sync_rate_trend"`
-	PerformanceTrend    TrendDirection `json:"performance_trend"`
-	ErrorRateTrend      TrendDirection `json:"error_rate_trend"`
-	VolumeProjection    *VolumeProjection `json:"volume_projection,omitempty"`
-	Anomalies           []*Anomaly      `json:"anomalies,omitempty"`
-	Recommendations     []string        `json:"recommendations,omitempty"`
+	SyncRateTrend    TrendDirection    `json:"sync_rate_trend"`
+	PerformanceTrend TrendDirection    `json:"performance_trend"`
+	ErrorRateTrend   TrendDirection    `json:"error_rate_trend"`
+	VolumeProjection *VolumeProjection `json:"volume_projection,omitempty"`
+	Anomalies        []*Anomaly        `json:"anomalies,omitempty"`
+	Recommendations  []string          `json:"recommendations,omitempty"`
 }
 
 // TrendDirection indicates the direction of a trend
@@ -78,22 +78,22 @@ const (
 
 // VolumeProjection provides volume projections
 type VolumeProjection struct {
-	ProjectedSyncs        int       `json:"projected_syncs_next_24h"`
-	ProjectedFiles        int       `json:"projected_files_next_24h"`
-	ProjectedBytes        int64     `json:"projected_bytes_next_24h"`
-	ConfidenceLevel       float64   `json:"confidence_level"`
-	ProjectionDate        time.Time `json:"projection_date"`
+	ProjectedSyncs  int       `json:"projected_syncs_next_24h"`
+	ProjectedFiles  int       `json:"projected_files_next_24h"`
+	ProjectedBytes  int64     `json:"projected_bytes_next_24h"`
+	ConfidenceLevel float64   `json:"confidence_level"`
+	ProjectionDate  time.Time `json:"projection_date"`
 }
 
 // Anomaly represents detected anomalies in sync patterns
 type Anomaly struct {
-	Type        AnomalyType `json:"type"`
-	Severity    string      `json:"severity"` // low, medium, high, critical
-	Description string      `json:"description"`
-	DetectedAt  time.Time   `json:"detected_at"`
-	Value       float64     `json:"value"`
-	Expected    float64     `json:"expected"`
-	Deviation   float64     `json:"deviation"`
+	Type        AnomalyType            `json:"type"`
+	Severity    string                 `json:"severity"` // low, medium, high, critical
+	Description string                 `json:"description"`
+	DetectedAt  time.Time              `json:"detected_at"`
+	Value       float64                `json:"value"`
+	Expected    float64                `json:"expected"`
+	Deviation   float64                `json:"deviation"`
 	Context     map[string]interface{} `json:"context,omitempty"`
 }
 
@@ -102,19 +102,19 @@ type AnomalyType string
 
 const (
 	AnomalyTypePerformanceDegradation AnomalyType = "performance_degradation"
-	AnomalyTypeErrorSpike            AnomalyType = "error_spike"
-	AnomalyTypeVolumeAnomaly         AnomalyType = "volume_anomaly"
-	AnomalyTypeLatencySpike          AnomalyType = "latency_spike"
-	AnomalyTypeUnusualPattern        AnomalyType = "unusual_pattern"
+	AnomalyTypeErrorSpike             AnomalyType = "error_spike"
+	AnomalyTypeVolumeAnomaly          AnomalyType = "volume_anomaly"
+	AnomalyTypeLatencySpike           AnomalyType = "latency_spike"
+	AnomalyTypeUnusualPattern         AnomalyType = "unusual_pattern"
 )
 
 // NewSyncMetricsCollector creates a new metrics collector
 func NewSyncMetricsCollector(retentionDays int) *SyncMetricsCollector {
 	config := &MetricsConfig{
-		RetentionDays:           retentionDays,
-		AggregationInterval:     5 * time.Minute,
-		RealtimeWindowSize:      1 * time.Hour,
-		EnableDetailedMetrics:   true,
+		RetentionDays:             retentionDays,
+		AggregationInterval:       5 * time.Minute,
+		RealtimeWindowSize:        1 * time.Hour,
+		EnableDetailedMetrics:     true,
 		EnablePredictiveAnalytics: true,
 	}
 
@@ -266,7 +266,7 @@ func (smc *SyncMetricsCollector) InitializeSchema(ctx context.Context) error {
 
 // RecordSyncStarted records when a sync job starts
 func (smc *SyncMetricsCollector) RecordSyncStarted(job *SyncJob) {
-	ctx, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_started")
+	_, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_started")
 	defer span.End()
 
 	span.SetAttributes(
@@ -283,7 +283,7 @@ func (smc *SyncMetricsCollector) RecordSyncStarted(job *SyncJob) {
 
 // RecordSyncCompleted records when a sync job completes successfully
 func (smc *SyncMetricsCollector) RecordSyncCompleted(job *SyncJob) {
-	ctx, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_completed")
+	_, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_completed")
 	defer span.End()
 
 	span.SetAttributes(
@@ -329,7 +329,7 @@ func (smc *SyncMetricsCollector) RecordSyncCompleted(job *SyncJob) {
 
 // RecordSyncFailed records when a sync job fails
 func (smc *SyncMetricsCollector) RecordSyncFailed(job *SyncJob, err error) {
-	ctx, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_failed")
+	_, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_failed")
 	defer span.End()
 
 	span.SetAttributes(
@@ -364,7 +364,7 @@ func (smc *SyncMetricsCollector) RecordSyncFailed(job *SyncJob, err error) {
 
 // RecordSyncCancelled records when a sync job is cancelled
 func (smc *SyncMetricsCollector) RecordSyncCancelled(job *SyncJob) {
-	ctx, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_cancelled")
+	_, span := smc.tracer.Start(context.Background(), "metrics_collector.record_sync_cancelled")
 	defer span.End()
 
 	span.SetAttributes(
@@ -440,7 +440,7 @@ func (smc *SyncMetricsCollector) GetRealtimeMetrics(ctx context.Context, dataSou
 
 	// Create a copy to avoid race conditions
 	metricsCopy := *metrics
-	
+
 	// Update trend analysis if predictive analytics is enabled
 	if smc.config.EnablePredictiveAnalytics {
 		trendData, err := smc.calculateTrendAnalysis(ctx, dataSourceID, connectorType)
@@ -604,7 +604,7 @@ func (smc *SyncMetricsCollector) getTimeSeriesMetrics(ctx context.Context, reque
 	// This would query hourly/daily metrics tables
 	// For now, return mock data
 	var points []*SyncMetricsPoint
-	
+
 	now := time.Now()
 	for i := 0; i < 24; i++ {
 		timestamp := now.Add(-time.Duration(i) * time.Hour)
@@ -618,7 +618,7 @@ func (smc *SyncMetricsCollector) getTimeSeriesMetrics(ctx context.Context, reque
 			},
 		})
 	}
-	
+
 	return points, nil
 }
 
@@ -681,15 +681,15 @@ func (smc *SyncMetricsCollector) detectAnomalies(ctx context.Context, job *SyncJ
 func (smc *SyncMetricsCollector) detectErrorSpike(ctx context.Context, dataSourceID uuid.UUID, connectorType string) {
 	// Detect sudden spikes in error rates
 	key := smc.buildMetricsKey(&dataSourceID, connectorType)
-	
+
 	smc.metricsMutex.RLock()
 	metrics, exists := smc.realtimeMetrics[key]
 	smc.metricsMutex.RUnlock()
-	
+
 	if !exists || metrics.ErrorRate < 20.0 { // Threshold for error spike
 		return
 	}
-	
+
 	// Record anomaly
 	anomaly := &Anomaly{
 		Type:        AnomalyTypeErrorSpike,
@@ -706,7 +706,7 @@ func (smc *SyncMetricsCollector) detectErrorSpike(ctx context.Context, dataSourc
 			"completed_syncs": metrics.CompletedSyncs,
 		},
 	}
-	
+
 	go smc.storeAnomaly(context.Background(), anomaly)
 }
 
@@ -714,16 +714,16 @@ func (smc *SyncMetricsCollector) storeAnomaly(ctx context.Context, anomaly *Anom
 	if smc.db == nil {
 		return
 	}
-	
+
 	contextJSON, _ := json.Marshal(anomaly.Context)
-	
+
 	query := `
 		INSERT INTO sync_anomalies (
 			anomaly_type, severity, description, detected_at,
 			value, expected_value, deviation_percentage, context
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
-	
+
 	smc.db.ExecContext(ctx, query,
 		anomaly.Type,
 		anomaly.Severity,
@@ -738,7 +738,7 @@ func (smc *SyncMetricsCollector) storeAnomaly(ctx context.Context, anomaly *Anom
 
 func (smc *SyncMetricsCollector) startBackgroundAggregation() {
 	smc.aggregationTicker = time.NewTicker(smc.config.AggregationInterval)
-	
+
 	go func() {
 		for {
 			select {
@@ -753,10 +753,10 @@ func (smc *SyncMetricsCollector) startBackgroundAggregation() {
 
 func (smc *SyncMetricsCollector) performAggregation() {
 	ctx := context.Background()
-	
+
 	// Clean up old real-time metrics
 	cutoff := time.Now().Add(-smc.config.RealtimeWindowSize)
-	
+
 	smc.metricsMutex.Lock()
 	for key, metrics := range smc.realtimeMetrics {
 		if metrics.LastUpdated.Before(cutoff) {
@@ -764,7 +764,7 @@ func (smc *SyncMetricsCollector) performAggregation() {
 		}
 	}
 	smc.metricsMutex.Unlock()
-	
+
 	// Aggregate hourly metrics from jobs table
 	if smc.db != nil {
 		smc.aggregateHourlyMetrics(ctx)
@@ -783,7 +783,7 @@ func (smc *SyncMetricsCollector) aggregateDailyMetrics(ctx context.Context) {
 
 func (smc *SyncMetricsCollector) cleanupOldMetrics(ctx context.Context) {
 	cutoff := time.Now().AddDate(0, 0, -smc.config.RetentionDays)
-	
+
 	// Clean up old metrics
 	tables := []string{"sync_metrics_hourly", "sync_metrics_daily", "sync_anomalies"}
 	for _, table := range tables {
@@ -797,17 +797,17 @@ func (smc *SyncMetricsCollector) Shutdown(ctx context.Context) error {
 	if smc.aggregationTicker != nil {
 		smc.aggregationTicker.Stop()
 	}
-	
+
 	close(smc.stopChan)
 	return nil
 }
 
 // AnomalyFilters contains filters for querying anomalies
 type AnomalyFilters struct {
-	DataSourceID     uuid.UUID   `json:"data_source_id,omitempty"`
-	ConnectorType    string      `json:"connector_type,omitempty"`
-	AnomalyType      AnomalyType `json:"anomaly_type,omitempty"`
-	Severity         string      `json:"severity,omitempty"`
-	Since            *time.Time  `json:"since,omitempty"`
-	IncludeResolved  bool        `json:"include_resolved"`
+	DataSourceID    uuid.UUID   `json:"data_source_id,omitempty"`
+	ConnectorType   string      `json:"connector_type,omitempty"`
+	AnomalyType     AnomalyType `json:"anomaly_type,omitempty"`
+	Severity        string      `json:"severity,omitempty"`
+	Since           *time.Time  `json:"since,omitempty"`
+	IncludeResolved bool        `json:"include_resolved"`
 }

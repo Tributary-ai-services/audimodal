@@ -11,11 +11,11 @@ import (
 
 // Common cache errors
 var (
-	ErrCacheMiss     = errors.New("cache miss")
-	ErrCacheExpired  = errors.New("cache expired")
-	ErrInvalidKey    = errors.New("invalid cache key")
-	ErrSizeExceeded  = errors.New("content size exceeds cache limit")
-	ErrNotSupported  = errors.New("operation not supported")
+	ErrCacheMiss    = errors.New("cache miss")
+	ErrCacheExpired = errors.New("cache expired")
+	ErrInvalidKey   = errors.New("invalid cache key")
+	ErrSizeExceeded = errors.New("content size exceeds cache limit")
+	ErrNotSupported = errors.New("operation not supported")
 )
 
 // Cache defines the interface for storage caching
@@ -70,16 +70,16 @@ type CacheStats struct {
 	Evicted int64 `json:"evicted"`
 
 	// Performance metrics
-	Operations      int64         `json:"operations"`
-	Errors          int64         `json:"errors"`
-	AverageLatency  time.Duration `json:"average_latency"`
+	Operations     int64         `json:"operations"`
+	Errors         int64         `json:"errors"`
+	AverageLatency time.Duration `json:"average_latency"`
 
 	// Size information
 	TotalSize       int64 `json:"total_size"`
 	AverageItemSize int64 `json:"average_item_size"`
 
 	// Connection information
-	Connections int `json:"connections"`
+	Connections int           `json:"connections"`
 	Uptime      time.Duration `json:"uptime"`
 }
 
@@ -178,11 +178,11 @@ type CacheConfig struct {
 	Provider string `yaml:"provider"`
 
 	// General settings
-	Enabled          bool          `yaml:"enabled"`
-	DefaultTTL       time.Duration `yaml:"default_ttl"`
-	MaxSize          int64         `yaml:"max_size"`
-	MaxItemSize      int64         `yaml:"max_item_size"`
-	CleanupInterval  time.Duration `yaml:"cleanup_interval"`
+	Enabled         bool          `yaml:"enabled"`
+	DefaultTTL      time.Duration `yaml:"default_ttl"`
+	MaxSize         int64         `yaml:"max_size"`
+	MaxItemSize     int64         `yaml:"max_item_size"`
+	CleanupInterval time.Duration `yaml:"cleanup_interval"`
 
 	// Performance settings
 	EnableCompression bool `yaml:"enable_compression"`
@@ -190,16 +190,16 @@ type CacheConfig struct {
 	EnableMetrics     bool `yaml:"enable_metrics"`
 
 	// Content-specific settings
-	CacheFileInfo    bool          `yaml:"cache_file_info"`
-	CacheContent     bool          `yaml:"cache_content"`
-	CacheMetadata    bool          `yaml:"cache_metadata"`
-	FileInfoTTL      time.Duration `yaml:"file_info_ttl"`
-	ContentTTL       time.Duration `yaml:"content_ttl"`
-	MetadataTTL      time.Duration `yaml:"metadata_ttl"`
+	CacheFileInfo bool          `yaml:"cache_file_info"`
+	CacheContent  bool          `yaml:"cache_content"`
+	CacheMetadata bool          `yaml:"cache_metadata"`
+	FileInfoTTL   time.Duration `yaml:"file_info_ttl"`
+	ContentTTL    time.Duration `yaml:"content_ttl"`
+	MetadataTTL   time.Duration `yaml:"metadata_ttl"`
 
 	// Size limits
-	MaxContentSize   int64 `yaml:"max_content_size"`
-	MaxMetadataSize  int64 `yaml:"max_metadata_size"`
+	MaxContentSize  int64 `yaml:"max_content_size"`
+	MaxMetadataSize int64 `yaml:"max_metadata_size"`
 
 	// Eviction policy
 	EvictionPolicy   string `yaml:"eviction_policy"` // lru, lfu, ttl, random
@@ -213,27 +213,27 @@ type CacheConfig struct {
 // DefaultCacheConfig returns default cache configuration
 func DefaultCacheConfig() *CacheConfig {
 	return &CacheConfig{
-		Provider:         "memory",
-		Enabled:          true,
-		DefaultTTL:       1 * time.Hour,
-		MaxSize:          1024 * 1024 * 1024, // 1GB
-		MaxItemSize:      50 * 1024 * 1024,   // 50MB
-		CleanupInterval:  10 * time.Minute,
+		Provider:          "memory",
+		Enabled:           true,
+		DefaultTTL:        1 * time.Hour,
+		MaxSize:           1024 * 1024 * 1024, // 1GB
+		MaxItemSize:       50 * 1024 * 1024,   // 50MB
+		CleanupInterval:   10 * time.Minute,
 		EnableCompression: true,
-		CompressionLevel: 6,
-		EnableMetrics:    true,
-		CacheFileInfo:    true,
-		CacheContent:     true,
-		CacheMetadata:    true,
-		FileInfoTTL:      30 * time.Minute,
-		ContentTTL:       2 * time.Hour,
-		MetadataTTL:      1 * time.Hour,
-		MaxContentSize:   50 * 1024 * 1024, // 50MB
-		MaxMetadataSize:  1 * 1024 * 1024,  // 1MB
-		EvictionPolicy:   "lru",
-		EvictionMaxItems: 10000,
-		Redis:           DefaultRedisCacheConfig(),
-		Memory:          DefaultMemoryCacheConfig(),
+		CompressionLevel:  6,
+		EnableMetrics:     true,
+		CacheFileInfo:     true,
+		CacheContent:      true,
+		CacheMetadata:     true,
+		FileInfoTTL:       30 * time.Minute,
+		ContentTTL:        2 * time.Hour,
+		MetadataTTL:       1 * time.Hour,
+		MaxContentSize:    50 * 1024 * 1024, // 50MB
+		MaxMetadataSize:   1 * 1024 * 1024,  // 1MB
+		EvictionPolicy:    "lru",
+		EvictionMaxItems:  10000,
+		Redis:             DefaultRedisCacheConfig(),
+		Memory:            DefaultMemoryCacheConfig(),
 	}
 }
 
@@ -267,12 +267,12 @@ func (e *CacheEntry) UpdateAccess() {
 
 // CacheOperationResult represents the result of a cache operation
 type CacheOperationResult struct {
-	Success   bool          `json:"success"`
-	Hit       bool          `json:"hit"`
-	Size      int64         `json:"size"`
-	Duration  time.Duration `json:"duration"`
-	Error     error         `json:"-"`
-	ErrorMsg  string        `json:"error,omitempty"`
+	Success  bool          `json:"success"`
+	Hit      bool          `json:"hit"`
+	Size     int64         `json:"size"`
+	Duration time.Duration `json:"duration"`
+	Error    error         `json:"-"`
+	ErrorMsg string        `json:"error,omitempty"`
 }
 
 // CacheLayer represents different caching layers
@@ -287,15 +287,15 @@ const (
 // MultiLevelCache supports multiple cache layers
 type MultiLevelCache interface {
 	Cache
-	
+
 	// Layer-specific operations
 	GetFromLayer(ctx context.Context, layer CacheLayer, key string) ([]byte, error)
 	SetToLayer(ctx context.Context, layer CacheLayer, key string, value []byte, ttl time.Duration) error
-	
+
 	// Cache promotion/demotion
 	PromoteToL1(ctx context.Context, key string) error
 	DemoteFromL1(ctx context.Context, key string) error
-	
+
 	// Layer statistics
 	GetLayerStats(ctx context.Context, layer CacheLayer) (*CacheStats, error)
 }
@@ -304,25 +304,25 @@ type MultiLevelCache interface {
 type CacheEventType string
 
 const (
-	CacheEventHit      CacheEventType = "hit"
-	CacheEventMiss     CacheEventType = "miss"
-	CacheEventSet      CacheEventType = "set"
-	CacheEventDelete   CacheEventType = "delete"
-	CacheEventExpire   CacheEventType = "expire"
-	CacheEventEvict    CacheEventType = "evict"
-	CacheEventError    CacheEventType = "error"
+	CacheEventHit    CacheEventType = "hit"
+	CacheEventMiss   CacheEventType = "miss"
+	CacheEventSet    CacheEventType = "set"
+	CacheEventDelete CacheEventType = "delete"
+	CacheEventExpire CacheEventType = "expire"
+	CacheEventEvict  CacheEventType = "evict"
+	CacheEventError  CacheEventType = "error"
 )
 
 // CacheEvent represents a cache event for monitoring/logging
 type CacheEvent struct {
-	Type        CacheEventType         `json:"type"`
-	Key         string                 `json:"key"`
-	Layer       CacheLayer             `json:"layer,omitempty"`
-	Size        int64                  `json:"size,omitempty"`
-	Duration    time.Duration          `json:"duration,omitempty"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	Error       string                 `json:"error,omitempty"`
+	Type      CacheEventType         `json:"type"`
+	Key       string                 `json:"key"`
+	Layer     CacheLayer             `json:"layer,omitempty"`
+	Size      int64                  `json:"size,omitempty"`
+	Duration  time.Duration          `json:"duration,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Error     string                 `json:"error,omitempty"`
 }
 
 // CacheObserver defines an interface for cache event observation
@@ -333,11 +333,11 @@ type CacheObserver interface {
 // ObservableCache extends Cache with event observation capabilities
 type ObservableCache interface {
 	Cache
-	
+
 	// Observer management
 	AddObserver(observer CacheObserver)
 	RemoveObserver(observer CacheObserver)
-	
+
 	// Event emission
 	EmitEvent(event *CacheEvent)
 }
@@ -346,11 +346,11 @@ type ObservableCache interface {
 type CacheStrategy string
 
 const (
-	CacheStrategyWriteThrough  CacheStrategy = "write_through"
-	CacheStrategyWriteBack     CacheStrategy = "write_back"
-	CacheStrategyWriteAround   CacheStrategy = "write_around"
-	CacheStrategyLazyLoading   CacheStrategy = "lazy_loading"
-	CacheStrategyRefreshAhead  CacheStrategy = "refresh_ahead"
+	CacheStrategyWriteThrough CacheStrategy = "write_through"
+	CacheStrategyWriteBack    CacheStrategy = "write_back"
+	CacheStrategyWriteAround  CacheStrategy = "write_around"
+	CacheStrategyLazyLoading  CacheStrategy = "lazy_loading"
+	CacheStrategyRefreshAhead CacheStrategy = "refresh_ahead"
 )
 
 // CacheOptions contains options for cache operations

@@ -12,62 +12,62 @@ type Tenant struct {
 	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	Name        string    `gorm:"unique;not null;index" json:"name"`
 	DisplayName string    `gorm:"not null" json:"display_name"`
-	
+
 	// Billing information
 	BillingPlan  string `gorm:"not null" json:"billing_plan"`
 	BillingEmail string `gorm:"not null" json:"billing_email"`
-	
+
 	// Quotas (stored as JSON for flexibility)
 	Quotas TenantQuotas `gorm:"type:jsonb" json:"quotas"`
-	
+
 	// Compliance requirements
 	Compliance TenantCompliance `gorm:"type:jsonb" json:"compliance"`
-	
+
 	// Contact information
 	ContactInfo TenantContactInfo `gorm:"type:jsonb" json:"contact_info"`
-	
+
 	// Status and metadata
-	Status    string    `gorm:"not null;default:'active'" json:"status"`
-	CreatedAt time.Time `gorm:"not null" json:"created_at"`
-	UpdatedAt time.Time `gorm:"not null" json:"updated_at"`
+	Status    string     `gorm:"not null;default:'active'" json:"status"`
+	CreatedAt time.Time  `gorm:"not null" json:"created_at"`
+	UpdatedAt time.Time  `gorm:"not null" json:"updated_at"`
 	DeletedAt *time.Time `gorm:"index" json:"deleted_at,omitempty"`
-	
+
 	// Relationships
-	DataSources       []DataSource       `gorm:"foreignKey:TenantID" json:"data_sources,omitempty"`
+	DataSources        []DataSource        `gorm:"foreignKey:TenantID" json:"data_sources,omitempty"`
 	ProcessingSessions []ProcessingSession `gorm:"foreignKey:TenantID" json:"processing_sessions,omitempty"`
-	DLPPolicies       []DLPPolicy        `gorm:"foreignKey:TenantID" json:"dlp_policies,omitempty"`
-	Files             []File             `gorm:"foreignKey:TenantID" json:"files,omitempty"`
-	Chunks            []Chunk            `gorm:"foreignKey:TenantID" json:"chunks,omitempty"`
+	DLPPolicies        []DLPPolicy         `gorm:"foreignKey:TenantID" json:"dlp_policies,omitempty"`
+	Files              []File              `gorm:"foreignKey:TenantID" json:"files,omitempty"`
+	Chunks             []Chunk             `gorm:"foreignKey:TenantID" json:"chunks,omitempty"`
 }
 
 // TenantQuotas represents the quotas for a tenant
 type TenantQuotas struct {
-	FilesPerHour           int64 `json:"files_per_hour"`
-	StorageGB              int64 `json:"storage_gb"`
-	ComputeHours           int64 `json:"compute_hours"`
-	APIRequestsPerMinute   int64 `json:"api_requests_per_minute"`
-	MaxConcurrentJobs      int64 `json:"max_concurrent_jobs"`
-	MaxFileSize            int64 `json:"max_file_size"`
-	MaxChunksPerFile       int64 `json:"max_chunks_per_file"`
-	VectorStorageGB        int64 `json:"vector_storage_gb"`
+	FilesPerHour         int64 `json:"files_per_hour"`
+	StorageGB            int64 `json:"storage_gb"`
+	ComputeHours         int64 `json:"compute_hours"`
+	APIRequestsPerMinute int64 `json:"api_requests_per_minute"`
+	MaxConcurrentJobs    int64 `json:"max_concurrent_jobs"`
+	MaxFileSize          int64 `json:"max_file_size"`
+	MaxChunksPerFile     int64 `json:"max_chunks_per_file"`
+	VectorStorageGB      int64 `json:"vector_storage_gb"`
 }
 
 // TenantCompliance represents compliance requirements for a tenant
 type TenantCompliance struct {
-	GDPR           bool     `json:"gdpr"`
-	HIPAA          bool     `json:"hipaa"`
-	SOX            bool     `json:"sox"`
-	PCI            bool     `json:"pci"`
-	DataResidency  []string `json:"data_residency"`
-	RetentionDays  int      `json:"retention_days"`
-	EncryptionRequired bool `json:"encryption_required"`
+	GDPR               bool     `json:"gdpr"`
+	HIPAA              bool     `json:"hipaa"`
+	SOX                bool     `json:"sox"`
+	PCI                bool     `json:"pci"`
+	DataResidency      []string `json:"data_residency"`
+	RetentionDays      int      `json:"retention_days"`
+	EncryptionRequired bool     `json:"encryption_required"`
 }
 
 // TenantContactInfo represents contact information for a tenant
 type TenantContactInfo struct {
-	AdminEmail    string `json:"admin_email"`
-	SecurityEmail string `json:"security_email"`
-	BillingEmail  string `json:"billing_email"`
+	AdminEmail     string `json:"admin_email"`
+	SecurityEmail  string `json:"security_email"`
+	BillingEmail   string `json:"billing_email"`
 	TechnicalEmail string `json:"technical_email"`
 }
 
@@ -158,42 +158,42 @@ func (t *Tenant) GetQuotaLimit(resource string) int64 {
 // Validate validates the tenant model
 func (t *Tenant) Validate() ValidationErrors {
 	var errors ValidationErrors
-	
+
 	// Validate required fields
 	if t.Name == "" {
 		errors.Add("name", "name is required")
 	}
-	
+
 	if t.DisplayName == "" {
 		errors.Add("display_name", "display name is required")
 	}
-	
+
 	if t.BillingPlan == "" {
 		errors.Add("billing_plan", "billing plan is required")
 	}
-	
+
 	if t.BillingEmail == "" {
 		errors.Add("billing_email", "billing email is required")
 	}
-	
+
 	// Validate status
 	if !IsValidStatus("tenant", t.Status) {
 		errors.Add("status", "invalid status value")
 	}
-	
+
 	// Validate quotas
 	if t.Quotas.FilesPerHour < 0 {
 		errors.Add("quotas.files_per_hour", "files per hour must be non-negative")
 	}
-	
+
 	if t.Quotas.StorageGB < 0 {
 		errors.Add("quotas.storage_gb", "storage GB must be non-negative")
 	}
-	
+
 	// Validate email format for contact info
 	if t.ContactInfo.AdminEmail == "" {
 		errors.Add("contact_info.admin_email", "admin email is required")
 	}
-	
+
 	return errors
 }

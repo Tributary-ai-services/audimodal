@@ -96,13 +96,13 @@ func GetRecommendedStrategies(contentType string, size int64, complexity string)
 
 // StrategyCapabilities describes what each strategy is good for
 type StrategyCapabilities struct {
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	BestFor      []string `json:"best_for"`
-	DataTypes    []string `json:"data_types"`
-	Complexity   string   `json:"complexity"`
-	Performance  string   `json:"performance"`
-	MemoryUsage  string   `json:"memory_usage"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	BestFor     []string `json:"best_for"`
+	DataTypes   []string `json:"data_types"`
+	Complexity  string   `json:"complexity"`
+	Performance string   `json:"performance"`
+	MemoryUsage string   `json:"memory_usage"`
 }
 
 // GetStrategyCapabilities returns detailed information about all registered strategies
@@ -150,13 +150,13 @@ func GetStrategyCapabilities() []StrategyCapabilities {
 // ValidateBasicStrategies validates all registered basic strategies
 func ValidateBasicStrategies() error {
 	strategies := []string{"fixed_size_text", "semantic_text", "row_based_structured", "adaptive_hybrid"}
-	
+
 	for _, name := range strategies {
 		if err := registry.GlobalRegistry.ValidatePlugin("strategy", name); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -209,12 +209,12 @@ func GetOptimalStrategyConfig(strategyName string, contentSize int64, dataType s
 
 // StrategyPerformanceHints provides performance optimization hints for strategies
 type StrategyPerformanceHints struct {
-	StrategyName     string            `json:"strategy_name"`
-	ParallelSafe     bool              `json:"parallel_safe"`
-	MemoryEfficient  bool              `json:"memory_efficient"`
-	RecommendedBatch int               `json:"recommended_batch_size"`
-	OptimalConfig    map[string]any    `json:"optimal_config"`
-	Warnings         []string          `json:"warnings"`
+	StrategyName     string         `json:"strategy_name"`
+	ParallelSafe     bool           `json:"parallel_safe"`
+	MemoryEfficient  bool           `json:"memory_efficient"`
+	RecommendedBatch int            `json:"recommended_batch_size"`
+	OptimalConfig    map[string]any `json:"optimal_config"`
+	Warnings         []string       `json:"warnings"`
 }
 
 // GetPerformanceHints returns performance optimization hints for each strategy
@@ -250,9 +250,9 @@ func GetPerformanceHints() []StrategyPerformanceHints {
 			MemoryEfficient:  true,
 			RecommendedBatch: 2000,
 			OptimalConfig: map[string]any{
-				"rows_per_chunk":   100,
-				"include_headers":  true,
-				"output_format":    "records",
+				"rows_per_chunk":  100,
+				"include_headers": true,
+				"output_format":   "records",
 			},
 			Warnings: []string{"Assumes consistent row structure", "May create large chunks with wide tables"},
 		},

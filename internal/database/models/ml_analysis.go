@@ -43,26 +43,26 @@ func (m *MLAnalysisResult) BeforeCreate(tx *gorm.DB) error {
 
 // MLAnalysisJob represents a queued ML analysis job
 type MLAnalysisJob struct {
-	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	DocumentID   uuid.UUID `gorm:"type:uuid;not null;index" json:"document_id"`
-	ChunkID      *uuid.UUID `gorm:"type:uuid;index" json:"chunk_id,omitempty"`
-	JobType      string    `gorm:"type:varchar(50);not null" json:"job_type"`
-	Priority     int       `gorm:"type:int;default:1" json:"priority"`
-	Status       string    `gorm:"type:varchar(20);not null;default:'pending'" json:"status"`
-	Parameters   string    `gorm:"type:jsonb" json:"parameters"`
-	RequestedBy  string    `gorm:"type:varchar(100)" json:"requested_by"`
-	Error        string    `gorm:"type:text" json:"error,omitempty"`
-	RetryCount   int       `gorm:"type:int;default:0" json:"retry_count"`
-	MaxRetries   int       `gorm:"type:int;default:3" json:"max_retries"`
-	ScheduledAt  *time.Time `gorm:"type:timestamp" json:"scheduled_at,omitempty"`
-	StartedAt    *time.Time `gorm:"type:timestamp" json:"started_at,omitempty"`
-	CompletedAt  *time.Time `gorm:"type:timestamp" json:"completed_at,omitempty"`
-	CreatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID          uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	DocumentID  uuid.UUID  `gorm:"type:uuid;not null;index" json:"document_id"`
+	ChunkID     *uuid.UUID `gorm:"type:uuid;index" json:"chunk_id,omitempty"`
+	JobType     string     `gorm:"type:varchar(50);not null" json:"job_type"`
+	Priority    int        `gorm:"type:int;default:1" json:"priority"`
+	Status      string     `gorm:"type:varchar(20);not null;default:'pending'" json:"status"`
+	Parameters  string     `gorm:"type:jsonb" json:"parameters"`
+	RequestedBy string     `gorm:"type:varchar(100)" json:"requested_by"`
+	Error       string     `gorm:"type:text" json:"error,omitempty"`
+	RetryCount  int        `gorm:"type:int;default:0" json:"retry_count"`
+	MaxRetries  int        `gorm:"type:int;default:3" json:"max_retries"`
+	ScheduledAt *time.Time `gorm:"type:timestamp" json:"scheduled_at,omitempty"`
+	StartedAt   *time.Time `gorm:"type:timestamp" json:"started_at,omitempty"`
+	CompletedAt *time.Time `gorm:"type:timestamp" json:"completed_at,omitempty"`
+	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 
 	// Relationships
-	File   *File   `gorm:"foreignKey:DocumentID;references:ID" json:"file,omitempty"`
-	Chunk  *Chunk  `gorm:"foreignKey:ChunkID;references:ID" json:"chunk,omitempty"`
+	File   *File             `gorm:"foreignKey:DocumentID;references:ID" json:"file,omitempty"`
+	Chunk  *Chunk            `gorm:"foreignKey:ChunkID;references:ID" json:"chunk,omitempty"`
 	Result *MLAnalysisResult `gorm:"foreignKey:DocumentID,ChunkID;references:DocumentID,ChunkID" json:"result,omitempty"`
 }
 
@@ -91,20 +91,20 @@ func (m *MLAnalysisJob) CanStart() bool {
 
 // MLAnalysisBatch represents a batch of ML analysis jobs
 type MLAnalysisBatch struct {
-	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Name            string    `gorm:"type:varchar(255)" json:"name"`
-	Description     string    `gorm:"type:text" json:"description"`
-	Status          string    `gorm:"type:varchar(20);not null;default:'pending'" json:"status"`
-	TotalJobs       int       `gorm:"type:int;default:0" json:"total_jobs"`
-	CompletedJobs   int       `gorm:"type:int;default:0" json:"completed_jobs"`
-	FailedJobs      int       `gorm:"type:int;default:0" json:"failed_jobs"`
-	Parameters      string    `gorm:"type:jsonb" json:"parameters"`
-	RequestedBy     string    `gorm:"type:varchar(100)" json:"requested_by"`
-	ProcessingTime  int64     `gorm:"type:bigint;default:0" json:"processing_time_ms"`
-	StartedAt       *time.Time `gorm:"type:timestamp" json:"started_at,omitempty"`
-	CompletedAt     *time.Time `gorm:"type:timestamp" json:"completed_at,omitempty"`
-	CreatedAt       time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt       time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID             uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Name           string     `gorm:"type:varchar(255)" json:"name"`
+	Description    string     `gorm:"type:text" json:"description"`
+	Status         string     `gorm:"type:varchar(20);not null;default:'pending'" json:"status"`
+	TotalJobs      int        `gorm:"type:int;default:0" json:"total_jobs"`
+	CompletedJobs  int        `gorm:"type:int;default:0" json:"completed_jobs"`
+	FailedJobs     int        `gorm:"type:int;default:0" json:"failed_jobs"`
+	Parameters     string     `gorm:"type:jsonb" json:"parameters"`
+	RequestedBy    string     `gorm:"type:varchar(100)" json:"requested_by"`
+	ProcessingTime int64      `gorm:"type:bigint;default:0" json:"processing_time_ms"`
+	StartedAt      *time.Time `gorm:"type:timestamp" json:"started_at,omitempty"`
+	CompletedAt    *time.Time `gorm:"type:timestamp" json:"completed_at,omitempty"`
+	CreatedAt      time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 
 	// Relationships
 	Jobs []MLAnalysisJob `gorm:"foreignKey:BatchID" json:"jobs,omitempty"`
@@ -131,11 +131,11 @@ func (m *MLAnalysisBatch) IsComplete() bool {
 // UpdateProgress updates the batch progress
 func (m *MLAnalysisBatch) UpdateProgress(tx *gorm.DB) error {
 	var completed, failed int64
-	
+
 	if err := tx.Model(&MLAnalysisJob{}).Where("batch_id = ? AND status = ?", m.ID, "completed").Count(&completed).Error; err != nil {
 		return err
 	}
-	
+
 	if err := tx.Model(&MLAnalysisJob{}).Where("batch_id = ? AND status = ?", m.ID, "failed").Count(&failed).Error; err != nil {
 		return err
 	}
@@ -154,22 +154,22 @@ func (m *MLAnalysisBatch) UpdateProgress(tx *gorm.DB) error {
 
 // MLAnalysisMetrics represents aggregated analysis metrics
 type MLAnalysisMetrics struct {
-	ID                 uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	DocumentID         *uuid.UUID `gorm:"type:uuid;index" json:"document_id,omitempty"`
-	TimeFrame          string    `gorm:"type:varchar(20);not null" json:"time_frame"` // daily, weekly, monthly
-	Date               time.Time `gorm:"type:date;not null;index" json:"date"`
-	TotalAnalyses      int       `gorm:"type:int;default:0" json:"total_analyses"`
-	AvgConfidence      float64   `gorm:"type:decimal(5,4);default:0.0" json:"avg_confidence"`
-	AvgProcessingTime  int64     `gorm:"type:bigint;default:0" json:"avg_processing_time_ms"`
-	SentimentPositive  int       `gorm:"type:int;default:0" json:"sentiment_positive"`
-	SentimentNegative  int       `gorm:"type:int;default:0" json:"sentiment_negative"`
-	SentimentNeutral   int       `gorm:"type:int;default:0" json:"sentiment_neutral"`
-	TopicDistribution  string    `gorm:"type:jsonb" json:"topic_distribution"`
-	EntityCounts       string    `gorm:"type:jsonb" json:"entity_counts"`
-	QualityScores      string    `gorm:"type:jsonb" json:"quality_scores"`
-	LanguageDistribution string  `gorm:"type:jsonb" json:"language_distribution"`
-	CreatedAt          time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt          time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID                   uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	DocumentID           *uuid.UUID `gorm:"type:uuid;index" json:"document_id,omitempty"`
+	TimeFrame            string     `gorm:"type:varchar(20);not null" json:"time_frame"` // daily, weekly, monthly
+	Date                 time.Time  `gorm:"type:date;not null;index" json:"date"`
+	TotalAnalyses        int        `gorm:"type:int;default:0" json:"total_analyses"`
+	AvgConfidence        float64    `gorm:"type:decimal(5,4);default:0.0" json:"avg_confidence"`
+	AvgProcessingTime    int64      `gorm:"type:bigint;default:0" json:"avg_processing_time_ms"`
+	SentimentPositive    int        `gorm:"type:int;default:0" json:"sentiment_positive"`
+	SentimentNegative    int        `gorm:"type:int;default:0" json:"sentiment_negative"`
+	SentimentNeutral     int        `gorm:"type:int;default:0" json:"sentiment_neutral"`
+	TopicDistribution    string     `gorm:"type:jsonb" json:"topic_distribution"`
+	EntityCounts         string     `gorm:"type:jsonb" json:"entity_counts"`
+	QualityScores        string     `gorm:"type:jsonb" json:"quality_scores"`
+	LanguageDistribution string     `gorm:"type:jsonb" json:"language_distribution"`
+	CreatedAt            time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt            time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 
 	// Relationships
 	Document *File `gorm:"foreignKey:DocumentID;references:ID" json:"document,omitempty"`
@@ -190,33 +190,33 @@ func (m *MLAnalysisMetrics) BeforeCreate(tx *gorm.DB) error {
 
 // MLAnalysisConfig represents ML analysis configuration per tenant
 type MLAnalysisConfig struct {
-	ID                  uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Name                string    `gorm:"type:varchar(255);not null" json:"name"`
-	Description         string    `gorm:"type:text" json:"description"`
-	IsDefault           bool      `gorm:"type:boolean;default:false" json:"is_default"`
-	EnableSentiment     bool      `gorm:"type:boolean;default:true" json:"enable_sentiment"`
-	EnableTopics        bool      `gorm:"type:boolean;default:true" json:"enable_topics"`
-	EnableEntities      bool      `gorm:"type:boolean;default:true" json:"enable_entities"`
-	EnableSummary       bool      `gorm:"type:boolean;default:true" json:"enable_summary"`
-	EnableQuality       bool      `gorm:"type:boolean;default:true" json:"enable_quality"`
-	EnableLanguage      bool      `gorm:"type:boolean;default:true" json:"enable_language"`
-	EnableEmotion       bool      `gorm:"type:boolean;default:true" json:"enable_emotion"`
-	MaxTopics           int       `gorm:"type:int;default:5" json:"max_topics"`
-	SummaryRatio        float64   `gorm:"type:decimal(3,2);default:0.3" json:"summary_ratio"`
-	MinConfidence       float64   `gorm:"type:decimal(3,2);default:0.5" json:"min_confidence"`
-	BatchSize           int       `gorm:"type:int;default:10" json:"batch_size"`
-	ProcessingTimeout   int       `gorm:"type:int;default:300" json:"processing_timeout_seconds"`
-	RetryAttempts       int       `gorm:"type:int;default:3" json:"retry_attempts"`
-	CacheEnabled        bool      `gorm:"type:boolean;default:true" json:"cache_enabled"`
-	CacheTTL            int       `gorm:"type:int;default:3600" json:"cache_ttl_seconds"`
-	AutoAnalyze         bool      `gorm:"type:boolean;default:false" json:"auto_analyze"`
-	AnalyzeTriggers     string    `gorm:"type:jsonb" json:"analyze_triggers"`
-	ModelPreferences    string    `gorm:"type:jsonb" json:"model_preferences"`
-	CustomParameters    string    `gorm:"type:jsonb" json:"custom_parameters"`
-	CreatedAt           time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt           time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	CreatedBy           string    `gorm:"type:varchar(100)" json:"created_by"`
-	UpdatedBy           string    `gorm:"type:varchar(100)" json:"updated_by"`
+	ID                uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Name              string    `gorm:"type:varchar(255);not null" json:"name"`
+	Description       string    `gorm:"type:text" json:"description"`
+	IsDefault         bool      `gorm:"type:boolean;default:false" json:"is_default"`
+	EnableSentiment   bool      `gorm:"type:boolean;default:true" json:"enable_sentiment"`
+	EnableTopics      bool      `gorm:"type:boolean;default:true" json:"enable_topics"`
+	EnableEntities    bool      `gorm:"type:boolean;default:true" json:"enable_entities"`
+	EnableSummary     bool      `gorm:"type:boolean;default:true" json:"enable_summary"`
+	EnableQuality     bool      `gorm:"type:boolean;default:true" json:"enable_quality"`
+	EnableLanguage    bool      `gorm:"type:boolean;default:true" json:"enable_language"`
+	EnableEmotion     bool      `gorm:"type:boolean;default:true" json:"enable_emotion"`
+	MaxTopics         int       `gorm:"type:int;default:5" json:"max_topics"`
+	SummaryRatio      float64   `gorm:"type:decimal(3,2);default:0.3" json:"summary_ratio"`
+	MinConfidence     float64   `gorm:"type:decimal(3,2);default:0.5" json:"min_confidence"`
+	BatchSize         int       `gorm:"type:int;default:10" json:"batch_size"`
+	ProcessingTimeout int       `gorm:"type:int;default:300" json:"processing_timeout_seconds"`
+	RetryAttempts     int       `gorm:"type:int;default:3" json:"retry_attempts"`
+	CacheEnabled      bool      `gorm:"type:boolean;default:true" json:"cache_enabled"`
+	CacheTTL          int       `gorm:"type:int;default:3600" json:"cache_ttl_seconds"`
+	AutoAnalyze       bool      `gorm:"type:boolean;default:false" json:"auto_analyze"`
+	AnalyzeTriggers   string    `gorm:"type:jsonb" json:"analyze_triggers"`
+	ModelPreferences  string    `gorm:"type:jsonb" json:"model_preferences"`
+	CustomParameters  string    `gorm:"type:jsonb" json:"custom_parameters"`
+	CreatedAt         time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt         time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	CreatedBy         string    `gorm:"type:varchar(100)" json:"created_by"`
+	UpdatedBy         string    `gorm:"type:varchar(100)" json:"updated_by"`
 }
 
 // TableName returns the table name for GORM
@@ -281,21 +281,21 @@ func (m *MLAnalysisConfig) GetEnabledAnalysis() []string {
 
 // MLAnalysisAlert represents alerts for ML analysis results
 type MLAnalysisAlert struct {
-	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	DocumentID   uuid.UUID `gorm:"type:uuid;not null;index" json:"document_id"`
-	ChunkID      *uuid.UUID `gorm:"type:uuid;index" json:"chunk_id,omitempty"`
-	AlertType    string    `gorm:"type:varchar(50);not null" json:"alert_type"`
-	Severity     string    `gorm:"type:varchar(20);not null" json:"severity"` // low, medium, high, critical
-	Title        string    `gorm:"type:varchar(255);not null" json:"title"`
-	Description  string    `gorm:"type:text" json:"description"`
-	Condition    string    `gorm:"type:jsonb" json:"condition"`
-	Triggered    bool      `gorm:"type:boolean;default:true" json:"triggered"`
-	Acknowledged bool      `gorm:"type:boolean;default:false" json:"acknowledged"`
-	AcknowledgedBy string  `gorm:"type:varchar(100)" json:"acknowledged_by"`
+	ID             uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	DocumentID     uuid.UUID  `gorm:"type:uuid;not null;index" json:"document_id"`
+	ChunkID        *uuid.UUID `gorm:"type:uuid;index" json:"chunk_id,omitempty"`
+	AlertType      string     `gorm:"type:varchar(50);not null" json:"alert_type"`
+	Severity       string     `gorm:"type:varchar(20);not null" json:"severity"` // low, medium, high, critical
+	Title          string     `gorm:"type:varchar(255);not null" json:"title"`
+	Description    string     `gorm:"type:text" json:"description"`
+	Condition      string     `gorm:"type:jsonb" json:"condition"`
+	Triggered      bool       `gorm:"type:boolean;default:true" json:"triggered"`
+	Acknowledged   bool       `gorm:"type:boolean;default:false" json:"acknowledged"`
+	AcknowledgedBy string     `gorm:"type:varchar(100)" json:"acknowledged_by"`
 	AcknowledgedAt *time.Time `gorm:"type:timestamp" json:"acknowledged_at,omitempty"`
-	ResolvedAt   *time.Time `gorm:"type:timestamp" json:"resolved_at,omitempty"`
-	CreatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ResolvedAt     *time.Time `gorm:"type:timestamp" json:"resolved_at,omitempty"`
+	CreatedAt      time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 
 	// Relationships
 	Document *File  `gorm:"foreignKey:DocumentID;references:ID" json:"document,omitempty"`

@@ -34,13 +34,13 @@ func NewWebhookHandler(connector *NotionConnector, secret string, tracer trace.T
 		secret:    secret,
 		handlers:  make(map[string]EventHandler),
 	}
-	
+
 	// Register default event handlers
 	handler.RegisterHandler(&PageHandler{connector: connector})
 	handler.RegisterHandler(&DatabaseHandler{connector: connector})
 	handler.RegisterHandler(&BlockHandler{connector: connector})
 	handler.RegisterHandler(&UserHandler{connector: connector})
-	
+
 	return handler
 }
 
@@ -54,13 +54,13 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	_, span := wh.tracer.Start(ctx, "notion_webhook_handler")
 	defer span.End()
-	
+
 	// Verify request method
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -68,28 +68,28 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	defer r.Body.Close()
-	
+
 	// Validate webhook (when Notion adds webhook support)
 	validator := NewNotionWebhookValidator(wh.secret)
 	if err := validator.ValidateWebhook(r, body); err != nil {
 		http.Error(w, "Invalid webhook", http.StatusUnauthorized)
 		return
 	}
-	
+
 	// Parse webhook event
 	var event NotionWebhookEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Handle the event
 	if err := wh.handleEvent(ctx, &event); err != nil {
 		span.RecordError(err)
 		http.Error(w, "Failed to process event", http.StatusInternalServerError)
 		return
 	}
-	
+
 	// Acknowledge receipt
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
@@ -99,14 +99,14 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 func (wh *WebhookHandler) handleEvent(ctx context.Context, event *NotionWebhookEvent) error {
 	// Determine event type based on object type and properties
 	eventType := wh.determineEventType(event)
-	
+
 	// Find and execute appropriate handler
 	handler, exists := wh.handlers[eventType]
 	if !exists {
 		// Log unknown event type but don't fail
 		return nil
 	}
-	
+
 	return handler.HandleEvent(ctx, event)
 }
 
@@ -114,7 +114,7 @@ func (wh *WebhookHandler) handleEvent(ctx context.Context, event *NotionWebhookE
 func (wh *WebhookHandler) determineEventType(event *NotionWebhookEvent) string {
 	// Since Notion doesn't have webhooks yet, this is speculative
 	// based on how other platforms structure their webhooks
-	
+
 	switch event.Object {
 	case "page":
 		return "page_updated"
@@ -143,12 +143,12 @@ func (h *PageHandler) HandleEvent(ctx context.Context, event *NotionWebhookEvent
 	h.connector.cache.mu.Lock()
 	delete(h.connector.cache.pages, event.ID)
 	h.connector.cache.mu.Unlock()
-	
+
 	// If the page has blocks, also clear the blocks cache
 	h.connector.cache.mu.Lock()
 	delete(h.connector.cache.blocks, event.ID)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -166,7 +166,7 @@ func (h *DatabaseHandler) HandleEvent(ctx context.Context, event *NotionWebhookE
 	h.connector.cache.mu.Lock()
 	delete(h.connector.cache.databases, event.ID)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -186,7 +186,7 @@ func (h *BlockHandler) HandleEvent(ctx context.Context, event *NotionWebhookEven
 		delete(h.connector.cache.blocks, event.Parent.PageID)
 		h.connector.cache.mu.Unlock()
 	}
-	
+
 	return nil
 }
 
@@ -204,7 +204,7 @@ func (h *UserHandler) HandleEvent(ctx context.Context, event *NotionWebhookEvent
 	h.connector.cache.mu.Lock()
 	delete(h.connector.cache.users, event.ID)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -219,10 +219,10 @@ type PollingHandler struct {
 
 // NotionChange represents a detected change in Notion
 type NotionChange struct {
-	Type           string    `json:"type"` // page, database, block, user
-	Action         string    `json:"action"` // created, updated, deleted
-	ObjectID       string    `json:"object_id"`
-	LastEditedTime time.Time `json:"last_edited_time"`
+	Type           string      `json:"type"`   // page, database, block, user
+	Action         string      `json:"action"` // created, updated, deleted
+	ObjectID       string      `json:"object_id"`
+	LastEditedTime time.Time   `json:"last_edited_time"`
 	Object         interface{} `json:"object"`
 }
 
@@ -245,7 +245,7 @@ func (ph *PollingHandler) SetChangeHandler(handler func(ctx context.Context, cha
 func (ph *PollingHandler) StartPolling(ctx context.Context) error {
 	ticker := time.NewTicker(ph.pollInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -263,9 +263,9 @@ func (ph *PollingHandler) StartPolling(ctx context.Context) error {
 func (ph *PollingHandler) pollForChanges(ctx context.Context) error {
 	_, span := ph.tracer.Start(ctx, "notion_poll_changes")
 	defer span.End()
-	
+
 	var changes []*NotionChange
-	
+
 	// Poll for page changes
 	pageChanges, err := ph.pollPageChanges(ctx)
 	if err != nil {
@@ -273,7 +273,7 @@ func (ph *PollingHandler) pollForChanges(ctx context.Context) error {
 		return err
 	}
 	changes = append(changes, pageChanges...)
-	
+
 	// Poll for database changes
 	dbChanges, err := ph.pollDatabaseChanges(ctx)
 	if err != nil {
@@ -281,7 +281,7 @@ func (ph *PollingHandler) pollForChanges(ctx context.Context) error {
 		return err
 	}
 	changes = append(changes, dbChanges...)
-	
+
 	// Poll for user changes (less frequent)
 	userChanges, err := ph.pollUserChanges(ctx)
 	if err != nil {
@@ -289,28 +289,28 @@ func (ph *PollingHandler) pollForChanges(ctx context.Context) error {
 		return err
 	}
 	changes = append(changes, userChanges...)
-	
+
 	// Update last poll time
 	ph.lastPollTime = time.Now()
-	
+
 	// Process changes if any were found
 	if len(changes) > 0 && ph.changeHandler != nil {
 		return ph.changeHandler(ctx, changes)
 	}
-	
+
 	return nil
 }
 
 // pollPageChanges polls for page changes
 func (ph *PollingHandler) pollPageChanges(ctx context.Context) ([]*NotionChange, error) {
 	var changes []*NotionChange
-	
+
 	// Get current pages
 	pages, err := ph.connector.listPages(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Check for changes since last poll
 	for _, page := range pages {
 		lastEdited := parseNotionTimestamp(page.LastEditedTime)
@@ -324,20 +324,20 @@ func (ph *PollingHandler) pollPageChanges(ctx context.Context) ([]*NotionChange,
 			})
 		}
 	}
-	
+
 	return changes, nil
 }
 
 // pollDatabaseChanges polls for database changes
 func (ph *PollingHandler) pollDatabaseChanges(ctx context.Context) ([]*NotionChange, error) {
 	var changes []*NotionChange
-	
+
 	// Get current databases
 	databases, err := ph.connector.listDatabases(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Check for changes since last poll
 	for _, database := range databases {
 		lastEdited := parseNotionTimestamp(database.LastEditedTime)
@@ -351,17 +351,17 @@ func (ph *PollingHandler) pollDatabaseChanges(ctx context.Context) ([]*NotionCha
 			})
 		}
 	}
-	
+
 	return changes, nil
 }
 
 // pollUserChanges polls for user changes (infrequent)
 func (ph *PollingHandler) pollUserChanges(ctx context.Context) ([]*NotionChange, error) {
 	var changes []*NotionChange
-	
+
 	// User changes are rare, so we can poll less frequently
 	// For now, we'll skip detailed user change detection
-	
+
 	return changes, nil
 }
 
@@ -385,12 +385,12 @@ func (r *EventRouter) RegisterHandler(eventType string, handler EventHandler) {
 // RouteEvent routes an event to all registered handlers
 func (r *EventRouter) RouteEvent(ctx context.Context, event *NotionWebhookEvent) error {
 	eventType := r.determineEventType(event)
-	
+
 	handlers, exists := r.handlers[eventType]
 	if !exists {
 		return nil // No handlers for this event type
 	}
-	
+
 	var lastError error
 	for _, handler := range handlers {
 		if err := handler.HandleEvent(ctx, event); err != nil {
@@ -398,7 +398,7 @@ func (r *EventRouter) RouteEvent(ctx context.Context, event *NotionWebhookEvent)
 			// Continue processing other handlers even if one fails
 		}
 	}
-	
+
 	return lastError
 }
 
@@ -442,9 +442,9 @@ func NewBatchEventProcessor(router *EventRouter, batchSize int, flushInterval ti
 func (bp *BatchEventProcessor) Start(ctx context.Context) {
 	ticker := time.NewTicker(bp.flushInterval)
 	defer ticker.Stop()
-	
+
 	var batch []*NotionWebhookEvent
-	
+
 	for {
 		select {
 		case event := <-bp.events:
@@ -453,13 +453,13 @@ func (bp *BatchEventProcessor) Start(ctx context.Context) {
 				bp.processBatch(ctx, batch)
 				batch = nil
 			}
-			
+
 		case <-ticker.C:
 			if len(batch) > 0 {
 				bp.processBatch(ctx, batch)
 				batch = nil
 			}
-			
+
 		case <-ctx.Done():
 			// Process remaining events before shutting down
 			if len(batch) > 0 {
@@ -508,20 +508,20 @@ func NewChangeDetector(connector *NotionConnector, tracer trace.Tracer) *ChangeD
 func (cd *ChangeDetector) DetectChanges(ctx context.Context) ([]*NotionChange, error) {
 	_, span := cd.tracer.Start(ctx, "notion_detect_changes")
 	defer span.End()
-	
+
 	var changes []*NotionChange
 	currentSnapshot := make(map[string]time.Time)
-	
+
 	// Check pages for changes
 	pages, err := cd.connector.listPages(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, page := range pages {
 		lastEdited := parseNotionTimestamp(page.LastEditedTime)
 		currentSnapshot[page.ID] = lastEdited
-		
+
 		if lastSnapshotTime, exists := cd.lastSnapshot[page.ID]; exists {
 			if lastEdited.After(lastSnapshotTime) {
 				changes = append(changes, &NotionChange{
@@ -543,17 +543,17 @@ func (cd *ChangeDetector) DetectChanges(ctx context.Context) ([]*NotionChange, e
 			})
 		}
 	}
-	
+
 	// Check databases for changes
 	databases, err := cd.connector.listDatabases(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, database := range databases {
 		lastEdited := parseNotionTimestamp(database.LastEditedTime)
 		currentSnapshot[database.ID] = lastEdited
-		
+
 		if lastSnapshotTime, exists := cd.lastSnapshot[database.ID]; exists {
 			if lastEdited.After(lastSnapshotTime) {
 				changes = append(changes, &NotionChange{
@@ -575,9 +575,9 @@ func (cd *ChangeDetector) DetectChanges(ctx context.Context) ([]*NotionChange, e
 			})
 		}
 	}
-	
+
 	// Check for deleted items (items in last snapshot but not in current)
-	for objectID, _ := range cd.lastSnapshot {
+	for objectID := range cd.lastSnapshot {
 		if _, exists := currentSnapshot[objectID]; !exists {
 			changes = append(changes, &NotionChange{
 				Type:           "unknown", // We don't know the type of deleted objects
@@ -588,9 +588,9 @@ func (cd *ChangeDetector) DetectChanges(ctx context.Context) ([]*NotionChange, e
 			})
 		}
 	}
-	
+
 	// Update snapshot
 	cd.lastSnapshot = currentSnapshot
-	
+
 	return changes, nil
 }

@@ -25,32 +25,32 @@ func NewDataSourceHandler(db *database.Database) *DataSourceHandler {
 
 // DataSourceRequest represents a data source creation/update request
 type DataSourceRequest struct {
-	Name               string                                `json:"name"`
-	DisplayName        string                                `json:"display_name"`
-	Type               string                                `json:"type"`
-	Config             models.DataSourceConfig               `json:"config"`
-	CredentialsRef     models.DataSourceCredentials          `json:"credentials_ref"`
-	SyncSettings       models.DataSourceSyncSettings         `json:"sync_settings"`
-	ProcessingSettings models.DataSourceProcessingSettings   `json:"processing_settings"`
+	Name               string                              `json:"name"`
+	DisplayName        string                              `json:"display_name"`
+	Type               string                              `json:"type"`
+	Config             models.DataSourceConfig             `json:"config"`
+	CredentialsRef     models.DataSourceCredentials        `json:"credentials_ref"`
+	SyncSettings       models.DataSourceSyncSettings       `json:"sync_settings"`
+	ProcessingSettings models.DataSourceProcessingSettings `json:"processing_settings"`
 }
 
 // DataSourceResponse represents a data source response
 type DataSourceResponse struct {
-	ID                 uuid.UUID                             `json:"id"`
-	TenantID           uuid.UUID                             `json:"tenant_id"`
-	Name               string                                `json:"name"`
-	DisplayName        string                                `json:"display_name"`
-	Type               string                                `json:"type"`
-	Config             models.DataSourceConfig               `json:"config"`
-	CredentialsRef     models.DataSourceCredentials          `json:"credentials_ref"`
-	SyncSettings       models.DataSourceSyncSettings         `json:"sync_settings"`
-	ProcessingSettings models.DataSourceProcessingSettings   `json:"processing_settings"`
-	Status             string                                `json:"status"`
-	LastSyncAt         *string                               `json:"last_sync_at,omitempty"`
-	LastSyncStatus     string                                `json:"last_sync_status"`
-	LastSyncError      *string                               `json:"last_sync_error,omitempty"`
-	CreatedAt          string                                `json:"created_at"`
-	UpdatedAt          string                                `json:"updated_at"`
+	ID                 uuid.UUID                           `json:"id"`
+	TenantID           uuid.UUID                           `json:"tenant_id"`
+	Name               string                              `json:"name"`
+	DisplayName        string                              `json:"display_name"`
+	Type               string                              `json:"type"`
+	Config             models.DataSourceConfig             `json:"config"`
+	CredentialsRef     models.DataSourceCredentials        `json:"credentials_ref"`
+	SyncSettings       models.DataSourceSyncSettings       `json:"sync_settings"`
+	ProcessingSettings models.DataSourceProcessingSettings `json:"processing_settings"`
+	Status             string                              `json:"status"`
+	LastSyncAt         *string                             `json:"last_sync_at,omitempty"`
+	LastSyncStatus     string                              `json:"last_sync_status"`
+	LastSyncError      *string                             `json:"last_sync_error,omitempty"`
+	CreatedAt          string                              `json:"created_at"`
+	UpdatedAt          string                              `json:"updated_at"`
 }
 
 // ServeHTTP implements the http.Handler interface
@@ -64,7 +64,7 @@ func (h *DataSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	path := r.URL.Path
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	
+
 	// Find data-sources in the path
 	var dataSourceIndex int = -1
 	for i, part := range parts {
@@ -139,7 +139,7 @@ func (h *DataSourceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ListDataSources handles GET /api/v1/tenants/{tenant_id}/data-sources
 func (h *DataSourceHandler) ListDataSources(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	page, pageSize, offset := getPagination(r.Context())
-	
+
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
 	if err != nil {
@@ -329,7 +329,7 @@ func (h *DataSourceHandler) TriggerSync(w http.ResponseWriter, r *http.Request, 
 	}
 
 	responseData := map[string]interface{}{
-		"message": "Sync triggered successfully",
+		"message":     "Sync triggered successfully",
 		"sync_status": "running",
 	}
 

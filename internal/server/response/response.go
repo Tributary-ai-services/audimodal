@@ -63,7 +63,7 @@ func (rw *ResponseWriter) Success(data interface{}, meta *Meta) {
 		Timestamp: time.Now(),
 		RequestID: rw.requestID,
 	}
-	
+
 	rw.writeJSON(http.StatusOK, response)
 }
 
@@ -75,7 +75,7 @@ func (rw *ResponseWriter) Created(data interface{}) {
 		Timestamp: time.Now(),
 		RequestID: rw.requestID,
 	}
-	
+
 	rw.writeJSON(http.StatusCreated, response)
 }
 
@@ -96,7 +96,7 @@ func (rw *ResponseWriter) Error(statusCode int, code, message string, details in
 		Timestamp: time.Now(),
 		RequestID: rw.requestID,
 	}
-	
+
 	rw.writeJSON(statusCode, response)
 }
 
@@ -153,7 +153,7 @@ func (rw *ResponseWriter) ValidationError(errors interface{}) {
 // Paginated writes a paginated response
 func (rw *ResponseWriter) Paginated(data interface{}, page, pageSize int, totalCount int64) {
 	totalPages := int((totalCount + int64(pageSize) - 1) / int64(pageSize))
-	
+
 	pagination := &Pagination{
 		Page:       page,
 		PageSize:   pageSize,
@@ -162,12 +162,12 @@ func (rw *ResponseWriter) Paginated(data interface{}, page, pageSize int, totalC
 		HasNext:    page < totalPages,
 		HasPrev:    page > 1,
 	}
-	
+
 	meta := &Meta{
 		Pagination: pagination,
 		Count:      &totalCount,
 	}
-	
+
 	rw.Success(data, meta)
 }
 
@@ -175,7 +175,7 @@ func (rw *ResponseWriter) Paginated(data interface{}, page, pageSize int, totalC
 func (rw *ResponseWriter) writeJSON(statusCode int, data interface{}) {
 	rw.w.Header().Set("Content-Type", "application/json")
 	rw.w.WriteHeader(statusCode)
-	
+
 	if err := json.NewEncoder(rw.w).Encode(data); err != nil {
 		// If encoding fails, write a basic error response
 		http.Error(rw.w, "Internal server error", http.StatusInternalServerError)
@@ -253,12 +253,12 @@ func WriteHealthCheck(w http.ResponseWriter, status string, version string, chec
 		Timestamp: time.Now(),
 		Checks:    checks,
 	}
-	
+
 	statusCode := http.StatusOK
 	if status != "healthy" {
 		statusCode = http.StatusServiceUnavailable
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(response)
@@ -268,26 +268,26 @@ func WriteHealthCheck(w http.ResponseWriter, status string, version string, chec
 const (
 	ErrorCodeBadRequest          = "BAD_REQUEST"
 	ErrorCodeUnauthorized        = "UNAUTHORIZED"
-	ErrorCodeForbidden          = "FORBIDDEN"
-	ErrorCodeNotFound           = "NOT_FOUND"
-	ErrorCodeConflict           = "CONFLICT"
-	ErrorCodeValidationError    = "VALIDATION_ERROR"
-	ErrorCodeInternalError      = "INTERNAL_SERVER_ERROR"
-	ErrorCodeServiceUnavailable = "SERVICE_UNAVAILABLE"
-	ErrorCodeTooManyRequests    = "TOO_MANY_REQUESTS"
+	ErrorCodeForbidden           = "FORBIDDEN"
+	ErrorCodeNotFound            = "NOT_FOUND"
+	ErrorCodeConflict            = "CONFLICT"
+	ErrorCodeValidationError     = "VALIDATION_ERROR"
+	ErrorCodeInternalError       = "INTERNAL_SERVER_ERROR"
+	ErrorCodeServiceUnavailable  = "SERVICE_UNAVAILABLE"
+	ErrorCodeTooManyRequests     = "TOO_MANY_REQUESTS"
 	ErrorCodeUnprocessableEntity = "UNPROCESSABLE_ENTITY"
-	
+
 	// Business logic error codes
 	ErrorCodeTenantNotFound     = "TENANT_NOT_FOUND"
 	ErrorCodeTenantInactive     = "TENANT_INACTIVE"
 	ErrorCodeQuotaExceeded      = "QUOTA_EXCEEDED"
 	ErrorCodeDataSourceNotFound = "DATA_SOURCE_NOT_FOUND"
 	ErrorCodeSessionNotFound    = "SESSION_NOT_FOUND"
-	ErrorCodeFileNotFound      = "FILE_NOT_FOUND"
-	ErrorCodeChunkNotFound     = "CHUNK_NOT_FOUND"
-	ErrorCodePolicyNotFound    = "POLICY_NOT_FOUND"
-	ErrorCodeViolationNotFound = "VIOLATION_NOT_FOUND"
-	ErrorCodeInvalidFileFormat = "INVALID_FILE_FORMAT"
-	ErrorCodeProcessingFailed  = "PROCESSING_FAILED"
-	ErrorCodeDuplicateResource = "DUPLICATE_RESOURCE"
+	ErrorCodeFileNotFound       = "FILE_NOT_FOUND"
+	ErrorCodeChunkNotFound      = "CHUNK_NOT_FOUND"
+	ErrorCodePolicyNotFound     = "POLICY_NOT_FOUND"
+	ErrorCodeViolationNotFound  = "VIOLATION_NOT_FOUND"
+	ErrorCodeInvalidFileFormat  = "INVALID_FILE_FORMAT"
+	ErrorCodeProcessingFailed   = "PROCESSING_FAILED"
+	ErrorCodeDuplicateResource  = "DUPLICATE_RESOURCE"
 )

@@ -22,14 +22,14 @@ import (
 
 // KeyManager manages encryption keys for tenants
 type KeyManager struct {
-	config       *EncryptionConfig
-	keyStore     KeyStore
-	keyCache     *KeyCache
-	rotationMgr  *KeyRotationManager
-	auditLogger  AuditLogger
-	tracer       trace.Tracer
-	metrics      *EncryptionMetrics
-	mu           sync.RWMutex
+	config      *EncryptionConfig
+	keyStore    KeyStore
+	keyCache    *KeyCache
+	rotationMgr *KeyRotationManager
+	auditLogger AuditLogger
+	tracer      trace.Tracer
+	metrics     *EncryptionMetrics
+	mu          sync.RWMutex
 }
 
 // KeyStore interface for persistent key storage
@@ -356,13 +356,13 @@ func (km *KeyManager) DeriveKey(ctx context.Context, masterKey []byte, salt []by
 	switch km.config.KDF {
 	case KDFArgon2id:
 		return km.deriveKeyArgon2(masterKey, salt, keySize), nil
-		
+
 	case KDFPBKDF2:
 		return km.deriveKeyPBKDF2(masterKey, salt, keySize), nil
-		
+
 	case KDFScrypt:
 		return km.deriveKeyScrypt(masterKey, salt, keySize)
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported KDF: %s", km.config.KDF)
 	}
@@ -413,7 +413,7 @@ func (km *KeyManager) deriveKeyPBKDF2(masterKey, salt []byte, keySize int) []byt
 	default:
 		h = sha256.New
 	}
-	
+
 	return pbkdf2.Key(masterKey, salt, km.config.PBKDF2Iterations, keySize, h)
 }
 

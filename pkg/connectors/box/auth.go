@@ -20,10 +20,10 @@ import (
 
 // AuthManager handles OAuth2 and JWT authentication for Box
 type AuthManager struct {
-	config          *oauth2.Config
+	config           *oauth2.Config
 	enterpriseConfig *BoxEnterpriseConfig
-	stateString     string
-	httpClient      *http.Client
+	stateString      string
+	httpClient       *http.Client
 }
 
 // NewAuthManager creates a new authentication manager
@@ -108,7 +108,7 @@ func (am *AuthManager) RefreshToken(ctx context.Context, token *oauth2.Token) (*
 
 	// Create token source
 	tokenSource := am.config.TokenSource(ctx, token)
-	
+
 	// Get new token
 	newToken, err := tokenSource.Token()
 	if err != nil {
@@ -277,20 +277,20 @@ func (am *AuthManager) GetUserInfo(ctx context.Context, token *oauth2.Token) (*B
 	}
 
 	userInfo := &BoxUserInfo{
-		ID:           user.ID,
-		Name:         user.Name,
-		Login:        user.Login,
-		Language:     user.Language,
-		Timezone:     user.Timezone,
-		SpaceAmount:  user.SpaceAmount,
-		SpaceUsed:    user.SpaceUsed,
+		ID:            user.ID,
+		Name:          user.Name,
+		Login:         user.Login,
+		Language:      user.Language,
+		Timezone:      user.Timezone,
+		SpaceAmount:   user.SpaceAmount,
+		SpaceUsed:     user.SpaceUsed,
 		MaxUploadSize: user.MaxUploadSize,
-		Status:       user.Status,
-		JobTitle:     user.JobTitle,
-		Phone:        user.Phone,
-		Address:      user.Address,
-		AvatarURL:    user.AvatarURL,
-		Role:         user.Role,
+		Status:        user.Status,
+		JobTitle:      user.JobTitle,
+		Phone:         user.Phone,
+		Address:       user.Address,
+		AvatarURL:     user.AvatarURL,
+		Role:          user.Role,
 	}
 
 	if user.Enterprise != nil {
@@ -316,7 +316,7 @@ func (am *AuthManager) RevokeToken(ctx context.Context, token *oauth2.Token) err
 	data.Set("client_secret", am.config.ClientSecret)
 
 	// Create HTTP request to revoke token
-	req, err := http.NewRequestWithContext(ctx, "POST", 
+	req, err := http.NewRequestWithContext(ctx, "POST",
 		"https://api.box.com/oauth2/revoke", strings.NewReader(data.Encode()))
 	if err != nil {
 		return fmt.Errorf("failed to create revoke request: %w", err)
@@ -407,7 +407,7 @@ func (am *AuthManager) exchangeJWTForToken(ctx context.Context, jwtToken string)
 	data.Set("client_secret", am.enterpriseConfig.ClientSecret)
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, "POST", 
+	req, err := http.NewRequestWithContext(ctx, "POST",
 		"https://api.box.com/oauth2/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create token request: %w", err)
@@ -459,31 +459,31 @@ type JWTClaims struct {
 
 // TokenResponse represents the token response from Box
 type TokenResponse struct {
-	AccessToken           string `json:"access_token"`
-	ExpiresIn             int    `json:"expires_in"`
-	TokenType             string `json:"token_type"`
-	Scope                 string `json:"scope"`
-	RefreshToken          string `json:"refresh_token"`
-	RestrictedTo          []interface{} `json:"restricted_to"`
-	IssuedTokenType       string `json:"issued_token_type"`
+	AccessToken     string        `json:"access_token"`
+	ExpiresIn       int           `json:"expires_in"`
+	TokenType       string        `json:"token_type"`
+	Scope           string        `json:"scope"`
+	RefreshToken    string        `json:"refresh_token"`
+	RestrictedTo    []interface{} `json:"restricted_to"`
+	IssuedTokenType string        `json:"issued_token_type"`
 }
 
 // BoxUserInfo contains user information from Box
 type BoxUserInfo struct {
-	ID            string         `json:"id"`
-	Name          string         `json:"name"`
-	Login         string         `json:"login"`
-	Language      string         `json:"language"`
-	Timezone      string         `json:"timezone"`
-	SpaceAmount   int64          `json:"space_amount"`
-	SpaceUsed     int64          `json:"space_used"`
-	MaxUploadSize int64          `json:"max_upload_size"`
-	Status        string         `json:"status"`
-	JobTitle      string         `json:"job_title"`
-	Phone         string         `json:"phone"`
-	Address       string         `json:"address"`
-	AvatarURL     string         `json:"avatar_url"`
-	Role          string         `json:"role"`
+	ID            string          `json:"id"`
+	Name          string          `json:"name"`
+	Login         string          `json:"login"`
+	Language      string          `json:"language"`
+	Timezone      string          `json:"timezone"`
+	SpaceAmount   int64           `json:"space_amount"`
+	SpaceUsed     int64           `json:"space_used"`
+	MaxUploadSize int64           `json:"max_upload_size"`
+	Status        string          `json:"status"`
+	JobTitle      string          `json:"job_title"`
+	Phone         string          `json:"phone"`
+	Address       string          `json:"address"`
+	AvatarURL     string          `json:"avatar_url"`
+	Role          string          `json:"role"`
 	Enterprise    *EnterpriseInfo `json:"enterprise,omitempty"`
 }
 

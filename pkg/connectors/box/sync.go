@@ -15,18 +15,18 @@ import (
 
 // SyncManager handles file synchronization between Box and local storage
 type SyncManager struct {
-	connector      *BoxConnector
-	localStore     storage.LocalStore
-	config         *SyncConfig
-	tracer         trace.Tracer
+	connector  *BoxConnector
+	localStore storage.LocalStore
+	config     *SyncConfig
+	tracer     trace.Tracer
 
 	// Synchronization state
-	syncState      *DetailedSyncState
-	syncMu         sync.RWMutex
+	syncState *DetailedSyncState
+	syncMu    sync.RWMutex
 
 	// Change detection
 	changeDetector *ChangeDetector
-	
+
 	// Conflict resolution
 	conflictResolver *ConflictResolver
 
@@ -37,31 +37,31 @@ type SyncManager struct {
 // SyncConfig contains synchronization configuration
 type SyncConfig struct {
 	// Sync behavior
-	SyncDirection      SyncDirection     `yaml:"sync_direction"`      // bidirectional, upload_only, download_only
-	ConflictResolution ConflictStrategy  `yaml:"conflict_resolution"` // local_wins, remote_wins, manual, timestamp
-	DeleteBehavior     DeleteBehavior    `yaml:"delete_behavior"`     // sync_deletes, archive_deletes, ignore_deletes
-	
+	SyncDirection      SyncDirection    `yaml:"sync_direction"`      // bidirectional, upload_only, download_only
+	ConflictResolution ConflictStrategy `yaml:"conflict_resolution"` // local_wins, remote_wins, manual, timestamp
+	DeleteBehavior     DeleteBehavior   `yaml:"delete_behavior"`     // sync_deletes, archive_deletes, ignore_deletes
+
 	// Performance settings
-	BatchSize          int               `yaml:"batch_size"`
-	MaxWorkers         int               `yaml:"max_workers"`
-	ThrottleDelay      time.Duration     `yaml:"throttle_delay"`
-	
+	BatchSize     int           `yaml:"batch_size"`
+	MaxWorkers    int           `yaml:"max_workers"`
+	ThrottleDelay time.Duration `yaml:"throttle_delay"`
+
 	// Filtering
-	SyncFilters        *SyncFilters      `yaml:"sync_filters"`
-	
+	SyncFilters *SyncFilters `yaml:"sync_filters"`
+
 	// Advanced options
-	ChecksumValidation bool              `yaml:"checksum_validation"`
-	PartialSync        bool              `yaml:"partial_sync"`
-	ResumeSupport      bool              `yaml:"resume_support"`
-	DryRun            bool              `yaml:"dry_run"`
-	GenerateReports    bool              `yaml:"generate_reports"`
-	
+	ChecksumValidation bool `yaml:"checksum_validation"`
+	PartialSync        bool `yaml:"partial_sync"`
+	ResumeSupport      bool `yaml:"resume_support"`
+	DryRun             bool `yaml:"dry_run"`
+	GenerateReports    bool `yaml:"generate_reports"`
+
 	// Box-specific options
-	UseBoxEvents       bool              `yaml:"use_box_events"`
-	SyncComments       bool              `yaml:"sync_comments"`
-	SyncMetadata       bool              `yaml:"sync_metadata"`
-	SyncVersions       bool              `yaml:"sync_versions"`
-	SyncCollaborations bool              `yaml:"sync_collaborations"`
+	UseBoxEvents       bool `yaml:"use_box_events"`
+	SyncComments       bool `yaml:"sync_comments"`
+	SyncMetadata       bool `yaml:"sync_metadata"`
+	SyncVersions       bool `yaml:"sync_versions"`
+	SyncCollaborations bool `yaml:"sync_collaborations"`
 }
 
 // SyncDirection defines synchronization direction
@@ -98,63 +98,63 @@ const (
 
 // SyncFilters contains file filtering criteria
 type SyncFilters struct {
-	IncludePatterns []string      `yaml:"include_patterns"`
-	ExcludePatterns []string      `yaml:"exclude_patterns"`
-	MinSize         int64         `yaml:"min_size"`
-	MaxSize         int64         `yaml:"max_size"`
-	ModifiedAfter   *time.Time    `yaml:"modified_after,omitempty"`
-	ModifiedBefore  *time.Time    `yaml:"modified_before,omitempty"`
-	FileTypes       []string      `yaml:"file_types"`
-	ExcludeFolders  []string      `yaml:"exclude_folders"`
-	IncludeFolders  []string      `yaml:"include_folders"`
-	ExcludeShared   bool          `yaml:"exclude_shared"`
-	ExcludeTrashed  bool          `yaml:"exclude_trashed"`
+	IncludePatterns []string   `yaml:"include_patterns"`
+	ExcludePatterns []string   `yaml:"exclude_patterns"`
+	MinSize         int64      `yaml:"min_size"`
+	MaxSize         int64      `yaml:"max_size"`
+	ModifiedAfter   *time.Time `yaml:"modified_after,omitempty"`
+	ModifiedBefore  *time.Time `yaml:"modified_before,omitempty"`
+	FileTypes       []string   `yaml:"file_types"`
+	ExcludeFolders  []string   `yaml:"exclude_folders"`
+	IncludeFolders  []string   `yaml:"include_folders"`
+	ExcludeShared   bool       `yaml:"exclude_shared"`
+	ExcludeTrashed  bool       `yaml:"exclude_trashed"`
 }
 
 // DetailedSyncState contains detailed synchronization state
 type DetailedSyncState struct {
 	SyncState // Embedded base state
-	
+
 	// Detailed progress
-	Phase             SyncPhase         `json:"phase"`
-	CurrentFile       string            `json:"current_file"`
-	ProcessedFiles    int64             `json:"processed_files"`
-	SkippedFiles      int64             `json:"skipped_files"`
-	ConflictFiles     int64             `json:"conflict_files"`
-	
+	Phase          SyncPhase `json:"phase"`
+	CurrentFile    string    `json:"current_file"`
+	ProcessedFiles int64     `json:"processed_files"`
+	SkippedFiles   int64     `json:"skipped_files"`
+	ConflictFiles  int64     `json:"conflict_files"`
+
 	// Performance metrics
-	ThroughputMBps    float64           `json:"throughput_mbps"`
-	FilesPerSecond    float64           `json:"files_per_second"`
-	AverageFileSize   int64             `json:"average_file_size"`
-	
+	ThroughputMBps  float64 `json:"throughput_mbps"`
+	FilesPerSecond  float64 `json:"files_per_second"`
+	AverageFileSize int64   `json:"average_file_size"`
+
 	// Statistics
-	UploadedFiles     int64             `json:"uploaded_files"`
-	DownloadedFiles   int64             `json:"downloaded_files"`
-	UpdatedFiles      int64             `json:"updated_files"`
-	DeletedFiles      int64             `json:"deleted_files"`
-	
+	UploadedFiles   int64 `json:"uploaded_files"`
+	DownloadedFiles int64 `json:"downloaded_files"`
+	UpdatedFiles    int64 `json:"updated_files"`
+	DeletedFiles    int64 `json:"deleted_files"`
+
 	// Error tracking
-	ErrorsByType      map[string]int64  `json:"errors_by_type"`
-	RetryCount        int64             `json:"retry_count"`
-	
+	ErrorsByType map[string]int64 `json:"errors_by_type"`
+	RetryCount   int64            `json:"retry_count"`
+
 	// Timing
-	PhaseStartTime    time.Time         `json:"phase_start_time"`
-	EstimatedTimeLeft time.Duration     `json:"estimated_time_left"`
+	PhaseStartTime    time.Time     `json:"phase_start_time"`
+	EstimatedTimeLeft time.Duration `json:"estimated_time_left"`
 }
 
 // SyncPhase represents different phases of synchronization
 type SyncPhase string
 
 const (
-	SyncPhaseStarting       SyncPhase = "starting"
-	SyncPhaseDiscovery      SyncPhase = "discovery"
-	SyncPhaseChangeDetection SyncPhase = "change_detection"
+	SyncPhaseStarting           SyncPhase = "starting"
+	SyncPhaseDiscovery          SyncPhase = "discovery"
+	SyncPhaseChangeDetection    SyncPhase = "change_detection"
 	SyncPhaseConflictResolution SyncPhase = "conflict_resolution"
-	SyncPhaseSyncing        SyncPhase = "syncing"
-	SyncPhaseValidation     SyncPhase = "validation"
-	SyncPhaseFinalization   SyncPhase = "finalization"
-	SyncPhaseCompleted      SyncPhase = "completed"
-	SyncPhaseFailed         SyncPhase = "failed"
+	SyncPhaseSyncing            SyncPhase = "syncing"
+	SyncPhaseValidation         SyncPhase = "validation"
+	SyncPhaseFinalization       SyncPhase = "finalization"
+	SyncPhaseCompleted          SyncPhase = "completed"
+	SyncPhaseFailed             SyncPhase = "failed"
 )
 
 // NewSyncManager creates a new sync manager
@@ -190,7 +190,7 @@ func DefaultSyncConfig() *SyncConfig {
 		ChecksumValidation: true,
 		PartialSync:        true,
 		ResumeSupport:      true,
-		DryRun:            false,
+		DryRun:             false,
 		GenerateReports:    true,
 		UseBoxEvents:       true,
 		SyncComments:       false,
@@ -222,7 +222,7 @@ func (sm *SyncManager) StartSync(ctx context.Context, options *SyncOptions) (*Sy
 		sm.syncMu.Unlock()
 		return nil, fmt.Errorf("sync is already running")
 	}
-	
+
 	// Initialize sync state
 	sm.syncState.IsRunning = true
 	sm.syncState.LastSyncStart = time.Now()
@@ -568,7 +568,7 @@ func (sm *SyncManager) syncWorker(ctx context.Context, fileChan <-chan *FileToSy
 
 func (sm *SyncManager) syncFile(ctx context.Context, file *FileToSync) (*SyncFileResult, error) {
 	startTime := time.Now()
-	
+
 	result := &SyncFileResult{
 		FileID:   file.FileID,
 		FileName: file.FileName,
@@ -617,7 +617,7 @@ func (sm *SyncManager) syncFile(ctx context.Context, file *FileToSync) (*SyncFil
 	result.Success = true
 	result.BytesTransferred = file.Size
 	result.Duration = time.Since(startTime)
-	
+
 	return result, nil
 }
 
@@ -721,13 +721,13 @@ func (sm *SyncManager) updateWebhookConfig(ctx context.Context) {
 
 // FileToSync represents a file that needs to be synchronized
 type FileToSync struct {
-	FileID       string            `json:"file_id"`
-	FileName     string            `json:"file_name"`
-	LocalPath    string            `json:"local_path"`
-	RemotePath   string            `json:"remote_path"`
-	SyncAction   SyncAction        `json:"sync_action"`
-	Size         int64             `json:"size"`
-	ModifiedTime time.Time         `json:"modified_time"`
+	FileID       string                 `json:"file_id"`
+	FileName     string                 `json:"file_name"`
+	LocalPath    string                 `json:"local_path"`
+	RemotePath   string                 `json:"remote_path"`
+	SyncAction   SyncAction             `json:"sync_action"`
+	Size         int64                  `json:"size"`
+	ModifiedTime time.Time              `json:"modified_time"`
 	Metadata     map[string]interface{} `json:"metadata"`
 }
 
@@ -744,33 +744,33 @@ const (
 
 // SyncFileResult represents the result of syncing a single file
 type SyncFileResult struct {
-	FileID       string        `json:"file_id"`
-	FileName     string        `json:"file_name"`
-	Action       SyncAction    `json:"action"`
-	Success      bool          `json:"success"`
-	BytesTransferred int64     `json:"bytes_transferred"`
-	Duration     time.Duration `json:"duration"`
-	Error        string        `json:"error,omitempty"`
+	FileID           string        `json:"file_id"`
+	FileName         string        `json:"file_name"`
+	Action           SyncAction    `json:"action"`
+	Success          bool          `json:"success"`
+	BytesTransferred int64         `json:"bytes_transferred"`
+	Duration         time.Duration `json:"duration"`
+	Error            string        `json:"error,omitempty"`
 }
 
 // ValidationFile represents a file to be validated
 type ValidationFile struct {
-	FileID       string    `json:"file_id"`
-	Name         string    `json:"name"`
-	LocalPath    string    `json:"local_path"`
-	RemoteChecksum string  `json:"remote_checksum"`
-	Size         int64     `json:"size"`
-	ModifiedTime time.Time `json:"modified_time"`
+	FileID         string    `json:"file_id"`
+	Name           string    `json:"name"`
+	LocalPath      string    `json:"local_path"`
+	RemoteChecksum string    `json:"remote_checksum"`
+	Size           int64     `json:"size"`
+	ModifiedTime   time.Time `json:"modified_time"`
 }
 
 // SyncOptions contains options for synchronization
 type SyncOptions struct {
-	FullSync     bool      `json:"full_sync"`
-	Since        time.Time `json:"since"`
-	Paths        []string  `json:"paths,omitempty"`
-	DryRun       bool      `json:"dry_run"`
-	MaxFiles     int64     `json:"max_files,omitempty"`
-	MaxSize      int64     `json:"max_size,omitempty"`
+	FullSync bool      `json:"full_sync"`
+	Since    time.Time `json:"since"`
+	Paths    []string  `json:"paths,omitempty"`
+	DryRun   bool      `json:"dry_run"`
+	MaxFiles int64     `json:"max_files,omitempty"`
+	MaxSize  int64     `json:"max_size,omitempty"`
 }
 
 // SyncResult contains the result of a synchronization operation
@@ -801,9 +801,9 @@ func NewChangeDetector(connector *BoxConnector) *ChangeDetector {
 func (cd *ChangeDetector) DetectChanges(ctx context.Context, since time.Time) ([]FileChange, error) {
 	// Implement change detection using Box Events API
 	// This would track file modifications, creations, and deletions
-	
+
 	var changes []FileChange
-	
+
 	// Simulate change detection for now
 	// In a real implementation, this would use the Box Events API
 	changes = append(changes, FileChange{
@@ -812,21 +812,21 @@ func (cd *ChangeDetector) DetectChanges(ctx context.Context, since time.Time) ([
 		ChangeType: ChangeTypeModified,
 		Timestamp:  time.Now(),
 		Metadata: map[string]interface{}{
-			"size": 1024,
+			"size":    1024,
 			"version": "2",
 		},
 	})
-	
+
 	return changes, nil
 }
 
 // FileChange represents a file change
 type FileChange struct {
-	FileID    string           `json:"file_id"`
-	FilePath  string           `json:"file_path"`
-	ChangeType ChangeType      `json:"change_type"`
-	Timestamp time.Time        `json:"timestamp"`
-	Metadata  map[string]interface{} `json:"metadata"`
+	FileID     string                 `json:"file_id"`
+	FilePath   string                 `json:"file_path"`
+	ChangeType ChangeType             `json:"change_type"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Metadata   map[string]interface{} `json:"metadata"`
 }
 
 // ChangeType represents the type of change
@@ -859,12 +859,12 @@ func NewConflictResolver(strategy ConflictStrategy) *ConflictResolver {
 func (cr *ConflictResolver) ResolveConflicts(ctx context.Context) ([]Conflict, error) {
 	// Implement conflict resolution based on strategy
 	var conflicts []Conflict
-	
+
 	// In a real implementation, this would:
 	// 1. Identify conflicting files (same file modified in both locations)
 	// 2. Apply resolution strategy (local wins, remote wins, timestamp, etc.)
 	// 3. Return resolved conflicts for logging
-	
+
 	switch cr.strategy {
 	case ConflictStrategyLocalWins:
 		// Prefer local version
@@ -882,17 +882,17 @@ func (cr *ConflictResolver) ResolveConflicts(ctx context.Context) ([]Conflict, e
 		// Require manual resolution
 		return conflicts, fmt.Errorf("manual conflict resolution required")
 	}
-	
+
 	return conflicts, nil
 }
 
 // Conflict represents a synchronization conflict
 type Conflict struct {
-	FileID       string           `json:"file_id"`
-	LocalPath    string           `json:"local_path"`
-	RemotePath   string           `json:"remote_path"`
-	ConflictType ConflictType     `json:"conflict_type"`
-	Resolution   ConflictResolution `json:"resolution"`
+	FileID       string                 `json:"file_id"`
+	LocalPath    string                 `json:"local_path"`
+	RemotePath   string                 `json:"remote_path"`
+	ConflictType ConflictType           `json:"conflict_type"`
+	Resolution   ConflictResolution     `json:"resolution"`
 	Metadata     map[string]interface{} `json:"metadata"`
 }
 
@@ -909,10 +909,10 @@ const (
 
 // ConflictResolution represents how a conflict was resolved
 type ConflictResolution struct {
-	Strategy   ConflictStrategy `json:"strategy"`
-	Action     string          `json:"action"`
-	Winner     string          `json:"winner"` // local, remote, both
-	Timestamp  time.Time       `json:"timestamp"`
+	Strategy  ConflictStrategy `json:"strategy"`
+	Action    string           `json:"action"`
+	Winner    string           `json:"winner"` // local, remote, both
+	Timestamp time.Time        `json:"timestamp"`
 }
 
 // ProgressTracker tracks synchronization progress
@@ -932,13 +932,13 @@ func (pt *ProgressTracker) UpdateProgress(ctx context.Context, phase SyncPhase, 
 	if total > 0 {
 		_ = float64(completed) / float64(total) * 100
 	}
-	
+
 	// Log progress updates
 	if completed%100 == 0 || completed == total {
 		// Log every 100 files or at completion
 		// In a real implementation, this might update a progress callback or emit events
 	}
-	
+
 	// Update metrics and timing estimates
 	// This would track throughput, ETA calculations, etc.
 }

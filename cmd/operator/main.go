@@ -1,9 +1,11 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -78,14 +80,14 @@ func main() {
 	var tracingService *tracing.TracingService
 	if enableTracing {
 		tracingConfig := &tracing.TracingConfig{
-			ServiceName:     "audimodal-operator",
-			ServiceVersion:  "1.0.0",
-			Environment:     getEnv("ENVIRONMENT", "development"),
-			Enabled:         true,
-			SampleRate:      1.0,
-			ExportType:      "jaeger",
-			ExportEndpoint:  tracingEndpoint,
-			ExportTimeout:   30 * time.Second,
+			ServiceName:    "audimodal-operator",
+			ServiceVersion: "1.0.0",
+			Environment:    getEnv("ENVIRONMENT", "development"),
+			Enabled:        true,
+			SampleRate:     1.0,
+			ExportType:     "jaeger",
+			ExportEndpoint: tracingEndpoint,
+			ExportTimeout:  30 * time.Second,
 		}
 
 		var err error

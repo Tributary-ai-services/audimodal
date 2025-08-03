@@ -8,31 +8,31 @@ import (
 
 // SensitivityClassifier provides advanced content sensitivity classification
 type SensitivityClassifier struct {
-	name                string
-	version             string
-	sensitivityRules    map[SensitivityLevel]*SensitivityRuleSet
-	complianceAnalyzer  *ComplianceAnalyzer
-	piiDetector         *PIIDetector
-	dataClassifier      *DataClassifier
+	name               string
+	version            string
+	sensitivityRules   map[SensitivityLevel]*SensitivityRuleSet
+	complianceAnalyzer *ComplianceAnalyzer
+	piiDetector        *PIIDetector
+	dataClassifier     *DataClassifier
 }
 
 // SensitivityClassification represents detailed sensitivity classification results
 type SensitivityClassification struct {
-	Level                SensitivityLevel       `json:"level"`
-	Score                float64                `json:"score"`
-	Confidence           float64                `json:"confidence"`
-	Reasons              []SensitivityReason    `json:"reasons"`
-	ComplianceFlags      []ComplianceFramework  `json:"compliance_flags"`
-	ComplianceRisks      []ComplianceRisk       `json:"compliance_risks"`
-	PIIFindings          []PIIFinding           `json:"pii_findings"`
-	DataClassifications  []DataClassification   `json:"data_classifications"`
-	RecommendedActions   []string               `json:"recommended_actions"`
-	HandlingInstructions []string               `json:"handling_instructions"`
+	Level                SensitivityLevel      `json:"level"`
+	Score                float64               `json:"score"`
+	Confidence           float64               `json:"confidence"`
+	Reasons              []SensitivityReason   `json:"reasons"`
+	ComplianceFlags      []ComplianceFramework `json:"compliance_flags"`
+	ComplianceRisks      []ComplianceRisk      `json:"compliance_risks"`
+	PIIFindings          []PIIFinding          `json:"pii_findings"`
+	DataClassifications  []DataClassification  `json:"data_classifications"`
+	RecommendedActions   []string              `json:"recommended_actions"`
+	HandlingInstructions []string              `json:"handling_instructions"`
 }
 
 // SensitivityReason represents why content received a sensitivity classification
 type SensitivityReason struct {
-	Type        string  `json:"type"`        // pattern, pii, context, metadata
+	Type        string  `json:"type"` // pattern, pii, context, metadata
 	Description string  `json:"description"`
 	Evidence    string  `json:"evidence,omitempty"`
 	Confidence  float64 `json:"confidence"`
@@ -41,33 +41,33 @@ type SensitivityReason struct {
 
 // SensitivityRuleSet contains rules for a specific sensitivity level
 type SensitivityRuleSet struct {
-	Level            SensitivityLevel `json:"level"`
-	ThresholdScore   float64          `json:"threshold_score"`
-	PatternRules     []PatternRule    `json:"pattern_rules"`
-	ContextRules     []ContextRule    `json:"context_rules"`
-	MetadataRules    []MetadataRule   `json:"metadata_rules"`
-	PIIRequirements  PIIRequirements  `json:"pii_requirements"`
+	Level           SensitivityLevel `json:"level"`
+	ThresholdScore  float64          `json:"threshold_score"`
+	PatternRules    []PatternRule    `json:"pattern_rules"`
+	ContextRules    []ContextRule    `json:"context_rules"`
+	MetadataRules   []MetadataRule   `json:"metadata_rules"`
+	PIIRequirements PIIRequirements  `json:"pii_requirements"`
 }
 
 // PatternRule represents a pattern-based sensitivity rule
 type PatternRule struct {
-	Name        string           `json:"name"`
-	Pattern     *regexp.Regexp   `json:"-"`
-	PatternStr  string           `json:"pattern"`
-	Score       float64          `json:"score"`
-	Weight      float64          `json:"weight"`
-	Category    string           `json:"category"`
-	Description string           `json:"description"`
+	Name        string         `json:"name"`
+	Pattern     *regexp.Regexp `json:"-"`
+	PatternStr  string         `json:"pattern"`
+	Score       float64        `json:"score"`
+	Weight      float64        `json:"weight"`
+	Category    string         `json:"category"`
+	Description string         `json:"description"`
 }
 
 // ContextRule represents a context-based sensitivity rule
 type ContextRule struct {
-	Name           string            `json:"name"`
-	RequiredWords  []string          `json:"required_words"`
-	ProximityRules []ProximityRule   `json:"proximity_rules"`
-	Score          float64           `json:"score"`
-	Weight         float64           `json:"weight"`
-	Description    string            `json:"description"`
+	Name           string          `json:"name"`
+	RequiredWords  []string        `json:"required_words"`
+	ProximityRules []ProximityRule `json:"proximity_rules"`
+	Score          float64         `json:"score"`
+	Weight         float64         `json:"weight"`
+	Description    string          `json:"description"`
 }
 
 // ProximityRule defines word proximity requirements
@@ -79,21 +79,21 @@ type ProximityRule struct {
 
 // MetadataRule represents a metadata-based sensitivity rule
 type MetadataRule struct {
-	Name        string                 `json:"name"`
-	Field       string                 `json:"field"`
-	Values      []string               `json:"values"`
-	Pattern     string                 `json:"pattern,omitempty"`
-	Score       float64                `json:"score"`
-	Weight      float64                `json:"weight"`
-	Description string                 `json:"description"`
+	Name        string   `json:"name"`
+	Field       string   `json:"field"`
+	Values      []string `json:"values"`
+	Pattern     string   `json:"pattern,omitempty"`
+	Score       float64  `json:"score"`
+	Weight      float64  `json:"weight"`
+	Description string   `json:"description"`
 }
 
 // PIIRequirements defines PII requirements for sensitivity levels
 type PIIRequirements struct {
-	MinPIICount        int      `json:"min_pii_count"`
-	RequiredPIITypes   []string `json:"required_pii_types"`
-	HighRiskPIITypes   []string `json:"high_risk_pii_types"`
-	ScoreMultiplier    float64  `json:"score_multiplier"`
+	MinPIICount      int      `json:"min_pii_count"`
+	RequiredPIITypes []string `json:"required_pii_types"`
+	HighRiskPIITypes []string `json:"high_risk_pii_types"`
+	ScoreMultiplier  float64  `json:"score_multiplier"`
 }
 
 // PIIFinding represents a PII detection finding
@@ -108,11 +108,11 @@ type PIIFinding struct {
 
 // DataClassification represents data classification results
 type DataClassification struct {
-	Type        string  `json:"type"`        // financial, medical, personal, etc.
-	Confidence  float64 `json:"confidence"`
-	Evidence    string  `json:"evidence"`
-	Regulation  string  `json:"regulation,omitempty"`
-	RiskLevel   string  `json:"risk_level"`
+	Type       string  `json:"type"` // financial, medical, personal, etc.
+	Confidence float64 `json:"confidence"`
+	Evidence   string  `json:"evidence"`
+	Regulation string  `json:"regulation,omitempty"`
+	RiskLevel  string  `json:"risk_level"`
 }
 
 // ComplianceAnalyzer analyzes regulatory compliance requirements
@@ -136,11 +136,11 @@ type PIIDetector struct {
 
 // PIIPattern represents a PII detection pattern
 type PIIPattern struct {
-	Name        string         `json:"name"`
-	Pattern     *regexp.Regexp `json:"-"`
-	PatternStr  string         `json:"pattern"`
-	RiskLevel   string         `json:"risk_level"`
-	MaskFunc    func(string) string `json:"-"`
+	Name       string              `json:"name"`
+	Pattern    *regexp.Regexp      `json:"-"`
+	PatternStr string              `json:"pattern"`
+	RiskLevel  string              `json:"risk_level"`
+	MaskFunc   func(string) string `json:"-"`
 }
 
 // DataClassifier classifies data types
@@ -150,13 +150,13 @@ type DataClassifier struct {
 
 // DataTypeClassifier classifies specific data types
 type DataTypeClassifier struct {
-	Name         string          `json:"name"`
-	Patterns     []*regexp.Regexp `json:"-"`
-	PatternStrs  []string        `json:"patterns"`
-	Keywords     []string        `json:"keywords"`
-	Context      []string        `json:"context"`
-	RiskLevel    string          `json:"risk_level"`
-	Regulations  []string        `json:"regulations"`
+	Name        string           `json:"name"`
+	Patterns    []*regexp.Regexp `json:"-"`
+	PatternStrs []string         `json:"patterns"`
+	Keywords    []string         `json:"keywords"`
+	Context     []string         `json:"context"`
+	RiskLevel   string           `json:"risk_level"`
+	Regulations []string         `json:"regulations"`
 }
 
 // NewSensitivityClassifier creates a new sensitivity classifier
@@ -169,7 +169,7 @@ func NewSensitivityClassifier() *SensitivityClassifier {
 		piiDetector:        NewPIIDetector(),
 		dataClassifier:     NewDataClassifier(),
 	}
-	
+
 	classifier.initializeSensitivityRules()
 	return classifier
 }
@@ -188,45 +188,45 @@ func (s *SensitivityClassifier) ClassifySensitivity(ctx context.Context, input *
 		RecommendedActions:   []string{},
 		HandlingInstructions: []string{},
 	}
-	
+
 	if len(input.Content) == 0 {
 		return result, nil
 	}
-	
+
 	// Detect PII
 	piiFindings := s.piiDetector.DetectPII(input.Content)
 	result.PIIFindings = piiFindings
-	
+
 	// Classify data types
 	dataClassifications := s.dataClassifier.ClassifyData(input.Content)
 	result.DataClassifications = dataClassifications
-	
+
 	// Analyze compliance requirements
 	complianceResult := s.complianceAnalyzer.AnalyzeCompliance(input.Content, piiFindings, dataClassifications)
 	result.ComplianceFlags = complianceResult.Frameworks
 	result.ComplianceRisks = complianceResult.Risks
-	
+
 	// Calculate sensitivity scores for each level
 	levelScores := make(map[SensitivityLevel]float64)
 	levelReasons := make(map[SensitivityLevel][]SensitivityReason)
-	
+
 	for level, ruleSet := range s.sensitivityRules {
 		score, reasons := s.calculateLevelScore(input, ruleSet, piiFindings, dataClassifications)
 		levelScores[level] = score
 		levelReasons[level] = reasons
 	}
-	
+
 	// Determine final sensitivity level
 	finalLevel, finalScore, confidence := s.determineFinalLevel(levelScores)
 	result.Level = finalLevel
 	result.Score = finalScore
 	result.Confidence = confidence
 	result.Reasons = levelReasons[finalLevel]
-	
+
 	// Generate recommendations and handling instructions
 	result.RecommendedActions = s.generateRecommendations(result)
 	result.HandlingInstructions = s.generateHandlingInstructions(result)
-	
+
 	return result, nil
 }
 
@@ -234,13 +234,13 @@ func (s *SensitivityClassifier) ClassifySensitivity(ctx context.Context, input *
 func (s *SensitivityClassifier) calculateLevelScore(input *ClassificationInput, ruleSet *SensitivityRuleSet, piiFindings []PIIFinding, dataClassifications []DataClassification) (float64, []SensitivityReason) {
 	totalScore := 0.0
 	reasons := []SensitivityReason{}
-	
+
 	// Evaluate pattern rules
 	for _, rule := range ruleSet.PatternRules {
 		if rule.Pattern.MatchString(input.Content) {
 			score := rule.Score * rule.Weight
 			totalScore += score
-			
+
 			reasons = append(reasons, SensitivityReason{
 				Type:        "pattern",
 				Description: rule.Description,
@@ -250,13 +250,13 @@ func (s *SensitivityClassifier) calculateLevelScore(input *ClassificationInput, 
 			})
 		}
 	}
-	
+
 	// Evaluate context rules
 	for _, rule := range ruleSet.ContextRules {
 		if s.evaluateContextRule(input.Content, rule) {
 			score := rule.Score * rule.Weight
 			totalScore += score
-			
+
 			reasons = append(reasons, SensitivityReason{
 				Type:        "context",
 				Description: rule.Description,
@@ -266,14 +266,14 @@ func (s *SensitivityClassifier) calculateLevelScore(input *ClassificationInput, 
 			})
 		}
 	}
-	
+
 	// Evaluate metadata rules
 	if input.Metadata != nil {
 		for _, rule := range ruleSet.MetadataRules {
 			if s.evaluateMetadataRule(input.Metadata, rule) {
 				score := rule.Score * rule.Weight
 				totalScore += score
-				
+
 				reasons = append(reasons, SensitivityReason{
 					Type:        "metadata",
 					Description: rule.Description,
@@ -284,12 +284,12 @@ func (s *SensitivityClassifier) calculateLevelScore(input *ClassificationInput, 
 			}
 		}
 	}
-	
+
 	// Evaluate PII requirements
 	piiScore := s.evaluatePIIRequirements(piiFindings, ruleSet.PIIRequirements)
 	if piiScore > 0 {
 		totalScore += piiScore
-		
+
 		reasons = append(reasons, SensitivityReason{
 			Type:        "pii",
 			Description: "PII detected matching sensitivity requirements",
@@ -298,12 +298,12 @@ func (s *SensitivityClassifier) calculateLevelScore(input *ClassificationInput, 
 			Weight:      ruleSet.PIIRequirements.ScoreMultiplier,
 		})
 	}
-	
+
 	// Evaluate data classifications
 	for _, dataClass := range dataClassifications {
 		if dataClass.RiskLevel == "high" {
 			totalScore += 0.3 * dataClass.Confidence
-			
+
 			reasons = append(reasons, SensitivityReason{
 				Type:        "data_classification",
 				Description: "High-risk data type detected: " + dataClass.Type,
@@ -313,41 +313,41 @@ func (s *SensitivityClassifier) calculateLevelScore(input *ClassificationInput, 
 			})
 		}
 	}
-	
+
 	return totalScore, reasons
 }
 
 // evaluateContextRule evaluates a context-based rule
 func (s *SensitivityClassifier) evaluateContextRule(content string, rule ContextRule) bool {
 	lowerContent := strings.ToLower(content)
-	
+
 	// Check if all required words are present
 	for _, word := range rule.RequiredWords {
 		if !strings.Contains(lowerContent, strings.ToLower(word)) {
 			return false
 		}
 	}
-	
+
 	// Check proximity rules
 	for _, proxRule := range rule.ProximityRules {
 		if !s.checkWordProximity(lowerContent, strings.ToLower(proxRule.Word1), strings.ToLower(proxRule.Word2), proxRule.MaxDistance) {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
 // checkWordProximity checks if two words appear within a specified distance
 func (s *SensitivityClassifier) checkWordProximity(content, word1, word2 string, maxDistance int) bool {
 	words := strings.Fields(content)
-	
+
 	for i, word := range words {
 		if strings.Contains(word, word1) {
 			// Look for word2 within maxDistance
 			start := maxInt(0, i-maxDistance)
 			end := minInt(len(words), i+maxDistance+1)
-			
+
 			for j := start; j < end; j++ {
 				if j != i && strings.Contains(words[j], word2) {
 					return true
@@ -355,7 +355,7 @@ func (s *SensitivityClassifier) checkWordProximity(content, word1, word2 string,
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -365,21 +365,21 @@ func (s *SensitivityClassifier) evaluateMetadataRule(metadata map[string]string,
 	if !exists {
 		return false
 	}
-	
+
 	// Check against specific values
 	for _, ruleValue := range rule.Values {
 		if strings.EqualFold(value, ruleValue) {
 			return true
 		}
 	}
-	
+
 	// Check against pattern if specified
 	if rule.Pattern != "" {
 		if matched, _ := regexp.MatchString(rule.Pattern, value); matched {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -388,14 +388,14 @@ func (s *SensitivityClassifier) evaluatePIIRequirements(piiFindings []PIIFinding
 	if len(piiFindings) < requirements.MinPIICount {
 		return 0.0
 	}
-	
+
 	score := 0.0
-	
+
 	// Check for required PII types
 	foundTypes := make(map[string]bool)
 	for _, finding := range piiFindings {
 		foundTypes[finding.Type] = true
-		
+
 		// Give extra score for high-risk PII types
 		for _, highRiskType := range requirements.HighRiskPIITypes {
 			if finding.Type == highRiskType {
@@ -403,7 +403,7 @@ func (s *SensitivityClassifier) evaluatePIIRequirements(piiFindings []PIIFinding
 			}
 		}
 	}
-	
+
 	// Check if all required types are present
 	requiredFound := 0
 	for _, requiredType := range requirements.RequiredPIITypes {
@@ -411,11 +411,11 @@ func (s *SensitivityClassifier) evaluatePIIRequirements(piiFindings []PIIFinding
 			requiredFound++
 		}
 	}
-	
+
 	if requiredFound == len(requirements.RequiredPIITypes) {
 		score += requirements.ScoreMultiplier
 	}
-	
+
 	return score
 }
 
@@ -429,7 +429,7 @@ func (s *SensitivityClassifier) determineFinalLevel(levelScores map[SensitivityL
 		SensitivityInternal,
 		SensitivityPublic,
 	}
-	
+
 	thresholds := map[SensitivityLevel]float64{
 		SensitivityTopSecret:    0.9,
 		SensitivityRestricted:   0.7,
@@ -437,18 +437,18 @@ func (s *SensitivityClassifier) determineFinalLevel(levelScores map[SensitivityL
 		SensitivityInternal:     0.3,
 		SensitivityPublic:       0.0,
 	}
-	
+
 	// Find the highest level that meets the threshold
 	for _, level := range levels {
 		score := levelScores[level]
 		threshold := thresholds[level]
-		
+
 		if score >= threshold {
 			confidence := minFloat(score/threshold, 1.0)
 			return level, score, confidence
 		}
 	}
-	
+
 	return SensitivityPublic, levelScores[SensitivityPublic], 0.5
 }
 
@@ -476,7 +476,7 @@ func minInt(a, b int) int {
 // generateRecommendations generates recommended actions based on classification
 func (s *SensitivityClassifier) generateRecommendations(result *SensitivityClassification) []string {
 	recommendations := []string{}
-	
+
 	switch result.Level {
 	case SensitivityTopSecret:
 		recommendations = append(recommendations, "Implement maximum security controls")
@@ -497,13 +497,13 @@ func (s *SensitivityClassifier) generateRecommendations(result *SensitivityClass
 	case SensitivityPublic:
 		recommendations = append(recommendations, "Standard security measures sufficient")
 	}
-	
+
 	// Add PII-specific recommendations
 	if len(result.PIIFindings) > 0 {
 		recommendations = append(recommendations, "Implement PII protection measures")
 		recommendations = append(recommendations, "Consider data masking or tokenization")
 	}
-	
+
 	// Add compliance-specific recommendations
 	for _, framework := range result.ComplianceFlags {
 		switch framework {
@@ -515,14 +515,14 @@ func (s *SensitivityClassifier) generateRecommendations(result *SensitivityClass
 			recommendations = append(recommendations, "Implement PCI DSS controls")
 		}
 	}
-	
+
 	return recommendations
 }
 
 // generateHandlingInstructions generates handling instructions
 func (s *SensitivityClassifier) generateHandlingInstructions(result *SensitivityClassification) []string {
 	instructions := []string{}
-	
+
 	switch result.Level {
 	case SensitivityTopSecret:
 		instructions = append(instructions, "Handle as TOP SECRET - maximum protection required")
@@ -539,7 +539,7 @@ func (s *SensitivityClassifier) generateHandlingInstructions(result *Sensitivity
 	case SensitivityPublic:
 		instructions = append(instructions, "Standard handling procedures apply")
 	}
-	
+
 	return instructions
 }
 
@@ -576,7 +576,7 @@ func (s *SensitivityClassifier) initializeSensitivityRules() {
 			ScoreMultiplier:  0.8,
 		},
 	}
-	
+
 	// Restricted rules
 	s.sensitivityRules[SensitivityRestricted] = &SensitivityRuleSet{
 		Level:          SensitivityRestricted,
@@ -608,7 +608,7 @@ func (s *SensitivityClassifier) initializeSensitivityRules() {
 			ScoreMultiplier:  0.6,
 		},
 	}
-	
+
 	// Confidential rules
 	s.sensitivityRules[SensitivityConfidential] = &SensitivityRuleSet{
 		Level:          SensitivityConfidential,
@@ -640,7 +640,7 @@ func (s *SensitivityClassifier) initializeSensitivityRules() {
 			ScoreMultiplier:  0.4,
 		},
 	}
-	
+
 	// Internal rules
 	s.sensitivityRules[SensitivityInternal] = &SensitivityRuleSet{
 		Level:          SensitivityInternal,
@@ -663,7 +663,7 @@ func (s *SensitivityClassifier) initializeSensitivityRules() {
 			ScoreMultiplier:  0.2,
 		},
 	}
-	
+
 	// Public rules
 	s.sensitivityRules[SensitivityPublic] = &SensitivityRuleSet{
 		Level:          SensitivityPublic,
@@ -699,12 +699,12 @@ func (c *ComplianceAnalyzer) AnalyzeCompliance(content string, piiFindings []PII
 		Frameworks: []ComplianceFramework{},
 		Risks:      []ComplianceRisk{},
 	}
-	
+
 	lowerContent := strings.ToLower(content)
-	
+
 	for framework, rules := range c.frameworks {
 		triggered := false
-		
+
 		// Check trigger patterns
 		for _, pattern := range rules.TriggerPatterns {
 			if strings.Contains(lowerContent, strings.ToLower(pattern)) {
@@ -712,7 +712,7 @@ func (c *ComplianceAnalyzer) AnalyzeCompliance(content string, piiFindings []PII
 				break
 			}
 		}
-		
+
 		// Check PII requirements
 		if !triggered {
 			for _, finding := range piiFindings {
@@ -727,7 +727,7 @@ func (c *ComplianceAnalyzer) AnalyzeCompliance(content string, piiFindings []PII
 				}
 			}
 		}
-		
+
 		// Check data type requirements
 		if !triggered {
 			for _, dataClass := range dataClassifications {
@@ -742,10 +742,10 @@ func (c *ComplianceAnalyzer) AnalyzeCompliance(content string, piiFindings []PII
 				}
 			}
 		}
-		
+
 		if triggered {
 			result.Frameworks = append(result.Frameworks, framework)
-			
+
 			// Generate compliance risk
 			risk := ComplianceRisk{
 				Framework:   framework,
@@ -756,7 +756,7 @@ func (c *ComplianceAnalyzer) AnalyzeCompliance(content string, piiFindings []PII
 			result.Risks = append(result.Risks, risk)
 		}
 	}
-	
+
 	return result
 }
 
@@ -769,7 +769,7 @@ func (c *ComplianceAnalyzer) initializeFrameworks() {
 		DataTypes:       []string{"personal", "contact"},
 		RiskFactors:     []string{"cross_border_transfer", "automated_decision"},
 	}
-	
+
 	c.frameworks[ComplianceHIPAA] = &ComplianceFrameworkRules{
 		Framework:       ComplianceHIPAA,
 		TriggerPatterns: []string{"health information", "medical record", "patient data"},
@@ -777,7 +777,7 @@ func (c *ComplianceAnalyzer) initializeFrameworks() {
 		DataTypes:       []string{"medical", "health"},
 		RiskFactors:     []string{"phi_disclosure", "unauthorized_access"},
 	}
-	
+
 	c.frameworks[CompliancePCI] = &ComplianceFrameworkRules{
 		Framework:       CompliancePCI,
 		TriggerPatterns: []string{"payment card", "credit card", "cardholder data"},
@@ -799,21 +799,21 @@ func NewPIIDetector() *PIIDetector {
 // DetectPII detects PII in content
 func (p *PIIDetector) DetectPII(content string) []PIIFinding {
 	findings := []PIIFinding{}
-	
+
 	for name, pattern := range p.patterns {
 		matches := pattern.Pattern.FindAllStringSubmatch(content, -1)
 		matchIndices := pattern.Pattern.FindAllStringSubmatchIndex(content, -1)
-		
+
 		for i, match := range matches {
 			if len(match) > 0 {
 				value := match[0]
 				maskedValue := pattern.MaskFunc(value)
 				position := 0
-				
+
 				if i < len(matchIndices) && len(matchIndices[i]) >= 2 {
 					position = matchIndices[i][0]
 				}
-				
+
 				findings = append(findings, PIIFinding{
 					Type:        name,
 					Value:       value,
@@ -825,7 +825,7 @@ func (p *PIIDetector) DetectPII(content string) []PIIFinding {
 			}
 		}
 	}
-	
+
 	return findings
 }
 
@@ -838,7 +838,7 @@ func (p *PIIDetector) initializePatterns() {
 		RiskLevel:  "high",
 		MaskFunc:   func(s string) string { return "***-**-****" },
 	}
-	
+
 	p.patterns["credit_card"] = &PIIPattern{
 		Name:       "credit_card",
 		Pattern:    regexp.MustCompile(`\b4\d{3}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`),
@@ -846,13 +846,13 @@ func (p *PIIDetector) initializePatterns() {
 		RiskLevel:  "high",
 		MaskFunc:   func(s string) string { return "****-****-****-" + s[len(s)-4:] },
 	}
-	
+
 	p.patterns["email"] = &PIIPattern{
 		Name:       "email",
 		Pattern:    regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`),
 		PatternStr: `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`,
 		RiskLevel:  "medium",
-		MaskFunc:   func(s string) string { 
+		MaskFunc: func(s string) string {
 			parts := strings.Split(s, "@")
 			if len(parts) == 2 {
 				return "***@" + parts[1]
@@ -860,7 +860,7 @@ func (p *PIIDetector) initializePatterns() {
 			return "***@***.***"
 		},
 	}
-	
+
 	p.patterns["phone"] = &PIIPattern{
 		Name:       "phone",
 		Pattern:    regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
@@ -882,13 +882,13 @@ func NewDataClassifier() *DataClassifier {
 // ClassifyData classifies data types in content
 func (d *DataClassifier) ClassifyData(content string) []DataClassification {
 	classifications := []DataClassification{}
-	
+
 	lowerContent := strings.ToLower(content)
-	
+
 	for name, classifier := range d.classifiers {
 		confidence := 0.0
 		evidence := ""
-		
+
 		// Check patterns
 		for i, pattern := range classifier.Patterns {
 			if pattern.MatchString(content) {
@@ -896,7 +896,7 @@ func (d *DataClassifier) ClassifyData(content string) []DataClassification {
 				evidence = classifier.PatternStrs[i]
 			}
 		}
-		
+
 		// Check keywords
 		for _, keyword := range classifier.Keywords {
 			if strings.Contains(lowerContent, strings.ToLower(keyword)) {
@@ -907,14 +907,14 @@ func (d *DataClassifier) ClassifyData(content string) []DataClassification {
 				evidence += keyword
 			}
 		}
-		
+
 		// Check context
 		for _, context := range classifier.Context {
 			if strings.Contains(lowerContent, strings.ToLower(context)) {
 				confidence += 0.1
 			}
 		}
-		
+
 		if confidence > 0.3 {
 			classifications = append(classifications, DataClassification{
 				Type:       name,
@@ -924,7 +924,7 @@ func (d *DataClassifier) ClassifyData(content string) []DataClassification {
 			})
 		}
 	}
-	
+
 	return classifications
 }
 
@@ -939,7 +939,7 @@ func (d *DataClassifier) initializeClassifiers() {
 		RiskLevel:   "high",
 		Regulations: []string{"PCI", "SOX"},
 	}
-	
+
 	d.classifiers["medical"] = &DataTypeClassifier{
 		Name:        "medical",
 		Patterns:    []*regexp.Regexp{regexp.MustCompile(`(?i)patient\s+\w+`)},
@@ -949,7 +949,7 @@ func (d *DataClassifier) initializeClassifiers() {
 		RiskLevel:   "high",
 		Regulations: []string{"HIPAA"},
 	}
-	
+
 	d.classifiers["personal"] = &DataTypeClassifier{
 		Name:        "personal",
 		Patterns:    []*regexp.Regexp{regexp.MustCompile(`(?i)name:\s*\w+`)},

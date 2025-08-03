@@ -21,83 +21,83 @@ import (
 
 // DropboxConnector implements storage.StorageConnector for Dropbox
 type DropboxConnector struct {
-	config       *DropboxConfig
-	oauthConfig  *oauth2.Config
-	httpClient   *http.Client
-	tracer       trace.Tracer
-	
+	config      *DropboxConfig
+	oauthConfig *oauth2.Config
+	httpClient  *http.Client
+	tracer      trace.Tracer
+
 	// Connection state
-	isConnected  bool
-	lastSync     time.Time
-	accessToken  string
-	
+	isConnected bool
+	lastSync    time.Time
+	accessToken string
+
 	// Rate limiting and throttling
-	rateLimiter  *RateLimiter
-	
+	rateLimiter *RateLimiter
+
 	// Caching
-	fileCache    map[string]*DropboxFile
-	folderCache  map[string]*DropboxFolder
-	cacheMu      sync.RWMutex
-	
+	fileCache   map[string]*DropboxFile
+	folderCache map[string]*DropboxFolder
+	cacheMu     sync.RWMutex
+
 	// Sync state
-	syncState    *SyncState
-	syncMu       sync.RWMutex
-	
+	syncState *SyncState
+	syncMu    sync.RWMutex
+
 	// Metrics
-	metrics      *ConnectorMetrics
-	
+	metrics *ConnectorMetrics
+
 	// Error handling
-	retryPolicy  *RetryPolicy
-	
+	retryPolicy *RetryPolicy
+
 	// Dropbox-specific
-	cursor       string // For delta/list_folder/continue operations
+	cursor string // For delta/list_folder/continue operations
 }
 
 // DropboxConfig contains configuration for Dropbox connector
 type DropboxConfig struct {
 	// OAuth2 configuration
-	ClientID           string   `yaml:"client_id"`
-	ClientSecret       string   `yaml:"client_secret"`
-	RedirectURL        string   `yaml:"redirect_url"`
-	
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURL  string `yaml:"redirect_url"`
+
 	// Sync configuration
-	SyncInterval       time.Duration `yaml:"sync_interval"`
-	FullSyncInterval   time.Duration `yaml:"full_sync_interval"`
-	BatchSize          int           `yaml:"batch_size"`
-	MaxConcurrentReqs  int           `yaml:"max_concurrent_requests"`
-	
+	SyncInterval      time.Duration `yaml:"sync_interval"`
+	FullSyncInterval  time.Duration `yaml:"full_sync_interval"`
+	BatchSize         int           `yaml:"batch_size"`
+	MaxConcurrentReqs int           `yaml:"max_concurrent_requests"`
+
 	// Filter configuration
-	IncludeFolders     []string      `yaml:"include_folders"`
-	ExcludeFolders     []string      `yaml:"exclude_folders"`
-	FileExtensions     []string      `yaml:"file_extensions"`
-	MaxFileSize        int64         `yaml:"max_file_size"`
-	SyncSharedFiles    bool          `yaml:"sync_shared_files"`
-	SyncDeletedFiles   bool          `yaml:"sync_deleted_files"`
-	
+	IncludeFolders   []string `yaml:"include_folders"`
+	ExcludeFolders   []string `yaml:"exclude_folders"`
+	FileExtensions   []string `yaml:"file_extensions"`
+	MaxFileSize      int64    `yaml:"max_file_size"`
+	SyncSharedFiles  bool     `yaml:"sync_shared_files"`
+	SyncDeletedFiles bool     `yaml:"sync_deleted_files"`
+
 	// Rate limiting
-	RequestsPerSecond  float64       `yaml:"requests_per_second"`
-	BurstLimit         int           `yaml:"burst_limit"`
-	
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	BurstLimit        int     `yaml:"burst_limit"`
+
 	// Retry configuration
 	MaxRetries         int           `yaml:"max_retries"`
 	RetryDelay         time.Duration `yaml:"retry_delay"`
 	ExponentialBackoff bool          `yaml:"exponential_backoff"`
-	
+
 	// Cache configuration
-	CacheEnabled       bool          `yaml:"cache_enabled"`
-	CacheTTL           time.Duration `yaml:"cache_ttl"`
-	CacheSize          int           `yaml:"cache_size"`
-	
+	CacheEnabled bool          `yaml:"cache_enabled"`
+	CacheTTL     time.Duration `yaml:"cache_ttl"`
+	CacheSize    int           `yaml:"cache_size"`
+
 	// Dropbox-specific features
-	UseDropboxAPI      int           `yaml:"use_dropbox_api"` // 1 for v1, 2 for v2
-	IncludeMediaInfo   bool          `yaml:"include_media_info"`
-	IncludeSharing     bool          `yaml:"include_sharing"`
-	RecursiveSync      bool          `yaml:"recursive_sync"`
-	TeamSpace          bool          `yaml:"team_space"`
-	
+	UseDropboxAPI    int  `yaml:"use_dropbox_api"` // 1 for v1, 2 for v2
+	IncludeMediaInfo bool `yaml:"include_media_info"`
+	IncludeSharing   bool `yaml:"include_sharing"`
+	RecursiveSync    bool `yaml:"recursive_sync"`
+	TeamSpace        bool `yaml:"team_space"`
+
 	// Paper integration
-	SyncPaperDocs      bool          `yaml:"sync_paper_docs"`
-	PaperExportFormat  string        `yaml:"paper_export_format"` // html, markdown, pdf
+	SyncPaperDocs     bool   `yaml:"sync_paper_docs"`
+	PaperExportFormat string `yaml:"paper_export_format"` // html, markdown, pdf
 }
 
 // DefaultDropboxConfig returns default configuration
@@ -214,7 +214,7 @@ func (c *DropboxConnector) Disconnect(ctx context.Context) error {
 	c.isConnected = false
 	c.accessToken = ""
 	c.cursor = ""
-	
+
 	// Clear caches
 	c.cacheMu.Lock()
 	c.fileCache = make(map[string]*DropboxFile)
@@ -246,7 +246,7 @@ func (c *DropboxConnector) ListFiles(ctx context.Context, path string, options *
 
 	var files []*storage.ConnectorFileInfo
 	cursor := ""
-	
+
 	for {
 		// Wait for rate limit
 		if err := c.rateLimiter.Wait(ctx); err != nil {
@@ -262,12 +262,12 @@ func (c *DropboxConnector) ListFiles(ctx context.Context, path string, options *
 			// Initial request
 			apiURL = "https://api.dropboxapi.com/2/files/list_folder"
 			requestBody = &ListFolderRequest{
-				Path:             c.normalizePath(path),
-				Recursive:        c.config.RecursiveSync,
-				IncludeMediaInfo: c.config.IncludeMediaInfo,
-				IncludeDeleted:   c.config.SyncDeletedFiles,
+				Path:                            c.normalizePath(path),
+				Recursive:                       c.config.RecursiveSync,
+				IncludeMediaInfo:                c.config.IncludeMediaInfo,
+				IncludeDeleted:                  c.config.SyncDeletedFiles,
 				IncludeHasExplicitSharedMembers: c.config.IncludeSharing,
-				Limit:           uint32(c.config.BatchSize),
+				Limit:                           uint32(c.config.BatchSize),
 			}
 		} else {
 			// Continuation request
@@ -276,7 +276,7 @@ func (c *DropboxConnector) ListFiles(ctx context.Context, path string, options *
 				Cursor: cursor,
 			}
 		}
-		
+
 		// Execute API call with retry
 		response, err := c.executeDropboxAPICall(ctx, apiURL, requestBody)
 		if err != nil {
@@ -289,13 +289,13 @@ func (c *DropboxConnector) ListFiles(ctx context.Context, path string, options *
 			span.RecordError(err)
 			return nil, fmt.Errorf("failed to parse API response: %w", err)
 		}
-		
+
 		// Convert Dropbox entries to FileInfo
 		for _, entry := range listResponse.Entries {
 			if c.shouldIncludeEntry(&entry) {
 				fileInfo := c.convertToFileInfo(&entry)
 				files = append(files, fileInfo)
-				
+
 				// Cache entry
 				if c.config.CacheEnabled {
 					c.cacheEntry(&entry)
@@ -352,8 +352,8 @@ func (c *DropboxConnector) GetFile(ctx context.Context, fileID string) (*storage
 	// Get file metadata
 	requestBody := &GetMetadataRequest{
 		Path:                            fileID,
-		IncludeMediaInfo:               c.config.IncludeMediaInfo,
-		IncludeDeleted:                 c.config.SyncDeletedFiles,
+		IncludeMediaInfo:                c.config.IncludeMediaInfo,
+		IncludeDeleted:                  c.config.SyncDeletedFiles,
 		IncludeHasExplicitSharedMembers: c.config.IncludeSharing,
 	}
 
@@ -369,7 +369,7 @@ func (c *DropboxConnector) GetFile(ctx context.Context, fileID string) (*storage
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to parse API response: %w", err)
 	}
-	
+
 	// Cache file if it's a file type
 	if c.config.CacheEnabled && metadata.Tag == "file" {
 		file := &DropboxFile{
@@ -418,16 +418,16 @@ func (c *DropboxConnector) DownloadFile(ctx context.Context, fileID string) (io.
 
 	// Execute download with retry
 	response, err := c.executeWithRetry(ctx, func() (interface{}, error) {
-		req, err := http.NewRequestWithContext(ctx, "POST", 
+		req, err := http.NewRequestWithContext(ctx, "POST",
 			"https://content.dropboxapi.com/2/files/download", nil)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add headers
 		req.Header.Set("Authorization", "Bearer "+c.accessToken)
 		req.Header.Set("Dropbox-API-Arg", string(downloadJSON))
-		
+
 		return c.httpClient.Do(req)
 	})
 
@@ -574,7 +574,7 @@ func (c *DropboxConnector) testConnection(ctx context.Context) error {
 	if err := json.Unmarshal(response, &account); err != nil {
 		return fmt.Errorf("failed to parse account info: %w", err)
 	}
-	
+
 	c.metrics.LastConnectionTime = time.Now()
 	return nil
 }
@@ -583,12 +583,12 @@ func (c *DropboxConnector) normalizePath(path string) string {
 	if path == "" || path == "/" {
 		return ""
 	}
-	
+
 	// Ensure path starts with /
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	
+
 	return path
 }
 
@@ -664,7 +664,7 @@ func (c *DropboxConnector) convertToFileInfo(entry *DropboxEntry) *storage.Conne
 		DownloadURL:  "", // Generated dynamically
 		Size:         entry.Size,
 		Type:         fileType,
-		MimeType:     "", // Dropbox doesn't provide MIME type in metadata
+		MimeType:     "",           // Dropbox doesn't provide MIME type in metadata
 		CreatedAt:    modifiedTime, // Dropbox doesn't provide creation time
 		ModifiedAt:   modifiedTime,
 		LastAccessed: modifiedTime,
@@ -675,11 +675,11 @@ func (c *DropboxConnector) convertToFileInfo(entry *DropboxEntry) *storage.Conne
 			CanDelete: false,
 		},
 		Metadata: map[string]interface{}{
-			"dropbox_id":       entry.ID,
-			"path_display":     entry.PathDisplay,
-			"path_lower":       entry.PathLower,
-			"tag":              entry.Tag,
-			"content_hash":     entry.ContentHash,
+			"dropbox_id":         entry.ID,
+			"path_display":       entry.PathDisplay,
+			"path_lower":         entry.PathLower,
+			"tag":                entry.Tag,
+			"content_hash":       entry.ContentHash,
 			"has_shared_members": entry.HasExplicitSharedMembers,
 		},
 		Tags: map[string]string{
@@ -723,7 +723,7 @@ func (c *DropboxConnector) cacheEntry(entry *DropboxEntry) {
 		}
 		c.folderCache[entry.ID] = folder
 	}
-	
+
 	// Simple cache size management
 	if len(c.fileCache) > c.config.CacheSize {
 		// Remove oldest entries (simple FIFO)
@@ -763,7 +763,7 @@ func (c *DropboxConnector) getCachedFile(fileID string) *DropboxFile {
 func (c *DropboxConnector) executeSyncOperation(ctx context.Context, options *storage.SyncOptions, result *storage.SyncResult, isFullSync bool) error {
 	// For Dropbox, we can use list_folder for full sync
 	// and list_folder/longpoll + get_latest_cursor for incremental sync
-	
+
 	if isFullSync {
 		return c.executeFullSync(ctx, options, result)
 	} else {
@@ -777,17 +777,17 @@ func (c *DropboxConnector) executeFullSync(ctx context.Context, options *storage
 	if err != nil {
 		return err
 	}
-	
+
 	result.FilesFound = int64(len(files))
 	result.FilesChanged = int64(len(files)) // For full sync, consider all files as changed
-	
+
 	return nil
 }
 
 func (c *DropboxConnector) executeIncrementalSync(ctx context.Context, options *storage.SyncOptions, result *storage.SyncResult) error {
 	// Use Dropbox's delta endpoint or list_folder with cursor for incremental changes
 	// This would compare against the stored cursor from last sync
-	
+
 	// For now, fall back to full sync
 	return c.executeFullSync(ctx, options, result)
 }
@@ -807,28 +807,28 @@ func (c *DropboxConnector) executeDropboxAPICall(ctx context.Context, url string
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add headers
 		req.Header.Set("Authorization", "Bearer "+c.accessToken)
 		req.Header.Set("Content-Type", "application/json")
-		
+
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 		}
-		
+
 		return io.ReadAll(resp.Body)
 	})
 }
 
 func (c *DropboxConnector) executeWithRetry(ctx context.Context, operation func() (interface{}, error)) (interface{}, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -836,7 +836,7 @@ func (c *DropboxConnector) executeWithRetry(ctx context.Context, operation func(
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -850,7 +850,7 @@ func (c *DropboxConnector) executeWithRetry(ctx context.Context, operation func(
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -859,13 +859,13 @@ func (c *DropboxConnector) executeWithRetry(ctx context.Context, operation func(
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 
 func (c *DropboxConnector) executeWithRetryBytes(ctx context.Context, operation func() ([]byte, error)) ([]byte, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -873,7 +873,7 @@ func (c *DropboxConnector) executeWithRetryBytes(ctx context.Context, operation 
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -887,7 +887,7 @@ func (c *DropboxConnector) executeWithRetryBytes(ctx context.Context, operation 
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -896,7 +896,7 @@ func (c *DropboxConnector) executeWithRetryBytes(ctx context.Context, operation 
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 

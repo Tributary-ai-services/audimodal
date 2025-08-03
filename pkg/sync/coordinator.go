@@ -18,118 +18,135 @@ type SyncCoordinator struct {
 	crossSyncManager  *CrossSyncManager
 	conflictResolver  *ConflictResolver
 	dependencyManager *DependencyManager
-	
+
 	// Internal state
 	coordinations map[uuid.UUID]*CoordinationContext
 	mutex         sync.RWMutex
-	
+
 	config *CoordinatorConfig
 	tracer trace.Tracer
 }
 
 // CoordinatorConfig contains coordinator configuration
 type CoordinatorConfig struct {
-	EnableCrossConnectorSync  bool          `json:"enable_cross_connector_sync"`
-	MaxConcurrentCoordinations int          `json:"max_concurrent_coordinations"`
-	ConflictResolutionTimeout time.Duration `json:"conflict_resolution_timeout"`
-	DependencyTimeout         time.Duration `json:"dependency_timeout"`
-	CrossSyncBatchSize        int           `json:"cross_sync_batch_size"`
+	EnableCrossConnectorSync   bool          `json:"enable_cross_connector_sync"`
+	MaxConcurrentCoordinations int           `json:"max_concurrent_coordinations"`
+	ConflictResolutionTimeout  time.Duration `json:"conflict_resolution_timeout"`
+	DependencyTimeout          time.Duration `json:"dependency_timeout"`
+	CrossSyncBatchSize         int           `json:"cross_sync_batch_size"`
 }
 
 // CoordinationContext tracks a cross-connector sync operation
 type CoordinationContext struct {
-	ID                uuid.UUID
-	Name              string
-	Description       string
-	DataSources       []uuid.UUID
-	SyncJobs          map[uuid.UUID]*SyncJob
-	Dependencies      []*SyncDependency
-	ConflictStrategy  ConflictStrategy
-	Status            CoordinationStatus
-	StartTime         time.Time
-	EndTime           *time.Time
-	Progress          *CoordinationProgress
-	Results           *CoordinationResult
+	ID               uuid.UUID
+	Name             string
+	Description      string
+	DataSources      []uuid.UUID
+	SyncJobs         map[uuid.UUID]*SyncJob
+	Dependencies     []*SyncDependency
+	ConflictStrategy ConflictStrategy
+	Status           CoordinationStatus
+	StartTime        time.Time
+	EndTime          *time.Time
+	Progress         *CoordinationProgress
+	Results          *CoordinationResult
 }
 
 // CoordinationStatus represents the status of a coordination operation
 type CoordinationStatus string
 
 const (
-	CoordinationStatusPending     CoordinationStatus = "pending"
-	CoordinationStatusPreparing   CoordinationStatus = "preparing"
-	CoordinationStatusRunning     CoordinationStatus = "running"
-	CoordinationStatusResolving   CoordinationStatus = "resolving"
-	CoordinationStatusCompleted   CoordinationStatus = "completed"
-	CoordinationStatusFailed      CoordinationStatus = "failed"
-	CoordinationStatusCancelled   CoordinationStatus = "cancelled"
+	CoordinationStatusPending   CoordinationStatus = "pending"
+	CoordinationStatusPreparing CoordinationStatus = "preparing"
+	CoordinationStatusRunning   CoordinationStatus = "running"
+	CoordinationStatusResolving CoordinationStatus = "resolving"
+	CoordinationStatusCompleted CoordinationStatus = "completed"
+	CoordinationStatusFailed    CoordinationStatus = "failed"
+	CoordinationStatusCancelled CoordinationStatus = "cancelled"
 )
 
 // CoordinationProgress tracks progress across multiple sync operations
 type CoordinationProgress struct {
-	TotalDataSources     int     `json:"total_data_sources"`
-	CompletedDataSources int     `json:"completed_data_sources"`
-	FailedDataSources    int     `json:"failed_data_sources"`
-	PercentComplete      float64 `json:"percent_complete"`
-	TotalFiles           int     `json:"total_files"`
-	ProcessedFiles       int     `json:"processed_files"`
-	ConflictsDetected    int     `json:"conflicts_detected"`
-	ConflictsResolved    int     `json:"conflicts_resolved"`
-	CurrentPhase         string  `json:"current_phase"`
+	TotalDataSources     int        `json:"total_data_sources"`
+	CompletedDataSources int        `json:"completed_data_sources"`
+	FailedDataSources    int        `json:"failed_data_sources"`
+	PercentComplete      float64    `json:"percent_complete"`
+	TotalFiles           int        `json:"total_files"`
+	ProcessedFiles       int        `json:"processed_files"`
+	ConflictsDetected    int        `json:"conflicts_detected"`
+	ConflictsResolved    int        `json:"conflicts_resolved"`
+	CurrentPhase         string     `json:"current_phase"`
 	EstimatedCompletion  *time.Time `json:"estimated_completion,omitempty"`
 }
 
 // CoordinationResult contains the results of a coordination operation
 type CoordinationResult struct {
-	SuccessfulSyncs     int                          `json:"successful_syncs"`
-	FailedSyncs         int                          `json:"failed_syncs"`
-	TotalFilesProcessed int                          `json:"total_files_processed"`
-	TotalBytesTransferred int64                      `json:"total_bytes_transferred"`
-	ConflictsResolved   int                          `json:"conflicts_resolved"`
-	ConflictsPending    int                          `json:"conflicts_pending"`
-	SyncResults         map[uuid.UUID]*SyncJobStatus `json:"sync_results"`
-	Conflicts           []*CrossConnectorConflict    `json:"conflicts,omitempty"`
-	Warnings            []string                     `json:"warnings,omitempty"`
-	Errors              []string                     `json:"errors,omitempty"`
+	SuccessfulSyncs       int                          `json:"successful_syncs"`
+	FailedSyncs           int                          `json:"failed_syncs"`
+	TotalFilesProcessed   int                          `json:"total_files_processed"`
+	TotalBytesTransferred int64                        `json:"total_bytes_transferred"`
+	ConflictsResolved     int                          `json:"conflicts_resolved"`
+	ConflictsPending      int                          `json:"conflicts_pending"`
+	SyncResults           map[uuid.UUID]*SyncJobStatus `json:"sync_results"`
+	Conflicts             []*CrossConnectorConflict    `json:"conflicts,omitempty"`
+	Warnings              []string                     `json:"warnings,omitempty"`
+	Errors                []string                     `json:"errors,omitempty"`
 }
 
 // SyncDependency defines a dependency relationship between sync operations
 type SyncDependency struct {
-	DependentDataSource uuid.UUID    `json:"dependent_data_source"`
-	DependsOnDataSource uuid.UUID    `json:"depends_on_data_source"`
-	DependencyType      DependencyType `json:"dependency_type"`
+	ID                  uuid.UUID            `json:"id"`
+	DependentDataSource uuid.UUID            `json:"dependent_data_source"`
+	DependsOnDataSource uuid.UUID            `json:"depends_on_data_source"`
+	SourceJobID         uuid.UUID            `json:"source_job_id"`
+	TargetJobID         uuid.UUID            `json:"target_job_id"`
+	Type                DependencyType       `json:"type"`
+	Status              DependencyStatus     `json:"status"`
+	DependencyType      DependencyType       `json:"dependency_type"`
 	Condition           *DependencyCondition `json:"condition,omitempty"`
+	UpdatedAt           time.Time            `json:"updated_at"`
 }
 
 // DependencyType defines the type of dependency
 type DependencyType string
 
 const (
-	DependencyTypeSequential DependencyType = "sequential" // Must complete before dependent starts
+	DependencyTypeSequential  DependencyType = "sequential"  // Must complete before dependent starts
 	DependencyTypeConditional DependencyType = "conditional" // Depends on specific condition
-	DependencyTypeParallel   DependencyType = "parallel"    // Can run in parallel with coordination
+	DependencyTypeParallel    DependencyType = "parallel"    // Can run in parallel with coordination
+	DependencyTypeMandatory   DependencyType = "mandatory"   // Required dependency
+)
+
+// DependencyStatus defines the status of a dependency
+type DependencyStatus string
+
+const (
+	DependencyStatusPending   DependencyStatus = "pending"
+	DependencyStatusSatisfied DependencyStatus = "satisfied"
+	DependencyStatusFailed    DependencyStatus = "failed"
+	DependencyStatusViolated  DependencyStatus = "violated"
 )
 
 // DependencyCondition defines conditions for dependency resolution
 type DependencyCondition struct {
-	RequiredState    SyncState            `json:"required_state,omitempty"`
-	MinFilesProcessed int                 `json:"min_files_processed,omitempty"`
-	MinSuccessRate   float64             `json:"min_success_rate,omitempty"`
-	CustomCondition  map[string]interface{} `json:"custom_condition,omitempty"`
+	RequiredState     SyncState              `json:"required_state,omitempty"`
+	MinFilesProcessed int                    `json:"min_files_processed,omitempty"`
+	MinSuccessRate    float64                `json:"min_success_rate,omitempty"`
+	CustomCondition   map[string]interface{} `json:"custom_condition,omitempty"`
 }
 
 // CrossConnectorConflict represents a conflict between multiple connectors
 type CrossConnectorConflict struct {
-	ID                 uuid.UUID                  `json:"id"`
-	FilePath           string                     `json:"file_path"`
-	ConflictType       CrossConflictType          `json:"conflict_type"`
-	InvolvedDataSources []uuid.UUID               `json:"involved_data_sources"`
-	FileVersions       []*ConflictFileVersion     `json:"file_versions"`
-	ResolutionStrategy ConflictStrategy           `json:"resolution_strategy"`
-	ResolvedVersion    *ConflictFileVersion       `json:"resolved_version,omitempty"`
-	ResolvedAt         *time.Time                 `json:"resolved_at,omitempty"`
-	ResolvedBy         string                     `json:"resolved_by,omitempty"`
-	Metadata           map[string]interface{}     `json:"metadata,omitempty"`
+	ID                  uuid.UUID              `json:"id"`
+	FilePath            string                 `json:"file_path"`
+	ConflictType        CrossConflictType      `json:"conflict_type"`
+	InvolvedDataSources []uuid.UUID            `json:"involved_data_sources"`
+	FileVersions        []*ConflictFileVersion `json:"file_versions"`
+	ResolutionStrategy  ConflictStrategy       `json:"resolution_strategy"`
+	ResolvedVersion     *ConflictFileVersion   `json:"resolved_version,omitempty"`
+	ResolvedAt          *time.Time             `json:"resolved_at,omitempty"`
+	ResolvedBy          string                 `json:"resolved_by,omitempty"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // CrossConflictType defines types of cross-connector conflicts
@@ -141,19 +158,23 @@ const (
 	CrossConflictTypeCreatedMultiple  CrossConflictType = "created_multiple"  // Same file created in multiple sources
 	CrossConflictTypeNameConflict     CrossConflictType = "name_conflict"     // Different files with same name
 	CrossConflictTypeTypeConflict     CrossConflictType = "type_conflict"     // File vs directory conflict
+	CrossConflictTypeDataModified     CrossConflictType = "data_modified"     // Data modified in multiple sources
+	CrossConflictTypeDataDeleted      CrossConflictType = "data_deleted"      // Data deleted in one source
 )
 
 // ConflictFileVersion represents a version of a file in conflict
 type ConflictFileVersion struct {
-	DataSourceID   uuid.UUID                  `json:"data_source_id"`
-	ConnectorType  string                     `json:"connector_type"`
-	FilePath       string                     `json:"file_path"`
-	FileSize       int64                      `json:"file_size"`
-	ModifiedTime   time.Time                  `json:"modified_time"`
-	Checksum       string                     `json:"checksum,omitempty"`
-	ContentType    string                     `json:"content_type,omitempty"`
-	IsDirectory    bool                       `json:"is_directory"`
-	Metadata       map[string]interface{}     `json:"metadata,omitempty"`
+	DataSourceID  uuid.UUID              `json:"data_source_id"`
+	ConnectorType string                 `json:"connector_type"`
+	FilePath      string                 `json:"file_path"`
+	FileSize      int64                  `json:"file_size"`
+	ModifiedTime  time.Time              `json:"modified_time"`
+	CreatedTime   time.Time              `json:"created_time"`
+	Checksum      string                 `json:"checksum,omitempty"`
+	ContentType   string                 `json:"content_type,omitempty"`
+	IsDirectory   bool                   `json:"is_directory"`
+	IsDeleted     bool                   `json:"is_deleted"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // NewSyncCoordinator creates a new sync coordinator
@@ -176,9 +197,17 @@ func NewSyncCoordinator(orchestrator *SyncOrchestrator, config *CoordinatorConfi
 	}
 
 	// Initialize components
-	coordinator.crossSyncManager = NewCrossSyncManager(coordinator)
-	coordinator.conflictResolver = NewConflictResolver(config)
-	coordinator.dependencyManager = NewDependencyManager(config)
+	coordinator.crossSyncManager = NewCrossSyncManager()
+	coordinator.conflictResolver = NewConflictResolver(&ConflictResolverConfig{
+		DefaultStrategy:        ConflictStrategyLastWrite,
+		AutoResolveTimeout:     30 * time.Minute,
+		MaxConflictAge:         24 * time.Hour,
+		EnableVersioning:       false,
+		VersioningSuffix:       ".conflict",
+		EnableManualResolution: true,
+		BackupConflictedFiles:  true,
+	})
+	coordinator.dependencyManager = NewDependencyManager()
 
 	return coordinator
 }
@@ -357,7 +386,7 @@ func (sc *SyncCoordinator) executeCoordination(ctx context.Context, coord *Coord
 	// Phase 1: Preparation
 	coord.Status = CoordinationStatusPreparing
 	coord.Progress.CurrentPhase = "preparation"
-	
+
 	if err = sc.prepareCoordination(ctx, coord); err != nil {
 		sc.failCoordination(coord, fmt.Errorf("preparation failed: %w", err))
 		return
@@ -365,7 +394,7 @@ func (sc *SyncCoordinator) executeCoordination(ctx context.Context, coord *Coord
 
 	// Phase 2: Dependency resolution
 	coord.Progress.CurrentPhase = "dependency_resolution"
-	
+
 	if err = sc.resolveDependencies(ctx, coord); err != nil {
 		sc.failCoordination(coord, fmt.Errorf("dependency resolution failed: %w", err))
 		return
@@ -374,7 +403,7 @@ func (sc *SyncCoordinator) executeCoordination(ctx context.Context, coord *Coord
 	// Phase 3: Execute sync operations
 	coord.Status = CoordinationStatusRunning
 	coord.Progress.CurrentPhase = "sync_execution"
-	
+
 	if err = sc.executeSyncOperations(ctx, coord); err != nil {
 		sc.failCoordination(coord, fmt.Errorf("sync execution failed: %w", err))
 		return
@@ -383,7 +412,7 @@ func (sc *SyncCoordinator) executeCoordination(ctx context.Context, coord *Coord
 	// Phase 4: Conflict resolution
 	coord.Status = CoordinationStatusResolving
 	coord.Progress.CurrentPhase = "conflict_resolution"
-	
+
 	if err = sc.resolveConflicts(ctx, coord); err != nil {
 		sc.failCoordination(coord, fmt.Errorf("conflict resolution failed: %w", err))
 		return
@@ -391,13 +420,13 @@ func (sc *SyncCoordinator) executeCoordination(ctx context.Context, coord *Coord
 
 	// Phase 5: Finalization
 	coord.Progress.CurrentPhase = "finalization"
-	
+
 	sc.finalizeCoordination(coord)
 }
 
 func (sc *SyncCoordinator) prepareCoordination(ctx context.Context, coord *CoordinationContext) error {
 	// Validate all data sources exist and are accessible
-	for _, dsID := range coord.DataSources {
+	for range coord.DataSources {
 		// Check if data source exists and is accessible
 		// This would typically involve checking the database
 		// For now, we'll assume all data sources are valid
@@ -414,7 +443,14 @@ func (sc *SyncCoordinator) resolveDependencies(ctx context.Context, coord *Coord
 		return nil // No dependencies to resolve
 	}
 
-	return sc.dependencyManager.ResolveDependencies(ctx, coord.Dependencies)
+	// Extract job IDs from dependencies
+	jobIDs := make([]uuid.UUID, len(coord.Dependencies))
+	for i, dep := range coord.Dependencies {
+		jobIDs[i] = dep.SourceJobID
+	}
+
+	_, err := sc.dependencyManager.ResolveDependencies(ctx, jobIDs)
+	return err
 }
 
 func (sc *SyncCoordinator) executeSyncOperations(ctx context.Context, coord *CoordinationContext) error {
@@ -433,7 +469,7 @@ func (sc *SyncCoordinator) executeSyncOperations(ctx context.Context, coord *Coo
 
 		job, err := sc.orchestrator.StartSync(ctx, syncRequest)
 		if err != nil {
-			coord.Results.Errors = append(coord.Results.Errors, 
+			coord.Results.Errors = append(coord.Results.Errors,
 				fmt.Sprintf("Failed to start sync for data source %s: %v", dsID, err))
 			coord.Progress.FailedDataSources++
 			continue
@@ -507,7 +543,26 @@ func (sc *SyncCoordinator) resolveConflicts(ctx context.Context, coord *Coordina
 	// Resolve conflicts based on strategy
 	resolvedCount := 0
 	for _, conflict := range conflicts {
-		if err := sc.conflictResolver.ResolveConflict(ctx, conflict, coord.ConflictStrategy); err != nil {
+		// Convert CrossConflictType to ConflictType
+		var conflictType ConflictType
+		switch conflict.ConflictType {
+		case CrossConflictTypeDataModified:
+			conflictType = ConflictTypeModified
+		case CrossConflictTypeDataDeleted:
+			conflictType = ConflictTypeDeleted
+		default:
+			conflictType = ConflictTypeModified
+		}
+
+		if _, err := sc.conflictResolver.ResolveConflict(ctx, &SyncConflict{
+			ID:                  conflict.ID,
+			FilePath:            conflict.FilePath,
+			ConflictType:        conflictType,
+			DetectedAt:          time.Now(),
+			Status:              ConflictStatusPending,
+			InvolvedDataSources: conflict.InvolvedDataSources,
+			FileVersions:        conflict.FileVersions,
+		}, coord.ConflictStrategy); err != nil {
 			coord.Results.Warnings = append(coord.Results.Warnings,
 				fmt.Sprintf("Failed to resolve conflict for %s: %v", conflict.FilePath, err))
 			continue
@@ -531,8 +586,8 @@ func (sc *SyncCoordinator) detectCrossConnectorConflicts(ctx context.Context, co
 	if len(coord.DataSources) >= 2 {
 		conflict := &CrossConnectorConflict{
 			ID:                  uuid.New(),
-			FilePath:           "/shared/document.docx",
-			ConflictType:       CrossConflictTypeModifiedMultiple,
+			FilePath:            "/shared/document.docx",
+			ConflictType:        CrossConflictTypeModifiedMultiple,
 			InvolvedDataSources: coord.DataSources[:2],
 			FileVersions: []*ConflictFileVersion{
 				{
@@ -581,7 +636,7 @@ func (sc *SyncCoordinator) failCoordination(coord *CoordinationContext, err erro
 	now := time.Now()
 	coord.EndTime = &now
 	coord.Progress.CurrentPhase = "failed"
-	
+
 	if coord.Results.Errors == nil {
 		coord.Results.Errors = make([]string, 0)
 	}

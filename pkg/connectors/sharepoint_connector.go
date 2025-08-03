@@ -23,7 +23,7 @@ type SharePointConnector struct {
 	client   *http.Client
 	tracer   trace.Tracer
 	producer *events.Producer
-	
+
 	// Authentication
 	accessToken  string
 	tokenExpiry  time.Time
@@ -37,54 +37,54 @@ type SharePointConfig struct {
 	ClientID     string `yaml:"client_id"`
 	ClientSecret string `yaml:"client_secret"`
 	Scope        string `yaml:"scope"`
-	
+
 	// SharePoint URLs
-	BaseURL     string `yaml:"base_url"`     // https://tenant.sharepoint.com
-	SiteURL     string `yaml:"site_url"`     // /sites/sitename
-	AuthURL     string `yaml:"auth_url"`     // https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token
-	
+	BaseURL string `yaml:"base_url"` // https://tenant.sharepoint.com
+	SiteURL string `yaml:"site_url"` // /sites/sitename
+	AuthURL string `yaml:"auth_url"` // https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token
+
 	// Sync Configuration
-	SyncInterval        time.Duration `yaml:"sync_interval"`
-	InitialSyncEnabled  bool          `yaml:"initial_sync_enabled"`
-	DeltaSyncEnabled    bool          `yaml:"delta_sync_enabled"`
-	WebhooksEnabled     bool          `yaml:"webhooks_enabled"`
-	
+	SyncInterval       time.Duration `yaml:"sync_interval"`
+	InitialSyncEnabled bool          `yaml:"initial_sync_enabled"`
+	DeltaSyncEnabled   bool          `yaml:"delta_sync_enabled"`
+	WebhooksEnabled    bool          `yaml:"webhooks_enabled"`
+
 	// File Filtering
-	LibraryNames        []string `yaml:"library_names"`        // Document libraries to sync
-	FileExtensions      []string `yaml:"file_extensions"`      // .docx, .pdf, .txt, etc.
-	ExcludePatterns     []string `yaml:"exclude_patterns"`     // Patterns to exclude
-	MaxFileSizeMB       int      `yaml:"max_file_size_mb"`
-	
+	LibraryNames    []string `yaml:"library_names"`    // Document libraries to sync
+	FileExtensions  []string `yaml:"file_extensions"`  // .docx, .pdf, .txt, etc.
+	ExcludePatterns []string `yaml:"exclude_patterns"` // Patterns to exclude
+	MaxFileSizeMB   int      `yaml:"max_file_size_mb"`
+
 	// Processing Options
-	EnableVersions      bool     `yaml:"enable_versions"`       // Include version history
-	EnableMetadata      bool     `yaml:"enable_metadata"`       // Include SharePoint metadata
-	EnablePermissions   bool     `yaml:"enable_permissions"`    // Include permission info
-	
+	EnableVersions    bool `yaml:"enable_versions"`    // Include version history
+	EnableMetadata    bool `yaml:"enable_metadata"`    // Include SharePoint metadata
+	EnablePermissions bool `yaml:"enable_permissions"` // Include permission info
+
 	// Rate Limiting
-	RequestsPerSecond   float64  `yaml:"requests_per_second"`
-	MaxConcurrentReqs   int      `yaml:"max_concurrent_requests"`
-	
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	MaxConcurrentReqs int     `yaml:"max_concurrent_requests"`
+
 	// Error Handling
-	RetryAttempts       int           `yaml:"retry_attempts"`
-	RetryDelay          time.Duration `yaml:"retry_delay"`
-	CircuitBreakerThreshold int       `yaml:"circuit_breaker_threshold"`
+	RetryAttempts           int           `yaml:"retry_attempts"`
+	RetryDelay              time.Duration `yaml:"retry_delay"`
+	CircuitBreakerThreshold int           `yaml:"circuit_breaker_threshold"`
 }
 
 // SharePointFile represents a file in SharePoint
 type SharePointFile struct {
-	ID               string                 `json:"id"`
-	Name             string                 `json:"name"`
-	ServerRelativeURL string                `json:"serverRelativeUrl"`
-	Size             int64                  `json:"length"`
-	Created          time.Time              `json:"timeCreated"`
-	Modified         time.Time              `json:"timeLastModified"`
-	CreatedBy        SharePointUser         `json:"createdBy"`
-	ModifiedBy       SharePointUser         `json:"lastModifiedBy"`
-	ContentType      string                 `json:"mimeType"`
-	Checksum         string                 `json:"checksum,omitempty"`
-	Metadata         map[string]interface{} `json:"metadata,omitempty"`
-	Permissions      []SharePointPermission `json:"permissions,omitempty"`
-	Versions         []SharePointVersion    `json:"versions,omitempty"`
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	ServerRelativeURL string                 `json:"serverRelativeUrl"`
+	Size              int64                  `json:"length"`
+	Created           time.Time              `json:"timeCreated"`
+	Modified          time.Time              `json:"timeLastModified"`
+	CreatedBy         SharePointUser         `json:"createdBy"`
+	ModifiedBy        SharePointUser         `json:"lastModifiedBy"`
+	ContentType       string                 `json:"mimeType"`
+	Checksum          string                 `json:"checksum,omitempty"`
+	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+	Permissions       []SharePointPermission `json:"permissions,omitempty"`
+	Versions          []SharePointVersion    `json:"versions,omitempty"`
 }
 
 // SharePointUser represents a SharePoint user
@@ -104,69 +104,69 @@ type SharePointPermission struct {
 
 // SharePointVersion represents a file version
 type SharePointVersion struct {
-	ID       string    `json:"id"`
-	Label    string    `json:"label"`
-	Size     int64     `json:"size"`
-	Created  time.Time `json:"created"`
-	IsMinor  bool      `json:"isMinor"`
-	URL      string    `json:"url"`
+	ID      string    `json:"id"`
+	Label   string    `json:"label"`
+	Size    int64     `json:"size"`
+	Created time.Time `json:"created"`
+	IsMinor bool      `json:"isMinor"`
+	URL     string    `json:"url"`
 }
 
 // SharePointWebhook represents a SharePoint webhook subscription
 type SharePointWebhook struct {
-	ID               string    `json:"id"`
-	Resource         string    `json:"resource"`
-	NotificationURL  string    `json:"notificationUrl"`
-	ExpirationDate   time.Time `json:"expirationDateTime"`
-	ClientState      string    `json:"clientState"`
+	ID              string    `json:"id"`
+	Resource        string    `json:"resource"`
+	NotificationURL string    `json:"notificationUrl"`
+	ExpirationDate  time.Time `json:"expirationDateTime"`
+	ClientState     string    `json:"clientState"`
 }
 
 // SharePointEvent represents a change event from SharePoint
 type SharePointEvent struct {
-	SubscriptionID   string    `json:"subscriptionId"`
-	Resource         string    `json:"resource"`
-	TenantID         string    `json:"tenantId"`
-	SiteURL          string    `json:"siteUrl"`
-	WebID            string    `json:"webId"`
-	EventType        string    `json:"eventType"`        // ItemAdded, ItemUpdated, ItemDeleted
-	EventTime        time.Time `json:"eventTime"`
-	UniqueID         string    `json:"uniqueId"`
-	ItemID           string    `json:"itemId"`
-	ListID           string    `json:"listId"`
-	UserDisplayName  string    `json:"userDisplayName"`
-	UserLoginName    string    `json:"userLoginName"`
+	SubscriptionID  string    `json:"subscriptionId"`
+	Resource        string    `json:"resource"`
+	TenantID        string    `json:"tenantId"`
+	SiteURL         string    `json:"siteUrl"`
+	WebID           string    `json:"webId"`
+	EventType       string    `json:"eventType"` // ItemAdded, ItemUpdated, ItemDeleted
+	EventTime       time.Time `json:"eventTime"`
+	UniqueID        string    `json:"uniqueId"`
+	ItemID          string    `json:"itemId"`
+	ListID          string    `json:"listId"`
+	UserDisplayName string    `json:"userDisplayName"`
+	UserLoginName   string    `json:"userLoginName"`
 }
 
 // SyncResult represents the result of a sync operation
 type SyncResult struct {
-	StartTime       time.Time `json:"start_time"`
-	EndTime         time.Time `json:"end_time"`
-	Duration        time.Duration `json:"duration"`
-	FilesFound      int       `json:"files_found"`
-	FilesProcessed  int       `json:"files_processed"`
-	FilesSkipped    int       `json:"files_skipped"`
-	FilesErrored    int       `json:"files_errored"`
-	LastSyncToken   string    `json:"last_sync_token,omitempty"`
-	Errors          []string  `json:"errors,omitempty"`
+	StartTime      time.Time     `json:"start_time"`
+	EndTime        time.Time     `json:"end_time"`
+	Duration       time.Duration `json:"duration"`
+	FilesFound     int           `json:"files_found"`
+	FilesProcessed int           `json:"files_processed"`
+	FilesSkipped   int           `json:"files_skipped"`
+	FilesErrored   int           `json:"files_errored"`
+	LastSyncToken  string        `json:"last_sync_token,omitempty"`
+	Errors         []string      `json:"errors,omitempty"`
 }
 
 // DefaultSharePointConfig returns default SharePoint configuration
 func DefaultSharePointConfig() *SharePointConfig {
 	return &SharePointConfig{
-		Scope:               "https://graph.microsoft.com/.default",
-		SyncInterval:        15 * time.Minute,
-		InitialSyncEnabled:  true,
-		DeltaSyncEnabled:    true,
-		WebhooksEnabled:     true,
-		FileExtensions:      []string{".docx", ".pdf", ".txt", ".pptx", ".xlsx"},
-		MaxFileSizeMB:       100,
-		EnableVersions:      false,
-		EnableMetadata:      true,
-		EnablePermissions:   false,
-		RequestsPerSecond:   10.0,
-		MaxConcurrentReqs:   5,
-		RetryAttempts:       3,
-		RetryDelay:          5 * time.Second,
+		Scope:                   "https://graph.microsoft.com/.default",
+		SyncInterval:            15 * time.Minute,
+		InitialSyncEnabled:      true,
+		DeltaSyncEnabled:        true,
+		WebhooksEnabled:         true,
+		FileExtensions:          []string{".docx", ".pdf", ".txt", ".pptx", ".xlsx"},
+		MaxFileSizeMB:           100,
+		EnableVersions:          false,
+		EnableMetadata:          true,
+		EnablePermissions:       false,
+		RequestsPerSecond:       10.0,
+		MaxConcurrentReqs:       5,
+		RetryAttempts:           3,
+		RetryDelay:              5 * time.Second,
 		CircuitBreakerThreshold: 10,
 	}
 }
@@ -282,7 +282,7 @@ func (sp *SharePointConnector) performInitialSync(ctx context.Context) {
 	defer func() {
 		result.EndTime = time.Now()
 		result.Duration = result.EndTime.Sub(result.StartTime)
-		
+
 		span.SetAttributes(
 			attribute.Int("sync.files_found", result.FilesFound),
 			attribute.Int("sync.files_processed", result.FilesProcessed),
@@ -453,11 +453,11 @@ func (sp *SharePointConnector) processFile(ctx context.Context, file *SharePoint
 
 	// Prepare metadata
 	metadata := map[string]string{
-		"source":         "sharepoint",
-		"site_url":       sp.config.SiteURL,
-		"file_id":        file.ID,
-		"created_by":     file.CreatedBy.DisplayName,
-		"modified_by":    file.ModifiedBy.DisplayName,
+		"source":              "sharepoint",
+		"site_url":            sp.config.SiteURL,
+		"file_id":             file.ID,
+		"created_by":          file.CreatedBy.DisplayName,
+		"modified_by":         file.ModifiedBy.DisplayName,
 		"server_relative_url": file.ServerRelativeURL,
 	}
 
@@ -557,23 +557,23 @@ func getFileExtension(filename string) string {
 // GetSyncStatus returns the current sync status
 func (sp *SharePointConnector) GetSyncStatus() map[string]interface{} {
 	return map[string]interface{}{
-		"authenticated":     sp.accessToken != "",
-		"token_expires_at":  sp.tokenExpiry,
-		"last_sync":         time.Now(), // Placeholder
-		"files_synced":      1000,       // Placeholder
-		"sync_errors":       0,          // Placeholder
+		"authenticated":    sp.accessToken != "",
+		"token_expires_at": sp.tokenExpiry,
+		"last_sync":        time.Now(), // Placeholder
+		"files_synced":     1000,       // Placeholder
+		"sync_errors":      0,          // Placeholder
 	}
 }
 
 // GetMetrics returns SharePoint connector metrics
 func (sp *SharePointConnector) GetMetrics() map[string]interface{} {
 	return map[string]interface{}{
-		"sync_interval":         sp.config.SyncInterval.String(),
-		"max_file_size_mb":      sp.config.MaxFileSizeMB,
-		"supported_extensions":  len(sp.config.FileExtensions),
-		"libraries_monitored":   len(sp.config.LibraryNames),
-		"webhooks_enabled":      sp.config.WebhooksEnabled,
-		"delta_sync_enabled":    sp.config.DeltaSyncEnabled,
+		"sync_interval":        sp.config.SyncInterval.String(),
+		"max_file_size_mb":     sp.config.MaxFileSizeMB,
+		"supported_extensions": len(sp.config.FileExtensions),
+		"libraries_monitored":  len(sp.config.LibraryNames),
+		"webhooks_enabled":     sp.config.WebhooksEnabled,
+		"delta_sync_enabled":   sp.config.DeltaSyncEnabled,
 	}
 }
 

@@ -119,9 +119,9 @@ func (c *StorageUsageCollector) Collect(ctx context.Context) ([]*MetricSample, e
 	return samples, nil
 }
 
-func (c *StorageUsageCollector) GetName() string { return "storage_usage" }
+func (c *StorageUsageCollector) GetName() string            { return "storage_usage" }
 func (c *StorageUsageCollector) GetInterval() time.Duration { return c.interval }
-func (c *StorageUsageCollector) IsEnabled() bool { return c.enabled }
+func (c *StorageUsageCollector) IsEnabled() bool            { return c.enabled }
 
 func (c *StorageUsageCollector) collectTotalUsage(ctx context.Context) (int64, error) {
 	// Placeholder implementation - would integrate with actual storage manager
@@ -146,10 +146,10 @@ func (c *StorageUsageCollector) collectTierUsage(ctx context.Context) (map[strin
 func (c *StorageUsageCollector) collectTypeUsage(ctx context.Context) (map[string]int64, error) {
 	// Placeholder implementation
 	return map[string]int64{
-		"pdf":  150 * 1024 * 1024 * 1024, // 150GB
-		"docx": 100 * 1024 * 1024 * 1024, // 100GB
-		"txt":  80 * 1024 * 1024 * 1024,  // 80GB
-		"xlsx": 70 * 1024 * 1024 * 1024,  // 70GB
+		"pdf":   150 * 1024 * 1024 * 1024, // 150GB
+		"docx":  100 * 1024 * 1024 * 1024, // 100GB
+		"txt":   80 * 1024 * 1024 * 1024,  // 80GB
+		"xlsx":  70 * 1024 * 1024 * 1024,  // 70GB
 		"other": 100 * 1024 * 1024 * 1024, // 100GB
 	}, nil
 }
@@ -249,9 +249,9 @@ func (c *PerformanceCollector) Collect(ctx context.Context) ([]*MetricSample, er
 	return samples, nil
 }
 
-func (c *PerformanceCollector) GetName() string { return "performance" }
+func (c *PerformanceCollector) GetName() string            { return "performance" }
 func (c *PerformanceCollector) GetInterval() time.Duration { return c.interval }
-func (c *PerformanceCollector) IsEnabled() bool { return c.enabled }
+func (c *PerformanceCollector) IsEnabled() bool            { return c.enabled }
 
 func (c *PerformanceCollector) collectThroughput(ctx context.Context) float64 {
 	// Placeholder - would collect from actual performance monitoring
@@ -266,7 +266,7 @@ func (c *PerformanceCollector) collectIOPS(ctx context.Context) int64 {
 func (c *PerformanceCollector) collectLatency(ctx context.Context) time.Duration {
 	// Placeholder implementation
 	baseLatency := 15 * time.Millisecond
-	variation := time.Duration(math.Sin(float64(time.Now().Unix())/100) * 5) * time.Millisecond
+	variation := time.Duration(math.Sin(float64(time.Now().Unix())/100)*5) * time.Millisecond
 	return baseLatency + variation
 }
 
@@ -368,9 +368,9 @@ func (c *CostCollector) Collect(ctx context.Context) ([]*MetricSample, error) {
 	return samples, nil
 }
 
-func (c *CostCollector) GetName() string { return "cost" }
+func (c *CostCollector) GetName() string            { return "cost" }
 func (c *CostCollector) GetInterval() time.Duration { return c.interval }
-func (c *CostCollector) IsEnabled() bool { return c.enabled }
+func (c *CostCollector) IsEnabled() bool            { return c.enabled }
 
 func (c *CostCollector) collectTotalMonthlyCost(ctx context.Context) float64 {
 	// Placeholder implementation
@@ -485,9 +485,9 @@ func (c *AccessPatternCollector) Collect(ctx context.Context) ([]*MetricSample, 
 	return samples, nil
 }
 
-func (c *AccessPatternCollector) GetName() string { return "access_patterns" }
+func (c *AccessPatternCollector) GetName() string            { return "access_patterns" }
 func (c *AccessPatternCollector) GetInterval() time.Duration { return c.interval }
-func (c *AccessPatternCollector) IsEnabled() bool { return c.enabled }
+func (c *AccessPatternCollector) IsEnabled() bool            { return c.enabled }
 
 func (c *AccessPatternCollector) collectTotalAccesses(ctx context.Context) int64 {
 	// Placeholder implementation
@@ -498,20 +498,20 @@ func (c *AccessPatternCollector) collectAccessesByType(ctx context.Context) map[
 	// Placeholder implementation
 	total := c.collectTotalAccesses(ctx)
 	return map[string]int64{
-		"read":     int64(float64(total) * 0.75),  // 75% reads
-		"write":    int64(float64(total) * 0.20),  // 20% writes
-		"delete":   int64(float64(total) * 0.03),  // 3% deletes
-		"metadata": int64(float64(total) * 0.02),  // 2% metadata
+		"read":     int64(float64(total) * 0.75), // 75% reads
+		"write":    int64(float64(total) * 0.20), // 20% writes
+		"delete":   int64(float64(total) * 0.03), // 3% deletes
+		"metadata": int64(float64(total) * 0.02), // 2% metadata
 	}
 }
 
 func (c *AccessPatternCollector) collectAccessPatterns(ctx context.Context) map[string]int64 {
 	// Placeholder implementation
 	return map[string]int64{
-		"frequent":   15000,  // Files accessed daily
-		"regular":    8000,   // Files accessed weekly
-		"infrequent": 5000,   // Files accessed monthly
-		"rare":       2000,   // Files accessed quarterly
+		"frequent":   15000, // Files accessed daily
+		"regular":    8000,  // Files accessed weekly
+		"infrequent": 5000,  // Files accessed monthly
+		"rare":       2000,  // Files accessed quarterly
 	}
 }
 
@@ -603,9 +603,9 @@ func (c *HealthCollector) Collect(ctx context.Context) ([]*MetricSample, error) 
 	return samples, nil
 }
 
-func (c *HealthCollector) GetName() string { return "health" }
+func (c *HealthCollector) GetName() string            { return "health" }
 func (c *HealthCollector) GetInterval() time.Duration { return c.interval }
-func (c *HealthCollector) IsEnabled() bool { return c.enabled }
+func (c *HealthCollector) IsEnabled() bool            { return c.enabled }
 
 func (c *HealthCollector) collectAvailability(ctx context.Context) float64 {
 	// Placeholder implementation
@@ -617,7 +617,7 @@ func (c *HealthCollector) collectHealthScore(ctx context.Context) float64 {
 	availability := c.collectAvailability(ctx)
 	errorRate := 0.02 // From performance collector
 	capacity := c.collectCapacityUtilization(ctx)
-	
+
 	// Simple health score calculation
 	healthScore := (availability/100)*0.4 + (1-errorRate)*0.3 + (1-capacity/100)*0.3
 	return healthScore * 100

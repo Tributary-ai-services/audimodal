@@ -3,7 +3,6 @@ package compression
 import (
 	"context"
 	"fmt"
-	"io"
 	"mime"
 	"path/filepath"
 	"strings"
@@ -35,32 +34,32 @@ type DocumentCompressionConfig struct {
 	// General settings
 	Enabled                bool                        `yaml:"enabled"`
 	DefaultStrategy        DocumentCompressionStrategy `yaml:"default_strategy"`
-	MinFileSizeThreshold   int64                       `yaml:"min_file_size_threshold"`   // Don't compress files smaller than this
-	MaxFileSizeThreshold   int64                       `yaml:"max_file_size_threshold"`   // Don't compress files larger than this
-	CompressionRatioTarget float64                     `yaml:"compression_ratio_target"`  // Target compression ratio
-	
+	MinFileSizeThreshold   int64                       `yaml:"min_file_size_threshold"`  // Don't compress files smaller than this
+	MaxFileSizeThreshold   int64                       `yaml:"max_file_size_threshold"`  // Don't compress files larger than this
+	CompressionRatioTarget float64                     `yaml:"compression_ratio_target"` // Target compression ratio
+
 	// Strategy-specific settings
 	TextCompressionLevel   int     `yaml:"text_compression_level"`
 	BinaryCompressionLevel int     `yaml:"binary_compression_level"`
 	AdaptiveThreshold      float64 `yaml:"adaptive_threshold"`
-	
+
 	// File type mappings
 	TextFileExtensions    []string                               `yaml:"text_file_extensions"`
 	BinaryFileExtensions  []string                               `yaml:"binary_file_extensions"`
 	ArchiveFileExtensions []string                               `yaml:"archive_file_extensions"`
 	StrategyMappings      map[string]DocumentCompressionStrategy `yaml:"strategy_mappings"`
-	
+
 	// Performance settings
-	BufferSize        int           `yaml:"buffer_size"`
-	CompressionLevel  int           `yaml:"compression_level"`
-	EnableMetrics     bool          `yaml:"enable_metrics"`
-	MaxConcurrency    int           `yaml:"max_concurrency"`
-	
+	BufferSize       int  `yaml:"buffer_size"`
+	CompressionLevel int  `yaml:"compression_level"`
+	EnableMetrics    bool `yaml:"enable_metrics"`
+	MaxConcurrency   int  `yaml:"max_concurrency"`
+
 	// Storage integration
-	CacheCompressed   bool          `yaml:"cache_compressed"`
-	CacheTTL          time.Duration `yaml:"cache_ttl"`
-	StoreOriginal     bool          `yaml:"store_original"`     // Keep original alongside compressed
-	UseAsyncCompression bool        `yaml:"use_async_compression"`
+	CacheCompressed     bool          `yaml:"cache_compressed"`
+	CacheTTL            time.Duration `yaml:"cache_ttl"`
+	StoreOriginal       bool          `yaml:"store_original"` // Keep original alongside compressed
+	UseAsyncCompression bool          `yaml:"use_async_compression"`
 }
 
 // DefaultDocumentCompressionConfig returns default configuration
@@ -68,12 +67,12 @@ func DefaultDocumentCompressionConfig() *DocumentCompressionConfig {
 	return &DocumentCompressionConfig{
 		Enabled:                true,
 		DefaultStrategy:        StrategyAdaptive,
-		MinFileSizeThreshold:   1024,      // 1KB
+		MinFileSizeThreshold:   1024,              // 1KB
 		MaxFileSizeThreshold:   500 * 1024 * 1024, // 500MB
-		CompressionRatioTarget: 0.7,       // 30% size reduction
+		CompressionRatioTarget: 0.7,               // 30% size reduction
 		TextCompressionLevel:   9,
 		BinaryCompressionLevel: 6,
-		AdaptiveThreshold:      0.8,       // Use adaptive compression if entropy > 0.8
+		AdaptiveThreshold:      0.8, // Use adaptive compression if entropy > 0.8
 		TextFileExtensions: []string{
 			".txt", ".md", ".json", ".xml", ".html", ".css", ".js", ".csv",
 			".log", ".sql", ".py", ".go", ".java", ".cpp", ".c", ".h",
@@ -101,7 +100,7 @@ func DefaultDocumentCompressionConfig() *DocumentCompressionConfig {
 		EnableMetrics:       true,
 		MaxConcurrency:      4,
 		CacheCompressed:     true,
-		CacheTTL:           24 * time.Hour,
+		CacheTTL:            24 * time.Hour,
 		StoreOriginal:       false,
 		UseAsyncCompression: true,
 	}
@@ -109,11 +108,11 @@ func DefaultDocumentCompressionConfig() *DocumentCompressionConfig {
 
 // DocumentCompressor provides document-specific compression strategies
 type DocumentCompressor struct {
-	config           *DocumentCompressionConfig
-	compressor       cache.Compressor
+	config             *DocumentCompressionConfig
+	compressor         cache.Compressor
 	adaptiveCompressor *cache.AdaptiveCompressor
-	tracer           trace.Tracer
-	metrics          *CompressionMetrics
+	tracer             trace.Tracer
+	metrics            *CompressionMetrics
 }
 
 // NewDocumentCompressor creates a new document compressor
@@ -135,8 +134,8 @@ func NewDocumentCompressor(config *DocumentCompressionConfig) *DocumentCompresso
 		config:             config,
 		compressor:         compressor,
 		adaptiveCompressor: adaptiveCompressor,
-		tracer:            otel.Tracer("document-compressor"),
-		metrics:           metrics,
+		tracer:             otel.Tracer("document-compressor"),
+		metrics:            metrics,
 	}
 }
 
@@ -161,13 +160,13 @@ func (d *DocumentCompressor) CompressDocument(ctx context.Context, data []byte, 
 	if !d.shouldCompress(data, filename) {
 		span.SetAttributes(attribute.String("compression.strategy", "none"))
 		return &CompressionResult{
-			Data:              data,
-			OriginalSize:      len(data),
-			CompressedSize:    len(data),
-			CompressionRatio:  1.0,
-			Strategy:          StrategyNone,
-			Algorithm:         "none",
-			CompressionTime:   time.Since(start),
+			Data:             data,
+			OriginalSize:     len(data),
+			CompressedSize:   len(data),
+			CompressionRatio: 1.0,
+			Strategy:         StrategyNone,
+			Algorithm:        "none",
+			CompressionTime:  time.Since(start),
 		}, nil
 	}
 
@@ -183,7 +182,7 @@ func (d *DocumentCompressor) CompressDocument(ctx context.Context, data []byte, 
 	}
 
 	compressionRatio := float64(len(data)) / float64(len(compressed))
-	
+
 	// Check if compression was beneficial
 	if compressionRatio < d.config.CompressionRatioTarget {
 		// Compression didn't meet target, return original
@@ -273,7 +272,7 @@ func (d *DocumentCompressor) shouldCompress(data []byte, filename string) bool {
 	}
 
 	size := int64(len(data))
-	
+
 	// Check size thresholds
 	if size < d.config.MinFileSizeThreshold || size > d.config.MaxFileSizeThreshold {
 		return false
@@ -293,7 +292,7 @@ func (d *DocumentCompressor) shouldCompress(data []byte, filename string) bool {
 // determineStrategy determines the best compression strategy for a file
 func (d *DocumentCompressor) determineStrategy(data []byte, filename string) DocumentCompressionStrategy {
 	ext := strings.ToLower(filepath.Ext(filename))
-	
+
 	// Check explicit mappings first
 	if strategy, exists := d.config.StrategyMappings[ext]; exists {
 		return strategy
@@ -314,9 +313,9 @@ func (d *DocumentCompressor) determineStrategy(data []byte, filename string) Doc
 
 	// Use MIME type detection as fallback
 	mimeType := mime.TypeByExtension(ext)
-	if strings.HasPrefix(mimeType, "text/") || 
-	   strings.Contains(mimeType, "json") || 
-	   strings.Contains(mimeType, "xml") {
+	if strings.HasPrefix(mimeType, "text/") ||
+		strings.Contains(mimeType, "json") ||
+		strings.Contains(mimeType, "xml") {
 		return StrategyText
 	}
 
@@ -329,24 +328,24 @@ func (d *DocumentCompressor) applyStrategy(ctx context.Context, data []byte, str
 	switch strategy {
 	case StrategyNone:
 		return data, "none", nil
-		
+
 	case StrategyText:
 		compressed, err := cache.NewGzipCompressor(d.config.TextCompressionLevel).Compress(data)
 		return compressed, "gzip", err
-		
+
 	case StrategyBinary:
 		compressed, err := cache.NewGzipCompressor(d.config.BinaryCompressionLevel).Compress(data)
 		return compressed, "gzip", err
-		
+
 	case StrategyAdaptive:
 		compressed, err := d.adaptiveCompressor.Compress(data)
 		return compressed, "adaptive", err
-		
+
 	case StrategyAggressive:
 		// Use maximum compression level
 		compressed, err := cache.NewGzipCompressor(9).Compress(data)
 		return compressed, "gzip", err
-		
+
 	default:
 		// Fallback to default compressor
 		compressed, err := d.compressor.Compress(data)
@@ -410,13 +409,13 @@ func (m *CompressionMetrics) RecordDecompression(filename string, duration time.
 
 // BatchCompressionJob represents a batch compression job
 type BatchCompressionJob struct {
-	Files       []storage.FileInfo         `json:"files"`
+	Files       []storage.FileInfo          `json:"files"`
 	Strategy    DocumentCompressionStrategy `json:"strategy"`
-	Priority    int                        `json:"priority"`
-	CreatedAt   time.Time                  `json:"created_at"`
-	CompletedAt *time.Time                 `json:"completed_at,omitempty"`
-	Status      string                     `json:"status"`
-	Progress    float64                    `json:"progress"`
+	Priority    int                         `json:"priority"`
+	CreatedAt   time.Time                   `json:"created_at"`
+	CompletedAt *time.Time                  `json:"completed_at,omitempty"`
+	Status      string                      `json:"status"`
+	Progress    float64                     `json:"progress"`
 }
 
 // BatchCompressor handles batch compression operations
@@ -478,8 +477,8 @@ func (b *BatchCompressor) processJob(ctx context.Context, job *BatchCompressionJ
 	)
 
 	job.Status = "processing"
-	
-	for i, fileInfo := range job.Files {
+
+	for i := range job.Files {
 		// Process each file (implementation would include actual file reading and compression)
 		job.Progress = float64(i+1) / float64(len(job.Files))
 	}
