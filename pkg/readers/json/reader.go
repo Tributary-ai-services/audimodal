@@ -254,10 +254,10 @@ func (r *JSONReader) DiscoverSchema(ctx context.Context, sourcePath string) (cor
 	}
 
 	content := strings.TrimSpace(string(buffer[:n]))
-	
+
 	// Detect JSON format
 	format := r.detectJSONFormat(content)
-	
+
 	// Parse sample data based on detected format
 	var sampleObjects []map[string]any
 	var fields []core.FieldInfo
@@ -334,11 +334,11 @@ func (r *JSONReader) EstimateSize(ctx context.Context, sourcePath string) (core.
 	buffer := make([]byte, 4096)
 	n, _ := file.Read(buffer)
 	content := string(buffer[:n])
-	
+
 	format := r.detectJSONFormat(content)
-	
+
 	var estimatedObjects int64
-	
+
 	switch format {
 	case "single":
 		estimatedObjects = 1
@@ -397,7 +397,7 @@ func (r *JSONReader) CreateIterator(ctx context.Context, sourcePath string, stra
 	// Detect and handle encoding
 	var filePath string
 	var cleanupPath string
-	
+
 	if encoding, ok := strategyConfig["encoding"].(string); ok && encoding != "auto" {
 		// Use specified encoding
 		if encoding != "utf-8" {
@@ -416,7 +416,7 @@ func (r *JSONReader) CreateIterator(ctx context.Context, sourcePath string, stra
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect encoding: %w", err)
 		}
-		
+
 		if encodingInfo.Name != "utf-8" {
 			convertedPath, err := r.encodingDetector.ConvertToUTF8(sourcePath, encodingInfo.Name)
 			if err != nil {
@@ -501,11 +501,11 @@ func (r *JSONReader) GetSupportedFormats() []string {
 
 func (r *JSONReader) detectJSONFormat(content string) string {
 	content = strings.TrimSpace(content)
-	
+
 	if strings.HasPrefix(content, "[") {
 		return "array"
 	}
-	
+
 	if strings.HasPrefix(content, "{") {
 		// Check if it's a single object or line-delimited
 		lines := strings.Split(content, "\n")
@@ -519,19 +519,19 @@ func (r *JSONReader) detectJSONFormat(content string) string {
 				validJSONLines++
 			}
 		}
-		
+
 		if validJSONLines > 1 {
 			return "lines"
 		}
 		return "single"
 	}
-	
+
 	return "single" // Default
 }
 
 func (r *JSONReader) extractFieldsFromObject(obj map[string]any) []core.FieldInfo {
 	fields := make([]core.FieldInfo, 0, len(obj))
-	
+
 	for key, value := range obj {
 		fieldType := r.inferJSONFieldType(value)
 		field := core.FieldInfo{
@@ -540,14 +540,14 @@ func (r *JSONReader) extractFieldsFromObject(obj map[string]any) []core.FieldInf
 			Nullable:    true,
 			Description: fmt.Sprintf("JSON field: %s", key),
 		}
-		
+
 		if value != nil {
 			field.Examples = []any{value}
 		}
-		
+
 		fields = append(fields, field)
 	}
-	
+
 	return fields
 }
 
@@ -555,7 +555,7 @@ func (r *JSONReader) inferJSONFieldType(value any) string {
 	if value == nil {
 		return "null"
 	}
-	
+
 	switch reflect.TypeOf(value).Kind() {
 	case reflect.Bool:
 		return "boolean"
@@ -619,11 +619,11 @@ func (it *JSONIterator) Next(ctx context.Context) (core.Chunk, error) {
 			}
 			return core.Chunk{}, core.ErrIteratorExhausted
 		}
-		
+
 		line := it.scanner.Text()
 		rawBytes = []byte(line)
 		it.readBytes += int64(len(rawBytes))
-		
+
 		if err := json.Unmarshal(rawBytes, &data); err != nil {
 			return core.Chunk{}, fmt.Errorf("failed to parse JSON line: %w", err)
 		}
@@ -632,16 +632,16 @@ func (it *JSONIterator) Next(ctx context.Context) (core.Chunk, error) {
 		if it.arrayDone {
 			return core.Chunk{}, core.ErrIteratorExhausted
 		}
-		
+
 		if !it.decoder.More() {
 			it.arrayDone = true
 			return core.Chunk{}, core.ErrIteratorExhausted
 		}
-		
+
 		if err := it.decoder.Decode(&data); err != nil {
 			return core.Chunk{}, fmt.Errorf("failed to decode JSON array element: %w", err)
 		}
-		
+
 		// Estimate bytes read (rough approximation)
 		if jsonBytes, err := json.Marshal(data); err == nil {
 			it.readBytes += int64(len(jsonBytes))
@@ -651,14 +651,14 @@ func (it *JSONIterator) Next(ctx context.Context) (core.Chunk, error) {
 		if it.objectNum > 0 {
 			return core.Chunk{}, core.ErrIteratorExhausted
 		}
-		
+
 		if err := it.decoder.Decode(&data); err != nil {
 			if err == io.EOF {
 				return core.Chunk{}, core.ErrIteratorExhausted
 			}
 			return core.Chunk{}, fmt.Errorf("failed to decode JSON object: %w", err)
 		}
-		
+
 		it.readBytes = it.totalSize // For single object, we've read everything
 	}
 
@@ -708,9 +708,9 @@ func (it *JSONIterator) Next(ctx context.Context) (core.Chunk, error) {
 // processNestedObject handles flattening of nested objects
 func (it *JSONIterator) processNestedObject(data any, rawBytes []byte) (core.Chunk, error) {
 	// For now, return the first chunk and store nested data for future iterations
-	// This is a simplified implementation - a full version would require 
+	// This is a simplified implementation - a full version would require
 	// maintaining state for nested object iteration
-	
+
 	flattened := it.flattenObject(data, "", 0)
 	if len(flattened) > 0 {
 		// Return the first flattened object
@@ -719,14 +719,14 @@ func (it *JSONIterator) processNestedObject(data any, rawBytes []byte) (core.Chu
 			firstKey = key
 			break
 		}
-		
+
 		chunkSize := int64(len(rawBytes))
 		if chunkSize == 0 {
 			if jsonBytes, err := json.Marshal(flattened[firstKey]); err == nil {
 				chunkSize = int64(len(jsonBytes))
 			}
 		}
-		
+
 		chunk := core.Chunk{
 			Data: flattened[firstKey],
 			Metadata: core.ChunkMetadata{
@@ -745,10 +745,10 @@ func (it *JSONIterator) processNestedObject(data any, rawBytes []byte) (core.Chu
 				},
 			},
 		}
-		
+
 		return chunk, nil
 	}
-	
+
 	// Fallback to regular processing
 	return it.createRegularChunk(data, rawBytes)
 }
@@ -756,17 +756,17 @@ func (it *JSONIterator) processNestedObject(data any, rawBytes []byte) (core.Chu
 // flattenObject recursively flattens a JSON object
 func (it *JSONIterator) flattenObject(obj any, prefix string, depth int) map[string]any {
 	result := make(map[string]any)
-	
+
 	maxDepth := 10
 	if md, ok := it.config["max_nesting_depth"].(float64); ok {
 		maxDepth = int(md)
 	}
-	
+
 	if depth >= maxDepth {
 		result[prefix] = obj
 		return result
 	}
-	
+
 	switch v := obj.(type) {
 	case map[string]any:
 		for key, value := range v {
@@ -774,11 +774,11 @@ func (it *JSONIterator) flattenObject(obj any, prefix string, depth int) map[str
 			if prefix != "" {
 				newKey = prefix + "." + key
 			}
-			
+
 			if it.shouldSkipKey(key) {
 				continue
 			}
-			
+
 			nested := it.flattenObject(value, newKey, depth+1)
 			for k, val := range nested {
 				result[k] = val
@@ -799,7 +799,7 @@ func (it *JSONIterator) flattenObject(obj any, prefix string, depth int) map[str
 	default:
 		result[prefix] = obj
 	}
-	
+
 	return result
 }
 
@@ -808,17 +808,17 @@ func (it *JSONIterator) filterJSONData(data any) any {
 	switch v := data.(type) {
 	case map[string]any:
 		filtered := make(map[string]any)
-		
+
 		for key, value := range v {
 			if it.shouldSkipKey(key) {
 				continue
 			}
-			
+
 			if it.shouldExtractKey(key) {
 				filtered[key] = it.processValue(value)
 			}
 		}
-		
+
 		return filtered
 	case []any:
 		var filtered []any
@@ -863,7 +863,7 @@ func (it *JSONIterator) processValue(value any) any {
 		if nh, ok := it.config["null_handling"].(string); ok {
 			nullHandling = nh
 		}
-		
+
 		switch nullHandling {
 		case "skip":
 			return nil
@@ -873,7 +873,7 @@ func (it *JSONIterator) processValue(value any) any {
 			return nil
 		}
 	}
-	
+
 	return value
 }
 
@@ -943,12 +943,12 @@ func (it *JSONIterator) Close() error {
 	if it.file != nil {
 		err = it.file.Close()
 	}
-	
+
 	// Clean up temporary encoding conversion file
 	if it.cleanupPath != "" {
 		os.Remove(it.cleanupPath)
 	}
-	
+
 	return err
 }
 
@@ -959,7 +959,7 @@ func (it *JSONIterator) Reset() error {
 		if err != nil {
 			return err
 		}
-		
+
 		it.objectNum = 0
 		it.readBytes = 0
 		it.arrayDone = false

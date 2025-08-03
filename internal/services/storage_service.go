@@ -178,7 +178,7 @@ func (s *StorageService) SyncDataSource(ctx context.Context, tenantID uuid.UUID,
 		"include_patterns": []interface{}{dataSource.SyncSettings.FilePattern},
 		"exclude_patterns": []interface{}{dataSource.SyncSettings.ExcludePattern},
 	}
-	
+
 	// Parse sync configuration
 	syncConfig, err := s.parseSyncConfig(syncSettingsMap)
 	if err != nil {
@@ -198,7 +198,7 @@ func (s *StorageService) SyncDataSource(ctx context.Context, tenantID uuid.UUID,
 
 	// Construct URL from datasource config
 	dataSourceURL := s.constructDataSourceURL(dataSource)
-	
+
 	listResult, err := s.DiscoverFilesFromURL(ctx, tenantID, dataSourceURL, listOptions)
 	if err != nil {
 		result.Status = "failed"
@@ -377,7 +377,7 @@ func (s *StorageService) constructDataSourceURL(dataSource *models.DataSource) s
 			return "file://" + dataSource.Config.RootPath
 		}
 	}
-	
+
 	// Fallback - this should not happen in production
 	return ""
 }

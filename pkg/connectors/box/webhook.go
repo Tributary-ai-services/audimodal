@@ -19,11 +19,11 @@ import (
 
 // WebhookHandler handles Box webhook notifications for real-time sync
 type WebhookHandler struct {
-	connector    *BoxConnector
-	syncManager  *SyncManager
-	config       *BoxWebhookConfig
-	tracer       trace.Tracer
-	
+	connector   *BoxConnector
+	syncManager *SyncManager
+	config      *BoxWebhookConfig
+	tracer      trace.Tracer
+
 	// Event processing
 	eventProcessor *EventProcessor
 	eventQueue     chan *WebhookEvent
@@ -32,20 +32,20 @@ type WebhookHandler struct {
 
 // WebhookEvent represents a webhook event from Box
 type WebhookEvent struct {
-	WebhookID   string                 `json:"webhook_id"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Event       *BoxEvent              `json:"event"`
-	Source      interface{}            `json:"source"`
-	CreatedBy   *User                  `json:"created_by"`
-	Trigger     string                 `json:"trigger"`
-	RawPayload  []byte                 `json:"-"`
-	Headers     map[string]string      `json:"-"`
+	WebhookID  string            `json:"webhook_id"`
+	Timestamp  time.Time         `json:"timestamp"`
+	Event      *BoxEvent         `json:"event"`
+	Source     interface{}       `json:"source"`
+	CreatedBy  *User             `json:"created_by"`
+	Trigger    string            `json:"trigger"`
+	RawPayload []byte            `json:"-"`
+	Headers    map[string]string `json:"-"`
 }
 
 // WebhookResponse represents the response to a webhook
 type WebhookResponse struct {
-	Status    string `json:"status"`
-	Message   string `json:"message,omitempty"`
+	Status    string    `json:"status"`
+	Message   string    `json:"message,omitempty"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
@@ -511,32 +511,32 @@ func (ep *EventProcessor) extractSourceData(event *WebhookEvent) (*EventSourceDa
 func (ep *EventProcessor) triggerIncrementalSync(ctx context.Context, itemID, action string) error {
 	// This would trigger a targeted sync for the specific item
 	// For now, this is a placeholder implementation
-	
+
 	// In a real implementation, this would:
 	// 1. Queue the item for sync
 	// 2. Update local sync state
 	// 3. Optionally trigger immediate sync for high-priority items
-	
+
 	return nil
 }
 
 // EventSourceData represents the source data from a webhook event
 type EventSourceData struct {
-	Type           string `json:"type"`
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Parent         *EventSourceData `json:"parent,omitempty"`
-	OwnedBy        *User  `json:"owned_by,omitempty"`
-	CreatedAt      string `json:"created_at,omitempty"`
-	ModifiedAt     string `json:"modified_at,omitempty"`
-	TrashedAt      string `json:"trashed_at,omitempty"`
-	PurgedAt       string `json:"purged_at,omitempty"`
-	ContentCreatedAt string `json:"content_created_at,omitempty"`
-	ContentModifiedAt string `json:"content_modified_at,omitempty"`
-	SequenceID     string `json:"sequence_id,omitempty"`
-	ETag           string `json:"etag,omitempty"`
-	SHA1           string `json:"sha1,omitempty"`
-	Size           int64  `json:"size,omitempty"`
+	Type              string           `json:"type"`
+	ID                string           `json:"id"`
+	Name              string           `json:"name"`
+	Parent            *EventSourceData `json:"parent,omitempty"`
+	OwnedBy           *User            `json:"owned_by,omitempty"`
+	CreatedAt         string           `json:"created_at,omitempty"`
+	ModifiedAt        string           `json:"modified_at,omitempty"`
+	TrashedAt         string           `json:"trashed_at,omitempty"`
+	PurgedAt          string           `json:"purged_at,omitempty"`
+	ContentCreatedAt  string           `json:"content_created_at,omitempty"`
+	ContentModifiedAt string           `json:"content_modified_at,omitempty"`
+	SequenceID        string           `json:"sequence_id,omitempty"`
+	ETag              string           `json:"etag,omitempty"`
+	SHA1              string           `json:"sha1,omitempty"`
+	Size              int64            `json:"size,omitempty"`
 }
 
 // WebhookRegistrar handles webhook registration and management
@@ -566,7 +566,7 @@ func (wr *WebhookRegistrar) RegisterWebhook(ctx context.Context) error {
 			"type": "folder",
 			"id":   "0", // Root folder
 		},
-		"address": wr.config.WebhookURL,
+		"address":  wr.config.WebhookURL,
 		"triggers": wr.config.Triggers,
 	}
 
@@ -577,7 +577,7 @@ func (wr *WebhookRegistrar) RegisterWebhook(ctx context.Context) error {
 	}
 
 	// Make API request to register webhook
-	req, err := http.NewRequestWithContext(ctx, "POST", 
+	req, err := http.NewRequestWithContext(ctx, "POST",
 		"https://api.box.com/2.0/webhooks", strings.NewReader(string(payloadBytes)))
 	if err != nil {
 		span.RecordError(err)
@@ -628,7 +628,7 @@ func (wr *WebhookRegistrar) UnregisterWebhook(ctx context.Context) error {
 	}
 
 	// Make API request to delete webhook
-	req, err := http.NewRequestWithContext(ctx, "DELETE", 
+	req, err := http.NewRequestWithContext(ctx, "DELETE",
 		fmt.Sprintf("https://api.box.com/2.0/webhooks/%s", wr.config.WebhookID), nil)
 	if err != nil {
 		span.RecordError(err)

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/TAS/audimodal/pkg/anomaly"
+	"github.com/jscharber/eAIIngest/pkg/anomaly"
 )
 
 // Request types
@@ -61,17 +61,17 @@ type DetectionResponse struct {
 
 // AnomalyResponse represents an anomaly in API responses
 type AnomalyResponse struct {
-	ID           uuid.UUID                 `json:"id"`
-	Type         anomaly.AnomalyType       `json:"type"`
-	Severity     anomaly.AnomalySeverity   `json:"severity"`
-	Status       anomaly.AnomalyStatus     `json:"status"`
-	Title        string                    `json:"title"`
-	Description  string                    `json:"description"`
-	DetectedAt   time.Time                 `json:"detected_at"`
-	Score        float64                   `json:"score"`
-	Confidence   float64                   `json:"confidence"`
-	DetectorName string                    `json:"detector_name"`
-	Metadata     map[string]interface{}    `json:"metadata,omitempty"`
+	ID           uuid.UUID               `json:"id"`
+	Type         anomaly.AnomalyType     `json:"type"`
+	Severity     anomaly.AnomalySeverity `json:"severity"`
+	Status       anomaly.AnomalyStatus   `json:"status"`
+	Title        string                  `json:"title"`
+	Description  string                  `json:"description"`
+	DetectedAt   time.Time               `json:"detected_at"`
+	Score        float64                 `json:"score"`
+	Confidence   float64                 `json:"confidence"`
+	DetectorName string                  `json:"detector_name"`
+	Metadata     map[string]interface{}  `json:"metadata,omitempty"`
 }
 
 // AsyncDetectionResponse represents the response from async detection submission
@@ -105,32 +105,32 @@ type AnomalyListItem struct {
 
 // AnomalyDetailResponse represents detailed anomaly information
 type AnomalyDetailResponse struct {
-	ID                    uuid.UUID                      `json:"id"`
-	Type                  anomaly.AnomalyType            `json:"type"`
-	Severity              anomaly.AnomalySeverity        `json:"severity"`
-	Status                anomaly.AnomalyStatus          `json:"status"`
-	Title                 string                         `json:"title"`
-	Description           string                         `json:"description"`
-	DetectedAt            time.Time                      `json:"detected_at"`
-	UpdatedAt             time.Time                      `json:"updated_at"`
-	ResolvedAt            *time.Time                     `json:"resolved_at,omitempty"`
-	TenantID              uuid.UUID                      `json:"tenant_id"`
-	DataSourceID          *uuid.UUID                     `json:"data_source_id,omitempty"`
-	DocumentID            *uuid.UUID                     `json:"document_id,omitempty"`
-	ChunkID               *uuid.UUID                     `json:"chunk_id,omitempty"`
-	UserID                *uuid.UUID                     `json:"user_id,omitempty"`
-	Score                 float64                        `json:"score"`
-	Confidence            float64                        `json:"confidence"`
-	Threshold             float64                        `json:"threshold"`
-	Baseline              map[string]interface{}         `json:"baseline,omitempty"`
-	Detected              map[string]interface{}         `json:"detected"`
-	Metadata              map[string]interface{}         `json:"metadata,omitempty"`
-	DetectorName          string                         `json:"detector_name"`
-	DetectorVersion       string                         `json:"detector_version"`
-	RuleName              string                         `json:"rule_name,omitempty"`
-	ResolutionNotes       string                         `json:"resolution_notes,omitempty"`
-	Actions               []anomaly.AnomalyAction        `json:"actions,omitempty"`
-	NotificationsSent     []anomaly.NotificationRecord   `json:"notifications_sent,omitempty"`
+	ID                uuid.UUID                    `json:"id"`
+	Type              anomaly.AnomalyType          `json:"type"`
+	Severity          anomaly.AnomalySeverity      `json:"severity"`
+	Status            anomaly.AnomalyStatus        `json:"status"`
+	Title             string                       `json:"title"`
+	Description       string                       `json:"description"`
+	DetectedAt        time.Time                    `json:"detected_at"`
+	UpdatedAt         time.Time                    `json:"updated_at"`
+	ResolvedAt        *time.Time                   `json:"resolved_at,omitempty"`
+	TenantID          uuid.UUID                    `json:"tenant_id"`
+	DataSourceID      *uuid.UUID                   `json:"data_source_id,omitempty"`
+	DocumentID        *uuid.UUID                   `json:"document_id,omitempty"`
+	ChunkID           *uuid.UUID                   `json:"chunk_id,omitempty"`
+	UserID            *uuid.UUID                   `json:"user_id,omitempty"`
+	Score             float64                      `json:"score"`
+	Confidence        float64                      `json:"confidence"`
+	Threshold         float64                      `json:"threshold"`
+	Baseline          map[string]interface{}       `json:"baseline,omitempty"`
+	Detected          map[string]interface{}       `json:"detected"`
+	Metadata          map[string]interface{}       `json:"metadata,omitempty"`
+	DetectorName      string                       `json:"detector_name"`
+	DetectorVersion   string                       `json:"detector_version"`
+	RuleName          string                       `json:"rule_name,omitempty"`
+	ResolutionNotes   string                       `json:"resolution_notes,omitempty"`
+	Actions           []anomaly.AnomalyAction      `json:"actions,omitempty"`
+	NotificationsSent []anomaly.NotificationRecord `json:"notifications_sent,omitempty"`
 }
 
 // BulkUpdateStatusResponse represents the response from bulk status update
@@ -170,10 +170,10 @@ type AnomalyTrendsResponse struct {
 
 // TrendDataPoint represents a single data point in trend analysis
 type TrendDataPoint struct {
-	Date             string                             `json:"date"`
-	Count            int                                `json:"count"`
-	SeverityBreakdown map[string]int                   `json:"severity_breakdown"`
-	TypeBreakdown    map[anomaly.AnomalyType]int       `json:"type_breakdown"`
+	Date              string                      `json:"date"`
+	Count             int                         `json:"count"`
+	SeverityBreakdown map[string]int              `json:"severity_breakdown"`
+	TypeBreakdown     map[anomaly.AnomalyType]int `json:"type_breakdown"`
 }
 
 // AnomalySummaryResponse represents a summary of anomalies
@@ -183,16 +183,16 @@ type AnomalySummaryResponse struct {
 
 // AnomalySummary contains summary statistics
 type AnomalySummary struct {
-	TotalAnomalies   int                                `json:"total_anomalies"`
-	Resolved         int                                `json:"resolved"`
-	Pending          int                                `json:"pending"`
-	FalsePositives   int                                `json:"false_positives"`
-	ByType           map[anomaly.AnomalyType]int        `json:"by_type"`
-	BySeverity       map[anomaly.AnomalySeverity]int    `json:"by_severity"`
-	ByStatus         map[anomaly.AnomalyStatus]int      `json:"by_status"`
-	TopSources       []string                           `json:"top_sources"`
-	ResolutionRate   float64                            `json:"resolution_rate"`
-	AvgResolutionTime time.Duration                     `json:"avg_resolution_time"`
+	TotalAnomalies    int                             `json:"total_anomalies"`
+	Resolved          int                             `json:"resolved"`
+	Pending           int                             `json:"pending"`
+	FalsePositives    int                             `json:"false_positives"`
+	ByType            map[anomaly.AnomalyType]int     `json:"by_type"`
+	BySeverity        map[anomaly.AnomalySeverity]int `json:"by_severity"`
+	ByStatus          map[anomaly.AnomalyStatus]int   `json:"by_status"`
+	TopSources        []string                        `json:"top_sources"`
+	ResolutionRate    float64                         `json:"resolution_rate"`
+	AvgResolutionTime time.Duration                   `json:"avg_resolution_time"`
 }
 
 // DetectorInfoResponse represents detector information
@@ -202,13 +202,13 @@ type DetectorInfoResponse struct {
 
 // DetectorInfo contains information about a detector
 type DetectorInfo struct {
-	Name           string                  `json:"name"`
-	Version        string                  `json:"version"`
-	Enabled        bool                    `json:"enabled"`
-	SupportedTypes []anomaly.AnomalyType   `json:"supported_types"`
-	Configuration  map[string]interface{}  `json:"configuration,omitempty"`
-	LastUpdated    time.Time               `json:"last_updated,omitempty"`
-	Statistics     DetectorStatistics      `json:"statistics,omitempty"`
+	Name           string                 `json:"name"`
+	Version        string                 `json:"version"`
+	Enabled        bool                   `json:"enabled"`
+	SupportedTypes []anomaly.AnomalyType  `json:"supported_types"`
+	Configuration  map[string]interface{} `json:"configuration,omitempty"`
+	LastUpdated    time.Time              `json:"last_updated,omitempty"`
+	Statistics     DetectorStatistics     `json:"statistics,omitempty"`
 }
 
 // DetectorStatistics contains statistics for a detector
@@ -225,8 +225,8 @@ type DetectorStatistics struct {
 
 // NotificationHistoryResponse represents notification history
 type NotificationHistoryResponse struct {
-	AnomalyID     uuid.UUID                        `json:"anomaly_id"`
-	Notifications []anomaly.NotificationRecord     `json:"notifications"`
+	AnomalyID     uuid.UUID                    `json:"anomaly_id"`
+	Notifications []anomaly.NotificationRecord `json:"notifications"`
 }
 
 // Configuration types
@@ -260,25 +260,25 @@ type ValidationError struct {
 
 // ValidationErrorResponse represents validation error response
 type ValidationErrorResponse struct {
-	Error   string            `json:"error"`
-	Errors  []ValidationError `json:"errors"`
+	Error  string            `json:"error"`
+	Errors []ValidationError `json:"errors"`
 }
 
 // Search and filter types
 
 // AnomalySearchRequest represents an anomaly search request
 type AnomalySearchRequest struct {
-	Query        string                            `json:"query"`
-	Types        []anomaly.AnomalyType             `json:"types,omitempty"`
-	Severities   []anomaly.AnomalySeverity         `json:"severities,omitempty"`
-	Statuses     []anomaly.AnomalyStatus           `json:"statuses,omitempty"`
-	DateRange    *DateRange                        `json:"date_range,omitempty"`
-	ScoreRange   *ScoreRange                       `json:"score_range,omitempty"`
-	TenantID     *uuid.UUID                        `json:"tenant_id,omitempty"`
-	DataSourceID *uuid.UUID                        `json:"data_source_id,omitempty"`
-	Detectors    []string                          `json:"detectors,omitempty"`
-	Limit        int                               `json:"limit,omitempty"`
-	Offset       int                               `json:"offset,omitempty"`
+	Query        string                    `json:"query"`
+	Types        []anomaly.AnomalyType     `json:"types,omitempty"`
+	Severities   []anomaly.AnomalySeverity `json:"severities,omitempty"`
+	Statuses     []anomaly.AnomalyStatus   `json:"statuses,omitempty"`
+	DateRange    *DateRange                `json:"date_range,omitempty"`
+	ScoreRange   *ScoreRange               `json:"score_range,omitempty"`
+	TenantID     *uuid.UUID                `json:"tenant_id,omitempty"`
+	DataSourceID *uuid.UUID                `json:"data_source_id,omitempty"`
+	Detectors    []string                  `json:"detectors,omitempty"`
+	Limit        int                       `json:"limit,omitempty"`
+	Offset       int                       `json:"offset,omitempty"`
 }
 
 // DateRange represents a date range filter
@@ -313,10 +313,10 @@ type SearchFacets struct {
 
 // ExportRequest represents an export request
 type ExportRequest struct {
-	Format   string              `json:"format" binding:"required"` // csv, json, xlsx
+	Format   string                `json:"format" binding:"required"` // csv, json, xlsx
 	Filter   *AnomalySearchRequest `json:"filter,omitempty"`
-	Fields   []string            `json:"fields,omitempty"`
-	Filename string              `json:"filename,omitempty"`
+	Fields   []string              `json:"fields,omitempty"`
+	Filename string                `json:"filename,omitempty"`
 }
 
 // ExportResponse represents an export response
@@ -333,12 +333,12 @@ type ExportResponse struct {
 
 // WebhookRequest represents a webhook configuration request
 type WebhookRequest struct {
-	URL        string                          `json:"url" binding:"required"`
-	Events     []string                        `json:"events" binding:"required"`
-	Filters    *WebhookFilters                 `json:"filters,omitempty"`
-	Headers    map[string]string               `json:"headers,omitempty"`
-	Secret     string                          `json:"secret,omitempty"`
-	Active     bool                            `json:"active"`
+	URL     string            `json:"url" binding:"required"`
+	Events  []string          `json:"events" binding:"required"`
+	Filters *WebhookFilters   `json:"filters,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
+	Secret  string            `json:"secret,omitempty"`
+	Active  bool              `json:"active"`
 }
 
 // WebhookFilters represents webhook filtering options
@@ -350,23 +350,23 @@ type WebhookFilters struct {
 
 // WebhookResponse represents a webhook configuration response
 type WebhookResponse struct {
-	ID        uuid.UUID         `json:"id"`
-	URL       string            `json:"url"`
-	Events    []string          `json:"events"`
-	Filters   *WebhookFilters   `json:"filters,omitempty"`
-	Active    bool              `json:"active"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
-	LastFired *time.Time        `json:"last_fired,omitempty"`
+	ID        uuid.UUID       `json:"id"`
+	URL       string          `json:"url"`
+	Events    []string        `json:"events"`
+	Filters   *WebhookFilters `json:"filters,omitempty"`
+	Active    bool            `json:"active"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	LastFired *time.Time      `json:"last_fired,omitempty"`
 }
 
 // WebhookEvent represents a webhook event payload
 type WebhookEvent struct {
-	ID        uuid.UUID                 `json:"id"`
-	Event     string                    `json:"event"`
-	Timestamp time.Time                 `json:"timestamp"`
-	Data      map[string]interface{}    `json:"data"`
-	Anomaly   *AnomalyResponse          `json:"anomaly,omitempty"`
+	ID        uuid.UUID              `json:"id"`
+	Event     string                 `json:"event"`
+	Timestamp time.Time              `json:"timestamp"`
+	Data      map[string]interface{} `json:"data"`
+	Anomaly   *AnomalyResponse       `json:"anomaly,omitempty"`
 }
 
 // Health check types
@@ -391,24 +391,24 @@ type HealthCheck struct {
 
 // MetricsResponse represents system metrics
 type MetricsResponse struct {
-	Timestamp time.Time            `json:"timestamp"`
-	Metrics   map[string]Metric    `json:"metrics"`
+	Timestamp time.Time         `json:"timestamp"`
+	Metrics   map[string]Metric `json:"metrics"`
 }
 
 // Metric represents a system metric
 type Metric struct {
-	Value       float64              `json:"value"`
-	Unit        string               `json:"unit"`
-	Description string               `json:"description"`
-	Labels      map[string]string    `json:"labels,omitempty"`
+	Value       float64           `json:"value"`
+	Unit        string            `json:"unit"`
+	Description string            `json:"description"`
+	Labels      map[string]string `json:"labels,omitempty"`
 }
 
 // Rate limiting types
 
 // RateLimitInfo represents rate limit information
 type RateLimitInfo struct {
-	Limit     int       `json:"limit"`
-	Remaining int       `json:"remaining"`
-	ResetAt   time.Time `json:"reset_at"`
+	Limit      int            `json:"limit"`
+	Remaining  int            `json:"remaining"`
+	ResetAt    time.Time      `json:"reset_at"`
 	RetryAfter *time.Duration `json:"retry_after,omitempty"`
 }

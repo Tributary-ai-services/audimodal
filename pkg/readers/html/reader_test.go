@@ -94,7 +94,7 @@ func TestHTMLReader_ValidateConfig(t *testing.T) {
 
 func TestHTMLReader_ExtractMetadata(t *testing.T) {
 	reader := &HTMLReader{}
-	
+
 	testHTML := `
 	<!DOCTYPE html>
 	<html>
@@ -139,7 +139,7 @@ func TestHTMLReader_ExtractMetadata(t *testing.T) {
 
 func TestHTMLReader_AnalyzeStructure(t *testing.T) {
 	reader := &HTMLReader{}
-	
+
 	testHTML := `
 	<html>
 	<body>
@@ -181,7 +181,7 @@ func TestHTMLReader_AnalyzeStructure(t *testing.T) {
 
 func TestHTMLReader_StripTags(t *testing.T) {
 	reader := &HTMLReader{}
-	
+
 	tests := []struct {
 		name     string
 		input    string
@@ -226,7 +226,7 @@ func TestHTMLReader_StripTags(t *testing.T) {
 
 func TestHTMLReader_ParseElements(t *testing.T) {
 	reader := &HTMLReader{}
-	
+
 	testHTML := `
 	<html>
 	<body>
@@ -274,7 +274,7 @@ func TestHTMLReader_CreateIterator(t *testing.T) {
 	// Create temporary HTML file
 	tempDir := t.TempDir()
 	htmlPath := filepath.Join(tempDir, "test.html")
-	
+
 	testHTML := `
 	<html>
 	<head><title>Test</title></head>
@@ -285,7 +285,7 @@ func TestHTMLReader_CreateIterator(t *testing.T) {
 	</body>
 	</html>
 	`
-	
+
 	err := os.WriteFile(htmlPath, []byte(testHTML), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
@@ -313,7 +313,7 @@ func TestHTMLReader_CreateIterator(t *testing.T) {
 			t.Errorf("Unexpected error during iteration: %v", err)
 		}
 		chunkCount++
-		
+
 		if chunk.Data == "" {
 			t.Error("Expected non-empty chunk data")
 		}
@@ -368,7 +368,7 @@ func TestHTMLReader_GetBasicInfo(t *testing.T) {
 func BenchmarkHTMLReader_StripTags(b *testing.B) {
 	reader := &HTMLReader{}
 	testHTML := `<div class="content"><h1>Title</h1><p>This is a <strong>test</strong> paragraph with <a href="#">links</a> and <em>emphasis</em>.</p></div>`
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader.stripHTMLTags(testHTML)
@@ -377,12 +377,12 @@ func BenchmarkHTMLReader_StripTags(b *testing.B) {
 
 func BenchmarkHTMLReader_ParseElements(b *testing.B) {
 	reader := &HTMLReader{}
-	testHTML := `<html><body>` + 
+	testHTML := `<html><body>` +
 		`<h1>Title</h1><p>Paragraph 1</p><p>Paragraph 2</p>` +
 		`<h2>Subtitle</h2><p>Paragraph 3</p><p>Paragraph 4</p>` +
 		`</body></html>`
 	config := map[string]any{}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader.parseHTMLElements(testHTML, config)

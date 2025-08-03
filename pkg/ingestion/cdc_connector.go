@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -23,26 +22,26 @@ type CDCConnector struct {
 // CDCConfig contains configuration for Change Data Capture
 type CDCConfig struct {
 	// Database CDC settings
-	DatabaseURL         string        `yaml:"database_url"`
-	DatabaseType        string        `yaml:"database_type"` // postgres, mysql, sqlserver
-	ReplicationSlot     string        `yaml:"replication_slot,omitempty"`
-	PublicationName     string        `yaml:"publication_name,omitempty"`
-	
+	DatabaseURL     string `yaml:"database_url"`
+	DatabaseType    string `yaml:"database_type"` // postgres, mysql, sqlserver
+	ReplicationSlot string `yaml:"replication_slot,omitempty"`
+	PublicationName string `yaml:"publication_name,omitempty"`
+
 	// File system watching
-	WatchDirectories    []string      `yaml:"watch_directories"`
-	FilePatterns        []string      `yaml:"file_patterns"`
-	IgnorePatterns      []string      `yaml:"ignore_patterns"`
-	
+	WatchDirectories []string `yaml:"watch_directories"`
+	FilePatterns     []string `yaml:"file_patterns"`
+	IgnorePatterns   []string `yaml:"ignore_patterns"`
+
 	// S3 event notifications
-	S3BucketNames       []string      `yaml:"s3_bucket_names"`
-	S3EventTypes        []string      `yaml:"s3_event_types"` // s3:ObjectCreated:*, s3:ObjectRemoved:*
-	SQSQueueURL         string        `yaml:"sqs_queue_url"`
-	
+	S3BucketNames []string `yaml:"s3_bucket_names"`
+	S3EventTypes  []string `yaml:"s3_event_types"` // s3:ObjectCreated:*, s3:ObjectRemoved:*
+	SQSQueueURL   string   `yaml:"sqs_queue_url"`
+
 	// General settings
-	BatchSize           int           `yaml:"batch_size"`
-	BatchTimeout        time.Duration `yaml:"batch_timeout"`
-	ErrorRetryAttempts  int           `yaml:"error_retry_attempts"`
-	ErrorRetryDelay     time.Duration `yaml:"error_retry_delay"`
+	BatchSize          int           `yaml:"batch_size"`
+	BatchTimeout       time.Duration `yaml:"batch_timeout"`
+	ErrorRetryAttempts int           `yaml:"error_retry_attempts"`
+	ErrorRetryDelay    time.Duration `yaml:"error_retry_delay"`
 }
 
 // DefaultCDCConfig returns default CDC configuration
@@ -119,7 +118,7 @@ func (c *CDCConnector) startDatabaseCDC(ctx context.Context) {
 func (c *CDCConnector) startPostgresCDC(ctx context.Context) {
 	// This would use PostgreSQL logical replication to capture changes
 	// to file-related tables and emit file discovery events
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -127,7 +126,7 @@ func (c *CDCConnector) startPostgresCDC(ctx context.Context) {
 		default:
 			// Poll for changes or listen to replication stream
 			time.Sleep(1 * time.Second)
-			
+
 			// Example: Detect new files added to a files table
 			// and emit FileDiscoveredEvent
 			// This is a simplified placeholder
@@ -158,7 +157,7 @@ func (c *CDCConnector) startFileSystemWatcher(ctx context.Context) {
 
 	// This would use a file system watcher library like fsnotify
 	// to monitor directories for file changes and emit events
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -183,7 +182,7 @@ func (c *CDCConnector) startS3EventProcessor(ctx context.Context) {
 
 	// This would poll SQS for S3 event notifications
 	// and convert them to FileDiscoveredEvent
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -198,7 +197,7 @@ func (c *CDCConnector) startS3EventProcessor(ctx context.Context) {
 
 // FileSystemEvent represents a file system change event
 type FileSystemEvent struct {
-	EventType   string    `json:"event_type"`   // created, modified, deleted
+	EventType   string    `json:"event_type"` // created, modified, deleted
 	FilePath    string    `json:"file_path"`
 	FileName    string    `json:"file_name"`
 	FileSize    int64     `json:"file_size"`
@@ -266,11 +265,11 @@ func (c *CDCConnector) convertS3EventToDiscovery(s3Event *S3Event, tenantID stri
 func (c *CDCConnector) convertDatabaseEventToDiscovery(dbEvent *DatabaseChangeEvent, tenantID string) *events.FileDiscoveredEvent {
 	// Extract file information from database change
 	// This assumes the database change contains file metadata
-	
+
 	var fileURL, sourceID string
 	var fileSize int64
 	var contentType string
-	
+
 	if url, ok := dbEvent.NewValues["url"].(string); ok {
 		fileURL = url
 	}
@@ -329,10 +328,10 @@ func (c *CDCConnector) HealthCheck(ctx context.Context) error {
 func (c *CDCConnector) GetMetrics() (map[string]interface{}, error) {
 	// Return metrics about CDC processing
 	return map[string]interface{}{
-		"database_changes_processed": 1000,
+		"database_changes_processed":  1000,
 		"filesystem_events_processed": 500,
-		"s3_events_processed": 300,
-		"total_files_discovered": 1800,
-		"last_processed_at": time.Now(),
+		"s3_events_processed":         300,
+		"total_files_discovered":      1800,
+		"last_processed_at":           time.Now(),
 	}, nil
 }

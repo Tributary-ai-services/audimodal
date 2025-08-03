@@ -2,6 +2,7 @@ package compression
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -17,36 +18,36 @@ import (
 
 // CompressedStorageResolver wraps a storage resolver with compression capabilities
 type CompressedStorageResolver struct {
-	baseResolver   storage.StorageResolver
-	policyManager  *PolicyManager
-	cache          cache.Cache
-	tracer         trace.Tracer
-	config         *CompressionIntegrationConfig
+	baseResolver  storage.StorageResolver
+	policyManager *PolicyManager
+	cache         cache.Cache
+	tracer        trace.Tracer
+	config        *CompressionIntegrationConfig
 }
 
 // CompressionIntegrationConfig contains configuration for storage integration
 type CompressionIntegrationConfig struct {
 	// Compression settings
-	EnableCompression     bool          `yaml:"enable_compression"`
-	CacheCompressed       bool          `yaml:"cache_compressed"`
-	StoreOriginal         bool          `yaml:"store_original"`
-	AsyncCompression      bool          `yaml:"async_compression"`
-	
+	EnableCompression bool `yaml:"enable_compression"`
+	CacheCompressed   bool `yaml:"cache_compressed"`
+	StoreOriginal     bool `yaml:"store_original"`
+	AsyncCompression  bool `yaml:"async_compression"`
+
 	// Performance settings
-	CompressionThreshold  int64         `yaml:"compression_threshold"`  // Min file size to compress
-	CacheThreshold        int64         `yaml:"cache_threshold"`        // Min file size to cache
-	MaxConcurrentJobs     int           `yaml:"max_concurrent_jobs"`
-	CompressionTimeout    time.Duration `yaml:"compression_timeout"`
-	
+	CompressionThreshold int64         `yaml:"compression_threshold"` // Min file size to compress
+	CacheThreshold       int64         `yaml:"cache_threshold"`       // Min file size to cache
+	MaxConcurrentJobs    int           `yaml:"max_concurrent_jobs"`
+	CompressionTimeout   time.Duration `yaml:"compression_timeout"`
+
 	// Storage settings
-	CompressedPrefix      string        `yaml:"compressed_prefix"`      // Prefix for compressed files
-	MetadataPrefix        string        `yaml:"metadata_prefix"`        // Prefix for compression metadata
-	OriginalPrefix        string        `yaml:"original_prefix"`        // Prefix for original files
-	
+	CompressedPrefix string `yaml:"compressed_prefix"` // Prefix for compressed files
+	MetadataPrefix   string `yaml:"metadata_prefix"`   // Prefix for compression metadata
+	OriginalPrefix   string `yaml:"original_prefix"`   // Prefix for original files
+
 	// Cleanup settings
-	CleanupOriginals      bool          `yaml:"cleanup_originals"`
-	CleanupDelay          time.Duration `yaml:"cleanup_delay"`
-	RetentionPeriod       time.Duration `yaml:"retention_period"`
+	CleanupOriginals bool          `yaml:"cleanup_originals"`
+	CleanupDelay     time.Duration `yaml:"cleanup_delay"`
+	RetentionPeriod  time.Duration `yaml:"retention_period"`
 }
 
 // DefaultCompressionIntegrationConfig returns default integration configuration
@@ -113,7 +114,7 @@ func (r *CompressedStorageResolver) GetFileInfo(ctx context.Context, storageURL 
 	}
 
 	// Get file info from base resolver
-	fileInfo, err := r.baseResolver.GetFileInfo(ctx, storageURL, credentials)
+	fileInfo, err := r.baseResolver.GetFileInfo(ctx, storageURL, &credentials)
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
@@ -121,15 +122,15 @@ func (r *CompressedStorageResolver) GetFileInfo(ctx context.Context, storageURL 
 
 	// Check if compressed version exists
 	compressedURL := r.buildCompressedURL(storageURL)
-	if compressedInfo, err := r.baseResolver.GetFileInfo(ctx, compressedURL, credentials); err == nil {
+	if compressedInfo, err := r.baseResolver.GetFileInfo(ctx, compressedURL, &credentials); err == nil {
 		// Check if compressed version is newer or preferred
 		if r.shouldUseCompressed(fileInfo, compressedInfo) {
 			// Load compression metadata
 			if metadata, err := r.loadCompressionMetadata(ctx, storageURL, credentials); err == nil {
-				fileInfo.Metadata["compression"] = metadata
-				fileInfo.Metadata["compressed"] = true
-				fileInfo.Metadata["compressed_size"] = compressedInfo.Size
-				fileInfo.Metadata["compression_ratio"] = metadata.CompressionRatio
+				fileInfo.Metadata["compression"] = fmt.Sprintf("%+v", metadata)
+				fileInfo.Metadata["compressed"] = "true"
+				fileInfo.Metadata["compressed_size"] = fmt.Sprintf("%d", compressedInfo.Size)
+				fileInfo.Metadata["compression_ratio"] = fmt.Sprintf("%.2f", metadata.CompressionRatio)
 			}
 		}
 	}
@@ -147,7 +148,7 @@ func (r *CompressedStorageResolver) GetFileInfo(ctx context.Context, storageURL 
 	span.SetAttributes(
 		attribute.Int64("file.size", fileInfo.Size),
 		attribute.String("file.mime_type", fileInfo.MimeType),
-		attribute.Bool("file.compressed", fileInfo.Metadata["compressed"] == true),
+		attribute.Bool("file.compressed", fileInfo.Metadata["compressed"] == "true"),
 	)
 
 	return fileInfo, nil
@@ -171,12 +172,12 @@ func (r *CompressedStorageResolver) DownloadFile(ctx context.Context, storageURL
 	}
 
 	// Check if file is compressed
-	if compressed, ok := fileInfo.Metadata["compressed"].(bool); ok && compressed {
+	if compressed := fileInfo.Metadata["compressed"]; compressed == "true" {
 		return r.downloadCompressedFile(ctx, storageURL, credentials, options, fileInfo)
 	}
 
 	// Download normally
-	return r.baseResolver.DownloadFile(ctx, storageURL, credentials, options)
+	return r.baseResolver.DownloadFile(ctx, storageURL, &credentials, options)
 }
 
 // downloadCompressedFile downloads and decompresses a file
@@ -202,7 +203,7 @@ func (r *CompressedStorageResolver) downloadCompressedFile(ctx context.Context, 
 
 	// Download compressed file
 	compressedURL := r.buildCompressedURL(storageURL)
-	reader, err := r.baseResolver.DownloadFile(ctx, compressedURL, credentials, options)
+	reader, err := r.baseResolver.DownloadFile(ctx, compressedURL, &credentials, options)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to download compressed file: %w", err)
@@ -250,7 +251,7 @@ func (r *CompressedStorageResolver) ListFiles(ctx context.Context, storageURL *s
 	defer span.End()
 
 	// Get base listing
-	result, err := r.baseResolver.ListFiles(ctx, storageURL, credentials, options)
+	result, err := r.baseResolver.ListFiles(ctx, storageURL, &credentials, options)
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
@@ -260,13 +261,13 @@ func (r *CompressedStorageResolver) ListFiles(ctx context.Context, storageURL *s
 	for i, file := range result.Files {
 		// Check if compressed version exists
 		compressedURL := r.buildCompressedURLFromPath(storageURL, file.Name)
-		if _, err := r.baseResolver.GetFileInfo(ctx, compressedURL, credentials); err == nil {
-			file.Metadata["has_compressed_version"] = true
-			
+		if _, err := r.baseResolver.GetFileInfo(ctx, compressedURL, &credentials); err == nil {
+			file.Metadata["has_compressed_version"] = "true"
+
 			// Load compression metadata if available
 			if metadata, err := r.loadCompressionMetadataFromPath(ctx, storageURL, file.Name, credentials); err == nil {
-				file.Metadata["compression_ratio"] = metadata.CompressionRatio
-				file.Metadata["compression_strategy"] = metadata.Strategy
+				file.Metadata["compression_ratio"] = fmt.Sprintf("%.2f", metadata.CompressionRatio)
+				file.Metadata["compression_strategy"] = string(metadata.Strategy)
 			}
 		}
 		result.Files[i] = file
@@ -274,7 +275,7 @@ func (r *CompressedStorageResolver) ListFiles(ctx context.Context, storageURL *s
 
 	span.SetAttributes(
 		attribute.Int("files.count", len(result.Files)),
-		attribute.Bool("has_more", result.HasMore),
+		attribute.Bool("has_more", result.IsTruncated),
 	)
 
 	return result, nil
@@ -284,12 +285,12 @@ func (r *CompressedStorageResolver) ListFiles(ctx context.Context, storageURL *s
 func (r *CompressedStorageResolver) GeneratePresignedURL(ctx context.Context, storageURL *storage.StorageURL, credentials storage.Credentials, options *storage.PresignedURLOptions) (*storage.PresignedURL, error) {
 	// For now, delegate to base resolver
 	// In a full implementation, this would need to handle compressed file URLs
-	return r.baseResolver.GeneratePresignedURL(ctx, storageURL, credentials, options)
+	return r.baseResolver.GeneratePresignedURL(ctx, storageURL, &credentials, options)
 }
 
 // ValidateAccess validates access to storage
 func (r *CompressedStorageResolver) ValidateAccess(ctx context.Context, storageURL *storage.StorageURL, credentials storage.Credentials) error {
-	return r.baseResolver.ValidateAccess(ctx, storageURL, credentials)
+	return r.baseResolver.ValidateAccess(ctx, storageURL, &credentials)
 }
 
 // CompressAndStore compresses a file and stores it
@@ -328,14 +329,14 @@ func (r *CompressedStorageResolver) CompressAndStore(ctx context.Context, storag
 
 	// Store compression metadata
 	metadata := &CompressionMetadata{
-		Strategy:           result.Strategy,
-		Algorithm:          result.Algorithm,
-		OriginalSize:       int64(result.OriginalSize),
-		CompressedSize:     int64(result.CompressedSize),
-		CompressionRatio:   result.CompressionRatio,
-		CompressionTime:    result.CompressionTime,
-		OriginalFilename:   fileInfo.Name,
-		CompressedAt:       time.Now(),
+		Strategy:         result.Strategy,
+		Algorithm:        result.Algorithm,
+		OriginalSize:     int64(result.OriginalSize),
+		CompressedSize:   int64(result.CompressedSize),
+		CompressionRatio: result.CompressionRatio,
+		CompressionTime:  result.CompressionTime,
+		OriginalFilename: fileInfo.Name,
+		CompressedAt:     time.Now(),
 	}
 
 	if err := r.storeCompressionMetadata(ctx, storageURL, credentials, metadata); err != nil {
@@ -402,7 +403,7 @@ func (r *CompressedStorageResolver) shouldUseCompressed(original, compressed *st
 	if !r.config.EnableCompression {
 		return false
 	}
-	
+
 	// Prefer compressed if it's significantly smaller or newer
 	sizeRatio := float64(compressed.Size) / float64(original.Size)
 	return sizeRatio < 0.8 || compressed.ModifiedAt.After(original.ModifiedAt)
@@ -410,7 +411,7 @@ func (r *CompressedStorageResolver) shouldUseCompressed(original, compressed *st
 
 func (r *CompressedStorageResolver) loadCompressionMetadata(ctx context.Context, storageURL *storage.StorageURL, credentials storage.Credentials) (*CompressionMetadata, error) {
 	metadataURL := r.buildMetadataURL(storageURL)
-	reader, err := r.baseResolver.DownloadFile(ctx, metadataURL, credentials, nil)
+	reader, err := r.baseResolver.DownloadFile(ctx, metadataURL, &credentials, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -432,8 +433,8 @@ func (r *CompressedStorageResolver) loadCompressionMetadata(ctx context.Context,
 func (r *CompressedStorageResolver) loadCompressionMetadataFromPath(ctx context.Context, storageURL *storage.StorageURL, filename string, credentials storage.Credentials) (*CompressionMetadata, error) {
 	metadataURL := *storageURL
 	metadataURL.Path = r.config.MetadataPrefix + filename + ".meta.json"
-	
-	reader, err := r.baseResolver.DownloadFile(ctx, &metadataURL, credentials, nil)
+
+	reader, err := r.baseResolver.DownloadFile(ctx, &metadataURL, &credentials, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -479,11 +480,11 @@ func (r *readCloser) Read(p []byte) (n int, err error) {
 	if r.closed {
 		return 0, fmt.Errorf("reader is closed")
 	}
-	
+
 	if r.pos >= len(r.data) {
 		return 0, io.EOF
 	}
-	
+
 	n = copy(p, r.data[r.pos:])
 	r.pos += n
 	return n, nil

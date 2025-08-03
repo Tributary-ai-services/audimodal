@@ -186,7 +186,7 @@ func (r *TIFFReader) TestConnection(ctx context.Context, config map[string]any) 
 
 	// Check OCR dependencies
 	dependencies := r.checkOCRDependencies()
-	
+
 	return core.ConnectionTestResult{
 		Success: len(dependencies) == 0,
 		Message: func() string {
@@ -208,17 +208,17 @@ func (r *TIFFReader) TestConnection(ctx context.Context, config map[string]any) 
 // checkOCRDependencies verifies OCR tools are available
 func (r *TIFFReader) checkOCRDependencies() []string {
 	var missing []string
-	
+
 	// Check for tesseract (OCR engine)
 	if !r.commandExists("tesseract") {
 		missing = append(missing, "tesseract (install tesseract-ocr)")
 	}
-	
+
 	// Check for ImageMagick (image processing)
 	if !r.commandExists("convert") {
 		missing = append(missing, "convert (install imagemagick)")
 	}
-	
+
 	return missing
 }
 
@@ -299,19 +299,19 @@ func (r *TIFFReader) DiscoverSchema(ctx context.Context, sourcePath string) (cor
 			},
 		},
 		Metadata: map[string]any{
-			"file_size":      stat.Size(),
-			"page_count":     tiffInfo.PageCount,
-			"width":          tiffInfo.Width,
-			"height":         tiffInfo.Height,
-			"color_space":    tiffInfo.ColorSpace,
-			"compression":    tiffInfo.Compression,
-			"resolution_x":   tiffInfo.ResolutionX,
-			"resolution_y":   tiffInfo.ResolutionY,
+			"file_size":       stat.Size(),
+			"page_count":      tiffInfo.PageCount,
+			"width":           tiffInfo.Width,
+			"height":          tiffInfo.Height,
+			"color_space":     tiffInfo.ColorSpace,
+			"compression":     tiffInfo.Compression,
+			"resolution_x":    tiffInfo.ResolutionX,
+			"resolution_y":    tiffInfo.ResolutionY,
 			"bits_per_sample": tiffInfo.BitsPerSample,
-			"creation_date":  tiffInfo.CreationDate,
-			"software":       tiffInfo.Software,
-			"photographer":   tiffInfo.Photographer,
-			"has_text":       tiffInfo.HasText,
+			"creation_date":   tiffInfo.CreationDate,
+			"software":        tiffInfo.Software,
+			"photographer":    tiffInfo.Photographer,
+			"has_text":        tiffInfo.HasText,
 		},
 	}
 
@@ -355,7 +355,7 @@ func (r *TIFFReader) EstimateSize(ctx context.Context, sourcePath string) (core.
 	// Complexity based on size, resolution, and page count
 	complexity := "low"
 	totalPixels := int64(tiffInfo.Width * tiffInfo.Height * tiffInfo.PageCount)
-	
+
 	if stat.Size() > 10*1024*1024 || totalPixels > 50*1024*1024 || tiffInfo.PageCount > 10 {
 		complexity = "medium"
 	}
@@ -416,20 +416,19 @@ func (r *TIFFReader) GetSupportedFormats() []string {
 
 // TIFFInfo contains extracted TIFF information
 type TIFFInfo struct {
-	PageCount      int
-	Width          int
-	Height         int
-	ColorSpace     string
-	Compression    string
-	ResolutionX    int
-	ResolutionY    int
-	BitsPerSample  int
-	CreationDate   string
-	Software       string
-	Photographer   string
-	HasText        bool
+	PageCount     int
+	Width         int
+	Height        int
+	ColorSpace    string
+	Compression   string
+	ResolutionX   int
+	ResolutionY   int
+	BitsPerSample int
+	CreationDate  string
+	Software      string
+	Photographer  string
+	HasText       bool
 }
-
 
 // isTIFFFile checks if the file is a valid TIFF file
 func (r *TIFFReader) isTIFFFile(filePath string) bool {
@@ -448,7 +447,7 @@ func (r *TIFFReader) isTIFFFile(filePath string) bool {
 
 	// TIFF signatures: II*\0 (little-endian) or MM\0* (big-endian)
 	return (signature[0] == 0x49 && signature[1] == 0x49 && signature[2] == 0x2A && signature[3] == 0x00) ||
-		   (signature[0] == 0x4D && signature[1] == 0x4D && signature[2] == 0x00 && signature[3] == 0x2A)
+		(signature[0] == 0x4D && signature[1] == 0x4D && signature[2] == 0x00 && signature[3] == 0x2A)
 }
 
 // extractTIFFInfo extracts metadata from TIFF file
@@ -457,7 +456,7 @@ func (r *TIFFReader) extractTIFFInfo(sourcePath string) (TIFFInfo, error) {
 	// In production, you'd use a proper TIFF library like:
 	// - golang.org/x/image/tiff
 	// - Or call external tools like exiftool
-	
+
 	info := TIFFInfo{
 		PageCount:     1, // Default single page
 		Width:         1024,
@@ -499,9 +498,9 @@ func (r *TIFFReader) performOCR(sourcePath string, pageNum int, config map[strin
 	ocrText := fmt.Sprintf("This is sample OCR text extracted from page %d of the TIFF image. "+
 		"In a production implementation, this would be the actual text recognized by Tesseract OCR "+
 		"from the image content.", pageNum)
-	
+
 	confidence := 0.85 // Mock confidence score
-	
+
 	// Mock text regions
 	regions := []TextRegion{
 		{
@@ -571,7 +570,7 @@ func (it *TIFFIterator) Next(ctx context.Context) (core.Chunk, error) {
 	var content string
 	var confidence float64
 	var regions []TextRegion
-	
+
 	if ocrEnabled, ok := it.config["ocr_enabled"]; !ok || ocrEnabled.(bool) {
 		var err error
 		content, confidence, regions, err = it.performPageOCR()
@@ -593,14 +592,14 @@ func (it *TIFFIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "tiff_reader",
 			Context: map[string]string{
-				"page_number":  strconv.Itoa(it.currentPage),
-				"total_pages":  strconv.Itoa(it.totalPages),
-				"confidence":   fmt.Sprintf("%.2f", confidence),
-				"file_type":    "tiff",
-				"width":        strconv.Itoa(it.tiffInfo.Width),
-				"height":       strconv.Itoa(it.tiffInfo.Height),
-				"color_space":  it.tiffInfo.ColorSpace,
-				"compression":  it.tiffInfo.Compression,
+				"page_number": strconv.Itoa(it.currentPage),
+				"total_pages": strconv.Itoa(it.totalPages),
+				"confidence":  fmt.Sprintf("%.2f", confidence),
+				"file_type":   "tiff",
+				"width":       strconv.Itoa(it.tiffInfo.Width),
+				"height":      strconv.Itoa(it.tiffInfo.Height),
+				"color_space": it.tiffInfo.ColorSpace,
+				"compression": it.tiffInfo.Compression,
 			},
 		},
 	}

@@ -252,10 +252,10 @@ func (r *RTFReader) EstimateSize(ctx context.Context, sourcePath string) (core.S
 	// Extract plain text for size estimation
 	plainText := r.extractPlainText(string(content))
 	textSize := int64(len(plainText))
-	
+
 	// Count paragraphs
 	paragraphCount := int64(r.countParagraphs(string(content)))
-	
+
 	// Estimate chunks based on text size
 	chunkSize := int64(1000)
 	estimatedChunks := int((textSize + chunkSize - 1) / chunkSize)
@@ -293,7 +293,7 @@ func (r *RTFReader) CreateIterator(ctx context.Context, sourcePath string, strat
 	}
 
 	paragraphs := r.parseRTFParagraphs(string(content), strategyConfig)
-	
+
 	iterator := &RTFIterator{
 		sourcePath:       sourcePath,
 		config:           strategyConfig,
@@ -360,7 +360,7 @@ func (r *RTFReader) extractRTFMetadata(content string) RTFMetadata {
 		level := 1
 		end := infoStart + 7 // After "{\\info"
 		infoContent := ""
-		
+
 		for end < len(content) && level > 0 {
 			if content[end] == '{' {
 				level++
@@ -372,45 +372,45 @@ func (r *RTFReader) extractRTFMetadata(content string) RTFMetadata {
 			}
 			end++
 		}
-		
+
 		info := infoContent
-		
+
 		// Extract title
 		if titleMatch := regexp.MustCompile(`\\title\s*([^}\\]+)`).FindStringSubmatch(info); len(titleMatch) > 1 {
 			metadata.Title = r.decodeRTFString(titleMatch[1])
 		}
-		
+
 		// Extract author
 		if authorMatch := regexp.MustCompile(`\\author\s*([^}\\]+)`).FindStringSubmatch(info); len(authorMatch) > 1 {
 			metadata.Author = r.decodeRTFString(authorMatch[1])
 		}
-		
+
 		// Extract subject
 		if subjectMatch := regexp.MustCompile(`\\subject\s*([^}\\]+)`).FindStringSubmatch(info); len(subjectMatch) > 1 {
 			metadata.Subject = r.decodeRTFString(subjectMatch[1])
 		}
-		
+
 		// Extract keywords
 		if keywordsMatch := regexp.MustCompile(`\\keywords\s*([^}\\]+)`).FindStringSubmatch(info); len(keywordsMatch) > 1 {
 			metadata.Keywords = r.decodeRTFString(keywordsMatch[1])
 		}
-		
+
 		// Extract comment
 		if commentMatch := regexp.MustCompile(`\\comment\s*([^}\\]+)`).FindStringSubmatch(info); len(commentMatch) > 1 {
 			metadata.Comment = r.decodeRTFString(commentMatch[1])
 		}
-		
+
 		// Extract generator
 		if genMatch := regexp.MustCompile(`\\generator\s*([^}\\]+)`).FindStringSubmatch(info); len(genMatch) > 1 {
 			metadata.Generator = r.decodeRTFString(genMatch[1])
 		}
-		
+
 		// Extract dates
 		// RTF dates are in the format: \yrYYYY\moMM\dyDD\hrHH\minMM\secSS
 		if createdMatch := regexp.MustCompile(`\\creatim\\yr(\d+)\\mo(\d+)\\dy(\d+)`).FindStringSubmatch(info); len(createdMatch) > 3 {
 			metadata.CreatedDate = fmt.Sprintf("%s-%02s-%02s", createdMatch[1], createdMatch[2], createdMatch[3])
 		}
-		
+
 		if modifiedMatch := regexp.MustCompile(`\\revtim\\yr(\d+)\\mo(\d+)\\dy(\d+)`).FindStringSubmatch(info); len(modifiedMatch) > 3 {
 			metadata.ModifiedDate = fmt.Sprintf("%s-%02s-%02s", modifiedMatch[1], modifiedMatch[2], modifiedMatch[3])
 		}
@@ -445,7 +445,7 @@ func (r *RTFReader) analyzeRTFStructure(content string) RTFStructure {
 func (r *RTFReader) extractPlainText(content string) string {
 	// Make a working copy
 	text := content
-	
+
 	// Remove the info group specifically
 	if infoStart := strings.Index(text, "{\\info"); infoStart >= 0 {
 		level := 1
@@ -462,7 +462,7 @@ func (r *RTFReader) extractPlainText(content string) string {
 			text = text[:infoStart] + text[end:]
 		}
 	}
-	
+
 	// Remove font table
 	if fontStart := strings.Index(text, "{\\fonttbl"); fontStart >= 0 {
 		level := 1
@@ -479,7 +479,7 @@ func (r *RTFReader) extractPlainText(content string) string {
 			text = text[:fontStart] + text[end:]
 		}
 	}
-	
+
 	// Remove style sheet
 	if styleStart := strings.Index(text, "{\\stylesheet"); styleStart >= 0 {
 		level := 1
@@ -496,38 +496,38 @@ func (r *RTFReader) extractPlainText(content string) string {
 			text = text[:styleStart] + text[end:]
 		}
 	}
-	
+
 	// Convert special characters before removing control words
 	text = strings.ReplaceAll(text, "\\'92", "'")
 	text = strings.ReplaceAll(text, "\\'93", "\"")
 	text = strings.ReplaceAll(text, "\\'94", "\"")
 	text = strings.ReplaceAll(text, "\\'96", "-")
 	text = strings.ReplaceAll(text, "\\'97", "--")
-	
+
 	// Replace line breaks
 	text = strings.ReplaceAll(text, "\\par", "\n")
 	text = strings.ReplaceAll(text, "\\line", "\n")
-	
+
 	// Remove control words (but preserve text after them)
 	text = regexp.MustCompile(`\\[a-z]+[0-9]*\s?`).ReplaceAllString(text, "")
-	
+
 	// Remove remaining braces
 	text = strings.ReplaceAll(text, "{", "")
 	text = strings.ReplaceAll(text, "}", "")
-	
+
 	// Clean up whitespace
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		lines[i] = strings.TrimSpace(line)
 	}
 	text = strings.Join(lines, "\n")
-	
+
 	// Remove multiple spaces
 	text = regexp.MustCompile(`[ \t]+`).ReplaceAllString(text, " ")
-	
+
 	// Remove leading/trailing whitespace from the entire text
 	text = strings.TrimSpace(text)
-	
+
 	return text
 }
 
@@ -535,7 +535,7 @@ func (r *RTFReader) extractPlainText(content string) string {
 func (r *RTFReader) decodeRTFString(s string) string {
 	// Simple RTF string decoding
 	s = strings.TrimSpace(s)
-	
+
 	// Convert RTF escaped characters
 	s = strings.ReplaceAll(s, "\\'92", "'")
 	s = strings.ReplaceAll(s, "\\'93", "\"")
@@ -545,7 +545,7 @@ func (r *RTFReader) decodeRTFString(s string) string {
 	s = strings.ReplaceAll(s, "\\{", "{")
 	s = strings.ReplaceAll(s, "\\}", "}")
 	s = strings.ReplaceAll(s, "\\\\", "\\")
-	
+
 	return s
 }
 
@@ -570,10 +570,10 @@ func (r *RTFReader) countParagraphs(content string) int {
 // parseRTFParagraphs parses RTF into paragraphs
 func (r *RTFReader) parseRTFParagraphs(content string, config map[string]any) []RTFParagraph {
 	var paragraphs []RTFParagraph
-	
+
 	// Split by paragraph markers
 	parts := strings.Split(content, "\\par")
-	
+
 	paragraphNum := 0
 	for _, part := range parts {
 		// Extract text from paragraph
@@ -581,38 +581,38 @@ func (r *RTFReader) parseRTFParagraphs(content string, config map[string]any) []
 		if strings.TrimSpace(text) == "" {
 			continue
 		}
-		
+
 		paragraphNum++
 		paragraph := RTFParagraph{
 			Content: text,
 			Number:  paragraphNum,
 		}
-		
+
 		// Extract basic formatting if enabled
 		if preserveFormatting, _ := config["preserve_formatting"].(bool); preserveFormatting {
 			formatting := make(map[string]any)
-			
+
 			// Check for bold
 			if strings.Contains(part, "\\b ") || strings.Contains(part, "\\b\\") {
 				formatting["bold"] = true
 			}
-			
+
 			// Check for italic
 			if strings.Contains(part, "\\i ") || strings.Contains(part, "\\i\\") {
 				formatting["italic"] = true
 			}
-			
+
 			// Check for underline
 			if strings.Contains(part, "\\ul ") || strings.Contains(part, "\\ul\\") {
 				formatting["underline"] = true
 			}
-			
+
 			paragraph.Formatting = formatting
 		}
-		
+
 		paragraphs = append(paragraphs, paragraph)
 	}
-	
+
 	// If no paragraphs found, treat entire content as one paragraph
 	if len(paragraphs) == 0 {
 		text := r.extractPlainText(content)
@@ -623,7 +623,7 @@ func (r *RTFReader) parseRTFParagraphs(content string, config map[string]any) []
 			})
 		}
 	}
-	
+
 	return paragraphs
 }
 

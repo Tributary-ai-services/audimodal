@@ -13,36 +13,36 @@ type ProcessingSession struct {
 	TenantID    uuid.UUID `gorm:"type:uuid;not null;index" json:"tenant_id"`
 	Name        string    `gorm:"not null;index" json:"name"`
 	DisplayName string    `gorm:"not null" json:"display_name"`
-	
+
 	// Session configuration
 	FileSpecs []ProcessingFileSpec `gorm:"type:jsonb" json:"file_specs"`
 	Options   ProcessingOptions    `gorm:"type:jsonb" json:"options"`
-	
+
 	// Status and progress
-	Status       string    `gorm:"not null;default:'pending'" json:"status"`
-	Progress     float64   `gorm:"default:0" json:"progress"`
-	TotalFiles   int       `gorm:"default:0" json:"total_files"`
+	Status         string  `gorm:"not null;default:'pending'" json:"status"`
+	Progress       float64 `gorm:"default:0" json:"progress"`
+	TotalFiles     int     `gorm:"default:0" json:"total_files"`
 	ProcessedFiles int     `gorm:"default:0" json:"processed_files"`
-	FailedFiles  int       `gorm:"default:0" json:"failed_files"`
-	
+	FailedFiles    int     `gorm:"default:0" json:"failed_files"`
+
 	// Timing
 	StartedAt   *time.Time `json:"started_at,omitempty"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 	CreatedAt   time.Time  `gorm:"not null" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"not null" json:"updated_at"`
 	DeletedAt   *time.Time `gorm:"index" json:"deleted_at,omitempty"`
-	
+
 	// Error handling
-	LastError     *string `json:"last_error,omitempty"`
-	ErrorCount    int     `gorm:"default:0" json:"error_count"`
-	RetryCount    int     `gorm:"default:0" json:"retry_count"`
-	MaxRetries    int     `gorm:"default:3" json:"max_retries"`
-	
+	LastError  *string `json:"last_error,omitempty"`
+	ErrorCount int     `gorm:"default:0" json:"error_count"`
+	RetryCount int     `gorm:"default:0" json:"retry_count"`
+	MaxRetries int     `gorm:"default:3" json:"max_retries"`
+
 	// Resource usage
 	ProcessedBytes int64 `gorm:"default:0" json:"processed_bytes"`
 	TotalBytes     int64 `gorm:"default:0" json:"total_bytes"`
 	ChunksCreated  int64 `gorm:"default:0" json:"chunks_created"`
-	
+
 	// Relationships
 	Tenant *Tenant `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	Files  []File  `gorm:"foreignKey:ProcessingSessionID" json:"session_files,omitempty"`
@@ -59,15 +59,15 @@ type ProcessingFileSpec struct {
 
 // ProcessingOptions represents options for processing a session
 type ProcessingOptions struct {
-	ChunkingStrategy   string            `json:"chunking_strategy"`
-	EmbeddingTypes     []string          `json:"embedding_types"`
-	DLPScanEnabled     bool              `json:"dlp_scan_enabled"`
-	Priority           string            `json:"priority"`
+	ChunkingStrategy   string                 `json:"chunking_strategy"`
+	EmbeddingTypes     []string               `json:"embedding_types"`
+	DLPScanEnabled     bool                   `json:"dlp_scan_enabled"`
+	Priority           string                 `json:"priority"`
 	CustomOptions      map[string]interface{} `json:"custom_options,omitempty"`
-	MaxChunkSize       int               `json:"max_chunk_size,omitempty"`
-	OverlapSize        int               `json:"overlap_size,omitempty"`
-	ParallelProcessing bool              `json:"parallel_processing"`
-	BatchSize          int               `json:"batch_size"`
+	MaxChunkSize       int                    `json:"max_chunk_size,omitempty"`
+	OverlapSize        int                    `json:"overlap_size,omitempty"`
+	ParallelProcessing bool                   `json:"parallel_processing"`
+	BatchSize          int                    `json:"batch_size"`
 }
 
 // GORM hooks for JSON serialization
@@ -162,7 +162,7 @@ func (p *ProcessingSession) UpdateProgress(processedFiles, failedFiles int, proc
 	p.FailedFiles = failedFiles
 	p.ProcessedBytes = processedBytes
 	p.Progress = p.GetProgress()
-	
+
 	// Update status based on progress
 	if p.ProcessedFiles+p.FailedFiles >= p.TotalFiles {
 		if p.FailedFiles == 0 {

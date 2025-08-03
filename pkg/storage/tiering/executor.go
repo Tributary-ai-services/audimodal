@@ -27,9 +27,9 @@ type TieringJobExecutor struct {
 	workerPool       chan TieringWorker
 
 	// Metrics and monitoring
-	metrics          *ExecutorMetrics
-	activeJobs       map[uuid.UUID]*TieringJobContext
-	mu               sync.RWMutex
+	metrics    *ExecutorMetrics
+	activeJobs map[uuid.UUID]*TieringJobContext
+	mu         sync.RWMutex
 }
 
 // TieringWorker interface for executing tiering operations
@@ -42,47 +42,47 @@ type TieringWorker interface {
 
 // TieringJobContext tracks the execution context of a tiering job
 type TieringJobContext struct {
-	Job        *TieringJob
-	StartTime  time.Time
-	Worker     TieringWorker
-	Progress   *TieringJobProgress
-	Cancel     context.CancelFunc
+	Job       *TieringJob
+	StartTime time.Time
+	Worker    TieringWorker
+	Progress  *TieringJobProgress
+	Cancel    context.CancelFunc
 }
 
 // TieringJobProgress tracks detailed progress of a tiering job
 type TieringJobProgress struct {
-	Phase                string    `json:"phase"`
-	FilesDiscovered      int64     `json:"files_discovered"`
-	FilesAnalyzed        int64     `json:"files_analyzed"`
-	TransitionsQueued    int64     `json:"transitions_queued"`
-	TransitionsCompleted int64     `json:"transitions_completed"`
-	TransitionsFailed    int64     `json:"transitions_failed"`
-	CurrentBatch         int       `json:"current_batch"`
-	TotalBatches         int       `json:"total_batches"`
-	LastActivity         time.Time `json:"last_activity"`
+	Phase                string     `json:"phase"`
+	FilesDiscovered      int64      `json:"files_discovered"`
+	FilesAnalyzed        int64      `json:"files_analyzed"`
+	TransitionsQueued    int64      `json:"transitions_queued"`
+	TransitionsCompleted int64      `json:"transitions_completed"`
+	TransitionsFailed    int64      `json:"transitions_failed"`
+	CurrentBatch         int        `json:"current_batch"`
+	TotalBatches         int        `json:"total_batches"`
+	LastActivity         time.Time  `json:"last_activity"`
 	EstimatedCompletion  *time.Time `json:"estimated_completion,omitempty"`
 }
 
 // ExecutorMetrics tracks executor performance
 type ExecutorMetrics struct {
-	ActiveWorkers        int           `json:"active_workers"`
-	QueuedJobs          int           `json:"queued_jobs"`
-	ProcessingJobs      int           `json:"processing_jobs"`
-	CompletedJobs       int64         `json:"completed_jobs"`
-	FailedJobs          int64         `json:"failed_jobs"`
-	AverageJobDuration  time.Duration `json:"average_job_duration"`
-	ThroughputJobsPerHour float64     `json:"throughput_jobs_per_hour"`
-	ErrorRate           float64       `json:"error_rate"`
-	LastReset           time.Time     `json:"last_reset"`
+	ActiveWorkers         int           `json:"active_workers"`
+	QueuedJobs            int           `json:"queued_jobs"`
+	ProcessingJobs        int           `json:"processing_jobs"`
+	CompletedJobs         int64         `json:"completed_jobs"`
+	FailedJobs            int64         `json:"failed_jobs"`
+	AverageJobDuration    time.Duration `json:"average_job_duration"`
+	ThroughputJobsPerHour float64       `json:"throughput_jobs_per_hour"`
+	ErrorRate             float64       `json:"error_rate"`
+	LastReset             time.Time     `json:"last_reset"`
 }
 
 // WorkerMetrics tracks individual worker performance
 type WorkerMetrics struct {
-	WorkerID           string        `json:"worker_id"`
-	JobsCompleted      int64         `json:"jobs_completed"`
-	JobsFailed         int64         `json:"jobs_failed"`
-	AverageJobTime     time.Duration `json:"average_job_time"`
-	LastJobCompleted   *time.Time    `json:"last_job_completed,omitempty"`
+	WorkerID            string        `json:"worker_id"`
+	JobsCompleted       int64         `json:"jobs_completed"`
+	JobsFailed          int64         `json:"jobs_failed"`
+	AverageJobTime      time.Duration `json:"average_job_time"`
+	LastJobCompleted    *time.Time    `json:"last_job_completed,omitempty"`
 	TotalProcessingTime time.Duration `json:"total_processing_time"`
 }
 
@@ -128,10 +128,10 @@ func (je *TieringJobExecutor) Start(ctx context.Context, jobQueue <-chan *Tierin
 				je.shutdownActiveJobs()
 				return // Channel closed
 			}
-			
+
 			// Execute job in goroutine
 			go je.executeJob(ctx, job)
-			
+
 		case <-ticker.C:
 			// Update metrics and check for stalled jobs
 			je.updateMetrics()
@@ -302,7 +302,7 @@ func (je *TieringJobExecutor) updateMetrics() {
 func (je *TieringJobExecutor) checkForStalledJobs(ctx context.Context) {
 	je.mu.RLock()
 	stalledJobs := make([]*TieringJobContext, 0)
-	
+
 	for _, jobCtx := range je.activeJobs {
 		// Check if job has been inactive for too long
 		if time.Since(jobCtx.Progress.LastActivity) > 30*time.Minute {
@@ -315,13 +315,13 @@ func (je *TieringJobExecutor) checkForStalledJobs(ctx context.Context) {
 	for _, jobCtx := range stalledJobs {
 		// Cancel stalled job
 		jobCtx.Cancel()
-		
+
 		// Update job status
 		jobCtx.Job.Status = StatusFailed
 		jobCtx.Job.ErrorMessage = "Job stalled - no activity for 30 minutes"
 		now := time.Now()
 		jobCtx.Job.CompletedAt = &now
-		
+
 		je.tieringManager.jobStore.UpdateJob(ctx, jobCtx.Job)
 	}
 }
@@ -390,7 +390,7 @@ func (w *DefaultTieringWorker) ExecuteJob(ctx context.Context, job *TieringJob) 
 		w.available = true
 		duration := time.Since(startTime)
 		w.metrics.TotalProcessingTime += duration
-		
+
 		// Update average job time
 		w.metrics.JobsCompleted++
 		if w.metrics.JobsCompleted > 0 {
@@ -428,24 +428,24 @@ func (w *DefaultTieringWorker) executePolicyAnalysis(ctx context.Context, job *T
 
 	// Phase 1: File Discovery
 	job.Progress.CurrentOperation = "discovering_files"
-	
+
 	// This would discover files based on policy criteria
 	// For now, using a placeholder
 	discoveredFiles := 0 // Placeholder
-	
+
 	job.Progress.TotalFiles = int64(discoveredFiles)
 	job.Progress.LastUpdate = time.Now()
 
 	// Phase 2: Analysis
 	job.Progress.CurrentOperation = "analyzing_files"
-	
+
 	// Analyze each file and generate transition recommendations
 	// This would use the AccessAnalyzer to determine optimal tiers
-	
+
 	// Phase 3: Transition Execution (if not dry run)
 	if !job.Config.DryRun {
 		job.Progress.CurrentOperation = "executing_transitions"
-		
+
 		// Execute recommended transitions
 		// This would use the TransitionEngine
 	}
@@ -468,17 +468,17 @@ func (w *DefaultTieringWorker) executeManualTransition(ctx context.Context, job 
 
 	// Phase 1: File Discovery and Validation
 	job.Progress.CurrentOperation = "discovering_files"
-	
+
 	// Discover files that match the transition criteria
 	// This would filter by FromTier and apply any path/file filters
-	
+
 	// Phase 2: Cost Estimation
 	job.Progress.CurrentOperation = "estimating_costs"
-	
+
 	// Estimate transition costs
 	var totalEstimatedCost float64
 	job.Progress.EstimatedCost = totalEstimatedCost
-	
+
 	// Check against cost limits
 	if job.Config.MaxCost > 0 && totalEstimatedCost > job.Config.MaxCost {
 		return fmt.Errorf("estimated cost %.2f exceeds maximum allowed cost %.2f", totalEstimatedCost, job.Config.MaxCost)
@@ -487,10 +487,10 @@ func (w *DefaultTieringWorker) executeManualTransition(ctx context.Context, job 
 	// Phase 3: Transition Execution
 	if !job.Config.DryRun {
 		job.Progress.CurrentOperation = "executing_transitions"
-		
+
 		// Create transition requests
 		var transitions []*TierTransition
-		
+
 		// Execute transitions through transition engine
 		results, err := w.transitionEngine.ExecuteTransitions(ctx, transitions)
 		if err != nil {
@@ -528,19 +528,19 @@ func (w *DefaultTieringWorker) executeCostOptimization(ctx context.Context, job 
 
 	// Phase 1: Data Collection
 	job.Progress.CurrentOperation = "collecting_data"
-	
+
 	// Collect current storage usage and costs
 	// This would query storage systems and metrics
-	
+
 	// Phase 2: Analysis
 	job.Progress.CurrentOperation = "analyzing_optimization_opportunities"
-	
+
 	// Use CostOptimizer to find optimization opportunities
 	// This would generate recommendations for tier transitions
-	
+
 	// Phase 3: Reporting
 	job.Progress.CurrentOperation = "generating_report"
-	
+
 	// Generate optimization report
 	// This would create detailed cost analysis and recommendations
 
@@ -570,7 +570,7 @@ func (w *DefaultTieringWorker) IsAvailable() bool {
 func (w *DefaultTieringWorker) GetMetrics() *WorkerMetrics {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
+
 	metrics := *w.metrics
 	return &metrics
 }

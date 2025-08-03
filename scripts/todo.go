@@ -73,7 +73,7 @@ func (tm *TodoManager) LoadFromFile() error {
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		if strings.HasPrefix(line, "## 🚧 In Progress") {
 			currentSection = "in_progress"
 			continue
@@ -213,7 +213,7 @@ func (tm *TodoManager) ListTodos() {
 		} else if item.Status == "in_progress" {
 			status = "[~]"
 		}
-		fmt.Printf("%d. %s %s (Priority: %s, Category: %s)\n", 
+		fmt.Printf("%d. %s %s (Priority: %s, Category: %s)\n",
 			i+1, status, item.Text, item.Priority, item.Category)
 	}
 }
@@ -243,14 +243,14 @@ func main() {
 		text := os.Args[2]
 		priority := "medium"
 		category := "general"
-		
+
 		if len(os.Args) > 3 {
 			priority = os.Args[3]
 		}
 		if len(os.Args) > 4 {
 			category = os.Args[4]
 		}
-		
+
 		tm.AddTodo(text, priority, category)
 		fmt.Printf("Added todo: %s\n", text)
 

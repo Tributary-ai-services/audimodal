@@ -32,7 +32,7 @@ func (f *TestDataFactory) CreateDatasetConfig(name string) *embeddings.DatasetCo
 	if name == "" {
 		name = fmt.Sprintf("test-dataset-%d", f.rand.Int31())
 	}
-	
+
 	return &embeddings.DatasetConfig{
 		Name:        name,
 		Description: fmt.Sprintf("Test dataset %s", name),
@@ -52,7 +52,7 @@ func (f *TestDataFactory) CreateDatasetInfo(name string) *embeddings.DatasetInfo
 	if name == "" {
 		name = fmt.Sprintf("test-dataset-%d", f.rand.Int31())
 	}
-	
+
 	return &embeddings.DatasetInfo{
 		Name:        name,
 		Description: fmt.Sprintf("Test dataset %s", name),
@@ -78,13 +78,13 @@ func (f *TestDataFactory) CreateDocumentVector(id, docID string) *embeddings.Doc
 	if docID == "" {
 		docID = fmt.Sprintf("doc-%d", f.rand.Int31())
 	}
-	
+
 	// Generate random vector with fixed dimensions
 	vector := make([]float32, 5) // Small vector for testing
 	for i := range vector {
 		vector[i] = f.rand.Float32()
 	}
-	
+
 	return &embeddings.DocumentVector{
 		ID:         id,
 		DocumentID: docID,
@@ -116,11 +116,11 @@ func (f *TestDataFactory) CreateSearchOptions() *embeddings.SearchOptions {
 // CreateSearchResult creates a test search result
 func (f *TestDataFactory) CreateSearchResult(count int) *embeddings.SearchResult {
 	results := make([]*embeddings.SimilarityResult, count)
-	
+
 	for i := 0; i < count; i++ {
 		vector := f.CreateDocumentVector("", "")
 		score := 1.0 - (float32(i) * 0.1) // Decreasing scores
-		
+
 		results[i] = &embeddings.SimilarityResult{
 			DocumentVector: vector,
 			Score:          score,
@@ -128,7 +128,7 @@ func (f *TestDataFactory) CreateSearchResult(count int) *embeddings.SearchResult
 			Rank:           i + 1,
 		}
 	}
-	
+
 	return &embeddings.SearchResult{
 		Results:    results,
 		QueryTime:  float64(f.rand.Intn(100)) + f.rand.Float64(),
@@ -158,14 +158,14 @@ func (f *TestDataFactory) CreateProcessDocumentRequest(tenantID uuid.UUID) *embe
 // CreateProcessDocumentResponse creates a test process document response
 func (f *TestDataFactory) CreateProcessDocumentResponse(docID string, chunkCount int) *embeddings.ProcessDocumentResponse {
 	return &embeddings.ProcessDocumentResponse{
-		DocumentID:      docID,
-		ChunksCreated:   chunkCount,
-		VectorsCreated:  chunkCount,
-		ProcessingTime:  float64(f.rand.Intn(1000)) + f.rand.Float64(),
-		TotalTokens:     chunkCount * 100, // Approximate tokens
-		EstimatedCost:   float64(chunkCount) * 0.001, // Sample cost
-		Status:          "completed",
-		CreatedAt:       time.Now(),
+		DocumentID:     docID,
+		ChunksCreated:  chunkCount,
+		VectorsCreated: chunkCount,
+		ProcessingTime: float64(f.rand.Intn(1000)) + f.rand.Float64(),
+		TotalTokens:    chunkCount * 100,            // Approximate tokens
+		EstimatedCost:  float64(chunkCount) * 0.001, // Sample cost
+		Status:         "completed",
+		CreatedAt:      time.Now(),
 	}
 }
 
@@ -182,7 +182,7 @@ func NewHTTPTestHelper(t *testing.T) *HTTPTestHelper {
 // CreateRequest creates an HTTP request with JSON body and headers
 func (h *HTTPTestHelper) CreateRequest(method, url string, body interface{}) *http.Request {
 	var bodyReader *bytes.Buffer
-	
+
 	if body != nil {
 		jsonBody, err := json.Marshal(body)
 		if err != nil {
@@ -192,11 +192,11 @@ func (h *HTTPTestHelper) CreateRequest(method, url string, body interface{}) *ht
 	} else {
 		bodyReader = bytes.NewBuffer([]byte{})
 	}
-	
+
 	req := httptest.NewRequest(method, url, bodyReader)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Tenant-ID", "test-tenant-id")
-	
+
 	return req
 }
 
@@ -212,17 +212,17 @@ func (h *HTTPTestHelper) AssertJSONResponse(rr *httptest.ResponseRecorder, expec
 	if rr.Code != expectedStatus {
 		h.t.Errorf("Expected status %d, got %d. Body: %s", expectedStatus, rr.Code, rr.Body.String())
 	}
-	
+
 	contentType := rr.Header().Get("Content-Type")
 	if contentType != "application/json" {
 		h.t.Errorf("Expected Content-Type application/json, got %s", contentType)
 	}
-	
+
 	var response map[string]interface{}
 	if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
 		h.t.Fatalf("Failed to parse JSON response: %v. Body: %s", err, rr.Body.String())
 	}
-	
+
 	return response
 }
 
@@ -231,7 +231,7 @@ func (h *HTTPTestHelper) AssertTypedJSONResponse(rr *httptest.ResponseRecorder, 
 	if rr.Code != expectedStatus {
 		h.t.Errorf("Expected status %d, got %d. Body: %s", expectedStatus, rr.Code, rr.Body.String())
 	}
-	
+
 	if err := json.Unmarshal(rr.Body.Bytes(), target); err != nil {
 		h.t.Fatalf("Failed to parse JSON response: %v. Body: %s", err, rr.Body.String())
 	}
@@ -255,10 +255,10 @@ func NewMockExpectationHelper() *MockExpectationHelper {
 
 // TestScenarioRunner helps run common test scenarios
 type TestScenarioRunner struct {
-	t           *testing.T
-	factory     *TestDataFactory
-	httpHelper  *HTTPTestHelper
-	mockHelper  *MockExpectationHelper
+	t          *testing.T
+	factory    *TestDataFactory
+	httpHelper *HTTPTestHelper
+	mockHelper *MockExpectationHelper
 }
 
 // NewTestScenarioRunner creates a new test scenario runner

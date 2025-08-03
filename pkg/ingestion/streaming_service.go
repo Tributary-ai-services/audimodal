@@ -17,30 +17,30 @@ import (
 
 // StreamingIngestionService handles real-time document processing via Kafka streams
 type StreamingIngestionService struct {
-	consumer            *events.Consumer
-	producer            *events.Producer
+	consumer             *events.Consumer
+	producer             *events.Producer
 	embeddingCoordinator *processors.EmbeddingCoordinator
-	db                  *database.Database
-	tracer              trace.Tracer
-	config              *StreamingConfig
+	db                   *database.Database
+	tracer               trace.Tracer
+	config               *StreamingConfig
 }
 
 // StreamingConfig contains configuration for streaming ingestion
 type StreamingConfig struct {
 	// Kafka configuration
-	KafkaConsumerGroup string `yaml:"kafka_consumer_group"`
+	KafkaConsumerGroup string   `yaml:"kafka_consumer_group"`
 	KafkaTopics        []string `yaml:"kafka_topics"`
-	
+
 	// Processing configuration
-	EnableEmbeddings    bool   `yaml:"enable_embeddings"`
-	DefaultDataset      string `yaml:"default_dataset"`
-	ProcessingTimeout   time.Duration `yaml:"processing_timeout"`
-	MaxConcurrentFiles  int    `yaml:"max_concurrent_files"`
-	
+	EnableEmbeddings   bool          `yaml:"enable_embeddings"`
+	DefaultDataset     string        `yaml:"default_dataset"`
+	ProcessingTimeout  time.Duration `yaml:"processing_timeout"`
+	MaxConcurrentFiles int           `yaml:"max_concurrent_files"`
+
 	// Error handling
-	MaxRetries          int           `yaml:"max_retries"`
-	RetryDelay          time.Duration `yaml:"retry_delay"`
-	DeadLetterTopic     string        `yaml:"dead_letter_topic"`
+	MaxRetries      int           `yaml:"max_retries"`
+	RetryDelay      time.Duration `yaml:"retry_delay"`
+	DeadLetterTopic string        `yaml:"dead_letter_topic"`
 }
 
 // DefaultStreamingConfig returns default configuration for streaming ingestion
@@ -70,7 +70,7 @@ func NewStreamingIngestionService(
 	producerConfig events.ProducerConfig,
 	streamingConfig *StreamingConfig,
 ) (*StreamingIngestionService, error) {
-	
+
 	if streamingConfig == nil {
 		streamingConfig = DefaultStreamingConfig()
 	}
@@ -91,12 +91,12 @@ func NewStreamingIngestionService(
 	}
 
 	service := &StreamingIngestionService{
-		consumer:            consumer,
-		producer:            producer,
+		consumer:             consumer,
+		producer:             producer,
 		embeddingCoordinator: embeddingCoordinator,
-		db:                  db,
-		tracer:              otel.Tracer("streaming-ingestion"),
-		config:              streamingConfig,
+		db:                   db,
+		tracer:               otel.Tracer("streaming-ingestion"),
+		config:               streamingConfig,
 	}
 
 	// Register event handlers
@@ -191,14 +191,14 @@ func (h *FileDiscoveryHandler) processDiscoveredFile(ctx context.Context, fileEv
 
 	// Process file through embedding coordinator
 	options := map[string]any{
-		"source_id":            fileEvent.Data.SourceID,
-		"discovered_at":        fileEvent.Data.DiscoveredAt,
-		"priority":             fileEvent.Data.Priority,
-		"embeddings_enabled":   h.service.config.EnableEmbeddings,
-		"dataset":              h.service.config.DefaultDataset,
-		"content_type":         fileEvent.Data.ContentType,
-		"metadata":             fileEvent.Data.Metadata,
-		"streaming_mode":       true,
+		"source_id":          fileEvent.Data.SourceID,
+		"discovered_at":      fileEvent.Data.DiscoveredAt,
+		"priority":           fileEvent.Data.Priority,
+		"embeddings_enabled": h.service.config.EnableEmbeddings,
+		"dataset":            h.service.config.DefaultDataset,
+		"content_type":       fileEvent.Data.ContentType,
+		"metadata":           fileEvent.Data.Metadata,
+		"streaming_mode":     true,
 	}
 
 	// Process the file
@@ -233,7 +233,7 @@ func (h *FileDiscoveryHandler) processDiscoveredFile(ctx context.Context, fileEv
 		EmbeddingsCreated:   result.EmbeddingsCreated,
 		DLPViolationsFound:  0, // TODO: Extract from result
 		FinalDataClass:      "processed",
-		StorageLocation:     result.ProcessingResult.OutputPath,
+		StorageLocation:     fmt.Sprintf("file-%s", result.ProcessingResult.FileID),
 		Success:             true,
 	})
 
@@ -346,8 +346,8 @@ func (s *StreamingIngestionService) CreateStreamSession(ctx context.Context, ten
 		DLPScanEnabled:     true,
 		ProcessingOptions: map[string]any{
 			"embeddings_enabled": s.config.EnableEmbeddings,
-			"dataset":           s.config.DefaultDataset,
-			"streaming_mode":    true,
+			"dataset":            s.config.DefaultDataset,
+			"streaming_mode":     true,
 		},
 	}
 

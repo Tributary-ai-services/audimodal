@@ -52,7 +52,7 @@ func (am *AuthManager) GenerateAuthURL() (string, string, error) {
 	am.stateString = state
 
 	// Generate authorization URL
-	authURL := am.config.AuthCodeURL(state, 
+	authURL := am.config.AuthCodeURL(state,
 		oauth2.AccessTypeOffline, // Request refresh token
 		oauth2.ApprovalForce,     // Force approval prompt
 	)
@@ -84,7 +84,7 @@ func (am *AuthManager) RefreshToken(ctx context.Context, token *oauth2.Token) (*
 
 	// Create token source
 	tokenSource := am.config.TokenSource(ctx, token)
-	
+
 	// Get new token
 	newToken, err := tokenSource.Token()
 	if err != nil {
@@ -137,19 +137,19 @@ func (am *AuthManager) GetUserInfo(ctx context.Context, token *oauth2.Token) (*U
 	}
 
 	userInfo := &UserInfo{
-		ID:           about.User.EmailAddress, // Use email as user ID
-		Name:         about.User.DisplayName,
-		Email:        about.User.EmailAddress,
-		PhotoURL:     about.User.PhotoLink,
-		Verified:     about.User.EmailAddress != "",
+		ID:       about.User.EmailAddress, // Use email as user ID
+		Name:     about.User.DisplayName,
+		Email:    about.User.EmailAddress,
+		PhotoURL: about.User.PhotoLink,
+		Verified: about.User.EmailAddress != "",
 	}
 
 	// Add storage quota information if available
 	if about.StorageQuota != nil {
 		userInfo.StorageQuota = &StorageQuota{
-			Limit:     about.StorageQuota.Limit,
-			Usage:     about.StorageQuota.Usage,
-			UsageInDrive: about.StorageQuota.UsageInDrive,
+			Limit:             about.StorageQuota.Limit,
+			Usage:             about.StorageQuota.Usage,
+			UsageInDrive:      about.StorageQuota.UsageInDrive,
 			UsageInDriveTrash: about.StorageQuota.UsageInDriveTrash,
 		}
 	}
@@ -164,7 +164,7 @@ func (am *AuthManager) RevokeToken(ctx context.Context, token *oauth2.Token) err
 	}
 
 	// Create HTTP request to revoke token
-	req, err := http.NewRequestWithContext(ctx, "POST", 
+	req, err := http.NewRequestWithContext(ctx, "POST",
 		"https://oauth2.googleapis.com/revoke?token="+token.AccessToken, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create revoke request: %w", err)

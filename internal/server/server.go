@@ -19,11 +19,11 @@ import (
 
 // Server represents the HTTP server
 type Server struct {
-	config         *Config
-	db             *database.Database
-	httpServer     *http.Server
-	router         *Router
-	logger         *logger.Logger
+	config          *Config
+	db              *database.Database
+	httpServer      *http.Server
+	router          *Router
+	logger          *logger.Logger
 	metricsRegistry *metrics.MetricsRegistry
 	systemMetrics   *metrics.SystemMetrics
 	healthChecker   *health.HealthChecker
@@ -64,16 +64,16 @@ func New(config *Config, db *database.Database) (*Server, error) {
 
 	// Initialize health checker
 	healthChecker := health.NewHealthChecker(config.HealthCheckTimeout)
-	
+
 	// Add database health check
 	healthChecker.AddChecker(health.DatabaseChecker("database", func(ctx context.Context) error {
 		return db.HealthCheck(ctx)
 	}))
-	
+
 	// Add system health checks
 	healthChecker.AddChecker(health.MemoryChecker("memory", 90.0))
 	healthChecker.AddChecker(health.DiskSpaceChecker("disk", "/", 10.0))
-	
+
 	// Create health handler
 	healthHandler := health.NewHandler(healthChecker, "audimodal", "1.0.0")
 
@@ -106,7 +106,7 @@ func New(config *Config, db *database.Database) (*Server, error) {
 func (s *Server) Start(ctx context.Context) error {
 	// Channel to signal server start errors
 	serverErrors := make(chan error, 1)
-	
+
 	// Start system metrics collection
 	if s.config.MetricsEnabled {
 		go s.systemMetrics.Start(ctx, 15*time.Second)
@@ -116,22 +116,22 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start server in a goroutine
 	go func() {
 		s.logger.WithFields(map[string]interface{}{
-			"address": s.config.GetAddress(),
+			"address":     s.config.GetAddress(),
 			"tls_enabled": s.config.TLSEnabled,
 		}).Info("Starting HTTP server")
-		
+
 		var err error
 		if s.config.TLSEnabled {
 			s.logger.WithFields(map[string]interface{}{
 				"cert_file": s.config.TLSCertFile,
-				"key_file": s.config.TLSKeyFile,
+				"key_file":  s.config.TLSKeyFile,
 			}).Info("TLS enabled, starting HTTPS server")
 			err = s.httpServer.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
 		} else {
 			s.logger.Info("TLS disabled, starting HTTP server")
 			err = s.httpServer.ListenAndServe()
 		}
-		
+
 		if err != nil && err != http.ErrServerClosed {
 			s.logger.WithField("error", err).Error("HTTP server error")
 			serverErrors <- err
@@ -167,7 +167,7 @@ func (s *Server) Start(ctx context.Context) error {
 // Shutdown gracefully shuts down the server and its dependencies
 func (s *Server) Shutdown() error {
 	s.logger.Info("Starting graceful shutdown sequence")
-	
+
 	// Create shutdown context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 	defer cancel()
@@ -279,7 +279,7 @@ func (r *Router) setupMiddleware() {
 	r.middleware.Use(RecoveryMiddleware())
 	r.middleware.Use(SecurityHeadersMiddleware())
 	r.middleware.Use(RequestIDMiddleware(r.config.RequestIDHeader))
-	
+
 	// Add metrics collection middleware if enabled
 	if r.config.MetricsEnabled {
 		r.middleware.Use(metrics.GetHTTPMetricsMiddleware())
@@ -288,10 +288,10 @@ func (r *Router) setupMiddleware() {
 	// Add structured logging middleware if request logging is enabled
 	if r.config.LogRequests {
 		httpLogConfig := &logger.HTTPLogConfig{
-			SkipPaths: []string{r.config.HealthCheckPath, r.config.MetricsPath},
-			LogRequestBody: r.config.LogRequestBody,
+			SkipPaths:       []string{r.config.HealthCheckPath, r.config.MetricsPath},
+			LogRequestBody:  r.config.LogRequestBody,
 			LogResponseBody: r.config.LogResponseBody,
-			LogHeaders: r.config.LogHeaders,
+			LogHeaders:      r.config.LogHeaders,
 			SanitizeHeaders: []string{
 				"authorization", "x-api-key", "cookie", "set-cookie",
 				"x-auth-token", "x-csrf-token", "jwt", "bearer",
@@ -300,7 +300,7 @@ func (r *Router) setupMiddleware() {
 		}
 		r.middleware.Use(logger.RequestLoggingMiddleware(r.logger, httpLogConfig))
 	}
-	
+
 	r.middleware.Use(CORSMiddleware(r.config))
 	r.middleware.Use(RateLimitMiddleware(r.config))
 	r.middleware.Use(MaxRequestSizeMiddleware(r.config.MaxRequestSize))
@@ -411,7 +411,6 @@ func (r *Router) setupRoutes() {
 	r.HandleFunc("/static/", webHandler.StaticFileHandler())
 }
 
-
 // metricsHandler handles metrics requests
 func (r *Router) metricsHandler(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodGet {
@@ -447,8 +446,8 @@ func (r *Router) docsHandler(w http.ResponseWriter, req *http.Request) {
 			"data_sources":        fmt.Sprintf("%s/tenants/{tenant_id}/data-sources", r.config.APIPrefix),
 			"processing_sessions": fmt.Sprintf("%s/tenants/{tenant_id}/sessions", r.config.APIPrefix),
 			"dlp_policies":        fmt.Sprintf("%s/tenants/{tenant_id}/dlp-policies", r.config.APIPrefix),
-			"files":              fmt.Sprintf("%s/tenants/{tenant_id}/files", r.config.APIPrefix),
-			"chunks":             fmt.Sprintf("%s/tenants/{tenant_id}/chunks", r.config.APIPrefix),
+			"files":               fmt.Sprintf("%s/tenants/{tenant_id}/files", r.config.APIPrefix),
+			"chunks":              fmt.Sprintf("%s/tenants/{tenant_id}/chunks", r.config.APIPrefix),
 		},
 		"authentication": map[string]interface{}{
 			"type":        "API Key or JWT Bearer Token",
@@ -510,10 +509,10 @@ func isMLAnalysisRoute(path, apiPrefix string) bool {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr || 
-		   len(s) > len(substr) && s[len(s)-len(substr)-1:len(s)-len(substr)] == "/" && s[len(s)-len(substr):] == substr ||
-		   s == substr ||
-		   (len(s) > len(substr) && s[:len(substr)] == substr && s[len(substr)] == '/')
+	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr ||
+		len(s) > len(substr) && s[len(s)-len(substr)-1:len(s)-len(substr)] == "/" && s[len(s)-len(substr):] == substr ||
+		s == substr ||
+		(len(s) > len(substr) && s[:len(substr)] == substr && s[len(substr)] == '/')
 }
 
 // RunServer is a convenience function to run the server

@@ -62,7 +62,7 @@ func (am *AuthManager) GenerateAuthURL() (string, string, error) {
 
 	// Generate authorization URL with additional parameters for Microsoft
 	authURL := am.config.AuthCodeURL(state,
-		oauth2.AccessTypeOffline, // Request refresh token
+		oauth2.AccessTypeOffline,                         // Request refresh token
 		oauth2.SetAuthURLParam("prompt", "consent"),      // Force consent screen
 		oauth2.SetAuthURLParam("response_mode", "query"), // Use query parameters
 	)
@@ -94,7 +94,7 @@ func (am *AuthManager) RefreshToken(ctx context.Context, token *oauth2.Token) (*
 
 	// Create token source
 	tokenSource := am.config.TokenSource(ctx, token)
-	
+
 	// Get new token
 	newToken, err := tokenSource.Token()
 	if err != nil {
@@ -315,13 +315,13 @@ type OneDriveUserInfo struct {
 
 // OneDriveDriveInfo contains drive information
 type OneDriveDriveInfo struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	DriveType   string           `json:"driveType"`
-	Description string           `json:"description"`
-	WebURL      string           `json:"webUrl"`
-	Quota       *OneDriveQuota   `json:"quota,omitempty"`
-	Owner       *OneDriveOwner   `json:"owner,omitempty"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	DriveType   string         `json:"driveType"`
+	Description string         `json:"description"`
+	WebURL      string         `json:"webUrl"`
+	Quota       *OneDriveQuota `json:"quota,omitempty"`
+	Owner       *OneDriveOwner `json:"owner,omitempty"`
 }
 
 // OneDriveQuota contains quota information
@@ -333,7 +333,7 @@ type OneDriveQuota struct {
 	State     string `json:"state"`
 }
 
-// OneDriveOwner contains owner information  
+// OneDriveOwner contains owner information
 type OneDriveOwner struct {
 	DisplayName string `json:"displayName"`
 	ID          string `json:"id"`

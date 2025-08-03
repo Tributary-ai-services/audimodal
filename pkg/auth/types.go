@@ -15,28 +15,28 @@ type AuthService interface {
 	RefreshToken(ctx context.Context, refreshToken string) (*AuthResponse, error)
 	Logout(ctx context.Context, userID uuid.UUID, tokenID string) error
 	LogoutAll(ctx context.Context, userID uuid.UUID) error
-	
+
 	// Token management
 	ValidateToken(ctx context.Context, token string) (*Claims, error)
 	RevokeToken(ctx context.Context, tokenID string) error
-	
+
 	// User management
 	CreateUser(ctx context.Context, req *CreateUserRequest) (*User, error)
 	GetUser(ctx context.Context, userID uuid.UUID) (*User, error)
 	UpdateUser(ctx context.Context, userID uuid.UUID, req *UpdateUserRequest) (*User, error)
 	DeleteUser(ctx context.Context, userID uuid.UUID) error
-	
+
 	// Role and permission management
 	AssignRole(ctx context.Context, userID uuid.UUID, role Role) error
 	RevokeRole(ctx context.Context, userID uuid.UUID, role Role) error
 	CheckPermission(ctx context.Context, userID uuid.UUID, permission Permission) (bool, error)
-	
+
 	// Tenant management
 	CreateTenant(ctx context.Context, req *CreateTenantRequest) (*Tenant, error)
 	GetTenant(ctx context.Context, tenantID uuid.UUID) (*Tenant, error)
 	AddUserToTenant(ctx context.Context, userID, tenantID uuid.UUID, role TenantRole) error
 	RemoveUserFromTenant(ctx context.Context, userID, tenantID uuid.UUID) error
-	
+
 	// Health and metrics
 	HealthCheck(ctx context.Context) error
 	GetMetrics(ctx context.Context) (*AuthMetrics, error)
@@ -70,7 +70,7 @@ type TenantStore interface {
 	UpdateTenant(ctx context.Context, tenant *Tenant) error
 	DeleteTenant(ctx context.Context, tenantID uuid.UUID) error
 	ListTenants(ctx context.Context, filter *TenantFilter) ([]*Tenant, error)
-	
+
 	AddUserToTenant(ctx context.Context, userID, tenantID uuid.UUID, role TenantRole) error
 	RemoveUserFromTenant(ctx context.Context, userID, tenantID uuid.UUID) error
 	GetUserTenants(ctx context.Context, userID uuid.UUID) ([]*UserTenant, error)
@@ -79,15 +79,15 @@ type TenantStore interface {
 
 // AuthRequest represents an authentication request
 type AuthRequest struct {
-	Type       AuthType `json:"type"`
-	Username   string   `json:"username,omitempty"`
-	Email      string   `json:"email,omitempty"`
-	Password   string   `json:"password,omitempty"`
-	APIKey     string   `json:"api_key,omitempty"`
-	Token      string   `json:"token,omitempty"`
-	TenantID   uuid.UUID `json:"tenant_id,omitempty"`
-	ExpiresIn  *time.Duration `json:"expires_in,omitempty"`
-	Scopes     []string `json:"scopes,omitempty"`
+	Type      AuthType       `json:"type"`
+	Username  string         `json:"username,omitempty"`
+	Email     string         `json:"email,omitempty"`
+	Password  string         `json:"password,omitempty"`
+	APIKey    string         `json:"api_key,omitempty"`
+	Token     string         `json:"token,omitempty"`
+	TenantID  uuid.UUID      `json:"tenant_id,omitempty"`
+	ExpiresIn *time.Duration `json:"expires_in,omitempty"`
+	Scopes    []string       `json:"scopes,omitempty"`
 }
 
 // AuthResponse represents an authentication response
@@ -104,72 +104,72 @@ type AuthResponse struct {
 
 // Claims represents JWT claims
 type Claims struct {
-	UserID    uuid.UUID `json:"user_id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	TenantID  uuid.UUID `json:"tenant_id"`
-	Roles     []Role    `json:"roles"`
-	TenantRole TenantRole `json:"tenant_role"`
+	UserID      uuid.UUID    `json:"user_id"`
+	Username    string       `json:"username"`
+	Email       string       `json:"email"`
+	TenantID    uuid.UUID    `json:"tenant_id"`
+	Roles       []Role       `json:"roles"`
+	TenantRole  TenantRole   `json:"tenant_role"`
 	Permissions []Permission `json:"permissions"`
-	Scopes    []string  `json:"scopes,omitempty"`
-	TokenID   string    `json:"token_id"`
-	TokenType TokenType `json:"token_type"`
+	Scopes      []string     `json:"scopes,omitempty"`
+	TokenID     string       `json:"token_id"`
+	TokenType   TokenType    `json:"token_type"`
 	jwt.RegisteredClaims
 }
 
 // User represents a user in the system
 type User struct {
-	ID          uuid.UUID          `json:"id" db:"id"`
-	Username    string             `json:"username" db:"username"`
-	Email       string             `json:"email" db:"email"`
+	ID           uuid.UUID         `json:"id" db:"id"`
+	Username     string            `json:"username" db:"username"`
+	Email        string            `json:"email" db:"email"`
 	PasswordHash string            `json:"-" db:"password_hash"`
-	FirstName   string             `json:"first_name" db:"first_name"`
-	LastName    string             `json:"last_name" db:"last_name"`
-	Status      UserStatus         `json:"status" db:"status"`
-	Roles       []Role             `json:"roles" db:"roles"`
-	Permissions []Permission       `json:"permissions" db:"permissions"`
-	Metadata    map[string]string  `json:"metadata" db:"metadata"`
-	CreatedAt   time.Time          `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at" db:"updated_at"`
-	LastLoginAt *time.Time         `json:"last_login_at" db:"last_login_at"`
-	ExpiresAt   *time.Time         `json:"expires_at" db:"expires_at"`
+	FirstName    string            `json:"first_name" db:"first_name"`
+	LastName     string            `json:"last_name" db:"last_name"`
+	Status       UserStatus        `json:"status" db:"status"`
+	Roles        []Role            `json:"roles" db:"roles"`
+	Permissions  []Permission      `json:"permissions" db:"permissions"`
+	Metadata     map[string]string `json:"metadata" db:"metadata"`
+	CreatedAt    time.Time         `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at" db:"updated_at"`
+	LastLoginAt  *time.Time        `json:"last_login_at" db:"last_login_at"`
+	ExpiresAt    *time.Time        `json:"expires_at" db:"expires_at"`
 }
 
 // Tenant represents a tenant in the system
 type Tenant struct {
-	ID          uuid.UUID          `json:"id" db:"id"`
-	Name        string             `json:"name" db:"name"`
-	DisplayName string             `json:"display_name" db:"display_name"`
-	Domain      string             `json:"domain" db:"domain"`
-	Status      TenantStatus       `json:"status" db:"status"`
-	Settings    TenantSettings     `json:"settings" db:"settings"`
-	Metadata    map[string]string  `json:"metadata" db:"metadata"`
-	CreatedAt   time.Time          `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at" db:"updated_at"`
-	ExpiresAt   *time.Time         `json:"expires_at" db:"expires_at"`
+	ID          uuid.UUID         `json:"id" db:"id"`
+	Name        string            `json:"name" db:"name"`
+	DisplayName string            `json:"display_name" db:"display_name"`
+	Domain      string            `json:"domain" db:"domain"`
+	Status      TenantStatus      `json:"status" db:"status"`
+	Settings    TenantSettings    `json:"settings" db:"settings"`
+	Metadata    map[string]string `json:"metadata" db:"metadata"`
+	CreatedAt   time.Time         `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
+	ExpiresAt   *time.Time        `json:"expires_at" db:"expires_at"`
 }
 
 // TenantSettings represents tenant configuration
 type TenantSettings struct {
-	MaxUsers         int           `json:"max_users"`
-	MaxStorage       int64         `json:"max_storage"`
-	MaxAPIRequests   int           `json:"max_api_requests"`
-	AllowedDomains   []string      `json:"allowed_domains"`
-	RequireMFA       bool          `json:"require_mfa"`
-	SessionTimeout   time.Duration `json:"session_timeout"`
-	PasswordPolicy   PasswordPolicy `json:"password_policy"`
+	MaxUsers         int              `json:"max_users"`
+	MaxStorage       int64            `json:"max_storage"`
+	MaxAPIRequests   int              `json:"max_api_requests"`
+	AllowedDomains   []string         `json:"allowed_domains"`
+	RequireMFA       bool             `json:"require_mfa"`
+	SessionTimeout   time.Duration    `json:"session_timeout"`
+	PasswordPolicy   PasswordPolicy   `json:"password_policy"`
 	SecuritySettings SecuritySettings `json:"security_settings"`
 }
 
 // PasswordPolicy defines password requirements
 type PasswordPolicy struct {
-	MinLength        int  `json:"min_length"`
-	RequireUppercase bool `json:"require_uppercase"`
-	RequireLowercase bool `json:"require_lowercase"`
-	RequireNumbers   bool `json:"require_numbers"`
-	RequireSymbols   bool `json:"require_symbols"`
+	MinLength        int            `json:"min_length"`
+	RequireUppercase bool           `json:"require_uppercase"`
+	RequireLowercase bool           `json:"require_lowercase"`
+	RequireNumbers   bool           `json:"require_numbers"`
+	RequireSymbols   bool           `json:"require_symbols"`
 	MaxAge           *time.Duration `json:"max_age,omitempty"`
-	PreventReuse     int  `json:"prevent_reuse"`
+	PreventReuse     int            `json:"prevent_reuse"`
 }
 
 // SecuritySettings defines security configuration
@@ -184,45 +184,45 @@ type SecuritySettings struct {
 
 // UserTenant represents a user's association with a tenant
 type UserTenant struct {
-	UserID    uuid.UUID  `json:"user_id" db:"user_id"`
-	TenantID  uuid.UUID  `json:"tenant_id" db:"tenant_id"`
-	Role      TenantRole `json:"role" db:"role"`
+	UserID    uuid.UUID        `json:"user_id" db:"user_id"`
+	TenantID  uuid.UUID        `json:"tenant_id" db:"tenant_id"`
+	Role      TenantRole       `json:"role" db:"role"`
 	Status    UserTenantStatus `json:"status" db:"status"`
-	CreatedAt time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at" db:"updated_at"`
+	CreatedAt time.Time        `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time        `json:"updated_at" db:"updated_at"`
 }
 
 // TenantUser represents a tenant's user
 type TenantUser struct {
-	User      *User      `json:"user"`
-	Role      TenantRole `json:"role"`
+	User      *User            `json:"user"`
+	Role      TenantRole       `json:"role"`
 	Status    UserTenantStatus `json:"status"`
-	CreatedAt time.Time  `json:"created_at"`
+	CreatedAt time.Time        `json:"created_at"`
 }
 
 // CreateUserRequest represents a user creation request
 type CreateUserRequest struct {
-	Username    string            `json:"username"`
-	Email       string            `json:"email"`
-	Password    string            `json:"password"`
-	FirstName   string            `json:"first_name"`
-	LastName    string            `json:"last_name"`
-	Roles       []Role            `json:"roles,omitempty"`
-	TenantID    *uuid.UUID        `json:"tenant_id,omitempty"`
-	TenantRole  *TenantRole       `json:"tenant_role,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	ExpiresAt   *time.Time        `json:"expires_at,omitempty"`
+	Username   string            `json:"username"`
+	Email      string            `json:"email"`
+	Password   string            `json:"password"`
+	FirstName  string            `json:"first_name"`
+	LastName   string            `json:"last_name"`
+	Roles      []Role            `json:"roles,omitempty"`
+	TenantID   *uuid.UUID        `json:"tenant_id,omitempty"`
+	TenantRole *TenantRole       `json:"tenant_role,omitempty"`
+	Metadata   map[string]string `json:"metadata,omitempty"`
+	ExpiresAt  *time.Time        `json:"expires_at,omitempty"`
 }
 
 // UpdateUserRequest represents a user update request
 type UpdateUserRequest struct {
-	Username    *string           `json:"username,omitempty"`
-	Email       *string           `json:"email,omitempty"`
-	FirstName   *string           `json:"first_name,omitempty"`
-	LastName    *string           `json:"last_name,omitempty"`
-	Status      *UserStatus       `json:"status,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	ExpiresAt   *time.Time        `json:"expires_at,omitempty"`
+	Username  *string           `json:"username,omitempty"`
+	Email     *string           `json:"email,omitempty"`
+	FirstName *string           `json:"first_name,omitempty"`
+	LastName  *string           `json:"last_name,omitempty"`
+	Status    *UserStatus       `json:"status,omitempty"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	ExpiresAt *time.Time        `json:"expires_at,omitempty"`
 }
 
 // CreateTenantRequest represents a tenant creation request
@@ -256,19 +256,19 @@ type TenantFilter struct {
 
 // AuthMetrics represents authentication metrics
 type AuthMetrics struct {
-	TotalUsers           int64              `json:"total_users"`
-	ActiveUsers          int64              `json:"active_users"`
-	TotalTenants         int64              `json:"total_tenants"`
-	ActiveTenants        int64              `json:"active_tenants"`
-	TotalLogins          int64              `json:"total_logins"`
-	FailedLogins         int64              `json:"failed_logins"`
-	ActiveSessions       int64              `json:"active_sessions"`
-	TokensIssued         int64              `json:"tokens_issued"`
-	TokensRevoked        int64              `json:"tokens_revoked"`
-	AverageSessionLength time.Duration      `json:"average_session_length"`
-	LoginsByHour         map[int]int64      `json:"logins_by_hour"`
-	FailureReasons       map[string]int64   `json:"failure_reasons"`
-	LastUpdated          time.Time          `json:"last_updated"`
+	TotalUsers           int64            `json:"total_users"`
+	ActiveUsers          int64            `json:"active_users"`
+	TotalTenants         int64            `json:"total_tenants"`
+	ActiveTenants        int64            `json:"active_tenants"`
+	TotalLogins          int64            `json:"total_logins"`
+	FailedLogins         int64            `json:"failed_logins"`
+	ActiveSessions       int64            `json:"active_sessions"`
+	TokensIssued         int64            `json:"tokens_issued"`
+	TokensRevoked        int64            `json:"tokens_revoked"`
+	AverageSessionLength time.Duration    `json:"average_session_length"`
+	LoginsByHour         map[int]int64    `json:"logins_by_hour"`
+	FailureReasons       map[string]int64 `json:"failure_reasons"`
+	LastUpdated          time.Time        `json:"last_updated"`
 }
 
 // Enums and constants
@@ -297,11 +297,11 @@ const (
 type Role string
 
 const (
-	RoleSuperAdmin    Role = "super_admin"
-	RoleAdmin         Role = "admin"
-	RoleUser          Role = "user"
-	RoleViewer        Role = "viewer"
-	RoleAPIClient     Role = "api_client"
+	RoleSuperAdmin     Role = "super_admin"
+	RoleAdmin          Role = "admin"
+	RoleUser           Role = "user"
+	RoleViewer         Role = "viewer"
+	RoleAPIClient      Role = "api_client"
 	RoleServiceAccount Role = "service_account"
 )
 
@@ -309,11 +309,11 @@ const (
 type TenantRole string
 
 const (
-	TenantRoleOwner     TenantRole = "owner"
-	TenantRoleAdmin     TenantRole = "admin"
-	TenantRoleMember    TenantRole = "member"
-	TenantRoleViewer    TenantRole = "viewer"
-	TenantRoleGuest     TenantRole = "guest"
+	TenantRoleOwner  TenantRole = "owner"
+	TenantRoleAdmin  TenantRole = "admin"
+	TenantRoleMember TenantRole = "member"
+	TenantRoleViewer TenantRole = "viewer"
+	TenantRoleGuest  TenantRole = "guest"
 )
 
 // Permission represents specific permissions
@@ -321,44 +321,44 @@ type Permission string
 
 const (
 	// System permissions
-	PermissionSystemRead   Permission = "system:read"
-	PermissionSystemWrite  Permission = "system:write"
-	PermissionSystemAdmin  Permission = "system:admin"
-	
+	PermissionSystemRead  Permission = "system:read"
+	PermissionSystemWrite Permission = "system:write"
+	PermissionSystemAdmin Permission = "system:admin"
+
 	// User permissions
-	PermissionUserRead     Permission = "user:read"
-	PermissionUserWrite    Permission = "user:write"
-	PermissionUserDelete   Permission = "user:delete"
-	PermissionUserAdmin    Permission = "user:admin"
-	
+	PermissionUserRead   Permission = "user:read"
+	PermissionUserWrite  Permission = "user:write"
+	PermissionUserDelete Permission = "user:delete"
+	PermissionUserAdmin  Permission = "user:admin"
+
 	// Tenant permissions
 	PermissionTenantRead   Permission = "tenant:read"
 	PermissionTenantWrite  Permission = "tenant:write"
 	PermissionTenantDelete Permission = "tenant:delete"
 	PermissionTenantAdmin  Permission = "tenant:admin"
-	
+
 	// Data permissions
-	PermissionDataRead     Permission = "data:read"
-	PermissionDataWrite    Permission = "data:write"
-	PermissionDataDelete   Permission = "data:delete"
-	PermissionDataProcess  Permission = "data:process"
-	PermissionDataExport   Permission = "data:export"
-	
+	PermissionDataRead    Permission = "data:read"
+	PermissionDataWrite   Permission = "data:write"
+	PermissionDataDelete  Permission = "data:delete"
+	PermissionDataProcess Permission = "data:process"
+	PermissionDataExport  Permission = "data:export"
+
 	// API permissions
-	PermissionAPIRead      Permission = "api:read"
-	PermissionAPIWrite     Permission = "api:write"
-	PermissionAPIAdmin     Permission = "api:admin"
-	
+	PermissionAPIRead  Permission = "api:read"
+	PermissionAPIWrite Permission = "api:write"
+	PermissionAPIAdmin Permission = "api:admin"
+
 	// Workflow permissions
-	PermissionWorkflowRead   Permission = "workflow:read"
-	PermissionWorkflowWrite  Permission = "workflow:write"
+	PermissionWorkflowRead    Permission = "workflow:read"
+	PermissionWorkflowWrite   Permission = "workflow:write"
 	PermissionWorkflowExecute Permission = "workflow:execute"
-	PermissionWorkflowAdmin  Permission = "workflow:admin"
-	
+	PermissionWorkflowAdmin   Permission = "workflow:admin"
+
 	// Classification permissions
-	PermissionClassifyRead   Permission = "classify:read"
-	PermissionClassifyWrite  Permission = "classify:write"
-	PermissionClassifyAdmin  Permission = "classify:admin"
+	PermissionClassifyRead  Permission = "classify:read"
+	PermissionClassifyWrite Permission = "classify:write"
+	PermissionClassifyAdmin Permission = "classify:admin"
 )
 
 // UserStatus represents user status
@@ -410,67 +410,67 @@ var (
 		Code:    "INVALID_CREDENTIALS",
 		Message: "Invalid username or password",
 	}
-	
+
 	ErrUserNotFound = &AuthError{
 		Code:    "USER_NOT_FOUND",
 		Message: "User not found",
 	}
-	
+
 	ErrUserInactive = &AuthError{
 		Code:    "USER_INACTIVE",
 		Message: "User account is inactive",
 	}
-	
+
 	ErrUserSuspended = &AuthError{
 		Code:    "USER_SUSPENDED",
 		Message: "User account is suspended",
 	}
-	
+
 	ErrUserExpired = &AuthError{
 		Code:    "USER_EXPIRED",
 		Message: "User account has expired",
 	}
-	
+
 	ErrInvalidToken = &AuthError{
 		Code:    "INVALID_TOKEN",
 		Message: "Invalid or expired token",
 	}
-	
+
 	ErrTokenRevoked = &AuthError{
 		Code:    "TOKEN_REVOKED",
 		Message: "Token has been revoked",
 	}
-	
+
 	ErrPermissionDenied = &AuthError{
 		Code:    "PERMISSION_DENIED",
 		Message: "Permission denied",
 	}
-	
+
 	ErrTenantNotFound = &AuthError{
 		Code:    "TENANT_NOT_FOUND",
 		Message: "Tenant not found",
 	}
-	
+
 	ErrTenantInactive = &AuthError{
 		Code:    "TENANT_INACTIVE",
 		Message: "Tenant is inactive",
 	}
-	
+
 	ErrUserAlreadyExists = &AuthError{
 		Code:    "USER_ALREADY_EXISTS",
 		Message: "User already exists",
 	}
-	
+
 	ErrTenantAlreadyExists = &AuthError{
 		Code:    "TENANT_ALREADY_EXISTS",
 		Message: "Tenant already exists",
 	}
-	
+
 	ErrWeakPassword = &AuthError{
 		Code:    "WEAK_PASSWORD",
 		Message: "Password does not meet security requirements",
 	}
-	
+
 	ErrTooManyAttempts = &AuthError{
 		Code:    "TOO_MANY_ATTEMPTS",
 		Message: "Too many failed login attempts",

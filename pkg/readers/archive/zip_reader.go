@@ -14,6 +14,22 @@ import (
 	"github.com/jscharber/eAIIngest/pkg/core"
 )
 
+// getCompressionMethodName returns the name of the compression method
+func getCompressionMethodName(method uint16) string {
+	switch method {
+	case 0:
+		return "Store"
+	case 8:
+		return "Deflate"
+	case 12:
+		return "BZip2"
+	case 14:
+		return "LZMA"
+	default:
+		return fmt.Sprintf("Method_%d", method)
+	}
+}
+
 // ZIPReader implements DataSourceReader for ZIP archives
 type ZIPReader struct {
 	name    string
@@ -136,7 +152,7 @@ func (r *ZIPReader) TestConnection(ctx context.Context, config map[string]any) c
 		Details: map[string]any{
 			"extract_nested_archives": config["extract_nested_archives"],
 			"skip_binary_files":       config["skip_binary_files"],
-			"max_file_size":          config["max_file_size"],
+			"max_file_size":           config["max_file_size"],
 		},
 	}
 }
@@ -215,16 +231,16 @@ func (r *ZIPReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 			},
 		},
 		Metadata: map[string]any{
-			"total_files":        metadata.TotalFiles,
-			"total_directories":  metadata.TotalDirectories,
-			"compressed_size":    metadata.CompressedSize,
-			"uncompressed_size":  metadata.UncompressedSize,
-			"compression_ratio":  metadata.CompressionRatio,
-			"created_date":       metadata.CreatedDate,
-			"has_directories":    metadata.HasDirectories,
+			"total_files":         metadata.TotalFiles,
+			"total_directories":   metadata.TotalDirectories,
+			"compressed_size":     metadata.CompressedSize,
+			"uncompressed_size":   metadata.UncompressedSize,
+			"compression_ratio":   metadata.CompressionRatio,
+			"created_date":        metadata.CreatedDate,
+			"has_directories":     metadata.HasDirectories,
 			"has_encrypted_files": metadata.HasEncryptedFiles,
-			"compression_method": metadata.CompressionMethod,
-			"archive_comment":    metadata.Comment,
+			"compression_method":  metadata.CompressionMethod,
+			"archive_comment":     metadata.Comment,
 		},
 	}
 
@@ -304,10 +320,10 @@ func (r *ZIPReader) CreateIterator(ctx context.Context, sourcePath string, strat
 	}
 
 	iterator := &ZIPIterator{
-		sourcePath:   sourcePath,
-		config:       strategyConfig,
-		archive:      archive,
-		currentFile:  0,
+		sourcePath:  sourcePath,
+		config:      strategyConfig,
+		archive:     archive,
+		currentFile: 0,
 	}
 
 	return iterator, nil
@@ -346,16 +362,16 @@ type ZIPArchive struct {
 
 // ZIPFileInfo represents a file within the archive
 type ZIPFileInfo struct {
-	Name             string
-	Path             string
-	Size             int64
-	CompressedSize   int64
-	ModifiedTime     time.Time
-	IsDirectory      bool
-	IsEncrypted      bool
+	Name              string
+	Path              string
+	Size              int64
+	CompressedSize    int64
+	ModifiedTime      time.Time
+	IsDirectory       bool
+	IsEncrypted       bool
 	CompressionMethod string
-	CRC32            uint32
-	FileHeader       *zip.File
+	CRC32             uint32
+	FileHeader        *zip.File
 }
 
 // ptrFloat64 returns a pointer to a float64 value
@@ -395,9 +411,9 @@ func (r *ZIPReader) extractZIPMetadata(sourcePath string) (ZIPMetadata, error) {
 	}
 
 	metadata := ZIPMetadata{
-		CreatedDate:      stat.ModTime().Format("2006-01-02 15:04:05"),
+		CreatedDate:       stat.ModTime().Format("2006-01-02 15:04:05"),
 		CompressionMethod: "Deflate",
-		Comment:          reader.Comment,
+		Comment:           reader.Comment,
 	}
 
 	var totalCompressed, totalUncompressed int64
@@ -414,7 +430,7 @@ func (r *ZIPReader) extractZIPMetadata(sourcePath string) (ZIPMetadata, error) {
 		totalCompressed += int64(file.CompressedSize64)
 		totalUncompressed += int64(file.UncompressedSize64)
 
-		if file.IsEncrypted() {
+		if file.Flags&0x1 != 0 {
 			hasEncrypted = true
 		}
 	}
@@ -542,16 +558,16 @@ func (r *ZIPReader) openZIPArchive(sourcePath string, config map[string]any) (*Z
 		}
 
 		fileInfo := &ZIPFileInfo{
-			Name:             filepath.Base(file.Name),
-			Path:             file.Name,
-			Size:             int64(file.UncompressedSize64),
-			CompressedSize:   int64(file.CompressedSize64),
-			ModifiedTime:     file.Modified,
-			IsDirectory:      file.FileInfo().IsDir(),
-			IsEncrypted:      file.IsEncrypted(),
-			CompressionMethod: file.Method.String(),
-			CRC32:            file.CRC32,
-			FileHeader:       file,
+			Name:              filepath.Base(file.Name),
+			Path:              file.Name,
+			Size:              int64(file.UncompressedSize64),
+			CompressedSize:    int64(file.CompressedSize64),
+			ModifiedTime:      file.Modified,
+			IsDirectory:       file.FileInfo().IsDir(),
+			IsEncrypted:       file.Flags&0x1 != 0,
+			CompressionMethod: getCompressionMethodName(file.Method),
+			CRC32:             file.CRC32,
+			FileHeader:        file,
 		}
 
 		files = append(files, fileInfo)

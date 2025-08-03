@@ -179,7 +179,7 @@ func (r *PNGReader) TestConnection(ctx context.Context, config map[string]any) c
 
 	// Check OCR dependencies
 	dependencies := r.checkOCRDependencies()
-	
+
 	return core.ConnectionTestResult{
 		Success: len(dependencies) == 0,
 		Message: func() string {
@@ -201,17 +201,17 @@ func (r *PNGReader) TestConnection(ctx context.Context, config map[string]any) c
 // checkOCRDependencies verifies OCR tools are available
 func (r *PNGReader) checkOCRDependencies() []string {
 	var missing []string
-	
+
 	// Check for tesseract (OCR engine)
 	if !r.commandExists("tesseract") {
 		missing = append(missing, "tesseract (install tesseract-ocr)")
 	}
-	
+
 	// Check for ImageMagick (image processing)
 	if !r.commandExists("convert") {
 		missing = append(missing, "convert (install imagemagick)")
 	}
-	
+
 	return missing
 }
 
@@ -302,20 +302,20 @@ func (r *PNGReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 			},
 		},
 		Metadata: map[string]any{
-			"file_size":       stat.Size(),
-			"width":           width,
-			"height":          height,
-			"color_model":     r.getColorModelName(img.ColorModel()),
-			"aspect_ratio":    float64(width) / float64(height),
-			"pixel_count":     width * height,
-			"has_alpha":       pngInfo.HasAlpha,
-			"bit_depth":       pngInfo.BitDepth,
-			"color_type":      pngInfo.ColorType,
-			"compression":     pngInfo.Compression,
-			"interlace":       pngInfo.Interlace,
-			"creation_time":   pngInfo.CreationTime,
-			"software":        pngInfo.Software,
-			"has_text":        pngInfo.HasText,
+			"file_size":     stat.Size(),
+			"width":         width,
+			"height":        height,
+			"color_model":   r.getColorModelName(img.ColorModel()),
+			"aspect_ratio":  float64(width) / float64(height),
+			"pixel_count":   width * height,
+			"has_alpha":     pngInfo.HasAlpha,
+			"bit_depth":     pngInfo.BitDepth,
+			"color_type":    pngInfo.ColorType,
+			"compression":   pngInfo.Compression,
+			"interlace":     pngInfo.Interlace,
+			"creation_time": pngInfo.CreationTime,
+			"software":      pngInfo.Software,
+			"has_text":      pngInfo.HasText,
 		},
 	}
 
@@ -409,22 +409,21 @@ func (r *PNGReader) GetSupportedFormats() []string {
 
 // PNGInfo contains extracted PNG metadata
 type PNGInfo struct {
-	HasAlpha      bool
-	BitDepth      int
-	ColorType     string
-	Compression   string
-	Interlace     string
-	CreationTime  string
-	Software      string
-	HasText       bool
+	HasAlpha     bool
+	BitDepth     int
+	ColorType    string
+	Compression  string
+	Interlace    string
+	CreationTime string
+	Software     string
+	HasText      bool
 }
-
 
 // extractPNGInfo extracts metadata from PNG file
 func (r *PNGReader) extractPNGInfo(sourcePath string) PNGInfo {
 	// This is a simplified PNG metadata extractor
 	// In production, you'd parse PNG chunks for metadata
-	
+
 	info := PNGInfo{
 		BitDepth:    8, // Common default
 		ColorType:   "RGB",
@@ -477,9 +476,9 @@ func (r *PNGReader) performOCR(sourcePath string, config map[string]any) (string
 	ocrText := fmt.Sprintf("This is sample OCR text extracted from the PNG image. " +
 		"In a production implementation, this would be the actual text recognized by Tesseract OCR " +
 		"from the image content.")
-	
+
 	confidence := 0.85 // Mock confidence score
-	
+
 	// Mock text regions
 	regions := []TextRegion{
 		{
@@ -539,7 +538,7 @@ func (it *PNGIterator) Next(ctx context.Context) (core.Chunk, error) {
 	var content string
 	var confidence float64
 	var regions []TextRegion
-	
+
 	if ocrEnabled, ok := it.config["ocr_enabled"]; !ok || ocrEnabled.(bool) {
 		var err error
 		content, confidence, regions, err = it.reader.performOCR(it.sourcePath, it.config)
@@ -617,4 +616,3 @@ func (it *PNGIterator) Progress() float64 {
 	}
 	return 0.0
 }
-

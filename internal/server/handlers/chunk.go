@@ -24,44 +24,44 @@ func NewChunkHandler(db *database.Database) *ChunkHandler {
 
 // ChunkResponse represents a chunk response
 type ChunkResponse struct {
-	ID               uuid.UUID                      `json:"id"`
-	TenantID         uuid.UUID                      `json:"tenant_id"`
-	FileID           uuid.UUID                      `json:"file_id"`
-	ChunkID          string                         `json:"chunk_id"`
-	ChunkType        string                         `json:"chunk_type"`
-	ChunkNumber      int                            `json:"chunk_number"`
-	Content          string                         `json:"content"`
-	ContentHash      string                         `json:"content_hash"`
-	SizeBytes        int64                          `json:"size_bytes"`
-	StartPosition    *int64                         `json:"start_position,omitempty"`
-	EndPosition      *int64                         `json:"end_position,omitempty"`
-	PageNumber       *int                           `json:"page_number,omitempty"`
-	LineNumber       *int                           `json:"line_number,omitempty"`
-	ParentChunkID    *uuid.UUID                     `json:"parent_chunk_id,omitempty"`
-	Relationships    []string                       `json:"relationships,omitempty"`
-	ProcessedAt      string                         `json:"processed_at"`
-	ProcessedBy      string                         `json:"processed_by"`
-	ProcessingTime   int64                          `json:"processing_time"`
-	Quality          models.ChunkQualityMetrics     `json:"quality"`
-	Language         string                         `json:"language,omitempty"`
-	LanguageConf     float64                        `json:"language_confidence,omitempty"`
-	ContentCategory  string                         `json:"content_category,omitempty"`
-	SensitivityLevel string                         `json:"sensitivity_level,omitempty"`
-	Classifications  []string                       `json:"classifications,omitempty"`
-	EmbeddingStatus  string                         `json:"embedding_status"`
-	EmbeddingModel   string                         `json:"embedding_model,omitempty"`
-	EmbeddingDim     int                            `json:"embedding_dimension,omitempty"`
-	EmbeddedAt       *string                        `json:"embedded_at,omitempty"`
-	PIIDetected      bool                           `json:"pii_detected"`
-	ComplianceFlags  []string                       `json:"compliance_flags,omitempty"`
-	DLPScanStatus    string                         `json:"dlp_scan_status"`
-	DLPScanResult    string                         `json:"dlp_scan_result,omitempty"`
-	Context          map[string]string              `json:"context,omitempty"`
-	SchemaInfo       map[string]interface{}         `json:"schema_info,omitempty"`
-	Metadata         map[string]interface{}         `json:"metadata,omitempty"`
-	CustomFields     map[string]interface{}         `json:"custom_fields,omitempty"`
-	CreatedAt        string                         `json:"created_at"`
-	UpdatedAt        string                         `json:"updated_at"`
+	ID               uuid.UUID                  `json:"id"`
+	TenantID         uuid.UUID                  `json:"tenant_id"`
+	FileID           uuid.UUID                  `json:"file_id"`
+	ChunkID          string                     `json:"chunk_id"`
+	ChunkType        string                     `json:"chunk_type"`
+	ChunkNumber      int                        `json:"chunk_number"`
+	Content          string                     `json:"content"`
+	ContentHash      string                     `json:"content_hash"`
+	SizeBytes        int64                      `json:"size_bytes"`
+	StartPosition    *int64                     `json:"start_position,omitempty"`
+	EndPosition      *int64                     `json:"end_position,omitempty"`
+	PageNumber       *int                       `json:"page_number,omitempty"`
+	LineNumber       *int                       `json:"line_number,omitempty"`
+	ParentChunkID    *uuid.UUID                 `json:"parent_chunk_id,omitempty"`
+	Relationships    []string                   `json:"relationships,omitempty"`
+	ProcessedAt      string                     `json:"processed_at"`
+	ProcessedBy      string                     `json:"processed_by"`
+	ProcessingTime   int64                      `json:"processing_time"`
+	Quality          models.ChunkQualityMetrics `json:"quality"`
+	Language         string                     `json:"language,omitempty"`
+	LanguageConf     float64                    `json:"language_confidence,omitempty"`
+	ContentCategory  string                     `json:"content_category,omitempty"`
+	SensitivityLevel string                     `json:"sensitivity_level,omitempty"`
+	Classifications  []string                   `json:"classifications,omitempty"`
+	EmbeddingStatus  string                     `json:"embedding_status"`
+	EmbeddingModel   string                     `json:"embedding_model,omitempty"`
+	EmbeddingDim     int                        `json:"embedding_dimension,omitempty"`
+	EmbeddedAt       *string                    `json:"embedded_at,omitempty"`
+	PIIDetected      bool                       `json:"pii_detected"`
+	ComplianceFlags  []string                   `json:"compliance_flags,omitempty"`
+	DLPScanStatus    string                     `json:"dlp_scan_status"`
+	DLPScanResult    string                     `json:"dlp_scan_result,omitempty"`
+	Context          map[string]string          `json:"context,omitempty"`
+	SchemaInfo       map[string]interface{}     `json:"schema_info,omitempty"`
+	Metadata         map[string]interface{}     `json:"metadata,omitempty"`
+	CustomFields     map[string]interface{}     `json:"custom_fields,omitempty"`
+	CreatedAt        string                     `json:"created_at"`
+	UpdatedAt        string                     `json:"updated_at"`
 }
 
 // ChunkSearchRequest represents a chunk search request
@@ -84,7 +84,7 @@ func (h *ChunkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	path := r.URL.Path
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	
+
 	// Find chunks in the path
 	var chunkIndex int = -1
 	for i, part := range parts {
@@ -177,7 +177,7 @@ func (h *ChunkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ListChunks handles GET /api/v1/tenants/{tenant_id}/chunks
 func (h *ChunkHandler) ListChunks(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	page, pageSize, offset := getPagination(r.Context())
-	
+
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
 	if err != nil {
@@ -187,35 +187,35 @@ func (h *ChunkHandler) ListChunks(w http.ResponseWriter, r *http.Request, tenant
 
 	var chunks []models.Chunk
 	query := tenantRepo.DB().Limit(pageSize).Offset(offset).Order("created_at DESC")
-	
+
 	// Apply filters
 	if fileID := r.URL.Query().Get("file_id"); fileID != "" {
 		if fID, err := uuid.Parse(fileID); err == nil {
 			query = query.Where("file_id = ?", fID)
 		}
 	}
-	
+
 	if chunkType := r.URL.Query().Get("chunk_type"); chunkType != "" {
 		query = query.Where("chunk_type = ?", chunkType)
 	}
-	
+
 	if embeddingStatus := r.URL.Query().Get("embedding_status"); embeddingStatus != "" {
 		query = query.Where("embedding_status = ?", embeddingStatus)
 	}
-	
+
 	if dlpStatus := r.URL.Query().Get("dlp_scan_status"); dlpStatus != "" {
 		query = query.Where("dlp_scan_status = ?", dlpStatus)
 	}
-	
+
 	if piiDetected := r.URL.Query().Get("pii_detected"); piiDetected != "" {
 		detected := piiDetected == "true"
 		query = query.Where("pii_detected = ?", detected)
 	}
-	
+
 	if language := r.URL.Query().Get("language"); language != "" {
 		query = query.Where("language = ?", language)
 	}
-	
+
 	err = query.Find(&chunks).Error
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to list chunks", err.Error())
@@ -275,7 +275,7 @@ func (h *ChunkHandler) UpdateChunk(w http.ResponseWriter, r *http.Request, tenan
 		Metadata         map[string]interface{}     `json:"metadata"`
 		CustomFields     map[string]interface{}     `json:"custom_fields"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteBadRequest(w, getRequestID(r), "Invalid JSON request", err.Error())
 		return
@@ -375,7 +375,7 @@ func (h *ChunkHandler) SearchChunks(w http.ResponseWriter, r *http.Request, tena
 
 	// Build search query
 	query := tenantRepo.DB()
-	
+
 	// Text search using PostgreSQL full-text search
 	if req.Query != "" {
 		query = query.Where("to_tsvector('english', content) @@ plainto_tsquery('english', ?)", req.Query)
@@ -463,11 +463,11 @@ func (h *ChunkHandler) GetChunkEmbedding(w http.ResponseWriter, r *http.Request,
 	}
 
 	embedding := map[string]interface{}{
-		"chunk_id":  chunk.ID,
-		"vector":    chunk.EmbeddingVector,
-		"dimension": chunk.EmbeddingDim,
-		"model":     chunk.EmbeddingModel,
-		"status":    chunk.EmbeddingStatus,
+		"chunk_id":    chunk.ID,
+		"vector":      chunk.EmbeddingVector,
+		"dimension":   chunk.EmbeddingDim,
+		"model":       chunk.EmbeddingModel,
+		"status":      chunk.EmbeddingStatus,
 		"embedded_at": chunk.EmbeddedAt,
 	}
 
@@ -502,7 +502,7 @@ func (h *ChunkHandler) FindSimilarChunks(w http.ResponseWriter, r *http.Request,
 
 	// TODO: Implement actual vector similarity search
 	// This would involve comparing embedding vectors using cosine similarity or other metrics
-	
+
 	// For now, return a mock response
 	similarChunks := []map[string]interface{}{
 		// Mock similar chunks
@@ -606,11 +606,11 @@ func (h *ChunkHandler) GetChunkRelationships(w http.ResponseWriter, r *http.Requ
 	}
 
 	relationships := map[string]interface{}{
-		"chunk_id":      chunkID,
-		"parent_chunk":  parentChunk,
-		"child_chunks":  childChunks,
+		"chunk_id":       chunkID,
+		"parent_chunk":   parentChunk,
+		"child_chunks":   childChunks,
 		"related_chunks": relatedChunks,
-		"relationships": chunk.Relationships,
+		"relationships":  chunk.Relationships,
 	}
 
 	response.WriteSuccess(w, getRequestID(r), relationships, nil)

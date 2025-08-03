@@ -10,6 +10,13 @@ import (
 	"github.com/jscharber/eAIIngest/pkg/chunking"
 )
 
+const (
+	// NanosecondsToMilliseconds converts nanoseconds to milliseconds
+	NanosecondsToMilliseconds = 1e6
+	// AverageWeightFactor for calculating running averages
+	AverageWeightFactor = 2
+)
+
 // embeddingService implements the EmbeddingService interface
 type embeddingService struct {
 	provider    EmbeddingProvider
@@ -22,17 +29,17 @@ type embeddingService struct {
 func NewEmbeddingService(provider EmbeddingProvider, vectorStore VectorStore, config *ServiceConfig) EmbeddingService {
 	if config == nil {
 		config = &ServiceConfig{
-			DefaultDataset:  "default",
-			ChunkSize:       1000,
-			ChunkOverlap:    100,
-			BatchSize:       10,
-			MaxConcurrency:  5,
-			CacheEnabled:    true,
-			CacheTTL:        24 * time.Hour,
-			MetricsEnabled:  true,
-			DefaultTopK:     10,
+			DefaultDataset:   "default",
+			ChunkSize:        1000,
+			ChunkOverlap:     100,
+			BatchSize:        10,
+			MaxConcurrency:   5,
+			CacheEnabled:     true,
+			CacheTTL:         24 * time.Hour,
+			MetricsEnabled:   true,
+			DefaultTopK:      10,
 			DefaultThreshold: 0.7,
-			DefaultMetric:   "cosine",
+			DefaultMetric:    "cosine",
 		}
 	}
 
@@ -41,7 +48,7 @@ func NewEmbeddingService(provider EmbeddingProvider, vectorStore VectorStore, co
 		vectorStore: vectorStore,
 		config:      config,
 		stats: &ServiceStats{
-			LastUpdated: time.Now(),
+			LastUpdated:   time.Now(),
 			ProviderStats: make(map[string]interface{}),
 		},
 	}
@@ -50,7 +57,7 @@ func NewEmbeddingService(provider EmbeddingProvider, vectorStore VectorStore, co
 // ProcessDocument processes a document and stores its embeddings
 func (s *embeddingService) ProcessDocument(ctx context.Context, request *ProcessDocumentRequest) (*ProcessDocumentResponse, error) {
 	startTime := time.Now()
-	
+
 	// Validate request
 	if err := s.validateProcessDocumentRequest(request); err != nil {
 		return nil, err
@@ -69,10 +76,10 @@ func (s *embeddingService) ProcessDocument(ctx context.Context, request *Process
 		}
 		if exists && !request.Overwrite {
 			return &ProcessDocumentResponse{
-				DocumentID:     request.DocumentID,
-				Status:         "skipped",
-				Message:        "document already exists",
-				CreatedAt:      time.Now(),
+				DocumentID: request.DocumentID,
+				Status:     "skipped",
+				Message:    "document already exists",
+				CreatedAt:  time.Now(),
 			}, nil
 		}
 	}
@@ -109,11 +116,11 @@ func (s *embeddingService) ProcessDocument(ctx context.Context, request *Process
 
 	// Process chunks
 	processChunksRequest := &ProcessChunksRequest{
-		Chunks:   chunkInputs,
-		Dataset:  request.Dataset,
-		TenantID: request.TenantID,
+		Chunks:    chunkInputs,
+		Dataset:   request.Dataset,
+		TenantID:  request.TenantID,
 		BatchSize: s.config.BatchSize,
-		Async:    request.Async,
+		Async:     request.Async,
 	}
 
 	chunksResponse, err := s.ProcessChunks(ctx, processChunksRequest)
@@ -121,20 +128,20 @@ func (s *embeddingService) ProcessDocument(ctx context.Context, request *Process
 		return nil, err
 	}
 
-	processingTime := float64(time.Since(startTime).Nanoseconds()) / 1e6
+	processingTime := float64(time.Since(startTime).Nanoseconds()) / NanosecondsToMilliseconds
 
 	// Update stats
 	s.updateProcessingStats(len(chunks), chunksResponse.VectorsCreated, processingTime)
 
 	return &ProcessDocumentResponse{
-		DocumentID:      request.DocumentID,
-		ChunksCreated:   len(chunks),
-		VectorsCreated:  chunksResponse.VectorsCreated,
-		ProcessingTime:  processingTime,
-		TotalTokens:     chunksResponse.TotalTokens,
-		EstimatedCost:   chunksResponse.EstimatedCost,
-		Status:          "completed",
-		CreatedAt:       time.Now(),
+		DocumentID:     request.DocumentID,
+		ChunksCreated:  len(chunks),
+		VectorsCreated: chunksResponse.VectorsCreated,
+		ProcessingTime: processingTime,
+		TotalTokens:    chunksResponse.TotalTokens,
+		EstimatedCost:  chunksResponse.EstimatedCost,
+		Status:         "completed",
+		CreatedAt:      time.Now(),
 	}, nil
 }
 
@@ -242,7 +249,7 @@ func (s *embeddingService) ProcessChunks(ctx context.Context, request *ProcessCh
 		totalCost = float64(totalTokens) * modelInfo.CostPerToken
 	}
 
-	processingTime := float64(time.Since(startTime).Nanoseconds()) / 1e6
+	processingTime := float64(time.Since(startTime).Nanoseconds()) / NanosecondsToMilliseconds
 	status := "completed"
 	if len(errors) > 0 {
 		if vectorsCreated == 0 {
@@ -286,7 +293,7 @@ func (s *embeddingService) SearchDocuments(ctx context.Context, request *SearchR
 		}
 	}
 
-	embeddingTime := float64(time.Since(startTime).Nanoseconds()) / 1e6
+	embeddingTime := float64(time.Since(startTime).Nanoseconds()) / NanosecondsToMilliseconds
 
 	// Prepare search options
 	searchOptions := request.Options
@@ -317,7 +324,7 @@ func (s *embeddingService) SearchDocuments(ctx context.Context, request *SearchR
 	if err != nil {
 		return nil, err
 	}
-	databaseTime := float64(time.Since(searchStartTime).Nanoseconds()) / 1e6
+	databaseTime := float64(time.Since(searchStartTime).Nanoseconds()) / NanosecondsToMilliseconds
 
 	// Apply post-processing if needed
 	results := searchResult.Results
@@ -328,7 +335,7 @@ func (s *embeddingService) SearchDocuments(ctx context.Context, request *SearchR
 		results = s.deduplicateResults(results)
 	}
 
-	queryTime := float64(time.Since(startTime).Nanoseconds()) / 1e6
+	queryTime := float64(time.Since(startTime).Nanoseconds()) / NanosecondsToMilliseconds
 
 	// Update search stats
 	s.updateSearchStats(len(results), queryTime)
@@ -439,15 +446,15 @@ func (s *embeddingService) GetStats(ctx context.Context) (*ServiceStats, error) 
 	datasets, err := s.vectorStore.ListDatasets(ctx)
 	if err == nil {
 		s.stats.TotalDatasets = len(datasets)
-		
+
 		var totalVectors int64
 		var totalStorage int64
-		
+
 		for _, dataset := range datasets {
 			totalVectors += dataset.VectorCount
 			totalStorage += dataset.StorageSize
 		}
-		
+
 		s.stats.TotalVectors = totalVectors
 		s.stats.StorageUsage = totalStorage
 	}
@@ -529,7 +536,7 @@ func (s *embeddingService) ensureDatasetExists(ctx context.Context, datasetName 
 	return s.vectorStore.CreateDataset(ctx, config)
 }
 
-func (s *embeddingService) documentExists(ctx context.Context, dataset, documentID string) (bool, error) {
+func (s *embeddingService) documentExists(ctx context.Context, _ /* dataset */, documentID string) (bool, error) {
 	vectors, err := s.GetDocumentVectors(ctx, documentID)
 	if err != nil {
 		return false, err
@@ -556,34 +563,34 @@ func (s *embeddingService) chunkDocument(content string, chunkSize, chunkOverlap
 	for i, chunk := range chunks {
 		result[i] = chunk.Content
 	}
-	
+
 	return result, nil
 }
 
 func (s *embeddingService) groupResultsByDocument(results []*SimilarityResult) []*SimilarityResult {
 	// Group results by document ID and keep the best result for each document
 	docMap := make(map[string]*SimilarityResult)
-	
+
 	for _, result := range results {
 		docID := result.DocumentVector.DocumentID
 		if existing, exists := docMap[docID]; !exists || result.Score > existing.Score {
 			docMap[docID] = result
 		}
 	}
-	
+
 	// Convert back to slice
 	grouped := make([]*SimilarityResult, 0, len(docMap))
 	for _, result := range docMap {
 		grouped = append(grouped, result)
 	}
-	
+
 	return grouped
 }
 
 func (s *embeddingService) deduplicateResults(results []*SimilarityResult) []*SimilarityResult {
 	seen := make(map[string]bool)
 	deduplicated := make([]*SimilarityResult, 0, len(results))
-	
+
 	for _, result := range results {
 		// Use content hash for deduplication
 		hash := result.DocumentVector.ContentHash
@@ -591,35 +598,35 @@ func (s *embeddingService) deduplicateResults(results []*SimilarityResult) []*Si
 			// Fallback to content if no hash
 			hash = result.DocumentVector.Content
 		}
-		
+
 		if !seen[hash] {
 			seen[hash] = true
 			deduplicated = append(deduplicated, result)
 		}
 	}
-	
+
 	return deduplicated
 }
 
 func (s *embeddingService) updateProcessingStats(chunksProcessed, vectorsCreated int, processingTime float64) {
 	s.stats.TotalDocuments++
 	s.stats.TotalVectors += int64(vectorsCreated)
-	
+
 	// Update average processing time
 	if s.stats.TotalDocuments == 1 {
 		s.stats.AvgProcessingTime = processingTime
 	} else {
-		s.stats.AvgProcessingTime = (s.stats.AvgProcessingTime + processingTime) / 2
+		s.stats.AvgProcessingTime = (s.stats.AvgProcessingTime + processingTime) / AverageWeightFactor
 	}
 }
 
 func (s *embeddingService) updateSearchStats(resultCount int, queryTime float64) {
 	s.stats.TotalSearches++
-	
+
 	// Update average search time
 	if s.stats.TotalSearches == 1 {
 		s.stats.AvgSearchTime = queryTime
 	} else {
-		s.stats.AvgSearchTime = (s.stats.AvgSearchTime + queryTime) / 2
+		s.stats.AvgSearchTime = (s.stats.AvgSearchTime + queryTime) / AverageWeightFactor
 	}
 }

@@ -122,12 +122,12 @@ func (a *TimeSeriesAggregator) GetTimeWindow() time.Duration {
 
 func (a *TimeSeriesAggregator) groupSamples(samples []*MetricSample) map[string][]*MetricSample {
 	groups := make(map[string][]*MetricSample)
-	
+
 	for _, sample := range samples {
 		key := fmt.Sprintf("%s:%s", sample.MetricType, sample.MetricName)
 		groups[key] = append(groups[key], sample)
 	}
-	
+
 	return groups
 }
 
@@ -135,7 +135,7 @@ func (a *TimeSeriesAggregator) calculateMin(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	
+
 	min := values[0]
 	for _, v := range values[1:] {
 		if v < min {
@@ -149,7 +149,7 @@ func (a *TimeSeriesAggregator) calculateMax(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	
+
 	max := values[0]
 	for _, v := range values[1:] {
 		if v > max {
@@ -163,13 +163,13 @@ func (a *TimeSeriesAggregator) calculateStdDev(values []float64, mean float64) f
 	if len(values) <= 1 {
 		return 0
 	}
-	
+
 	var sumSquaredDiffs float64
 	for _, v := range values {
 		diff := v - mean
 		sumSquaredDiffs += diff * diff
 	}
-	
+
 	variance := sumSquaredDiffs / float64(len(values)-1)
 	return math.Sqrt(variance)
 }
@@ -178,19 +178,19 @@ func (a *TimeSeriesAggregator) calculatePercentiles(values []float64) map[string
 	if len(values) == 0 {
 		return map[string]float64{}
 	}
-	
+
 	// Sort values for percentile calculation
 	sorted := make([]float64, len(values))
 	copy(sorted, values)
 	sort.Float64s(sorted)
-	
+
 	percentiles := map[string]float64{
 		"P50": a.percentile(sorted, 0.50),
 		"P90": a.percentile(sorted, 0.90),
 		"P95": a.percentile(sorted, 0.95),
 		"P99": a.percentile(sorted, 0.99),
 	}
-	
+
 	return percentiles
 }
 
@@ -198,19 +198,19 @@ func (a *TimeSeriesAggregator) percentile(sortedValues []float64, p float64) flo
 	if len(sortedValues) == 0 {
 		return 0
 	}
-	
+
 	if len(sortedValues) == 1 {
 		return sortedValues[0]
 	}
-	
+
 	index := p * float64(len(sortedValues)-1)
 	lower := int(math.Floor(index))
 	upper := int(math.Ceil(index))
-	
+
 	if lower == upper {
 		return sortedValues[lower]
 	}
-	
+
 	weight := index - float64(lower)
 	return sortedValues[lower]*(1-weight) + sortedValues[upper]*weight
 }
@@ -242,7 +242,7 @@ func (a *StatisticalAggregator) Aggregate(ctx context.Context, samples []*Metric
 
 	// Group samples by metric
 	groupedSamples := a.groupSamplesByMetric(samples)
-	
+
 	// For now, aggregate the first group
 	var firstGroup []*MetricSample
 	for _, group := range groupedSamples {
@@ -280,12 +280,12 @@ func (a *StatisticalAggregator) Aggregate(ctx context.Context, samples []*Metric
 
 	// Add statistical metadata
 	aggregated.Metadata = map[string]interface{}{
-		"median":    aggregated.Percentiles["P50"],
-		"iqr":       aggregated.Percentiles["P75"] - aggregated.Percentiles["P25"],
-		"skewness":  a.calculateSkewness(values, aggregated.Average, aggregated.StdDev),
-		"kurtosis":  a.calculateKurtosis(values, aggregated.Average, aggregated.StdDev),
-		"variance":  aggregated.StdDev * aggregated.StdDev,
-		"range":     aggregated.Max - aggregated.Min,
+		"median":   aggregated.Percentiles["P50"],
+		"iqr":      aggregated.Percentiles["P75"] - aggregated.Percentiles["P25"],
+		"skewness": a.calculateSkewness(values, aggregated.Average, aggregated.StdDev),
+		"kurtosis": a.calculateKurtosis(values, aggregated.Average, aggregated.StdDev),
+		"variance": aggregated.StdDev * aggregated.StdDev,
+		"range":    aggregated.Max - aggregated.Min,
 	}
 
 	span.SetAttributes(
@@ -307,20 +307,20 @@ func (a *StatisticalAggregator) GetTimeWindow() time.Duration {
 
 func (a *StatisticalAggregator) groupSamplesByMetric(samples []*MetricSample) map[string][]*MetricSample {
 	groups := make(map[string][]*MetricSample)
-	
+
 	for _, sample := range samples {
 		key := fmt.Sprintf("%s:%s", sample.MetricType, sample.MetricName)
-		
+
 		// Include labels in grouping
 		if len(sample.Labels) > 0 {
 			for k, v := range sample.Labels {
 				key += fmt.Sprintf(":%s=%s", k, v)
 			}
 		}
-		
+
 		groups[key] = append(groups[key], sample)
 	}
-	
+
 	return groups
 }
 
@@ -336,7 +336,7 @@ func (a *StatisticalAggregator) calculateMin(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	
+
 	min := values[0]
 	for _, v := range values[1:] {
 		if v < min {
@@ -350,7 +350,7 @@ func (a *StatisticalAggregator) calculateMax(values []float64) float64 {
 	if len(values) == 0 {
 		return 0
 	}
-	
+
 	max := values[0]
 	for _, v := range values[1:] {
 		if v > max {
@@ -364,13 +364,13 @@ func (a *StatisticalAggregator) calculateStdDev(values []float64, mean float64) 
 	if len(values) <= 1 {
 		return 0
 	}
-	
+
 	var sumSquaredDiffs float64
 	for _, v := range values {
 		diff := v - mean
 		sumSquaredDiffs += diff * diff
 	}
-	
+
 	variance := sumSquaredDiffs / float64(len(values)-1)
 	return math.Sqrt(variance)
 }
@@ -379,11 +379,11 @@ func (a *StatisticalAggregator) calculateAdvancedPercentiles(values []float64) m
 	if len(values) == 0 {
 		return map[string]float64{}
 	}
-	
+
 	sorted := make([]float64, len(values))
 	copy(sorted, values)
 	sort.Float64s(sorted)
-	
+
 	percentiles := map[string]float64{
 		"P1":  a.percentile(sorted, 0.01),
 		"P5":  a.percentile(sorted, 0.05),
@@ -395,7 +395,7 @@ func (a *StatisticalAggregator) calculateAdvancedPercentiles(values []float64) m
 		"P95": a.percentile(sorted, 0.95),
 		"P99": a.percentile(sorted, 0.99),
 	}
-	
+
 	return percentiles
 }
 
@@ -403,19 +403,19 @@ func (a *StatisticalAggregator) percentile(sortedValues []float64, p float64) fl
 	if len(sortedValues) == 0 {
 		return 0
 	}
-	
+
 	if len(sortedValues) == 1 {
 		return sortedValues[0]
 	}
-	
+
 	index := p * float64(len(sortedValues)-1)
 	lower := int(math.Floor(index))
 	upper := int(math.Ceil(index))
-	
+
 	if lower == upper {
 		return sortedValues[lower]
 	}
-	
+
 	weight := index - float64(lower)
 	return sortedValues[lower]*(1-weight) + sortedValues[upper]*weight
 }
@@ -424,13 +424,13 @@ func (a *StatisticalAggregator) calculateSkewness(values []float64, mean, stddev
 	if len(values) <= 2 || stddev == 0 {
 		return 0
 	}
-	
+
 	var sumCubedDeviations float64
 	for _, v := range values {
 		deviation := (v - mean) / stddev
 		sumCubedDeviations += deviation * deviation * deviation
 	}
-	
+
 	n := float64(len(values))
 	return (n / ((n - 1) * (n - 2))) * sumCubedDeviations
 }
@@ -439,17 +439,17 @@ func (a *StatisticalAggregator) calculateKurtosis(values []float64, mean, stddev
 	if len(values) <= 3 || stddev == 0 {
 		return 0
 	}
-	
+
 	var sumFourthPowers float64
 	for _, v := range values {
 		deviation := (v - mean) / stddev
 		fourthPower := deviation * deviation * deviation * deviation
 		sumFourthPowers += fourthPower
 	}
-	
+
 	n := float64(len(values))
 	kurtosis := (n*(n+1))/((n-1)*(n-2)*(n-3))*sumFourthPowers - 3*(n-1)*(n-1)/((n-2)*(n-3))
-	
+
 	return kurtosis
 }
 
@@ -485,7 +485,7 @@ func (a *TrendAnalysisAggregator) Aggregate(ctx context.Context, samples []*Metr
 
 	values := make([]float64, len(samples))
 	timestamps := make([]float64, len(samples))
-	
+
 	baseTime := samples[0].Timestamp
 	for i, sample := range samples {
 		values[i] = sample.Value
@@ -511,7 +511,7 @@ func (a *TrendAnalysisAggregator) Aggregate(ctx context.Context, samples []*Metr
 
 	// Perform linear regression for trend analysis
 	slope, intercept, r2 := a.linearRegression(timestamps, values)
-	
+
 	// Calculate trend direction and strength
 	trendDirection := "stable"
 	if slope > 0.001 {
@@ -528,14 +528,14 @@ func (a *TrendAnalysisAggregator) Aggregate(ctx context.Context, samples []*Metr
 
 	// Add trend analysis metadata
 	aggregated.Metadata = map[string]interface{}{
-		"trend_direction":    trendDirection,
-		"trend_slope":        slope,
-		"trend_intercept":    intercept,
-		"trend_r_squared":    r2,
-		"rate_of_change":     rateOfChange,
-		"trend_strength":     a.categorizeTrendStrength(r2),
-		"volatility":         a.calculateVolatility(values),
-		"momentum":           a.calculateMomentum(values),
+		"trend_direction": trendDirection,
+		"trend_slope":     slope,
+		"trend_intercept": intercept,
+		"trend_r_squared": r2,
+		"rate_of_change":  rateOfChange,
+		"trend_strength":  a.categorizeTrendStrength(r2),
+		"volatility":      a.calculateVolatility(values),
+		"momentum":        a.calculateMomentum(values),
 	}
 
 	span.SetAttributes(
@@ -595,7 +595,7 @@ func (a *TrendAnalysisAggregator) linearRegression(x, y []float64) (slope, inter
 	}
 
 	n := float64(len(x))
-	
+
 	// Calculate means
 	var sumX, sumY float64
 	for i := 0; i < len(x); i++ {
@@ -686,14 +686,14 @@ func (a *TrendAnalysisAggregator) calculateMomentum(values []float64) float64 {
 	// Calculate momentum as the rate of change over the last 10% of data points
 	recentCount := int(math.Max(float64(len(values))*0.1, 2))
 	recentValues := values[len(values)-recentCount:]
-	
+
 	if len(recentValues) < 2 {
 		return 0
 	}
 
 	start := recentValues[0]
 	end := recentValues[len(recentValues)-1]
-	
+
 	if start == 0 {
 		return 0
 	}

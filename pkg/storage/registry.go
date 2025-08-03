@@ -121,7 +121,7 @@ func (r *DefaultResolverRegistry) detectProvider(urlStr string) (CloudProvider, 
 	// Detect by hostname for HTTPS URLs
 	if parsed.Scheme == "https" {
 		host := strings.ToLower(parsed.Host)
-		
+
 		// AWS S3 detection
 		if strings.Contains(host, "amazonaws.com") || strings.Contains(host, ".s3.") {
 			return ProviderAWS, nil
@@ -349,4 +349,67 @@ func (m *StorageManager) GetFileInfoBatch(ctx context.Context, urls []string, te
 type FileInfoResult struct {
 	Info  *FileInfo
 	Error error
+}
+
+// GetLocalStore returns the local storage interface
+func (m *StorageManager) GetLocalStore() LocalStore {
+	// For now, return a simple implementation
+	// In practice, this should be injected or configured
+	return nil // TODO: Implement proper local store
+}
+
+// GetConnector returns a connector for the specified type
+func (m *StorageManager) GetConnector(connectorType string) (StorageConnector, error) {
+	// Convert connector type to provider
+	var provider CloudProvider
+	switch connectorType {
+	case "aws", "s3":
+		provider = ProviderAWS
+	case "gcp", "gcs":
+		provider = ProviderGCP
+	case "azure":
+		provider = ProviderAzure
+	case "local":
+		provider = ProviderLocal
+	default:
+		return nil, NewStorageError(
+			ErrorCodeUnsupportedProvider,
+			fmt.Sprintf("unsupported connector type: %s", connectorType),
+			"",
+			"",
+			nil,
+		)
+	}
+
+	_, err := m.registry.GetResolver(provider)
+	if err != nil {
+		return nil, err
+	}
+
+	// For now, we cannot convert resolvers to connectors due to interface conflicts
+	// TODO: Implement proper connector registry or adapter pattern
+	return nil, NewStorageError(
+		ErrorCodeUnsupportedProvider,
+		fmt.Sprintf("connector retrieval not yet implemented for %s", connectorType),
+		"",
+		"",
+		nil,
+	)
+}
+
+// RegisterConnector registers a new connector
+func (m *StorageManager) RegisterConnector(connectorType string, connector StorageConnector) error {
+	// Convert connector type to provider (not used currently but may be needed for future implementation)
+	_ = connectorType
+	_ = connector
+
+	// For now, we cannot convert connectors to resolvers due to interface conflicts
+	// TODO: Implement proper connector/resolver registration mechanism
+	return NewStorageError(
+		ErrorCodeUnsupportedProvider,
+		fmt.Sprintf("connector registration not yet implemented for %s", connectorType),
+		"",
+		"",
+		nil,
+	)
 }

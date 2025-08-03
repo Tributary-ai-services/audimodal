@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/services"
 	"github.com/jscharber/eAIIngest/internal/server/response"
+	"github.com/jscharber/eAIIngest/internal/services"
 	"github.com/jscharber/eAIIngest/pkg/storage"
 )
 
@@ -58,13 +58,13 @@ type FileInfoResponse struct {
 
 // ListFilesRequest represents a request to list files
 type ListFilesRequest struct {
-	URL                string `json:"url"`
-	Prefix             string `json:"prefix,omitempty"`
-	Delimiter          string `json:"delimiter,omitempty"`
-	MaxKeys            int    `json:"max_keys,omitempty"`
-	ContinuationToken  string `json:"continuation_token,omitempty"`
-	Recursive          bool   `json:"recursive,omitempty"`
-	IncludeMetadata    bool   `json:"include_metadata,omitempty"`
+	URL               string `json:"url"`
+	Prefix            string `json:"prefix,omitempty"`
+	Delimiter         string `json:"delimiter,omitempty"`
+	MaxKeys           int    `json:"max_keys,omitempty"`
+	ContinuationToken string `json:"continuation_token,omitempty"`
+	Recursive         bool   `json:"recursive,omitempty"`
+	IncludeMetadata   bool   `json:"include_metadata,omitempty"`
 }
 
 // ListFilesResponse represents the response from listing files
@@ -319,9 +319,9 @@ func (h *StorageHandler) handleGetProviders(w http.ResponseWriter, r *http.Reque
 	providersInfo := make([]map[string]interface{}, len(providers))
 	for i, provider := range providers {
 		providersInfo[i] = map[string]interface{}{
-			"name":        provider,
+			"name":         provider,
 			"display_name": getProviderDisplayName(provider),
-			"supported":   true,
+			"supported":    true,
 		}
 	}
 
@@ -377,15 +377,15 @@ type CredentialRequest struct {
 
 // CredentialResponse represents credential information without sensitive data
 type CredentialResponse struct {
-	ID        uuid.UUID               `json:"id"`
-	Provider  storage.CloudProvider   `json:"provider"`
-	Name      string                  `json:"name"`
-	Region    string                  `json:"region,omitempty"`
-	Project   string                  `json:"project,omitempty"`
-	Status    string                  `json:"status"`
-	ExpiresAt *time.Time              `json:"expires_at,omitempty"`
-	CreatedAt time.Time               `json:"created_at"`
-	UpdatedAt time.Time               `json:"updated_at"`
+	ID        uuid.UUID             `json:"id"`
+	Provider  storage.CloudProvider `json:"provider"`
+	Name      string                `json:"name"`
+	Region    string                `json:"region,omitempty"`
+	Project   string                `json:"project,omitempty"`
+	Status    string                `json:"status"`
+	ExpiresAt *time.Time            `json:"expires_at,omitempty"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
 }
 
 // ServeHTTP implements the http.Handler interface for credential management

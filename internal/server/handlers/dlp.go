@@ -87,7 +87,7 @@ func (h *DLPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := r.URL.Path
-	
+
 	if strings.Contains(path, "/dlp-policies") {
 		h.handlePolicyRoutes(w, r, tenantCtx.TenantID)
 	} else if strings.Contains(path, "/violations") {
@@ -101,7 +101,7 @@ func (h *DLPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *DLPHandler) handlePolicyRoutes(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	path := r.URL.Path
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	
+
 	// Find dlp-policies in the path
 	var policyIndex int = -1
 	for i, part := range parts {
@@ -170,7 +170,7 @@ func (h *DLPHandler) handlePolicyRoutes(w http.ResponseWriter, r *http.Request, 
 func (h *DLPHandler) handleViolationRoutes(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	path := r.URL.Path
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	
+
 	// Find violations in the path
 	var violationIndex int = -1
 	for i, part := range parts {
@@ -234,7 +234,7 @@ func (h *DLPHandler) handleViolationRoutes(w http.ResponseWriter, r *http.Reques
 // ListPolicies handles GET /api/v1/tenants/{tenant_id}/dlp-policies
 func (h *DLPHandler) ListPolicies(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	page, pageSize, offset := getPagination(r.Context())
-	
+
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
 	if err != nil {
@@ -244,13 +244,13 @@ func (h *DLPHandler) ListPolicies(w http.ResponseWriter, r *http.Request, tenant
 
 	var policies []models.DLPPolicy
 	query := tenantRepo.DB().Limit(pageSize).Offset(offset).Order("priority DESC, created_at DESC")
-	
+
 	// Filter by enabled status if provided
 	if enabledStr := r.URL.Query().Get("enabled"); enabledStr != "" {
 		enabled := enabledStr == "true"
 		query = query.Where("enabled = ?", enabled)
 	}
-	
+
 	err = query.Find(&policies).Error
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to list policies", err.Error())
@@ -454,7 +454,7 @@ func (h *DLPHandler) TestPolicy(w http.ResponseWriter, r *http.Request, tenantID
 // ListViolations handles GET /api/v1/tenants/{tenant_id}/violations
 func (h *DLPHandler) ListViolations(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	page, pageSize, offset := getPagination(r.Context())
-	
+
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
 	if err != nil {
@@ -464,17 +464,17 @@ func (h *DLPHandler) ListViolations(w http.ResponseWriter, r *http.Request, tena
 
 	var violations []models.DLPViolation
 	query := tenantRepo.DB().Limit(pageSize).Offset(offset).Order("created_at DESC")
-	
+
 	// Filter by severity if provided
 	if severity := r.URL.Query().Get("severity"); severity != "" {
 		query = query.Where("severity = ?", severity)
 	}
-	
+
 	// Filter by status if provided
 	if status := r.URL.Query().Get("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
-	
+
 	err = query.Find(&violations).Error
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to list violations", err.Error())

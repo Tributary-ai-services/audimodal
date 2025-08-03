@@ -16,24 +16,24 @@ import (
 func main() {
 	// Example usage of the document compression system
 	ctx := context.Background()
-	
+
 	// 1. Create compression configuration
 	compressionConfig := compression.DefaultDocumentCompressionConfig()
 	compressionConfig.DefaultStrategy = compression.StrategyAdaptive
-	compressionConfig.MinFileSizeThreshold = 1024 // 1KB
+	compressionConfig.MinFileSizeThreshold = 1024              // 1KB
 	compressionConfig.MaxFileSizeThreshold = 100 * 1024 * 1024 // 100MB
-	
+
 	// 2. Create document compressor
 	documentCompressor := compression.NewDocumentCompressor(compressionConfig)
-	
+
 	// 3. Create policy manager
 	policyManager := compression.NewPolicyManager(documentCompressor)
-	
+
 	// 4. Create and register compression policies
 	if err := setupCompressionPolicies(ctx, policyManager); err != nil {
 		log.Fatalf("Failed to setup compression policies: %v", err)
 	}
-	
+
 	// 5. Create cache for compressed data
 	cacheConfig := cache.DefaultMemoryCacheConfig()
 	cacheConfig.MaxSize = 512 * 1024 * 1024 // 512MB
@@ -42,7 +42,7 @@ func main() {
 		log.Fatalf("Failed to create cache: %v", err)
 	}
 	defer memoryCache.Close()
-	
+
 	// 6. Example: Compress different types of documents
 	exampleFiles := []struct {
 		name     string
@@ -70,33 +70,33 @@ func main() {
 			mimeType: "application/xml",
 		},
 	}
-	
+
 	tenantID := uuid.New()
-	
+
 	for _, file := range exampleFiles {
 		fmt.Printf("\n=== Processing file: %s ===\n", file.name)
-		
+
 		// Create file info
 		fileInfo := &storage.FileInfo{
 			URL:      fmt.Sprintf("file://%s", file.name),
 			Name:     file.name,
 			Size:     int64(len(file.content)),
 			MimeType: file.mimeType,
-			Metadata: make(map[string]interface{}),
+			Metadata: make(map[string]string),
 		}
-		
+
 		// Evaluate compression policy
 		action, err := policyManager.EvaluateFile(ctx, fileInfo, tenantID)
 		if err != nil {
 			fmt.Printf("No compression policy matched: %v\n", err)
 			continue
 		}
-		
+
 		fmt.Printf("Compression strategy: %s\n", action.Strategy)
 		fmt.Printf("Compression level: %d\n", action.CompressionLevel)
 		fmt.Printf("Store original: %t\n", action.StoreOriginal)
 		fmt.Printf("Cache result: %t\n", action.CacheResult)
-		
+
 		// Apply compression
 		if action.Strategy != compression.StrategyNone {
 			result, err := documentCompressor.CompressDocument(ctx, []byte(file.content), file.name)
@@ -104,13 +104,13 @@ func main() {
 				fmt.Printf("Compression failed: %v\n", err)
 				continue
 			}
-			
+
 			fmt.Printf("Original size: %d bytes\n", result.OriginalSize)
 			fmt.Printf("Compressed size: %d bytes\n", result.CompressedSize)
 			fmt.Printf("Compression ratio: %.2f\n", result.CompressionRatio)
 			fmt.Printf("Compression time: %v\n", result.CompressionTime)
 			fmt.Printf("Algorithm: %s\n", result.Algorithm)
-			
+
 			// Cache compressed data if configured
 			if action.CacheResult {
 				cacheKey := fmt.Sprintf("compressed:%s", file.name)
@@ -120,7 +120,7 @@ func main() {
 					fmt.Printf("Cached compressed data\n")
 				}
 			}
-			
+
 			// Demonstrate decompression
 			metadata := &compression.CompressionMetadata{
 				Strategy:         result.Strategy,
@@ -130,13 +130,13 @@ func main() {
 				CompressionRatio: result.CompressionRatio,
 				OriginalFilename: file.name,
 			}
-			
+
 			decompressed, err := documentCompressor.DecompressDocument(ctx, result.Data, metadata)
 			if err != nil {
 				fmt.Printf("Decompression failed: %v\n", err)
 				continue
 			}
-			
+
 			// Verify data integrity
 			if string(decompressed) == file.content {
 				fmt.Printf("✓ Data integrity verified\n")
@@ -147,13 +147,13 @@ func main() {
 			fmt.Printf("No compression applied\n")
 		}
 	}
-	
+
 	// 7. Demonstrate batch compression
 	fmt.Printf("\n=== Batch Compression Example ===\n")
-	
+
 	batchCompressor := compression.NewBatchCompressor(documentCompressor, 2)
 	batchCompressor.Start(ctx)
-	
+
 	// Create a batch job
 	var batchFiles []storage.FileInfo
 	for _, file := range exampleFiles {
@@ -162,7 +162,7 @@ func main() {
 			Size: int64(len(file.content)),
 		})
 	}
-	
+
 	job := &compression.BatchCompressionJob{
 		Files:     batchFiles,
 		Strategy:  compression.StrategyAdaptive,
@@ -170,13 +170,13 @@ func main() {
 		CreatedAt: time.Now(),
 		Status:    "pending",
 	}
-	
+
 	if err := batchCompressor.SubmitJob(job); err != nil {
 		fmt.Printf("Failed to submit batch job: %v\n", err)
 	} else {
 		fmt.Printf("Batch compression job submitted\n")
 	}
-	
+
 	// 8. Display cache statistics
 	fmt.Printf("\n=== Cache Statistics ===\n")
 	stats, err := memoryCache.GetStats(ctx)
@@ -195,7 +195,7 @@ func main() {
 
 func setupCompressionPolicies(ctx context.Context, manager *compression.PolicyManager) error {
 	tenantID := uuid.New()
-	
+
 	// Policy 1: Text files - high compression
 	textPolicy := &compression.CompressionPolicy{
 		ID:          uuid.New(),
@@ -206,9 +206,9 @@ func setupCompressionPolicies(ctx context.Context, manager *compression.PolicyMa
 		Priority:    100,
 		Rules: []compression.CompressionRule{
 			{
-				ID:      uuid.New(),
-				Name:    "Text files > 1KB",
-				Enabled: true,
+				ID:       uuid.New(),
+				Name:     "Text files > 1KB",
+				Enabled:  true,
 				Priority: 1,
 				Conditions: []compression.CompressionCondition{
 					{
@@ -251,11 +251,11 @@ func setupCompressionPolicies(ctx context.Context, manager *compression.PolicyMa
 			ErrorHandling:   "skip",
 		},
 	}
-	
+
 	if err := manager.CreatePolicy(ctx, textPolicy); err != nil {
 		return fmt.Errorf("failed to create text policy: %w", err)
 	}
-	
+
 	// Policy 2: Size-based policy
 	sizePolicy := &compression.CompressionPolicy{
 		ID:          uuid.New(),
@@ -266,9 +266,9 @@ func setupCompressionPolicies(ctx context.Context, manager *compression.PolicyMa
 		Priority:    90,
 		Rules: []compression.CompressionRule{
 			{
-				ID:      uuid.New(),
-				Name:    "Large files",
-				Enabled: true,
+				ID:       uuid.New(),
+				Name:     "Large files",
+				Enabled:  true,
 				Priority: 1,
 				Conditions: []compression.CompressionCondition{
 					{
@@ -306,11 +306,11 @@ func setupCompressionPolicies(ctx context.Context, manager *compression.PolicyMa
 			ErrorHandling:   "retry",
 		},
 	}
-	
+
 	if err := manager.CreatePolicy(ctx, sizePolicy); err != nil {
 		return fmt.Errorf("failed to create size policy: %w", err)
 	}
-	
+
 	return nil
 }
 

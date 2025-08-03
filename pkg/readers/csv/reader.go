@@ -178,7 +178,7 @@ func (r *CSVReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 	// Read first few rows to analyze structure
 	var headers []string
 	var sampleRows [][]string
-	
+
 	for i := 0; i < 10; i++ { // Read up to 10 rows for analysis
 		record, err := csvReader.Read()
 		if err == io.EOF {
@@ -218,10 +218,10 @@ func (r *CSVReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 	}
 
 	schema := core.SchemaInfo{
-		Format:      "structured",
-		Encoding:    "utf-8",
-		Delimiter:   ",",
-		Fields:      fields,
+		Format:    "structured",
+		Encoding:  "utf-8",
+		Delimiter: ",",
+		Fields:    fields,
 		Metadata: map[string]any{
 			"column_count": len(headers),
 			"sample_rows":  len(sampleRows),
@@ -263,7 +263,7 @@ func (r *CSVReader) EstimateSize(ctx context.Context, sourcePath string) (core.S
 	n, _ := file.Read(buffer)
 	content := string(buffer[:n])
 	lines := strings.Split(content, "\n")
-	
+
 	var avgRowSize int64 = 100 // Default estimate
 	if len(lines) > 1 {
 		avgRowSize = int64(n) / int64(len(lines))
@@ -316,12 +316,12 @@ func (r *CSVReader) CreateIterator(ctx context.Context, sourcePath string, strat
 	}
 
 	csvReader := csv.NewReader(file)
-	
+
 	// Configure CSV reader based on strategy config
 	if delimiter, ok := strategyConfig["delimiter"].(string); ok && len(delimiter) == 1 {
 		csvReader.Comma = rune(delimiter[0])
 	}
-	
+
 	csvReader.TrimLeadingSpace = true
 	csvReader.LazyQuotes = true
 
@@ -377,7 +377,7 @@ func (r *CSVReader) inferFieldType(rows [][]string, columnIndex int) string {
 		if columnIndex >= len(row) {
 			continue
 		}
-		
+
 		value := strings.TrimSpace(row[columnIndex])
 		if value == "" {
 			continue
@@ -417,7 +417,7 @@ func (r *CSVReader) inferFieldType(rows [][]string, columnIndex int) string {
 
 func (r *CSVReader) calculateFieldStats(rows [][]string, columnIndex int) core.FieldStats {
 	stats := core.FieldStats{}
-	
+
 	values := make([]string, 0)
 	for _, row := range rows {
 		if columnIndex < len(row) {
@@ -564,7 +564,7 @@ func (it *CSVIterator) Reset() error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Recreate CSV reader
 		it.csvReader = csv.NewReader(it.file)
 		if delimiter, ok := it.config["delimiter"].(string); ok && len(delimiter) == 1 {
@@ -572,7 +572,7 @@ func (it *CSVIterator) Reset() error {
 		}
 		it.csvReader.TrimLeadingSpace = true
 		it.csvReader.LazyQuotes = true
-		
+
 		it.rowNumber = 0
 		it.readBytes = 0
 

@@ -21,117 +21,117 @@ import (
 
 // OneDriveConnector implements storage.StorageConnector for Microsoft OneDrive
 type OneDriveConnector struct {
-	config       *OneDriveConfig
-	oauthConfig  *oauth2.Config
-	httpClient   *http.Client
-	tracer       trace.Tracer
-	
+	config      *OneDriveConfig
+	oauthConfig *oauth2.Config
+	httpClient  *http.Client
+	tracer      trace.Tracer
+
 	// Connection state
-	isConnected  bool
-	lastSync     time.Time
-	accessToken  string
-	
+	isConnected bool
+	lastSync    time.Time
+	accessToken string
+
 	// Rate limiting and throttling
-	rateLimiter  *RateLimiter
-	
+	rateLimiter *RateLimiter
+
 	// Caching
-	fileCache    map[string]*DriveItem
-	folderCache  map[string]*DriveItem
-	cacheMu      sync.RWMutex
-	
+	fileCache   map[string]*DriveItem
+	folderCache map[string]*DriveItem
+	cacheMu     sync.RWMutex
+
 	// Sync state
-	syncState    *SyncState
-	syncMu       sync.RWMutex
-	
+	syncState *SyncState
+	syncMu    sync.RWMutex
+
 	// Metrics
-	metrics      *ConnectorMetrics
-	
+	metrics *ConnectorMetrics
+
 	// Error handling
-	retryPolicy  *RetryPolicy
-	
+	retryPolicy *RetryPolicy
+
 	// OneDrive-specific
-	driveID      string // Current drive ID
-	deltaToken   string // For delta/change tracking operations
+	driveID    string // Current drive ID
+	deltaToken string // For delta/change tracking operations
 }
 
 // OneDriveConfig contains configuration for OneDrive connector
 type OneDriveConfig struct {
 	// OAuth2 configuration
-	ClientID           string   `yaml:"client_id"`
-	ClientSecret       string   `yaml:"client_secret"`
-	RedirectURL        string   `yaml:"redirect_url"`
-	TenantID           string   `yaml:"tenant_id"`
-	
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURL  string `yaml:"redirect_url"`
+	TenantID     string `yaml:"tenant_id"`
+
 	// Sync configuration
-	SyncInterval       time.Duration `yaml:"sync_interval"`
-	FullSyncInterval   time.Duration `yaml:"full_sync_interval"`
-	BatchSize          int           `yaml:"batch_size"`
-	MaxConcurrentReqs  int           `yaml:"max_concurrent_requests"`
-	
+	SyncInterval      time.Duration `yaml:"sync_interval"`
+	FullSyncInterval  time.Duration `yaml:"full_sync_interval"`
+	BatchSize         int           `yaml:"batch_size"`
+	MaxConcurrentReqs int           `yaml:"max_concurrent_requests"`
+
 	// Filter configuration
-	IncludeFolders     []string      `yaml:"include_folders"`
-	ExcludeFolders     []string      `yaml:"exclude_folders"`
-	FileExtensions     []string      `yaml:"file_extensions"`
-	MaxFileSize        int64         `yaml:"max_file_size"`
-	SyncSharedFiles    bool          `yaml:"sync_shared_files"`
-	SyncDeletedFiles   bool          `yaml:"sync_deleted_files"`
-	
+	IncludeFolders   []string `yaml:"include_folders"`
+	ExcludeFolders   []string `yaml:"exclude_folders"`
+	FileExtensions   []string `yaml:"file_extensions"`
+	MaxFileSize      int64    `yaml:"max_file_size"`
+	SyncSharedFiles  bool     `yaml:"sync_shared_files"`
+	SyncDeletedFiles bool     `yaml:"sync_deleted_files"`
+
 	// Rate limiting
-	RequestsPerSecond  float64       `yaml:"requests_per_second"`
-	BurstLimit         int           `yaml:"burst_limit"`
-	
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	BurstLimit        int     `yaml:"burst_limit"`
+
 	// Retry configuration
 	MaxRetries         int           `yaml:"max_retries"`
 	RetryDelay         time.Duration `yaml:"retry_delay"`
 	ExponentialBackoff bool          `yaml:"exponential_backoff"`
-	
+
 	// Cache configuration
-	CacheEnabled       bool          `yaml:"cache_enabled"`
-	CacheTTL           time.Duration `yaml:"cache_ttl"`
-	CacheSize          int           `yaml:"cache_size"`
-	
+	CacheEnabled bool          `yaml:"cache_enabled"`
+	CacheTTL     time.Duration `yaml:"cache_ttl"`
+	CacheSize    int           `yaml:"cache_size"`
+
 	// OneDrive-specific features
-	UsePersonalOneDrive bool         `yaml:"use_personal_onedrive"`
-	UseBusinessOneDrive bool         `yaml:"use_business_onedrive"`
-	IncludeMetadata     bool         `yaml:"include_metadata"`
-	IncludeVersions     bool         `yaml:"include_versions"`
-	RecursiveSync       bool         `yaml:"recursive_sync"`
-	
+	UsePersonalOneDrive bool `yaml:"use_personal_onedrive"`
+	UseBusinessOneDrive bool `yaml:"use_business_onedrive"`
+	IncludeMetadata     bool `yaml:"include_metadata"`
+	IncludeVersions     bool `yaml:"include_versions"`
+	RecursiveSync       bool `yaml:"recursive_sync"`
+
 	// SharePoint integration
-	SharePointSiteURL   string       `yaml:"sharepoint_site_url"`
-	SharePointListID    string       `yaml:"sharepoint_list_id"`
-	
+	SharePointSiteURL string `yaml:"sharepoint_site_url"`
+	SharePointListID  string `yaml:"sharepoint_list_id"`
+
 	// Office 365 integration
 	EnableOfficeIntegration bool     `yaml:"enable_office_integration"`
-	OfficeFileFormats  []string      `yaml:"office_file_formats"`
+	OfficeFileFormats       []string `yaml:"office_file_formats"`
 }
 
 // DefaultOneDriveConfig returns default configuration
 func DefaultOneDriveConfig() *OneDriveConfig {
 	return &OneDriveConfig{
-		SyncInterval:       15 * time.Minute,
-		FullSyncInterval:   24 * time.Hour,
-		BatchSize:          200, // Microsoft Graph supports up to 999 items per request
-		MaxConcurrentReqs:  10,
-		FileExtensions:     []string{".pdf", ".doc", ".docx", ".txt", ".xlsx", ".pptx"},
-		MaxFileSize:        4 * 1024 * 1024 * 1024, // 4GB (OneDrive file size limit)
-		SyncSharedFiles:    true,
-		SyncDeletedFiles:   false,
-		RequestsPerSecond:  10.0, // Microsoft Graph throttling limits
-		BurstLimit:         50,
-		MaxRetries:         3,
-		RetryDelay:         2 * time.Second,
-		ExponentialBackoff: true,
-		CacheEnabled:       true,
-		CacheTTL:           1 * time.Hour,
-		CacheSize:          10000,
-		UsePersonalOneDrive: true,
-		UseBusinessOneDrive: true,
-		IncludeMetadata:    true,
-		IncludeVersions:    false,
-		RecursiveSync:      true,
+		SyncInterval:            15 * time.Minute,
+		FullSyncInterval:        24 * time.Hour,
+		BatchSize:               200, // Microsoft Graph supports up to 999 items per request
+		MaxConcurrentReqs:       10,
+		FileExtensions:          []string{".pdf", ".doc", ".docx", ".txt", ".xlsx", ".pptx"},
+		MaxFileSize:             4 * 1024 * 1024 * 1024, // 4GB (OneDrive file size limit)
+		SyncSharedFiles:         true,
+		SyncDeletedFiles:        false,
+		RequestsPerSecond:       10.0, // Microsoft Graph throttling limits
+		BurstLimit:              50,
+		MaxRetries:              3,
+		RetryDelay:              2 * time.Second,
+		ExponentialBackoff:      true,
+		CacheEnabled:            true,
+		CacheTTL:                1 * time.Hour,
+		CacheSize:               10000,
+		UsePersonalOneDrive:     true,
+		UseBusinessOneDrive:     true,
+		IncludeMetadata:         true,
+		IncludeVersions:         false,
+		RecursiveSync:           true,
 		EnableOfficeIntegration: true,
-		OfficeFileFormats:  []string{".docx", ".xlsx", ".pptx", ".doc", ".xls", ".ppt"},
+		OfficeFileFormats:       []string{".docx", ".xlsx", ".pptx", ".doc", ".xls", ".ppt"},
 	}
 }
 
@@ -234,7 +234,7 @@ func (c *OneDriveConnector) Disconnect(ctx context.Context) error {
 	c.accessToken = ""
 	c.driveID = ""
 	c.deltaToken = ""
-	
+
 	// Clear caches
 	c.cacheMu.Lock()
 	c.fileCache = make(map[string]*DriveItem)
@@ -266,7 +266,7 @@ func (c *OneDriveConnector) ListFiles(ctx context.Context, path string, options 
 
 	var files []*storage.ConnectorFileInfo
 	nextLink := ""
-	
+
 	for {
 		// Wait for rate limit
 		if err := c.rateLimiter.Wait(ctx); err != nil {
@@ -286,20 +286,20 @@ func (c *OneDriveConnector) ListFiles(ctx context.Context, path string, options 
 				// List items in specified path
 				apiURL = fmt.Sprintf("https://graph.microsoft.com/v1.0/me/drive/root:/%s:/children", strings.Trim(path, "/"))
 			}
-			
+
 			// Add query parameters
 			params := []string{
 				fmt.Sprintf("$top=%d", c.config.BatchSize),
 				"$expand=thumbnails",
 			}
-			
+
 			if c.config.IncludeMetadata {
 				params = append(params, "$select=*")
 			}
-			
+
 			apiURL += "?" + strings.Join(params, "&")
 		}
-		
+
 		// Execute API call with retry
 		response, err := c.executeGraphAPICall(ctx, "GET", apiURL, nil)
 		if err != nil {
@@ -312,13 +312,13 @@ func (c *OneDriveConnector) ListFiles(ctx context.Context, path string, options 
 			span.RecordError(err)
 			return nil, fmt.Errorf("failed to parse API response: %w", err)
 		}
-		
+
 		// Convert OneDrive items to FileInfo
 		for _, item := range listResponse.Value {
 			if c.shouldIncludeItem(&item) {
 				fileInfo := c.convertToFileInfo(&item)
 				files = append(files, fileInfo)
-				
+
 				// Cache item
 				if c.config.CacheEnabled {
 					c.cacheItem(&item)
@@ -390,7 +390,7 @@ func (c *OneDriveConnector) GetFile(ctx context.Context, fileID string) (*storag
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to parse API response: %w", err)
 	}
-	
+
 	// Cache file
 	if c.config.CacheEnabled {
 		c.cacheItem(&driveItem)
@@ -432,10 +432,10 @@ func (c *OneDriveConnector) DownloadFile(ctx context.Context, fileID string) (io
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add authorization header
 		req.Header.Set("Authorization", "Bearer "+c.accessToken)
-		
+
 		return c.httpClient.Do(req)
 	})
 
@@ -699,15 +699,15 @@ func (c *OneDriveConnector) convertToFileInfo(item *DriveItem) *storage.Connecto
 			CanDelete: false,
 		},
 		Metadata: map[string]interface{}{
-			"onedrive_id":   item.ID,
-			"web_url":       item.WebURL,
-			"ctag":          item.CTag,
-			"etag":          item.ETag,
+			"onedrive_id": item.ID,
+			"web_url":     item.WebURL,
+			"ctag":        item.CTag,
+			"etag":        item.ETag,
 		},
 		Tags: map[string]string{
 			"source": "onedrive",
 		},
-		Source:       "onedrive",
+		Source: "onedrive",
 	}
 
 	// Add file-specific metadata
@@ -743,7 +743,7 @@ func (c *OneDriveConnector) cacheItem(item *DriveItem) {
 	} else if item.Folder != nil {
 		c.folderCache[item.ID] = item
 	}
-	
+
 	// Simple cache size management
 	if len(c.fileCache) > c.config.CacheSize {
 		// Remove oldest entries (simple FIFO)
@@ -772,7 +772,7 @@ func (c *OneDriveConnector) getCachedFile(fileID string) *DriveItem {
 func (c *OneDriveConnector) executeSyncOperation(ctx context.Context, options *storage.SyncOptions, result *storage.SyncResult, isFullSync bool) error {
 	// For OneDrive, we can use the delta API for incremental sync
 	// or traverse the drive for full sync
-	
+
 	if isFullSync {
 		return c.executeFullSync(ctx, options, result)
 	} else {
@@ -786,17 +786,17 @@ func (c *OneDriveConnector) executeFullSync(ctx context.Context, options *storag
 	if err != nil {
 		return err
 	}
-	
+
 	result.FilesFound = int64(len(files))
 	result.FilesChanged = int64(len(files)) // For full sync, consider all files as changed
-	
+
 	return nil
 }
 
 func (c *OneDriveConnector) executeIncrementalSync(ctx context.Context, options *storage.SyncOptions, result *storage.SyncResult) error {
 	// Use OneDrive's delta endpoint for incremental changes
 	// This would compare against the stored delta token from last sync
-	
+
 	// Build delta API URL
 	var apiURL string
 	if c.deltaToken != "" {
@@ -843,7 +843,7 @@ func (c *OneDriveConnector) executeIncrementalSync(ctx context.Context, options 
 			break
 		}
 	}
-	
+
 	return nil
 }
 
@@ -858,28 +858,28 @@ func (c *OneDriveConnector) executeGraphAPICall(ctx context.Context, method, url
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add headers
 		req.Header.Set("Authorization", "Bearer "+c.accessToken)
 		req.Header.Set("Content-Type", "application/json")
-		
+
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 		}
-		
+
 		return io.ReadAll(resp.Body)
 	})
 }
 
 func (c *OneDriveConnector) executeWithRetry(ctx context.Context, operation func() (interface{}, error)) (interface{}, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -887,7 +887,7 @@ func (c *OneDriveConnector) executeWithRetry(ctx context.Context, operation func
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -901,7 +901,7 @@ func (c *OneDriveConnector) executeWithRetry(ctx context.Context, operation func
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -910,13 +910,13 @@ func (c *OneDriveConnector) executeWithRetry(ctx context.Context, operation func
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 
 func (c *OneDriveConnector) executeWithRetryBytes(ctx context.Context, operation func() ([]byte, error)) ([]byte, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -924,7 +924,7 @@ func (c *OneDriveConnector) executeWithRetryBytes(ctx context.Context, operation
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -938,7 +938,7 @@ func (c *OneDriveConnector) executeWithRetryBytes(ctx context.Context, operation
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -947,7 +947,7 @@ func (c *OneDriveConnector) executeWithRetryBytes(ctx context.Context, operation
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 

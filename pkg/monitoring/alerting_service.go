@@ -2,7 +2,6 @@ package monitoring
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"sync"
@@ -34,19 +33,19 @@ type AlertingConfig struct {
 	// Evaluation settings
 	EvaluationInterval time.Duration `yaml:"evaluation_interval"`
 	DefaultThreshold   float64       `yaml:"default_threshold"`
-	
+
 	// Notification settings
 	NotificationChannels []NotificationChannel `yaml:"notification_channels"`
 	DefaultSeverity      AlertSeverity         `yaml:"default_severity"`
-	
+
 	// Alert lifecycle
-	AlertTimeout         time.Duration `yaml:"alert_timeout"`
-	AlertRetention       time.Duration `yaml:"alert_retention"`
-	ResolutionTimeout    time.Duration `yaml:"resolution_timeout"`
-	
+	AlertTimeout      time.Duration `yaml:"alert_timeout"`
+	AlertRetention    time.Duration `yaml:"alert_retention"`
+	ResolutionTimeout time.Duration `yaml:"resolution_timeout"`
+
 	// Rate limiting
-	MaxAlertsPerMinute   int `yaml:"max_alerts_per_minute"`
-	GroupingWindow       time.Duration `yaml:"grouping_window"`
+	MaxAlertsPerMinute int           `yaml:"max_alerts_per_minute"`
+	GroupingWindow     time.Duration `yaml:"grouping_window"`
 }
 
 // AlertSeverity represents the severity level of an alert
@@ -69,7 +68,7 @@ const (
 
 // NotificationChannel represents a channel for sending alerts
 type NotificationChannel struct {
-	Type     string                 `yaml:"type"`     // slack, email, webhook, pagerduty
+	Type     string                 `yaml:"type"` // slack, email, webhook, pagerduty
 	Name     string                 `yaml:"name"`
 	Config   map[string]interface{} `yaml:"config"`
 	Enabled  bool                   `yaml:"enabled"`
@@ -81,20 +80,20 @@ type AlertRule struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
 	Description string            `json:"description"`
-	Query       string            `json:"query"`       // Metric query expression
-	Condition   AlertCondition    `json:"condition"`   // Threshold condition
+	Query       string            `json:"query"`     // Metric query expression
+	Condition   AlertCondition    `json:"condition"` // Threshold condition
 	Severity    AlertSeverity     `json:"severity"`
 	Labels      map[string]string `json:"labels"`
-	
+
 	// Timing
-	For          time.Duration `json:"for"`           // How long condition must be true
-	Interval     time.Duration `json:"interval"`      // How often to evaluate
-	
+	For      time.Duration `json:"for"`      // How long condition must be true
+	Interval time.Duration `json:"interval"` // How often to evaluate
+
 	// State
 	LastEvaluated time.Time  `json:"last_evaluated"`
 	LastTriggered *time.Time `json:"last_triggered,omitempty"`
 	Enabled       bool       `json:"enabled"`
-	
+
 	// Internal state
 	consecutiveFailures int
 	pendingSince        *time.Time
@@ -102,32 +101,32 @@ type AlertRule struct {
 
 // AlertCondition defines the condition for triggering an alert
 type AlertCondition struct {
-	Operator  string  `json:"operator"`  // gt, lt, eq, ne, gte, lte
+	Operator  string  `json:"operator"` // gt, lt, eq, ne, gte, lte
 	Threshold float64 `json:"threshold"`
-	Function  string  `json:"function"`  // avg, max, min, sum, count
+	Function  string  `json:"function"` // avg, max, min, sum, count
 }
 
 // Alert represents an active or resolved alert
 type Alert struct {
-	ID          string                 `json:"id"`
-	RuleID      string                 `json:"rule_id"`
-	RuleName    string                 `json:"rule_name"`
-	State       AlertState             `json:"state"`
-	Severity    AlertSeverity          `json:"severity"`
-	Message     string                 `json:"message"`
-	Description string                 `json:"description"`
-	Value       float64                `json:"value"`
-	Threshold   float64                `json:"threshold"`
-	Labels      map[string]string      `json:"labels"`
-	
+	ID          string            `json:"id"`
+	RuleID      string            `json:"rule_id"`
+	RuleName    string            `json:"rule_name"`
+	State       AlertState        `json:"state"`
+	Severity    AlertSeverity     `json:"severity"`
+	Message     string            `json:"message"`
+	Description string            `json:"description"`
+	Value       float64           `json:"value"`
+	Threshold   float64           `json:"threshold"`
+	Labels      map[string]string `json:"labels"`
+
 	// Timing
 	FiredAt    time.Time  `json:"fired_at"`
 	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
 	UpdatedAt  time.Time  `json:"updated_at"`
-	
+
 	// Metadata
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	
+
 	// Notification tracking
 	NotificationsSent []NotificationRecord `json:"notifications_sent"`
 }
@@ -185,16 +184,16 @@ func NewAlertingService(producer *events.Producer, config *AlertingConfig) *Aler
 // Start starts the alerting service
 func (as *AlertingService) Start(ctx context.Context) error {
 	as.running = true
-	
+
 	// Load default alert rules
 	as.loadDefaultRules()
-	
+
 	// Start evaluation loop
 	go as.evaluationLoop(ctx)
-	
+
 	// Start cleanup routine
 	go as.cleanupLoop(ctx)
-	
+
 	return nil
 }
 
@@ -263,7 +262,7 @@ func (as *AlertingService) loadDefaultRules() {
 			Interval: 1 * time.Minute,
 			Enabled:  true,
 			Labels: map[string]string{
-				"category": "infrastructure",
+				"category":  "infrastructure",
 				"component": "kafka",
 			},
 		},
@@ -282,7 +281,7 @@ func (as *AlertingService) loadDefaultRules() {
 			Interval: 2 * time.Minute,
 			Enabled:  true,
 			Labels: map[string]string{
-				"category": "application",
+				"category":  "application",
 				"component": "queue",
 			},
 		},
@@ -679,7 +678,7 @@ func (as *AlertingService) sendResolutionNotifications(ctx context.Context, aler
 func (as *AlertingService) emitAlertEvent(ctx context.Context, alert *Alert, action string) {
 	// Create alert event for the event bus
 	// This would allow other services to react to alerts
-	
+
 	// For now, just log the event
 	fmt.Printf("Alert event: %s - %s\n", action, alert.ID)
 }
@@ -709,9 +708,9 @@ func (as *AlertingService) cleanupOldAlerts() {
 	cutoff := time.Now().Add(-as.config.AlertRetention)
 
 	for id, alert := range as.alerts {
-		if alert.State == AlertStateResolved && 
-		   alert.ResolvedAt != nil && 
-		   alert.ResolvedAt.Before(cutoff) {
+		if alert.State == AlertStateResolved &&
+			alert.ResolvedAt != nil &&
+			alert.ResolvedAt.Before(cutoff) {
 			delete(as.alerts, id)
 		}
 	}

@@ -27,14 +27,14 @@ type MetricsCollector struct {
 	scheduledTasks map[string]*ScheduledTask
 
 	// Runtime state
-	isRunning      bool
-	stopCh         chan struct{}
-	wg             sync.WaitGroup
-	mu             sync.RWMutex
+	isRunning bool
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
+	mu        sync.RWMutex
 
 	// Metrics cache
-	metricsCache   map[string]*CachedMetrics
-	cacheMu        sync.RWMutex
+	metricsCache map[string]*CachedMetrics
+	cacheMu      sync.RWMutex
 }
 
 // Collector interface for different types of metric collection
@@ -342,7 +342,7 @@ func (mc *MetricsCollector) runScheduler(ctx context.Context) {
 func (mc *MetricsCollector) runScheduledTasks(ctx context.Context) {
 	now := time.Now()
 
-	for name, task := range mc.scheduledTasks {
+	for _, task := range mc.scheduledTasks {
 		if now.After(task.NextRun) && !task.IsRunning {
 			go mc.executeTask(ctx, task)
 			task.NextRun = now.Add(task.Interval)
@@ -493,9 +493,9 @@ func (mc *MetricsCollector) cleanupExpiredCache() {
 }
 
 func (mc *MetricsCollector) generateCacheKey(query *MetricsQuery) string {
-	return fmt.Sprintf("metrics_%s_%d_%d_%s", 
-		query.TenantID.String(), 
-		query.TimeRange.Start.Unix(), 
+	return fmt.Sprintf("metrics_%s_%d_%d_%s",
+		query.TenantID.String(),
+		query.TimeRange.Start.Unix(),
 		query.TimeRange.End.Unix(),
 		query.MetricType)
 }
@@ -549,11 +549,11 @@ func (mc *MetricsCollector) enhanceUsageReport(ctx context.Context, report *Usag
 func (mc *MetricsCollector) addTrendAnalysis(ctx context.Context, report *UsageReport) error {
 	// Analyze usage trends over time
 	report.Trends = &UsageTrends{
-		StorageGrowthRate:    0.15, // Placeholder: 15% monthly growth
-		CostGrowthRate:       0.12, // Placeholder: 12% monthly cost growth
-		AccessPatternTrend:   "decreasing",
-		PredictedUsage:       report.TotalSizeBytes * 1.15,
-		TrendConfidence:      0.85,
+		StorageGrowthRate:  0.15, // Placeholder: 15% monthly growth
+		CostGrowthRate:     0.12, // Placeholder: 12% monthly cost growth
+		AccessPatternTrend: "decreasing",
+		PredictedUsage:     int64(float64(report.TotalSizeBytes) * 1.15),
+		TrendConfidence:    0.85,
 	}
 	return nil
 }
@@ -561,9 +561,9 @@ func (mc *MetricsCollector) addTrendAnalysis(ctx context.Context, report *UsageR
 func (mc *MetricsCollector) addCostPredictions(ctx context.Context, report *UsageReport) error {
 	// Predict future costs based on trends
 	report.CostPredictions = &CostPredictions{
-		NextMonthCost:     report.TotalCost * 1.12,
-		NextQuarterCost:   report.TotalCost * 1.40,
-		NextYearCost:      report.TotalCost * 2.10,
+		NextMonthCost:      report.TotalCost * 1.12,
+		NextQuarterCost:    report.TotalCost * 1.40,
+		NextYearCost:       report.TotalCost * 2.10,
 		PredictionAccuracy: 0.82,
 	}
 	return nil
@@ -594,16 +594,16 @@ func (mc *MetricsCollector) addOptimizationRecommendations(ctx context.Context, 
 
 func (mc *MetricsCollector) collectCurrentUsage(ctx context.Context, metrics *RealTimeMetrics) error {
 	// Collect current storage usage metrics
-	metrics.TotalFiles = 150000      // Placeholder
+	metrics.TotalFiles = 150000                       // Placeholder
 	metrics.TotalSizeBytes = 500 * 1024 * 1024 * 1024 // 500GB
-	metrics.UsedCapacity = 0.75      // 75% capacity used
+	metrics.UsedCapacity = 0.75                       // 75% capacity used
 	return nil
 }
 
 func (mc *MetricsCollector) collectPerformanceMetrics(ctx context.Context, metrics *RealTimeMetrics) error {
 	// Collect performance metrics
-	metrics.ThroughputMBps = 125.5   // MB/s
-	metrics.IOPS = 850               // Operations per second
+	metrics.ThroughputMBps = 125.5 // MB/s
+	metrics.IOPS = 850             // Operations per second
 	metrics.Latency = 15 * time.Millisecond
 	metrics.ActiveOperations = 25
 	return nil

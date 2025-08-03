@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -100,7 +99,7 @@ func (sc *SyncController) StartSync(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_REQUEST",
-			Message: fmt.Sprintf("Invalid request body: %v", err),
+			Details: fmt.Sprintf("Invalid request body: %v", err),
 		})
 		return
 	}
@@ -116,7 +115,7 @@ func (sc *SyncController) StartSync(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "SYNC_START_FAILED",
-			Message: fmt.Sprintf("Failed to start sync: %v", err),
+			Details: fmt.Sprintf("Failed to start sync: %v", err),
 		})
 		return
 	}
@@ -174,7 +173,7 @@ func (sc *SyncController) ListSyncJobs(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "LIST_JOBS_FAILED",
-			Message: fmt.Sprintf("Failed to list sync jobs: %v", err),
+			Details: fmt.Sprintf("Failed to list sync jobs: %v", err),
 		})
 		return
 	}
@@ -203,7 +202,7 @@ func (sc *SyncController) GetSyncJobStatus(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_JOB_ID",
-			Message: "Invalid job ID format",
+			Details: "Invalid job ID format",
 		})
 		return
 	}
@@ -216,13 +215,13 @@ func (sc *SyncController) GetSyncJobStatus(c *gin.Context) {
 		if err == sync.ErrSyncJobNotFound {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "JOB_NOT_FOUND",
-				Message: "Sync job not found",
+				Details: "Sync job not found",
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "GET_STATUS_FAILED",
-			Message: fmt.Sprintf("Failed to get sync job status: %v", err),
+			Details: fmt.Sprintf("Failed to get sync job status: %v", err),
 		})
 		return
 	}
@@ -249,7 +248,7 @@ func (sc *SyncController) CancelSyncJob(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_JOB_ID",
-			Message: "Invalid job ID format",
+			Details: "Invalid job ID format",
 		})
 		return
 	}
@@ -262,13 +261,13 @@ func (sc *SyncController) CancelSyncJob(c *gin.Context) {
 		if err == sync.ErrSyncJobNotFound {
 			c.JSON(http.StatusNotFound, ErrorResponse{
 				Error:   "JOB_NOT_FOUND",
-				Message: "Sync job not found",
+				Details: "Sync job not found",
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "CANCEL_FAILED",
-			Message: fmt.Sprintf("Failed to cancel sync job: %v", err),
+			Details: fmt.Sprintf("Failed to cancel sync job: %v", err),
 		})
 		return
 	}
@@ -297,7 +296,7 @@ func (sc *SyncController) StreamSyncProgress(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_JOB_ID",
-			Message: "Invalid job ID format",
+			Details: "Invalid job ID format",
 		})
 		return
 	}
@@ -360,7 +359,7 @@ func (sc *SyncController) StreamSyncProgress(c *gin.Context) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/sync/jobs/{job_id}/files [get]
 func (sc *SyncController) GetSyncJobFiles(c *gin.Context) {
-	ctx, span := sc.tracer.Start(c.Request.Context(), "sync_controller.get_sync_job_files")
+	_, span := sc.tracer.Start(c.Request.Context(), "sync_controller.get_sync_job_files")
 	defer span.End()
 
 	jobIDStr := c.Param("job_id")
@@ -369,14 +368,14 @@ func (sc *SyncController) GetSyncJobFiles(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_JOB_ID",
-			Message: "Invalid job ID format",
+			Details: "Invalid job ID format",
 		})
 		return
 	}
 
 	span.SetAttributes(attribute.String("job_id", jobID.String()))
 
-	filters := &sync.FileOperationFilters{
+	_ = &sync.FileOperationFilters{
 		Operation: c.Query("operation"),
 		Status:    c.Query("status"),
 	}
@@ -453,7 +452,7 @@ func (sc *SyncController) GetSyncHistory(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "GET_HISTORY_FAILED",
-			Message: fmt.Sprintf("Failed to get sync history: %v", err),
+			Details: fmt.Sprintf("Failed to get sync history: %v", err),
 		})
 		return
 	}
@@ -519,7 +518,7 @@ func (sc *SyncController) GetSyncMetrics(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "GET_METRICS_FAILED",
-			Message: fmt.Sprintf("Failed to get sync metrics: %v", err),
+			Details: fmt.Sprintf("Failed to get sync metrics: %v", err),
 		})
 		return
 	}
@@ -554,7 +553,7 @@ func (sc *SyncController) GetSyncMetricsSummary(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "GET_METRICS_SUMMARY_FAILED",
-			Message: fmt.Sprintf("Failed to get sync metrics summary: %v", err),
+			Details: fmt.Sprintf("Failed to get sync metrics summary: %v", err),
 		})
 		return
 	}
@@ -582,7 +581,7 @@ func (sc *SyncController) StartCoordination(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_REQUEST",
-			Message: fmt.Sprintf("Invalid request body: %v", err),
+			Details: fmt.Sprintf("Invalid request body: %v", err),
 		})
 		return
 	}
@@ -595,7 +594,7 @@ func (sc *SyncController) StartCoordination(c *gin.Context) {
 	if sc.coordinator == nil {
 		c.JSON(http.StatusServiceUnavailable, ErrorResponse{
 			Error:   "COORDINATOR_UNAVAILABLE",
-			Message: "Cross-connector coordination is not available",
+			Details: "Cross-connector coordination is not available",
 		})
 		return
 	}
@@ -605,7 +604,7 @@ func (sc *SyncController) StartCoordination(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "COORDINATION_START_FAILED",
-			Message: fmt.Sprintf("Failed to start coordination: %v", err),
+			Details: fmt.Sprintf("Failed to start coordination: %v", err),
 		})
 		return
 	}
@@ -628,7 +627,7 @@ func (sc *SyncController) ListCoordinations(c *gin.Context) {
 	if sc.coordinator == nil {
 		c.JSON(http.StatusServiceUnavailable, ErrorResponse{
 			Error:   "COORDINATOR_UNAVAILABLE",
-			Message: "Cross-connector coordination is not available",
+			Details: "Cross-connector coordination is not available",
 		})
 		return
 	}
@@ -638,7 +637,7 @@ func (sc *SyncController) ListCoordinations(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "LIST_COORDINATIONS_FAILED",
-			Message: fmt.Sprintf("Failed to list coordinations: %v", err),
+			Details: fmt.Sprintf("Failed to list coordinations: %v", err),
 		})
 		return
 	}
@@ -667,7 +666,7 @@ func (sc *SyncController) GetCoordinationStatus(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_COORDINATION_ID",
-			Message: "Invalid coordination ID format",
+			Details: "Invalid coordination ID format",
 		})
 		return
 	}
@@ -677,7 +676,7 @@ func (sc *SyncController) GetCoordinationStatus(c *gin.Context) {
 	if sc.coordinator == nil {
 		c.JSON(http.StatusServiceUnavailable, ErrorResponse{
 			Error:   "COORDINATOR_UNAVAILABLE",
-			Message: "Cross-connector coordination is not available",
+			Details: "Cross-connector coordination is not available",
 		})
 		return
 	}
@@ -687,7 +686,7 @@ func (sc *SyncController) GetCoordinationStatus(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusNotFound, ErrorResponse{
 			Error:   "COORDINATION_NOT_FOUND",
-			Message: "Coordination not found",
+			Details: "Coordination not found",
 		})
 		return
 	}
@@ -714,7 +713,7 @@ func (sc *SyncController) CancelCoordination(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_COORDINATION_ID",
-			Message: "Invalid coordination ID format",
+			Details: "Invalid coordination ID format",
 		})
 		return
 	}
@@ -724,7 +723,7 @@ func (sc *SyncController) CancelCoordination(c *gin.Context) {
 	if sc.coordinator == nil {
 		c.JSON(http.StatusServiceUnavailable, ErrorResponse{
 			Error:   "COORDINATOR_UNAVAILABLE",
-			Message: "Cross-connector coordination is not available",
+			Details: "Cross-connector coordination is not available",
 		})
 		return
 	}
@@ -734,7 +733,7 @@ func (sc *SyncController) CancelCoordination(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "CANCEL_COORDINATION_FAILED",
-			Message: fmt.Sprintf("Failed to cancel coordination: %v", err),
+			Details: fmt.Sprintf("Failed to cancel coordination: %v", err),
 		})
 		return
 	}
@@ -764,7 +763,7 @@ func (sc *SyncController) RegisterWebhook(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusBadRequest, ErrorResponse{
 			Error:   "INVALID_REQUEST",
-			Message: fmt.Sprintf("Invalid request body: %v", err),
+			Details: fmt.Sprintf("Invalid request body: %v", err),
 		})
 		return
 	}
@@ -774,7 +773,7 @@ func (sc *SyncController) RegisterWebhook(c *gin.Context) {
 		span.RecordError(err)
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error:   "WEBHOOK_REGISTRATION_FAILED",
-			Message: fmt.Sprintf("Failed to register webhook: %v", err),
+			Details: fmt.Sprintf("Failed to register webhook: %v", err),
 		})
 		return
 	}
@@ -783,27 +782,53 @@ func (sc *SyncController) RegisterWebhook(c *gin.Context) {
 }
 
 // Additional placeholder methods for remaining endpoints
-func (sc *SyncController) ListWebhooks(c *gin.Context)         { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) GetWebhook(c *gin.Context)           { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) UpdateWebhook(c *gin.Context)        { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) UnregisterWebhook(c *gin.Context)    { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) CreateSyncSchedule(c *gin.Context)   { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) ListSyncSchedules(c *gin.Context)    { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) GetSyncSchedule(c *gin.Context)      { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) UpdateSyncSchedule(c *gin.Context)   { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) DeleteSyncSchedule(c *gin.Context)   { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) TriggerScheduledSync(c *gin.Context) { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) ListSyncConflicts(c *gin.Context)    { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) GetSyncConflict(c *gin.Context)      { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) ResolveSyncConflict(c *gin.Context)  { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) GetSyncSystemStatus(c *gin.Context)  { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-func (sc *SyncController) BulkSyncOperations(c *gin.Context)   { c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"}) }
-
-// Response types
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Message string `json:"message"`
+func (sc *SyncController) ListWebhooks(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
 }
+func (sc *SyncController) GetWebhook(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) UpdateWebhook(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) UnregisterWebhook(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) CreateSyncSchedule(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) ListSyncSchedules(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) GetSyncSchedule(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) UpdateSyncSchedule(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) DeleteSyncSchedule(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) TriggerScheduledSync(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) ListSyncConflicts(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) GetSyncConflict(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) ResolveSyncConflict(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) GetSyncSystemStatus(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+func (sc *SyncController) BulkSyncOperations(c *gin.Context) {
+	c.JSON(http.StatusNotImplemented, gin.H{"message": "Not implemented"})
+}
+
+// Response types - using ErrorResponse from anomaly_types.go
 
 type SuccessResponse struct {
 	Message string `json:"message"`

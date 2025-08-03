@@ -11,15 +11,15 @@ import (
 // ExampleIntegration demonstrates how to use the event-driven processing workflow
 func ExampleIntegration() error {
 	ctx := context.Background()
-	
+
 	// 1. Create event bus
 	busConfig := DefaultEventBusConfig()
 	eventBus := NewInMemoryEventBus(busConfig)
-	
+
 	// 2. Create workflow engine
 	workflowConfig := DefaultWorkflowEngineConfig()
 	workflowEngine := NewWorkflowEngine(nil, nil, workflowConfig) // Producer/Consumer would be set up separately
-	
+
 	// 3. Register step handlers
 	workflowEngine.RegisterStepHandler(NewFileReaderHandler())
 	workflowEngine.RegisterStepHandler(NewChunkingHandler())
@@ -28,29 +28,29 @@ func ExampleIntegration() error {
 	workflowEngine.RegisterStepHandler(NewEmbeddingHandler())
 	workflowEngine.RegisterStepHandler(NewStorageHandler())
 	workflowEngine.RegisterStepHandler(NewNotificationHandler())
-	
+
 	// 4. Subscribe workflow engine to event bus
 	if err := eventBus.Subscribe(workflowEngine, workflowEngine.GetEventTypes()...); err != nil {
 		return fmt.Errorf("failed to subscribe workflow engine: %w", err)
 	}
-	
+
 	// 5. Create and register a file processing workflow
 	workflow := createFileProcessingWorkflow()
 	if err := workflowEngine.RegisterWorkflow(workflow); err != nil {
 		return fmt.Errorf("failed to register workflow: %w", err)
 	}
-	
+
 	// 6. Start services
 	if err := eventBus.Start(); err != nil {
 		return fmt.Errorf("failed to start event bus: %w", err)
 	}
 	defer eventBus.Stop()
-	
+
 	if err := workflowEngine.Start(ctx); err != nil {
 		return fmt.Errorf("failed to start workflow engine: %w", err)
 	}
 	defer workflowEngine.Stop(ctx)
-	
+
 	// 7. Simulate file discovery event
 	tenantID := uuid.New()
 	fileDiscoveredEvent := NewEvent(EventFileDiscovered, tenantID, map[string]interface{}{
@@ -62,59 +62,59 @@ func ExampleIntegration() error {
 			"priority":     "normal",
 		},
 	})
-	
+
 	fmt.Printf("Publishing file discovered event: %s\n", fileDiscoveredEvent.ID)
 	if err := eventBus.Publish(fileDiscoveredEvent); err != nil {
 		return fmt.Errorf("failed to publish event: %w", err)
 	}
-	
+
 	// 8. Wait for processing to complete
 	time.Sleep(2 * time.Second)
-	
+
 	// 9. Check metrics
 	busMetrics := eventBus.GetMetrics()
 	workflowMetrics := workflowEngine.GetMetrics()
-	
+
 	fmt.Printf("\nEvent Bus Metrics:\n")
 	fmt.Printf("  Events Published: %d\n", busMetrics.EventsPublished)
 	fmt.Printf("  Events Processed: %d\n", busMetrics.EventsProcessed)
 	fmt.Printf("  Events Failed: %d\n", busMetrics.EventsFailed)
 	fmt.Printf("  Queue Depth: %d\n", busMetrics.QueueDepth)
 	fmt.Printf("  Active Handlers: %d\n", busMetrics.HandlersActive)
-	
+
 	fmt.Printf("\nWorkflow Engine Metrics:\n")
 	fmt.Printf("  Total Workflows: %v\n", workflowMetrics["total_workflows"])
 	fmt.Printf("  Total Executions: %v\n", workflowMetrics["total_executions"])
 	fmt.Printf("  Running Executions: %v\n", workflowMetrics["running_executions"])
 	fmt.Printf("  Completed Executions: %v\n", workflowMetrics["completed_executions"])
-	
+
 	// 10. List workflow executions
 	executions, err := workflowEngine.ListExecutions(tenantID)
 	if err != nil {
 		return fmt.Errorf("failed to list executions: %w", err)
 	}
-	
+
 	fmt.Printf("\nWorkflow Executions (%d):\n", len(executions))
 	for _, execution := range executions {
-		fmt.Printf("  Execution %s: %s (Progress: %d%%)\n", 
+		fmt.Printf("  Execution %s: %s (Progress: %d%%)\n",
 			execution.ID, execution.Status, execution.Progress)
-		
+
 		if execution.Status == "completed" {
 			fmt.Printf("    Results: %+v\n", execution.Results)
 		}
-		
+
 		if execution.Status == "failed" && execution.LastError != nil {
 			fmt.Printf("    Error: %s\n", *execution.LastError)
 		}
 	}
-	
+
 	return nil
 }
 
 // createFileProcessingWorkflow creates a comprehensive file processing workflow
 func createFileProcessingWorkflow() *WorkflowDefinition {
 	tenantID := uuid.New() // In real implementation, this would be passed in
-	
+
 	return &WorkflowDefinition{
 		ID:          uuid.New(),
 		Name:        "file-processing-workflow",
@@ -147,9 +147,9 @@ func createFileProcessingWorkflow() *WorkflowDefinition {
 				Retries:      2,
 				Parallel:     false,
 				Config: map[string]interface{}{
-					"strategy":    "adaptive",
-					"chunk_size":  1000,
-					"overlap":     100,
+					"strategy":   "adaptive",
+					"chunk_size": 1000,
+					"overlap":    100,
 				},
 			},
 			{
@@ -257,11 +257,11 @@ func createFileProcessingWorkflow() *WorkflowDefinition {
 // DemoWorkflowExecution demonstrates a complete workflow execution
 func DemoWorkflowExecution() error {
 	fmt.Println("=== Event-Driven Processing Workflow Demo ===")
-	
+
 	if err := ExampleIntegration(); err != nil {
 		return fmt.Errorf("demo failed: %w", err)
 	}
-	
+
 	fmt.Println("\n=== Demo Completed Successfully ===")
 	return nil
 }
@@ -269,7 +269,7 @@ func DemoWorkflowExecution() error {
 // ExampleEventTypes demonstrates the different types of events in the system
 func ExampleEventTypes() {
 	fmt.Println("=== Available Event Types ===")
-	
+
 	eventTypes := []string{
 		EventFileDiscovered,
 		EventFileResolved,
@@ -284,11 +284,11 @@ func ExampleEventTypes() {
 		EventSessionStarted,
 		EventSessionCompleted,
 	}
-	
+
 	for i, eventType := range eventTypes {
 		fmt.Printf("%d. %s\n", i+1, eventType)
 	}
-	
+
 	fmt.Println("\n=== Example Event Flow ===")
 	fmt.Println("1. file.discovered → triggers workflow")
 	fmt.Println("2. file.resolved → starts processing pipeline")
@@ -302,7 +302,7 @@ func ExampleEventTypes() {
 // ExampleWorkflowDefinitions shows different workflow patterns
 func ExampleWorkflowDefinitions() []*WorkflowDefinition {
 	tenantID := uuid.New()
-	
+
 	return []*WorkflowDefinition{
 		// Simple file processing workflow
 		{
@@ -317,7 +317,7 @@ func ExampleWorkflowDefinitions() []*WorkflowDefinition {
 			},
 			Status: "active",
 		},
-		
+
 		// Security-focused workflow
 		{
 			ID:          uuid.New(),
@@ -332,7 +332,7 @@ func ExampleWorkflowDefinitions() []*WorkflowDefinition {
 			},
 			Status: "active",
 		},
-		
+
 		// High-volume processing workflow
 		{
 			ID:          uuid.New(),

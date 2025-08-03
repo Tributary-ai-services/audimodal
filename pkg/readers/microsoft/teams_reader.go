@@ -2,7 +2,6 @@ package microsoft
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -239,16 +238,16 @@ func (r *TeamsReader) DiscoverSchema(ctx context.Context, sourcePath string) (co
 			},
 		},
 		Metadata: map[string]any{
-			"total_messages":     metadata.TotalMessages,
-			"total_channels":     metadata.TotalChannels,
-			"total_teams":        metadata.TotalTeams,
+			"total_messages":      metadata.TotalMessages,
+			"total_channels":      metadata.TotalChannels,
+			"total_teams":         metadata.TotalTeams,
 			"unique_participants": metadata.UniqueParticipants,
-			"date_range_start":   metadata.DateRangeStart,
-			"date_range_end":     metadata.DateRangeEnd,
-			"export_date":        metadata.ExportDate,
-			"has_attachments":    metadata.HasAttachments,
-			"has_meeting_data":   metadata.HasMeetingData,
-			"export_type":        metadata.ExportType,
+			"date_range_start":    metadata.DateRangeStart,
+			"date_range_end":      metadata.DateRangeEnd,
+			"export_date":         metadata.ExportDate,
+			"has_attachments":     metadata.HasAttachments,
+			"has_meeting_data":    metadata.HasMeetingData,
+			"export_type":         metadata.ExportType,
 		},
 	}
 
@@ -343,16 +342,16 @@ func (r *TeamsReader) GetSupportedFormats() []string {
 
 // TeamsMetadata contains extracted Teams export metadata
 type TeamsMetadata struct {
-	TotalMessages       int
-	TotalChannels       int
-	TotalTeams          int
-	UniqueParticipants  int
-	DateRangeStart      string
-	DateRangeEnd        string
-	ExportDate          string
-	HasAttachments      bool
-	HasMeetingData      bool
-	ExportType          string
+	TotalMessages      int
+	TotalChannels      int
+	TotalTeams         int
+	UniqueParticipants int
+	DateRangeStart     string
+	DateRangeEnd       string
+	ExportDate         string
+	HasAttachments     bool
+	HasMeetingData     bool
+	ExportType         string
 }
 
 // TeamsExport represents a parsed Teams export
@@ -363,19 +362,19 @@ type TeamsExport struct {
 
 // TeamsMessage represents a Teams message
 type TeamsMessage struct {
-	ID            string             `json:"id"`
-	ChannelName   string             `json:"channelName"`
-	TeamName      string             `json:"teamName"`
-	Sender        string             `json:"sender"`
-	SenderEmail   string             `json:"senderEmail"`
-	Timestamp     time.Time          `json:"timestamp"`
-	MessageText   string             `json:"messageText"`
-	MessageType   string             `json:"messageType"`
-	ThreadID      string             `json:"threadId,omitempty"`
-	Attachments   []TeamsAttachment  `json:"attachments,omitempty"`
-	Reactions     []TeamsReaction    `json:"reactions,omitempty"`
-	IsDeleted     bool               `json:"isDeleted"`
-	IsSystemMsg   bool               `json:"isSystemMessage"`
+	ID          string            `json:"id"`
+	ChannelName string            `json:"channelName"`
+	TeamName    string            `json:"teamName"`
+	Sender      string            `json:"sender"`
+	SenderEmail string            `json:"senderEmail"`
+	Timestamp   time.Time         `json:"timestamp"`
+	MessageText string            `json:"messageText"`
+	MessageType string            `json:"messageType"`
+	ThreadID    string            `json:"threadId,omitempty"`
+	Attachments []TeamsAttachment `json:"attachments,omitempty"`
+	Reactions   []TeamsReaction   `json:"reactions,omitempty"`
+	IsDeleted   bool              `json:"isDeleted"`
+	IsSystemMsg bool              `json:"isSystemMessage"`
 }
 
 // TeamsAttachment represents a message attachment
@@ -388,8 +387,8 @@ type TeamsAttachment struct {
 
 // TeamsReaction represents a message reaction
 type TeamsReaction struct {
-	Type     string `json:"type"`
-	UserName string `json:"userName"`
+	Type      string `json:"type"`
+	UserName  string `json:"userName"`
 	UserEmail string `json:"userEmail"`
 }
 
@@ -416,7 +415,7 @@ func (r *TeamsReader) isTeamsExport(filePath string) bool {
 	}
 
 	content := string(buffer[:n])
-	
+
 	// Look for Teams-specific indicators
 	teamsIndicators := []string{
 		"channelName", "teamName", "messageText",
@@ -494,26 +493,26 @@ func (r *TeamsReader) extractSampleMessages(sourcePath string) ([]map[string]any
 	// Mock sample data - in production, would parse actual JSON content
 	return []map[string]any{
 		{
-			"message_id":    "msg_001",
-			"channel_name":  "General",
-			"team_name":     "Project Team",
-			"sender":        "John Doe",
-			"sender_email":  "john.doe@company.com",
-			"timestamp":     "2024-01-15 10:30:00",
-			"message_text":  "Hello team, let's discuss the project timeline.",
-			"message_type":  "text",
-			"thread_id":     "",
+			"message_id":   "msg_001",
+			"channel_name": "General",
+			"team_name":    "Project Team",
+			"sender":       "John Doe",
+			"sender_email": "john.doe@company.com",
+			"timestamp":    "2024-01-15 10:30:00",
+			"message_text": "Hello team, let's discuss the project timeline.",
+			"message_type": "text",
+			"thread_id":    "",
 		},
 		{
-			"message_id":    "msg_002",
-			"channel_name":  "General",
-			"team_name":     "Project Team",
-			"sender":        "Jane Smith",
-			"sender_email":  "jane.smith@company.com",
-			"timestamp":     "2024-01-15 10:32:00",
-			"message_text":  "Great idea! I've uploaded the latest document.",
-			"message_type":  "text",
-			"thread_id":     "msg_001",
+			"message_id":   "msg_002",
+			"channel_name": "General",
+			"team_name":    "Project Team",
+			"sender":       "Jane Smith",
+			"sender_email": "jane.smith@company.com",
+			"timestamp":    "2024-01-15 10:32:00",
+			"message_text": "Great idea! I've uploaded the latest document.",
+			"message_type": "text",
+			"thread_id":    "msg_001",
 		},
 	}, nil
 }
@@ -633,12 +632,12 @@ func (it *TeamsIterator) Next(ctx context.Context) (core.Chunk, error) {
 				"message_id":       message.ID,
 				"channel_name":     message.ChannelName,
 				"team_name":        message.TeamName,
-				"sender":          message.Sender,
-				"sender_email":    message.SenderEmail,
-				"timestamp":       message.Timestamp.Format("2006-01-02 15:04:05"),
-				"message_type":    message.MessageType,
-				"thread_id":       message.ThreadID,
-				"is_system_msg":   strconv.FormatBool(message.IsSystemMsg),
+				"sender":           message.Sender,
+				"sender_email":     message.SenderEmail,
+				"timestamp":        message.Timestamp.Format("2006-01-02 15:04:05"),
+				"message_type":     message.MessageType,
+				"thread_id":        message.ThreadID,
+				"is_system_msg":    strconv.FormatBool(message.IsSystemMsg),
 				"attachment_count": strconv.Itoa(len(message.Attachments)),
 				"reaction_count":   strconv.Itoa(len(message.Reactions)),
 			},

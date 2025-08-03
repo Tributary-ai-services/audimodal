@@ -24,39 +24,39 @@ func NewFileHandler(db *database.Database) *FileHandler {
 
 // FileResponse represents a file response
 type FileResponse struct {
-	ID                   uuid.UUID                  `json:"id"`
-	TenantID             uuid.UUID                  `json:"tenant_id"`
-	DataSourceID         *uuid.UUID                 `json:"data_source_id,omitempty"`
-	ProcessingSessionID  *uuid.UUID                 `json:"processing_session_id,omitempty"`
-	URL                  string                     `json:"url"`
-	Path                 string                     `json:"path"`
-	Filename             string                     `json:"filename"`
-	Extension            string                     `json:"extension"`
-	ContentType          string                     `json:"content_type"`
-	Size                 int64                      `json:"size"`
-	Checksum             string                     `json:"checksum"`
-	ChecksumType         string                     `json:"checksum_type"`
-	LastModified         string                     `json:"last_modified"`
-	Status               string                     `json:"status"`
-	ProcessingTier       string                     `json:"processing_tier"`
-	ProcessedAt          *string                    `json:"processed_at,omitempty"`
-	ProcessingError      *string                    `json:"processing_error,omitempty"`
-	ProcessingDuration   *int64                     `json:"processing_duration,omitempty"`
-	Language             string                     `json:"language,omitempty"`
-	LanguageConf         float64                    `json:"language_confidence,omitempty"`
-	ContentCategory      string                     `json:"content_category,omitempty"`
-	SensitivityLevel     string                     `json:"sensitivity_level,omitempty"`
-	Classifications      []string                   `json:"classifications,omitempty"`
-	SchemaInfo           models.FileSchemaInfo      `json:"schema_info"`
-	ChunkCount           int                        `json:"chunk_count"`
-	ChunkingStrategy     string                     `json:"chunking_strategy,omitempty"`
-	PIIDetected          bool                       `json:"pii_detected"`
-	ComplianceFlags      []string                   `json:"compliance_flags,omitempty"`
-	EncryptionStatus     string                     `json:"encryption_status"`
-	Metadata             map[string]interface{}     `json:"metadata,omitempty"`
-	CustomFields         map[string]interface{}     `json:"custom_fields,omitempty"`
-	CreatedAt            string                     `json:"created_at"`
-	UpdatedAt            string                     `json:"updated_at"`
+	ID                  uuid.UUID              `json:"id"`
+	TenantID            uuid.UUID              `json:"tenant_id"`
+	DataSourceID        *uuid.UUID             `json:"data_source_id,omitempty"`
+	ProcessingSessionID *uuid.UUID             `json:"processing_session_id,omitempty"`
+	URL                 string                 `json:"url"`
+	Path                string                 `json:"path"`
+	Filename            string                 `json:"filename"`
+	Extension           string                 `json:"extension"`
+	ContentType         string                 `json:"content_type"`
+	Size                int64                  `json:"size"`
+	Checksum            string                 `json:"checksum"`
+	ChecksumType        string                 `json:"checksum_type"`
+	LastModified        string                 `json:"last_modified"`
+	Status              string                 `json:"status"`
+	ProcessingTier      string                 `json:"processing_tier"`
+	ProcessedAt         *string                `json:"processed_at,omitempty"`
+	ProcessingError     *string                `json:"processing_error,omitempty"`
+	ProcessingDuration  *int64                 `json:"processing_duration,omitempty"`
+	Language            string                 `json:"language,omitempty"`
+	LanguageConf        float64                `json:"language_confidence,omitempty"`
+	ContentCategory     string                 `json:"content_category,omitempty"`
+	SensitivityLevel    string                 `json:"sensitivity_level,omitempty"`
+	Classifications     []string               `json:"classifications,omitempty"`
+	SchemaInfo          models.FileSchemaInfo  `json:"schema_info"`
+	ChunkCount          int                    `json:"chunk_count"`
+	ChunkingStrategy    string                 `json:"chunking_strategy,omitempty"`
+	PIIDetected         bool                   `json:"pii_detected"`
+	ComplianceFlags     []string               `json:"compliance_flags,omitempty"`
+	EncryptionStatus    string                 `json:"encryption_status"`
+	Metadata            map[string]interface{} `json:"metadata,omitempty"`
+	CustomFields        map[string]interface{} `json:"custom_fields,omitempty"`
+	CreatedAt           string                 `json:"created_at"`
+	UpdatedAt           string                 `json:"updated_at"`
 }
 
 // ServeHTTP implements the http.Handler interface
@@ -69,7 +69,7 @@ func (h *FileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	path := r.URL.Path
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	
+
 	// Find files in the path
 	var fileIndex int = -1
 	for i, part := range parts {
@@ -147,7 +147,7 @@ func (h *FileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ListFiles handles GET /api/v1/tenants/{tenant_id}/files
 func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	page, pageSize, offset := getPagination(r.Context())
-	
+
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
 	if err != nil {
@@ -157,37 +157,37 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request, tenantID
 
 	var files []models.File
 	query := tenantRepo.DB().Limit(pageSize).Offset(offset).Order("created_at DESC")
-	
+
 	// Apply filters
 	if status := r.URL.Query().Get("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
-	
+
 	if contentType := r.URL.Query().Get("content_type"); contentType != "" {
 		query = query.Where("content_type = ?", contentType)
 	}
-	
+
 	if extension := r.URL.Query().Get("extension"); extension != "" {
 		query = query.Where("extension = ?", extension)
 	}
-	
+
 	if dataSourceID := r.URL.Query().Get("data_source_id"); dataSourceID != "" {
 		if dsID, err := uuid.Parse(dataSourceID); err == nil {
 			query = query.Where("data_source_id = ?", dsID)
 		}
 	}
-	
+
 	if sessionID := r.URL.Query().Get("session_id"); sessionID != "" {
 		if sID, err := uuid.Parse(sessionID); err == nil {
 			query = query.Where("processing_session_id = ?", sID)
 		}
 	}
-	
+
 	if piiDetected := r.URL.Query().Get("pii_detected"); piiDetected != "" {
 		detected := piiDetected == "true"
 		query = query.Where("pii_detected = ?", detected)
 	}
-	
+
 	err = query.Find(&files).Error
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to list files", err.Error())
@@ -219,19 +219,19 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request, tenantID
 // CreateFile handles POST /api/v1/tenants/{tenant_id}/files
 func (h *FileHandler) CreateFile(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	var req struct {
-		URL                 string                     `json:"url"`
-		Path                string                     `json:"path"`
-		Filename            string                     `json:"filename"`
-		Extension           string                     `json:"extension"`
-		ContentType         string                     `json:"content_type"`
-		Size                int64                      `json:"size"`
-		Checksum            string                     `json:"checksum"`
-		ChecksumType        string                     `json:"checksum_type"`
-		DataSourceID        *uuid.UUID                 `json:"data_source_id,omitempty"`
-		ProcessingSessionID *uuid.UUID                 `json:"processing_session_id,omitempty"`
-		Metadata            map[string]interface{}     `json:"metadata,omitempty"`
+		URL                 string                 `json:"url"`
+		Path                string                 `json:"path"`
+		Filename            string                 `json:"filename"`
+		Extension           string                 `json:"extension"`
+		ContentType         string                 `json:"content_type"`
+		Size                int64                  `json:"size"`
+		Checksum            string                 `json:"checksum"`
+		ChecksumType        string                 `json:"checksum_type"`
+		DataSourceID        *uuid.UUID             `json:"data_source_id,omitempty"`
+		ProcessingSessionID *uuid.UUID             `json:"processing_session_id,omitempty"`
+		Metadata            map[string]interface{} `json:"metadata,omitempty"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteBadRequest(w, getRequestID(r), "Invalid JSON request", err.Error())
 		return
@@ -306,7 +306,7 @@ func (h *FileHandler) UpdateFile(w http.ResponseWriter, r *http.Request, tenantI
 		Metadata         map[string]interface{} `json:"metadata"`
 		CustomFields     map[string]interface{} `json:"custom_fields"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteBadRequest(w, getRequestID(r), "Invalid JSON request", err.Error())
 		return
@@ -438,7 +438,7 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 		Priority         string `json:"priority"`
 		DLPScanEnabled   bool   `json:"dlp_scan_enabled"`
 	}
-	
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteBadRequest(w, getRequestID(r), "Invalid JSON request", err.Error())
 		return
@@ -537,18 +537,18 @@ func (h *FileHandler) GetFileMetadata(w http.ResponseWriter, r *http.Request, te
 	}
 
 	metadata := map[string]interface{}{
-		"schema_info":        file.SchemaInfo,
-		"metadata":           file.Metadata,
-		"custom_fields":      file.CustomFields,
-		"classifications":    file.Classifications,
-		"compliance_flags":   file.ComplianceFlags,
-		"processing_tier":    file.GetProcessingTier(),
-		"sensitivity_level":  file.GetSensitivityLevel(),
-		"pii_detected":       file.HasPII(),
-		"is_structured":      file.IsStructuredData(),
-		"is_unstructured":    file.IsUnstructuredData(),
-		"chunk_count":        file.ChunkCount,
-		"chunking_strategy":  file.ChunkingStrategy,
+		"schema_info":       file.SchemaInfo,
+		"metadata":          file.Metadata,
+		"custom_fields":     file.CustomFields,
+		"classifications":   file.Classifications,
+		"compliance_flags":  file.ComplianceFlags,
+		"processing_tier":   file.GetProcessingTier(),
+		"sensitivity_level": file.GetSensitivityLevel(),
+		"pii_detected":      file.HasPII(),
+		"is_structured":     file.IsStructuredData(),
+		"is_unstructured":   file.IsUnstructuredData(),
+		"chunk_count":       file.ChunkCount,
+		"chunking_strategy": file.ChunkingStrategy,
 	}
 
 	response.WriteSuccess(w, getRequestID(r), metadata, nil)
@@ -598,38 +598,38 @@ func (h *FileHandler) ListFileViolations(w http.ResponseWriter, r *http.Request,
 
 func (h *FileHandler) toFileResponse(file *models.File) FileResponse {
 	responseData := FileResponse{
-		ID:                   file.ID,
-		TenantID:             file.TenantID,
-		DataSourceID:         file.DataSourceID,
-		ProcessingSessionID:  file.ProcessingSessionID,
-		URL:                  file.URL,
-		Path:                 file.Path,
-		Filename:             file.Filename,
-		Extension:            file.Extension,
-		ContentType:          file.ContentType,
-		Size:                 file.Size,
-		Checksum:             file.Checksum,
-		ChecksumType:         file.ChecksumType,
-		LastModified:         file.LastModified.Format("2006-01-02T15:04:05Z"),
-		Status:               file.Status,
-		ProcessingTier:       file.ProcessingTier,
-		ProcessingError:      file.ProcessingError,
-		ProcessingDuration:   file.ProcessingDuration,
-		Language:             file.Language,
-		LanguageConf:         file.LanguageConf,
-		ContentCategory:      file.ContentCategory,
-		SensitivityLevel:     file.SensitivityLevel,
-		Classifications:      file.Classifications,
-		SchemaInfo:           file.SchemaInfo,
-		ChunkCount:           file.ChunkCount,
-		ChunkingStrategy:     file.ChunkingStrategy,
-		PIIDetected:          file.PIIDetected,
-		ComplianceFlags:      file.ComplianceFlags,
-		EncryptionStatus:     file.EncryptionStatus,
-		Metadata:             file.Metadata,
-		CustomFields:         file.CustomFields,
-		CreatedAt:            file.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:            file.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:                  file.ID,
+		TenantID:            file.TenantID,
+		DataSourceID:        file.DataSourceID,
+		ProcessingSessionID: file.ProcessingSessionID,
+		URL:                 file.URL,
+		Path:                file.Path,
+		Filename:            file.Filename,
+		Extension:           file.Extension,
+		ContentType:         file.ContentType,
+		Size:                file.Size,
+		Checksum:            file.Checksum,
+		ChecksumType:        file.ChecksumType,
+		LastModified:        file.LastModified.Format("2006-01-02T15:04:05Z"),
+		Status:              file.Status,
+		ProcessingTier:      file.ProcessingTier,
+		ProcessingError:     file.ProcessingError,
+		ProcessingDuration:  file.ProcessingDuration,
+		Language:            file.Language,
+		LanguageConf:        file.LanguageConf,
+		ContentCategory:     file.ContentCategory,
+		SensitivityLevel:    file.SensitivityLevel,
+		Classifications:     file.Classifications,
+		SchemaInfo:          file.SchemaInfo,
+		ChunkCount:          file.ChunkCount,
+		ChunkingStrategy:    file.ChunkingStrategy,
+		PIIDetected:         file.PIIDetected,
+		ComplianceFlags:     file.ComplianceFlags,
+		EncryptionStatus:    file.EncryptionStatus,
+		Metadata:            file.Metadata,
+		CustomFields:        file.CustomFields,
+		CreatedAt:           file.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:           file.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	if file.ProcessedAt != nil {

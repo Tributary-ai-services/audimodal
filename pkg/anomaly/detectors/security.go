@@ -10,59 +10,59 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/TAS/audimodal/pkg/anomaly"
+	"github.com/jscharber/eAIIngest/pkg/anomaly"
 )
 
 // SecurityDetector implements security-focused anomaly detection
 type SecurityDetector struct {
-	name              string
-	version           string
-	enabled           bool
-	config            *SecurityConfig
-	baselines         map[string]*anomaly.BaselineData
+	name               string
+	version            string
+	enabled            bool
+	config             *SecurityConfig
+	baselines          map[string]*anomaly.BaselineData
 	threatIntelligence *ThreatIntelligence
-	dlpRules          []DLPRule
+	dlpRules           []DLPRule
 	securitySignatures map[string]SecuritySignature
 }
 
 // SecurityConfig contains configuration for security detection
 type SecurityConfig struct {
 	// Data loss prevention
-	EnableDLP             bool     `json:"enable_dlp"`
-	PIIDetectionEnabled   bool     `json:"pii_detection_enabled"`
-	CreditCardDetection   bool     `json:"credit_card_detection"`
-	SSNDetection          bool     `json:"ssn_detection"`
-	EmailDetection        bool     `json:"email_detection"`
-	PhoneDetection        bool     `json:"phone_detection"`
-	IPAddressDetection    bool     `json:"ip_address_detection"`
-	
+	EnableDLP           bool `json:"enable_dlp"`
+	PIIDetectionEnabled bool `json:"pii_detection_enabled"`
+	CreditCardDetection bool `json:"credit_card_detection"`
+	SSNDetection        bool `json:"ssn_detection"`
+	EmailDetection      bool `json:"email_detection"`
+	PhoneDetection      bool `json:"phone_detection"`
+	IPAddressDetection  bool `json:"ip_address_detection"`
+
 	// Malware detection
 	EnableMalwareDetection bool     `json:"enable_malware_detection"`
 	SuspiciousFileTypes    []string `json:"suspicious_file_types"`
 	ExecutableFileTypes    []string `json:"executable_file_types"`
-	
+
 	// Content security
-	EnableContentSecurity  bool     `json:"enable_content_security"`
-	MaxEntropyThreshold    float64  `json:"max_entropy_threshold"`
-	Base64DetectionEnabled bool     `json:"base64_detection_enabled"`
-	HexDetectionEnabled    bool     `json:"hex_detection_enabled"`
-	
+	EnableContentSecurity  bool    `json:"enable_content_security"`
+	MaxEntropyThreshold    float64 `json:"max_entropy_threshold"`
+	Base64DetectionEnabled bool    `json:"base64_detection_enabled"`
+	HexDetectionEnabled    bool    `json:"hex_detection_enabled"`
+
 	// Access control anomalies
 	PrivilegeEscalationDetection bool `json:"privilege_escalation_detection"`
 	UnauthorizedAccessDetection  bool `json:"unauthorized_access_detection"`
 	SuspiciousLoginDetection     bool `json:"suspicious_login_detection"`
-	
+
 	// Threat intelligence
-	EnableThreatIntel     bool          `json:"enable_threat_intel"`
-	IOCCheckEnabled       bool          `json:"ioc_check_enabled"`
-	ThreatFeedURL         string        `json:"threat_feed_url"`
+	EnableThreatIntel        bool          `json:"enable_threat_intel"`
+	IOCCheckEnabled          bool          `json:"ioc_check_enabled"`
+	ThreatFeedURL            string        `json:"threat_feed_url"`
 	ThreatFeedUpdateInterval time.Duration `json:"threat_feed_update_interval"`
-	
+
 	// Encryption and obfuscation
-	EncryptedContentDetection bool     `json:"encrypted_content_detection"`
-	ObfuscatedScriptDetection bool     `json:"obfuscated_script_detection"`
-	PackedFileDetection       bool     `json:"packed_file_detection"`
-	
+	EncryptedContentDetection bool `json:"encrypted_content_detection"`
+	ObfuscatedScriptDetection bool `json:"obfuscated_script_detection"`
+	PackedFileDetection       bool `json:"packed_file_detection"`
+
 	// Thresholds
 	HighRiskThreshold     float64 `json:"high_risk_threshold"`
 	CriticalRiskThreshold float64 `json:"critical_risk_threshold"`
@@ -101,28 +101,28 @@ type PatternInfo struct {
 
 // DLPRule represents a data loss prevention rule
 type DLPRule struct {
-	ID          string             `json:"id"`
-	Name        string             `json:"name"`
-	Pattern     *regexp.Regexp     `json:"-"`
-	PatternStr  string             `json:"pattern"`
-	Type        string             `json:"type"`
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Pattern     *regexp.Regexp          `json:"-"`
+	PatternStr  string                  `json:"pattern"`
+	Type        string                  `json:"type"`
 	Severity    anomaly.AnomalySeverity `json:"severity"`
-	Description string             `json:"description"`
-	Enabled     bool               `json:"enabled"`
-	Confidence  float64            `json:"confidence"`
+	Description string                  `json:"description"`
+	Enabled     bool                    `json:"enabled"`
+	Confidence  float64                 `json:"confidence"`
 }
 
 // SecuritySignature represents a security detection signature
 type SecuritySignature struct {
-	ID          string             `json:"id"`
-	Name        string             `json:"name"`
-	Pattern     *regexp.Regexp     `json:"-"`
-	PatternStr  string             `json:"pattern"`
-	Type        string             `json:"type"`
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	Pattern     *regexp.Regexp          `json:"-"`
+	PatternStr  string                  `json:"pattern"`
+	Type        string                  `json:"type"`
 	Severity    anomaly.AnomalySeverity `json:"severity"`
-	Description string             `json:"description"`
-	MITREID     string             `json:"mitre_id,omitempty"`
-	References  []string           `json:"references,omitempty"`
+	Description string                  `json:"description"`
+	MITREID     string                  `json:"mitre_id,omitempty"`
+	References  []string                `json:"references,omitempty"`
 }
 
 // NewSecurityDetector creates a new security-focused anomaly detector
@@ -160,7 +160,7 @@ func NewSecurityDetector() *SecurityDetector {
 			MinContentLength:             10,
 			MaxScanSize:                  10 * 1024 * 1024, // 10MB
 		},
-		baselines:          make(map[string]*anomaly.BaselineData),
+		baselines: make(map[string]*anomaly.BaselineData),
 		threatIntelligence: &ThreatIntelligence{
 			MaliciousHashes:  make(map[string]ThreatInfo),
 			MaliciousDomains: make(map[string]ThreatInfo),
@@ -171,7 +171,7 @@ func NewSecurityDetector() *SecurityDetector {
 
 	// Initialize DLP rules
 	detector.initializeDLPRules()
-	
+
 	// Initialize security signatures
 	detector.initializeSecuritySignatures()
 
@@ -268,7 +268,7 @@ func (d *SecurityDetector) detectDLPViolations(ctx context.Context, input *anoma
 		if len(matches) > 0 {
 			// Calculate risk score based on number of matches
 			riskScore := math.Min(float64(len(matches))/10.0, 1.0)
-			
+
 			// Adjust severity based on number of matches
 			severity := rule.Severity
 			if len(matches) > 5 {
@@ -280,28 +280,28 @@ func (d *SecurityDetector) detectDLPViolations(ctx context.Context, input *anoma
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeDataLeak,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          fmt.Sprintf("DLP Violation: %s", rule.Name),
-				Description:    fmt.Sprintf("Detected %d instances of %s in content", len(matches), rule.Type),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          riskScore,
-				Confidence:     rule.Confidence,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeDataLeak,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           fmt.Sprintf("DLP Violation: %s", rule.Name),
+				Description:     fmt.Sprintf("Detected %d instances of %s in content", len(matches), rule.Type),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           riskScore,
+				Confidence:      rule.Confidence,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
-				RuleName:       rule.Name,
+				RuleName:        rule.Name,
 				Detected: map[string]interface{}{
-					"rule_type":    rule.Type,
-					"match_count":  len(matches),
-					"first_match":  matches[0],
+					"rule_type":   rule.Type,
+					"match_count": len(matches),
+					"first_match": matches[0],
 				},
 				Metadata: map[string]interface{}{
 					"detection_method": "dlp_rule",
@@ -325,7 +325,7 @@ func (d *SecurityDetector) detectMalwareIndicators(ctx context.Context, input *a
 		for _, suspiciousType := range d.config.SuspiciousFileTypes {
 			if strings.HasSuffix(strings.ToLower(input.FileName), suspiciousType) {
 				severity := anomaly.SeverityMedium
-				
+
 				// Executables are higher risk
 				for _, execType := range d.config.ExecutableFileTypes {
 					if suspiciousType == execType {
@@ -335,24 +335,24 @@ func (d *SecurityDetector) detectMalwareIndicators(ctx context.Context, input *a
 				}
 
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeSuspiciousContent,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "Suspicious File Type",
-					Description:    fmt.Sprintf("File has potentially dangerous extension: %s", suspiciousType),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					UserID:         input.UserID,
-					Score:          0.8,
-					Confidence:     0.9,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeSuspiciousContent,
+					Severity:        severity,
+					Status:          anomaly.StatusDetected,
+					Title:           "Suspicious File Type",
+					Description:     fmt.Sprintf("File has potentially dangerous extension: %s", suspiciousType),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					UserID:          input.UserID,
+					Score:           0.8,
+					Confidence:      0.9,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Detected: map[string]interface{}{
-						"file_name":     input.FileName,
+						"file_name":      input.FileName,
 						"file_extension": suspiciousType,
 					},
 					Metadata: map[string]interface{}{
@@ -368,7 +368,7 @@ func (d *SecurityDetector) detectMalwareIndicators(ctx context.Context, input *a
 	// Content hash analysis
 	if len(input.Content) > 0 {
 		contentHash := fmt.Sprintf("%x", md5.Sum([]byte(input.Content)))
-		
+
 		if threatInfo, exists := d.threatIntelligence.MaliciousHashes[contentHash]; exists {
 			severity := anomaly.SeverityHigh
 			if threatInfo.Severity == "critical" {
@@ -376,27 +376,27 @@ func (d *SecurityDetector) detectMalwareIndicators(ctx context.Context, input *a
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeMaliciousPattern,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Malicious Content Hash",
-				Description:    fmt.Sprintf("Content matches known malicious hash: %s", threatInfo.Type),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				UserID:         input.UserID,
-				Score:          0.95,
-				Confidence:     threatInfo.Confidence,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeMaliciousPattern,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Malicious Content Hash",
+				Description:     fmt.Sprintf("Content matches known malicious hash: %s", threatInfo.Type),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				UserID:          input.UserID,
+				Score:           0.95,
+				Confidence:      threatInfo.Confidence,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
-					"content_hash":      contentHash,
-					"threat_type":       threatInfo.Type,
+					"content_hash":       contentHash,
+					"threat_type":        threatInfo.Type,
 					"threat_description": threatInfo.Description,
-					"threat_source":     threatInfo.Source,
+					"threat_source":      threatInfo.Source,
 				},
 				Metadata: map[string]interface{}{
 					"detection_method": "hash_match",
@@ -417,22 +417,22 @@ func (d *SecurityDetector) detectMalwareIndicators(ctx context.Context, input *a
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeSuspiciousContent,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "High Entropy Content",
-				Description:    fmt.Sprintf("Content has high entropy (%.2f), indicating possible encryption or packing", entropy),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				UserID:         input.UserID,
-				Score:          (entropy - 6.0) / 2.0, // Normalize to 0-1 scale
-				Confidence:     0.7,
-				Threshold:      d.config.MaxEntropyThreshold,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeSuspiciousContent,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "High Entropy Content",
+				Description:     fmt.Sprintf("Content has high entropy (%.2f), indicating possible encryption or packing", entropy),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				UserID:          input.UserID,
+				Score:           (entropy - 6.0) / 2.0, // Normalize to 0-1 scale
+				Confidence:      0.7,
+				Threshold:       d.config.MaxEntropyThreshold,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"entropy": entropy,
@@ -452,12 +452,12 @@ func (d *SecurityDetector) detectContentSecurityIssues(ctx context.Context, inpu
 	var anomalies []*anomaly.Anomaly
 
 	content := input.Content
-	
+
 	// Base64 encoded content detection
 	if d.config.Base64DetectionEnabled {
 		base64Pattern := regexp.MustCompile(`[A-Za-z0-9+/]{20,}={0,2}`)
 		base64Matches := base64Pattern.FindAllString(content, -1)
-		
+
 		if len(base64Matches) > 0 {
 			// Calculate base64 density
 			totalBase64Length := 0
@@ -465,7 +465,7 @@ func (d *SecurityDetector) detectContentSecurityIssues(ctx context.Context, inpu
 				totalBase64Length += len(match)
 			}
 			base64Density := float64(totalBase64Length) / float64(len(content))
-			
+
 			if base64Density > 0.3 { // More than 30% base64 content
 				severity := anomaly.SeverityLow
 				if base64Density > 0.6 {
@@ -476,22 +476,22 @@ func (d *SecurityDetector) detectContentSecurityIssues(ctx context.Context, inpu
 				}
 
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeSuspiciousContent,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "High Base64 Content Density",
-					Description:    fmt.Sprintf("Content contains %.1f%% base64 encoded data (%d matches)", base64Density*100, len(base64Matches)),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					UserID:         input.UserID,
-					Score:          base64Density,
-					Confidence:     0.8,
-					Threshold:      0.3,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeSuspiciousContent,
+					Severity:        severity,
+					Status:          anomaly.StatusDetected,
+					Title:           "High Base64 Content Density",
+					Description:     fmt.Sprintf("Content contains %.1f%% base64 encoded data (%d matches)", base64Density*100, len(base64Matches)),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					UserID:          input.UserID,
+					Score:           base64Density,
+					Confidence:      0.8,
+					Threshold:       0.3,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Detected: map[string]interface{}{
 						"base64_density": base64Density,
@@ -510,32 +510,32 @@ func (d *SecurityDetector) detectContentSecurityIssues(ctx context.Context, inpu
 	if d.config.HexDetectionEnabled {
 		hexPattern := regexp.MustCompile(`(?i)[0-9a-f]{16,}`)
 		hexMatches := hexPattern.FindAllString(content, -1)
-		
+
 		if len(hexMatches) > 0 {
 			totalHexLength := 0
 			for _, match := range hexMatches {
 				totalHexLength += len(match)
 			}
 			hexDensity := float64(totalHexLength) / float64(len(content))
-			
+
 			if hexDensity > 0.4 { // More than 40% hex content
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeSuspiciousContent,
-					Severity:       anomaly.SeverityMedium,
-					Status:         anomaly.StatusDetected,
-					Title:          "High Hexadecimal Content Density",
-					Description:    fmt.Sprintf("Content contains %.1f%% hexadecimal data", hexDensity*100),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					UserID:         input.UserID,
-					Score:          hexDensity,
-					Confidence:     0.7,
-					Threshold:      0.4,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeSuspiciousContent,
+					Severity:        anomaly.SeverityMedium,
+					Status:          anomaly.StatusDetected,
+					Title:           "High Hexadecimal Content Density",
+					Description:     fmt.Sprintf("Content contains %.1f%% hexadecimal data", hexDensity*100),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					UserID:          input.UserID,
+					Score:           hexDensity,
+					Confidence:      0.7,
+					Threshold:       0.4,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Detected: map[string]interface{}{
 						"hex_density": hexDensity,
@@ -565,7 +565,7 @@ func (d *SecurityDetector) detectContentSecurityIssues(ctx context.Context, inpu
 
 		obfuscationScore := 0.0
 		matchedIndicators := []string{}
-		
+
 		for _, indicator := range obfuscationIndicators {
 			pattern := regexp.MustCompile(indicator)
 			if pattern.MatchString(content) {
@@ -581,22 +581,22 @@ func (d *SecurityDetector) detectContentSecurityIssues(ctx context.Context, inpu
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeSuspiciousContent,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Obfuscated Script Content",
-				Description:    fmt.Sprintf("Content shows signs of script obfuscation (score: %.1f)", obfuscationScore),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				UserID:         input.UserID,
-				Score:          obfuscationScore,
-				Confidence:     0.8,
-				Threshold:      0.4,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeSuspiciousContent,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Obfuscated Script Content",
+				Description:     fmt.Sprintf("Content shows signs of script obfuscation (score: %.1f)", obfuscationScore),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				UserID:          input.UserID,
+				Score:           obfuscationScore,
+				Confidence:      0.8,
+				Threshold:       0.4,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"obfuscation_score": obfuscationScore,
@@ -636,26 +636,26 @@ func (d *SecurityDetector) detectThreatIntelligenceMatches(ctx context.Context, 
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeMaliciousPattern,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          fmt.Sprintf("Threat Intelligence Match: %s", pattern.Type),
-				Description:    fmt.Sprintf("Content matches suspicious pattern from threat intelligence: %s", pattern.Description),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				UserID:         input.UserID,
-				Score:          pattern.Confidence,
-				Confidence:     pattern.Confidence,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeMaliciousPattern,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           fmt.Sprintf("Threat Intelligence Match: %s", pattern.Type),
+				Description:     fmt.Sprintf("Content matches suspicious pattern from threat intelligence: %s", pattern.Description),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				UserID:          input.UserID,
+				Score:           pattern.Confidence,
+				Confidence:      pattern.Confidence,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
-					"pattern_type":   pattern.Type,
-					"match_count":    len(matches),
-					"first_match":    matches[0],
+					"pattern_type": pattern.Type,
+					"match_count":  len(matches),
+					"first_match":  matches[0],
 				},
 				Metadata: map[string]interface{}{
 					"detection_method": "threat_intelligence",
@@ -676,23 +676,23 @@ func (d *SecurityDetector) detectSecuritySignatures(ctx context.Context, input *
 		matches := signature.Pattern.FindAllString(input.Content, -1)
 		if len(matches) > 0 {
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeMaliciousPattern,
-				Severity:       signature.Severity,
-				Status:         anomaly.StatusDetected,
-				Title:          fmt.Sprintf("Security Signature: %s", signature.Name),
-				Description:    fmt.Sprintf("%s (MITRE: %s)", signature.Description, signature.MITREID),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				UserID:         input.UserID,
-				Score:          0.9,
-				Confidence:     0.85,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeMaliciousPattern,
+				Severity:        signature.Severity,
+				Status:          anomaly.StatusDetected,
+				Title:           fmt.Sprintf("Security Signature: %s", signature.Name),
+				Description:     fmt.Sprintf("%s (MITRE: %s)", signature.Description, signature.MITREID),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				UserID:          input.UserID,
+				Score:           0.9,
+				Confidence:      0.85,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
-				RuleName:       signature.Name,
+				RuleName:        signature.Name,
 				Detected: map[string]interface{}{
 					"signature_id":   signature.ID,
 					"signature_type": signature.Type,
@@ -716,26 +716,26 @@ func (d *SecurityDetector) detectAccessControlAnomalies(ctx context.Context, inp
 
 	// This would typically integrate with your access control system
 	// For now, we'll implement basic detection based on metadata
-	
+
 	if input.Metadata != nil {
 		// Check for privilege escalation indicators
 		if d.config.PrivilegeEscalationDetection {
 			if escalationEvent, exists := input.Metadata["privilege_escalation"]; exists {
 				if escalated, ok := escalationEvent.(bool); ok && escalated {
 					anomaly := &anomaly.Anomaly{
-						ID:             uuid.New(),
-						Type:           anomaly.AnomalyTypePrivilegeEscalation,
-						Severity:       anomaly.SeverityHigh,
-						Status:         anomaly.StatusDetected,
-						Title:          "Privilege Escalation Detected",
-						Description:    "User accessed content with elevated privileges",
-						DetectedAt:     time.Now(),
-						UpdatedAt:      time.Now(),
-						TenantID:       input.TenantID,
-						UserID:         input.UserID,
-						Score:          0.9,
-						Confidence:     0.8,
-						DetectorName:   d.name,
+						ID:              uuid.New(),
+						Type:            anomaly.AnomalyTypePrivilegeEscalation,
+						Severity:        anomaly.SeverityHigh,
+						Status:          anomaly.StatusDetected,
+						Title:           "Privilege Escalation Detected",
+						Description:     "User accessed content with elevated privileges",
+						DetectedAt:      time.Now(),
+						UpdatedAt:       time.Now(),
+						TenantID:        input.TenantID,
+						UserID:          input.UserID,
+						Score:           0.9,
+						Confidence:      0.8,
+						DetectorName:    d.name,
 						DetectorVersion: d.version,
 						Metadata: map[string]interface{}{
 							"detection_method": "access_control",
@@ -751,19 +751,19 @@ func (d *SecurityDetector) detectAccessControlAnomalies(ctx context.Context, inp
 			if accessDenied, exists := input.Metadata["access_denied"]; exists {
 				if denied, ok := accessDenied.(bool); ok && denied {
 					anomaly := &anomaly.Anomaly{
-						ID:             uuid.New(),
-						Type:           anomaly.AnomalyTypeUnauthorizedAccess,
-						Severity:       anomaly.SeverityMedium,
-						Status:         anomaly.StatusDetected,
-						Title:          "Unauthorized Access Attempt",
-						Description:    "User attempted to access restricted content",
-						DetectedAt:     time.Now(),
-						UpdatedAt:      time.Now(),
-						TenantID:       input.TenantID,
-						UserID:         input.UserID,
-						Score:          0.7,
-						Confidence:     0.9,
-						DetectorName:   d.name,
+						ID:              uuid.New(),
+						Type:            anomaly.AnomalyTypeUnauthorizedAccess,
+						Severity:        anomaly.SeverityMedium,
+						Status:          anomaly.StatusDetected,
+						Title:           "Unauthorized Access Attempt",
+						Description:     "User attempted to access restricted content",
+						DetectedAt:      time.Now(),
+						UpdatedAt:       time.Now(),
+						TenantID:        input.TenantID,
+						UserID:          input.UserID,
+						Score:           0.7,
+						Confidence:      0.9,
+						DetectorName:    d.name,
 						DetectorVersion: d.version,
 						Metadata: map[string]interface{}{
 							"detection_method": "access_control",
@@ -812,7 +812,7 @@ func (d *SecurityDetector) calculateEntropy(data string) float64 {
 	// Calculate entropy
 	entropy := 0.0
 	length := float64(len(data))
-	
+
 	for _, count := range freq {
 		if count > 0 {
 			p := float64(count) / length
@@ -826,7 +826,7 @@ func (d *SecurityDetector) calculateEntropy(data string) float64 {
 func (d *SecurityDetector) sanitizeMatches(matches []string, ruleType string) []string {
 	// Sanitize sensitive matches for logging
 	sanitized := make([]string, len(matches))
-	
+
 	for i, match := range matches {
 		switch strings.ToLower(ruleType) {
 		case "credit_card", "ssn", "phone":
@@ -854,7 +854,7 @@ func (d *SecurityDetector) sanitizeMatches(matches []string, ruleType string) []
 			sanitized[i] = match
 		}
 	}
-	
+
 	return sanitized
 }
 

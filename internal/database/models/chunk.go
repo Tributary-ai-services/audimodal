@@ -12,70 +12,70 @@ type Chunk struct {
 	ID       uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
 	TenantID uuid.UUID `gorm:"type:uuid;not null;index" json:"tenant_id"`
 	FileID   uuid.UUID `gorm:"type:uuid;not null;index" json:"file_id"`
-	
+
 	// Chunk identification
-	ChunkID     string `gorm:"not null;index" json:"chunk_id"`      // Unique identifier within file
-	ChunkType   string `gorm:"not null;index" json:"chunk_type"`    // text, table, image, etc.
-	ChunkNumber int    `gorm:"not null" json:"chunk_number"`        // Sequential number within file
-	
+	ChunkID     string `gorm:"not null;index" json:"chunk_id"`   // Unique identifier within file
+	ChunkType   string `gorm:"not null;index" json:"chunk_type"` // text, table, image, etc.
+	ChunkNumber int    `gorm:"not null" json:"chunk_number"`     // Sequential number within file
+
 	// Content
 	Content     string `gorm:"type:text;not null" json:"content"`
-	ContentHash string `gorm:"index" json:"content_hash"`           // Hash of content for deduplication
+	ContentHash string `gorm:"index" json:"content_hash"` // Hash of content for deduplication
 	SizeBytes   int64  `gorm:"not null" json:"size_bytes"`
-	
+
 	// Position information
 	StartPosition *int64 `json:"start_position,omitempty"`
 	EndPosition   *int64 `json:"end_position,omitempty"`
 	PageNumber    *int   `json:"page_number,omitempty"`
 	LineNumber    *int   `json:"line_number,omitempty"`
-	
+
 	// Relationships to other chunks
 	ParentChunkID *uuid.UUID `gorm:"type:uuid;index" json:"parent_chunk_id,omitempty"`
 	Relationships []string   `gorm:"type:jsonb" json:"relationships,omitempty"`
-	
+
 	// Processing metadata
-	ProcessedAt     time.Time `gorm:"not null" json:"processed_at"`
-	ProcessedBy     string    `gorm:"not null" json:"processed_by"`     // Strategy name
-	ProcessingTime  int64     `json:"processing_time"`                  // Time in milliseconds
-	
+	ProcessedAt    time.Time `gorm:"not null" json:"processed_at"`
+	ProcessedBy    string    `gorm:"not null" json:"processed_by"` // Strategy name
+	ProcessingTime int64     `json:"processing_time"`              // Time in milliseconds
+
 	// Quality metrics
 	Quality ChunkQualityMetrics `gorm:"type:jsonb" json:"quality"`
-	
+
 	// Content analysis
 	Language         string   `json:"language,omitempty"`
 	LanguageConf     float64  `json:"language_confidence,omitempty"`
 	ContentCategory  string   `json:"content_category,omitempty"`
 	SensitivityLevel string   `json:"sensitivity_level,omitempty"`
 	Classifications  []string `gorm:"type:jsonb" json:"classifications,omitempty"`
-	
+
 	// Embedding information
 	EmbeddingStatus string     `gorm:"default:'pending'" json:"embedding_status"`
 	EmbeddingModel  string     `json:"embedding_model,omitempty"`
 	EmbeddingVector []float64  `gorm:"type:jsonb" json:"embedding_vector,omitempty"`
 	EmbeddingDim    int        `json:"embedding_dimension,omitempty"`
 	EmbeddedAt      *time.Time `json:"embedded_at,omitempty"`
-	
+
 	// Compliance and security
 	PIIDetected     bool     `gorm:"default:false;index" json:"pii_detected"`
 	ComplianceFlags []string `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
 	DLPScanStatus   string   `gorm:"default:'pending'" json:"dlp_scan_status"`
 	DLPScanResult   string   `json:"dlp_scan_result,omitempty"`
-	
+
 	// Context information
 	Context map[string]string `gorm:"type:jsonb" json:"context,omitempty"`
-	
+
 	// Schema information for structured chunks
 	SchemaInfo map[string]interface{} `gorm:"type:jsonb" json:"schema_info,omitempty"`
-	
+
 	// Metadata
 	Metadata     map[string]interface{} `gorm:"type:jsonb" json:"metadata,omitempty"`
 	CustomFields map[string]interface{} `gorm:"type:jsonb" json:"custom_fields,omitempty"`
-	
+
 	// Timestamps
 	CreatedAt time.Time  `gorm:"not null" json:"created_at"`
 	UpdatedAt time.Time  `gorm:"not null" json:"updated_at"`
 	DeletedAt *time.Time `gorm:"index" json:"deleted_at,omitempty"`
-	
+
 	// Relationships
 	Tenant        *Tenant        `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	File          *File          `gorm:"foreignKey:FileID" json:"file,omitempty"`
@@ -231,17 +231,17 @@ func (c *Chunk) MarkDLPScanFailed() {
 // GetQualityScore returns an overall quality score for the chunk
 func (c *Chunk) GetQualityScore() float64 {
 	metrics := c.Quality
-	
+
 	// Weighted average of quality metrics
 	weights := map[string]float64{
-		"completeness": 0.25,
-		"coherence":    0.25,
-		"uniqueness":   0.20,
-		"readability":  0.15,
+		"completeness":  0.25,
+		"coherence":     0.25,
+		"uniqueness":    0.20,
+		"readability":   0.15,
 		"language_conf": 0.10,
-		"complexity":   0.05,
+		"complexity":    0.05,
 	}
-	
+
 	score := 0.0
 	score += metrics.Completeness * weights["completeness"]
 	score += metrics.Coherence * weights["coherence"]
@@ -249,7 +249,7 @@ func (c *Chunk) GetQualityScore() float64 {
 	score += metrics.Readability * weights["readability"]
 	score += metrics.LanguageConf * weights["language_conf"]
 	score += metrics.Complexity * weights["complexity"]
-	
+
 	return score
 }
 
@@ -274,13 +274,13 @@ func (c *Chunk) GetContentPreview(maxLength int) string {
 // AddRelationship adds a relationship to another chunk
 func (c *Chunk) AddRelationship(relationshipType string, chunkID uuid.UUID) {
 	relationship := relationshipType + ":" + chunkID.String()
-	
+
 	for _, r := range c.Relationships {
 		if r == relationship {
 			return // Already exists
 		}
 	}
-	
+
 	c.Relationships = append(c.Relationships, relationship)
 }
 
@@ -288,7 +288,7 @@ func (c *Chunk) AddRelationship(relationshipType string, chunkID uuid.UUID) {
 func (c *Chunk) GetRelationships(relationshipType string) []uuid.UUID {
 	var relationships []uuid.UUID
 	prefix := relationshipType + ":"
-	
+
 	for _, r := range c.Relationships {
 		if len(r) > len(prefix) && r[:len(prefix)] == prefix {
 			if id, err := uuid.Parse(r[len(prefix):]); err == nil {
@@ -296,7 +296,7 @@ func (c *Chunk) GetRelationships(relationshipType string) []uuid.UUID {
 			}
 		}
 	}
-	
+
 	return relationships
 }
 

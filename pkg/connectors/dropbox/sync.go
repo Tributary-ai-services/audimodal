@@ -16,26 +16,26 @@ import (
 
 // SyncManager manages synchronization with Dropbox using cursors and longpoll
 type SyncManager struct {
-	connector    *DropboxConnector
-	config       *SyncConfig
-	tracer       trace.Tracer
-	
+	connector *DropboxConnector
+	config    *SyncConfig
+	tracer    trace.Tracer
+
 	// Sync state management
-	syncState    *SyncState
-	syncMu       sync.RWMutex
-	
+	syncState *SyncState
+	syncMu    sync.RWMutex
+
 	// Cursor management for incremental sync
-	cursorStore  *CursorStore
-	
+	cursorStore *CursorStore
+
 	// Long polling for real-time changes
 	longpollState *LongpollState
 	longpollMu    sync.RWMutex
-	
+
 	// Event handlers
 	eventHandlers map[string]EventHandler
-	
+
 	// Metrics
-	metrics      *SyncMetrics
+	metrics *SyncMetrics
 }
 
 // SyncConfig contains configuration for sync operations
@@ -43,29 +43,29 @@ type SyncConfig struct {
 	// Sync intervals
 	IncrementalSyncInterval time.Duration `yaml:"incremental_sync_interval"`
 	FullSyncInterval        time.Duration `yaml:"full_sync_interval"`
-	
+
 	// Batch processing
-	BatchSize               int           `yaml:"batch_size"`
-	MaxConcurrentSyncs      int           `yaml:"max_concurrent_syncs"`
-	
+	BatchSize          int `yaml:"batch_size"`
+	MaxConcurrentSyncs int `yaml:"max_concurrent_syncs"`
+
 	// Longpoll configuration
-	EnableLongpoll          bool          `yaml:"enable_longpoll"`
-	LongpollTimeout         time.Duration `yaml:"longpoll_timeout"`
-	LongpollRetryDelay      time.Duration `yaml:"longpoll_retry_delay"`
-	
+	EnableLongpoll     bool          `yaml:"enable_longpoll"`
+	LongpollTimeout    time.Duration `yaml:"longpoll_timeout"`
+	LongpollRetryDelay time.Duration `yaml:"longpoll_retry_delay"`
+
 	// Conflict resolution
-	ConflictResolution      string        `yaml:"conflict_resolution"` // "server_wins", "client_wins", "timestamp"
-	
+	ConflictResolution string `yaml:"conflict_resolution"` // "server_wins", "client_wins", "timestamp"
+
 	// Feature flags
-	SyncMetadata            bool          `yaml:"sync_metadata"`
-	SyncSharing             bool          `yaml:"sync_sharing"`
-	SyncDeleted             bool          `yaml:"sync_deleted"`
-	SyncComments            bool          `yaml:"sync_comments"`
-	
+	SyncMetadata bool `yaml:"sync_metadata"`
+	SyncSharing  bool `yaml:"sync_sharing"`
+	SyncDeleted  bool `yaml:"sync_deleted"`
+	SyncComments bool `yaml:"sync_comments"`
+
 	// Performance tuning
-	EnableDeduplication     bool          `yaml:"enable_deduplication"`
-	EnableCompression       bool          `yaml:"enable_compression"`
-	EnableCaching           bool          `yaml:"enable_caching"`
+	EnableDeduplication bool `yaml:"enable_deduplication"`
+	EnableCompression   bool `yaml:"enable_compression"`
+	EnableCaching       bool `yaml:"enable_caching"`
 }
 
 // DefaultSyncConfig returns default sync configuration
@@ -97,11 +97,11 @@ type CursorStore struct {
 
 // LongpollState manages long polling state
 type LongpollState struct {
-	isRunning   bool
-	lastPoll    time.Time
-	pollCount   int64
-	errorCount  int64
-	lastError   string
+	isRunning  bool
+	lastPoll   time.Time
+	pollCount  int64
+	errorCount int64
+	lastError  string
 }
 
 // SyncMetrics tracks sync performance metrics
@@ -126,12 +126,12 @@ type EventHandler interface {
 
 // SyncEvent represents a synchronization event
 type SyncEvent struct {
-	Type      string                 `json:"type"`
-	Timestamp time.Time              `json:"timestamp"`
-	Path      string                 `json:"path"`
+	Type      string                     `json:"type"`
+	Timestamp time.Time                  `json:"timestamp"`
+	Path      string                     `json:"path"`
 	FileInfo  *storage.ConnectorFileInfo `json:"file_info,omitempty"`
-	Error     string                 `json:"error,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Error     string                     `json:"error,omitempty"`
+	Metadata  map[string]interface{}     `json:"metadata,omitempty"`
 }
 
 // NewSyncManager creates a new sync manager
@@ -479,14 +479,14 @@ func (sm *SyncManager) getLatestCursor(ctx context.Context, path string) (string
 	requestBody := &GetLatestCursorRequest{
 		Path:                            sm.connector.normalizePath(path),
 		Recursive:                       sm.config.SyncMetadata,
-		IncludeMediaInfo:               sm.connector.config.IncludeMediaInfo,
-		IncludeDeleted:                 sm.config.SyncDeleted,
+		IncludeMediaInfo:                sm.connector.config.IncludeMediaInfo,
+		IncludeDeleted:                  sm.config.SyncDeleted,
 		IncludeHasExplicitSharedMembers: sm.config.SyncSharing,
-		IncludeMountedFolders:          true,
-		IncludeNonDownloadableFiles:    true,
+		IncludeMountedFolders:           true,
+		IncludeNonDownloadableFiles:     true,
 	}
 
-	response, err := sm.connector.executeDropboxAPICall(ctx, 
+	response, err := sm.connector.executeDropboxAPICall(ctx,
 		"https://api.dropboxapi.com/2/files/list_folder/get_latest_cursor", requestBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to get latest cursor: %w", err)
@@ -555,8 +555,8 @@ func (sm *SyncManager) processChange(ctx context.Context, entry *DropboxEntry, r
 		Path:      entry.PathLower,
 		FileInfo:  fileInfo,
 		Metadata: map[string]interface{}{
-			"tag":         entry.Tag,
-			"revision":    entry.Rev,
+			"tag":          entry.Tag,
+			"revision":     entry.Rev,
 			"content_hash": entry.ContentHash,
 		},
 	}
@@ -637,7 +637,7 @@ func (sm *SyncManager) updateSyncMetrics(result *storage.SyncResult) {
 
 	// Calculate average duration
 	if sm.metrics.TotalSyncs > 0 {
-		totalDuration := time.Duration(sm.metrics.TotalSyncs) * sm.metrics.AverageSyncDuration + result.Duration
+		totalDuration := time.Duration(sm.metrics.TotalSyncs)*sm.metrics.AverageSyncDuration + result.Duration
 		sm.metrics.AverageSyncDuration = totalDuration / time.Duration(sm.metrics.TotalSyncs+1)
 	}
 }
@@ -675,7 +675,7 @@ func (cs *CursorStore) DeleteCursor(path string) {
 func (cs *CursorStore) GetAllCursors() map[string]string {
 	cs.mu.RLock()
 	defer cs.mu.RUnlock()
-	
+
 	result := make(map[string]string)
 	for k, v := range cs.cursors {
 		result[k] = v

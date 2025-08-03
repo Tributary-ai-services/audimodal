@@ -17,48 +17,48 @@ import (
 type ProcessingTier int
 
 const (
-	TierSmall ProcessingTier = iota // < 10MB - Fast processing, minimal resources
-	TierMedium                     // 10MB - 1GB - Standard processing with batching
-	TierLarge                      // > 1GB - Heavy processing with streaming and checkpoints
+	TierSmall  ProcessingTier = iota // < 10MB - Fast processing, minimal resources
+	TierMedium                       // 10MB - 1GB - Standard processing with batching
+	TierLarge                        // > 1GB - Heavy processing with streaming and checkpoints
 )
 
 // TierProcessor handles tier-based processing with different strategies for different file sizes
 type TierProcessor struct {
-	db              *database.Database
-	pipeline        *Pipeline
+	db               *database.Database
+	pipeline         *Pipeline
 	embeddingService embeddings.EmbeddingService
-	config          *TierProcessorConfig
+	config           *TierProcessorConfig
 }
 
 // TierProcessorConfig contains configuration for tier-based processing
 type TierProcessorConfig struct {
-	SmallFileTierThreshold  int64         `json:"small_file_tier_threshold"`  // 10MB
-	LargeFileTierThreshold  int64         `json:"large_file_tier_threshold"`  // 1GB
-	SmallFileTimeout        time.Duration `json:"small_file_timeout"`         // 5 minutes
-	MediumFileTimeout       time.Duration `json:"medium_file_timeout"`        // 30 minutes
-	LargeFileTimeout        time.Duration `json:"large_file_timeout"`         // 2 hours
-	CheckpointInterval      time.Duration `json:"checkpoint_interval"`        // 5 minutes
-	EnableEmbeddings        bool          `json:"enable_embeddings"`
-	EmbeddingBatchSize      int           `json:"embedding_batch_size"`
-	EmbeddingDataset        string        `json:"embedding_dataset"`
+	SmallFileTierThreshold int64         `json:"small_file_tier_threshold"` // 10MB
+	LargeFileTierThreshold int64         `json:"large_file_tier_threshold"` // 1GB
+	SmallFileTimeout       time.Duration `json:"small_file_timeout"`        // 5 minutes
+	MediumFileTimeout      time.Duration `json:"medium_file_timeout"`       // 30 minutes
+	LargeFileTimeout       time.Duration `json:"large_file_timeout"`        // 2 hours
+	CheckpointInterval     time.Duration `json:"checkpoint_interval"`       // 5 minutes
+	EnableEmbeddings       bool          `json:"enable_embeddings"`
+	EmbeddingBatchSize     int           `json:"embedding_batch_size"`
+	EmbeddingDataset       string        `json:"embedding_dataset"`
 }
 
 // TierProcessingResult contains results with tier-specific metrics
 type TierProcessingResult struct {
 	*ProcessingResult
-	Tier                ProcessingTier    `json:"tier"`
-	EmbeddingsCreated   int               `json:"embeddings_created"`
-	EmbeddingTime       time.Duration     `json:"embedding_time"`
-	CheckpointsCreated  int               `json:"checkpoints_created"`
-	ResourcesUsed       *ResourceMetrics  `json:"resources_used"`
+	Tier               ProcessingTier   `json:"tier"`
+	EmbeddingsCreated  int              `json:"embeddings_created"`
+	EmbeddingTime      time.Duration    `json:"embedding_time"`
+	CheckpointsCreated int              `json:"checkpoints_created"`
+	ResourcesUsed      *ResourceMetrics `json:"resources_used"`
 }
 
 // ResourceMetrics tracks resource usage during processing
 type ResourceMetrics struct {
-	PeakMemoryMB    int64   `json:"peak_memory_mb"`
-	CPUTimeSeconds  float64 `json:"cpu_time_seconds"`
-	DiskIOBytes     int64   `json:"disk_io_bytes"`
-	NetworkIOBytes  int64   `json:"network_io_bytes"`
+	PeakMemoryMB   int64   `json:"peak_memory_mb"`
+	CPUTimeSeconds float64 `json:"cpu_time_seconds"`
+	DiskIOBytes    int64   `json:"disk_io_bytes"`
+	NetworkIOBytes int64   `json:"network_io_bytes"`
 }
 
 // NewTierProcessor creates a new tier-based processor
@@ -78,15 +78,15 @@ func NewTierProcessor(db *database.Database, pipeline *Pipeline, embeddingServic
 // GetDefaultTierProcessorConfig returns default tier processor configuration
 func GetDefaultTierProcessorConfig() *TierProcessorConfig {
 	return &TierProcessorConfig{
-		SmallFileTierThreshold:  10 * 1024 * 1024,  // 10MB
-		LargeFileTierThreshold:  1024 * 1024 * 1024, // 1GB
-		SmallFileTimeout:        5 * time.Minute,
-		MediumFileTimeout:       30 * time.Minute,
-		LargeFileTimeout:        2 * time.Hour,
-		CheckpointInterval:      5 * time.Minute,
-		EnableEmbeddings:        true,
-		EmbeddingBatchSize:      50,
-		EmbeddingDataset:        "default",
+		SmallFileTierThreshold: 10 * 1024 * 1024,   // 10MB
+		LargeFileTierThreshold: 1024 * 1024 * 1024, // 1GB
+		SmallFileTimeout:       5 * time.Minute,
+		MediumFileTimeout:      30 * time.Minute,
+		LargeFileTimeout:       2 * time.Hour,
+		CheckpointInterval:     5 * time.Minute,
+		EnableEmbeddings:       true,
+		EmbeddingBatchSize:     50,
+		EmbeddingDataset:       "default",
 	}
 }
 
@@ -101,7 +101,7 @@ func (tp *TierProcessor) ProcessFileWithTier(ctx context.Context, request *Proce
 	}
 
 	tier := tp.determineTier(fileInfo.Size())
-	
+
 	// Create tier-specific context with appropriate timeout
 	tierCtx, cancel := tp.createTierContext(ctx, tier)
 	defer cancel()
@@ -210,11 +210,11 @@ func (tp *TierProcessor) processLargeFile(ctx context.Context, request *Processi
 	defer checkpointTicker.Stop()
 
 	checkpointCount := 0
-	
+
 	// Start processing in background
 	resultChan := make(chan *ProcessingResult, 1)
 	errorChan := make(chan error, 1)
-	
+
 	go func() {
 		result, err := tp.pipeline.ProcessFile(ctx, request)
 		if err != nil {
@@ -298,7 +298,7 @@ func (tp *TierProcessor) generateEmbeddings(ctx context.Context, request *Proces
 		}
 
 		batch := chunks[i:end]
-		
+
 		// Convert chunks to embedding input format
 		chunkInputs := make([]*embeddings.ChunkInput, len(batch))
 		for j, chunk := range batch {
@@ -309,21 +309,21 @@ func (tp *TierProcessor) generateEmbeddings(ctx context.Context, request *Proces
 				ChunkIndex:  chunk.ChunkNumber,
 				ContentType: chunk.ChunkType,
 				Metadata: map[string]interface{}{
-					"file_id":        chunk.FileID.String(),
-					"chunk_number":   chunk.ChunkNumber,
-					"size_bytes":     chunk.SizeBytes,
-					"processed_at":   chunk.ProcessedAt,
-					"language":       chunk.Language,
-					"quality_score":  chunk.Quality.Completeness,
+					"file_id":       chunk.FileID.String(),
+					"chunk_number":  chunk.ChunkNumber,
+					"size_bytes":    chunk.SizeBytes,
+					"processed_at":  chunk.ProcessedAt,
+					"language":      chunk.Language,
+					"quality_score": chunk.Quality.Completeness,
 				},
 			}
 		}
 
 		// Process chunk batch
 		embeddingRequest := &embeddings.ProcessChunksRequest{
-			Chunks:   chunkInputs,
-			Dataset:  tp.config.EmbeddingDataset,
-			TenantID: request.TenantID,
+			Chunks:    chunkInputs,
+			Dataset:   tp.config.EmbeddingDataset,
+			TenantID:  request.TenantID,
 			BatchSize: batchSize,
 		}
 
@@ -353,22 +353,22 @@ func (tp *TierProcessor) GetTierMetrics() map[ProcessingTier]*TierMetrics {
 	// In a full implementation, this would track metrics per tier
 	return map[ProcessingTier]*TierMetrics{
 		TierSmall: {
-			FilesProcessed:   100,
-			AverageTime:      2 * time.Second,
-			SuccessRate:      0.98,
-			AverageFileSize:  1024 * 1024, // 1MB
+			FilesProcessed:  100,
+			AverageTime:     2 * time.Second,
+			SuccessRate:     0.98,
+			AverageFileSize: 1024 * 1024, // 1MB
 		},
 		TierMedium: {
-			FilesProcessed:   50,
-			AverageTime:      30 * time.Second,
-			SuccessRate:      0.95,
-			AverageFileSize:  50 * 1024 * 1024, // 50MB
+			FilesProcessed:  50,
+			AverageTime:     30 * time.Second,
+			SuccessRate:     0.95,
+			AverageFileSize: 50 * 1024 * 1024, // 50MB
 		},
 		TierLarge: {
-			FilesProcessed:   10,
-			AverageTime:      10 * time.Minute,
-			SuccessRate:      0.90,
-			AverageFileSize:  500 * 1024 * 1024, // 500MB
+			FilesProcessed:  10,
+			AverageTime:     10 * time.Minute,
+			SuccessRate:     0.90,
+			AverageFileSize: 500 * 1024 * 1024, // 500MB
 		},
 	}
 }
@@ -384,7 +384,7 @@ type TierMetrics struct {
 // EstimateProcessingTimeForTier estimates processing time based on tier
 func (tp *TierProcessor) EstimateProcessingTimeForTier(fileSize int64, complexity string) time.Duration {
 	tier := tp.determineTier(fileSize)
-	
+
 	baseTime := time.Second
 	switch tier {
 	case TierSmall:

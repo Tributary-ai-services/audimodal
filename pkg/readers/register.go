@@ -203,7 +203,7 @@ func GetSupportedExtensions() []string {
 		// Legacy Office (Binary)
 		".doc", ".xls", ".ppt",
 		// Microsoft-specific products
-		".one",  // OneNote
+		".one", // OneNote
 
 		// === EMAIL & COMMUNICATION ===
 		// Email formats
@@ -243,10 +243,10 @@ func GetMicrosoftFormats() []string {
 		// Office Suite
 		".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt",
 		// Specialized products
-		".one",    // OneNote
-		".vsd", ".vsdx",  // Visio (planned)
-		".mpp",    // Project (planned)
-		".pub",    // Publisher (planned)
+		".one",          // OneNote
+		".vsd", ".vsdx", // Visio (planned)
+		".mpp",           // Project (planned)
+		".pub",           // Publisher (planned)
 		".mdb", ".accdb", // Access (planned)
 		".msg", ".pst", ".ost", // Outlook
 	}
@@ -265,12 +265,12 @@ func GetCollaborationFormats() []string {
 // ValidateBasicReaders validates all registered basic readers
 func ValidateBasicReaders() error {
 	readers := []string{"text", "markdown", "csv", "json", "xml", "pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "html", "rtf", "eml", "msg", "pst", "tiff", "png", "jpg", "zip", "teams", "one"}
-	
+
 	for _, name := range readers {
 		if err := registry.GlobalRegistry.ValidatePlugin("reader", name); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }

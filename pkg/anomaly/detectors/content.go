@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"math"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/TAS/audimodal/pkg/anomaly"
+	"github.com/jscharber/eAIIngest/pkg/anomaly"
 )
 
 // ContentDetector implements content-based anomaly detection
@@ -25,18 +24,18 @@ type ContentDetector struct {
 
 // ContentDetectorConfig contains configuration for content detection
 type ContentDetectorConfig struct {
-	MinContentLength        int     `json:"min_content_length"`
-	MaxContentLength        int     `json:"max_content_length"`
-	SentimentDeviationThreshold float64 `json:"sentiment_deviation_threshold"`
-	QualityThreshold        float64 `json:"quality_threshold"`
-	LanguageConsistencyThreshold float64 `json:"language_consistency_threshold"`
-	DuplicateThreshold      float64 `json:"duplicate_threshold"`
-	StructureAnalysisEnabled bool   `json:"structure_analysis_enabled"`
-	TopicCoherenceThreshold float64 `json:"topic_coherence_threshold"`
-	EmotionalToneThreshold  float64 `json:"emotional_tone_threshold"`
-	ReadabilityBounds       *ReadabilityBounds `json:"readability_bounds"`
-	SuspiciousPatterns      []string `json:"suspicious_patterns"`
-	EnableSemanticAnalysis  bool    `json:"enable_semantic_analysis"`
+	MinContentLength             int                `json:"min_content_length"`
+	MaxContentLength             int                `json:"max_content_length"`
+	SentimentDeviationThreshold  float64            `json:"sentiment_deviation_threshold"`
+	QualityThreshold             float64            `json:"quality_threshold"`
+	LanguageConsistencyThreshold float64            `json:"language_consistency_threshold"`
+	DuplicateThreshold           float64            `json:"duplicate_threshold"`
+	StructureAnalysisEnabled     bool               `json:"structure_analysis_enabled"`
+	TopicCoherenceThreshold      float64            `json:"topic_coherence_threshold"`
+	EmotionalToneThreshold       float64            `json:"emotional_tone_threshold"`
+	ReadabilityBounds            *ReadabilityBounds `json:"readability_bounds"`
+	SuspiciousPatterns           []string           `json:"suspicious_patterns"`
+	EnableSemanticAnalysis       bool               `json:"enable_semantic_analysis"`
 }
 
 // ReadabilityBounds defines acceptable readability score ranges
@@ -56,15 +55,15 @@ func NewContentDetector() *ContentDetector {
 		version: "1.0.0",
 		enabled: true,
 		config: &ContentDetectorConfig{
-			MinContentLength:        10,
-			MaxContentLength:        10000000, // 10MB
-			SentimentDeviationThreshold: 0.7,
-			QualityThreshold:        0.3,
+			MinContentLength:             10,
+			MaxContentLength:             10000000, // 10MB
+			SentimentDeviationThreshold:  0.7,
+			QualityThreshold:             0.3,
 			LanguageConsistencyThreshold: 0.8,
-			DuplicateThreshold:      0.95,
-			StructureAnalysisEnabled: true,
-			TopicCoherenceThreshold: 0.4,
-			EmotionalToneThreshold:  0.8,
+			DuplicateThreshold:           0.95,
+			StructureAnalysisEnabled:     true,
+			TopicCoherenceThreshold:      0.4,
+			EmotionalToneThreshold:       0.8,
 			ReadabilityBounds: &ReadabilityBounds{
 				MinFleschKincaid: -10,
 				MaxFleschKincaid: 20,
@@ -78,7 +77,7 @@ func NewContentDetector() *ContentDetector {
 				`(?i)(api[_-]?key|token)\s*[:=]\s*\S+`,
 				`(?i)(secret|private[_-]?key)\s*[:=]\s*\S+`,
 				`\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`, // Credit card pattern
-				`\b\d{3}-\d{2}-\d{4}\b`, // SSN pattern
+				`\b\d{3}-\d{2}-\d{4}\b`,                      // SSN pattern
 			},
 			EnableSemanticAnalysis: true,
 		},
@@ -178,23 +177,23 @@ func (d *ContentDetector) detectBasicContentAnomalies(ctx context.Context, input
 	// Content length anomalies
 	if contentLength < d.config.MinContentLength {
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeContentSize,
-			Severity:       anomaly.SeverityLow,
-			Status:         anomaly.StatusDetected,
-			Title:          "Content Too Short",
-			Description:    fmt.Sprintf("Content length (%d chars) is below minimum threshold (%d chars)", contentLength, d.config.MinContentLength),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			ChunkID:        input.ChunkID,
-			UserID:         input.UserID,
-			Score:          float64(d.config.MinContentLength-contentLength) / float64(d.config.MinContentLength),
-			Confidence:     0.9,
-			Threshold:      float64(d.config.MinContentLength),
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentSize,
+			Severity:        anomaly.SeverityLow,
+			Status:          anomaly.StatusDetected,
+			Title:           "Content Too Short",
+			Description:     fmt.Sprintf("Content length (%d chars) is below minimum threshold (%d chars)", contentLength, d.config.MinContentLength),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           float64(d.config.MinContentLength-contentLength) / float64(d.config.MinContentLength),
+			Confidence:      0.9,
+			Threshold:       float64(d.config.MinContentLength),
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"content_length": contentLength,
@@ -209,23 +208,23 @@ func (d *ContentDetector) detectBasicContentAnomalies(ctx context.Context, input
 
 	if contentLength > d.config.MaxContentLength {
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeContentSize,
-			Severity:       anomaly.SeverityMedium,
-			Status:         anomaly.StatusDetected,
-			Title:          "Content Too Large",
-			Description:    fmt.Sprintf("Content length (%d chars) exceeds maximum threshold (%d chars)", contentLength, d.config.MaxContentLength),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			ChunkID:        input.ChunkID,
-			UserID:         input.UserID,
-			Score:          math.Min(float64(contentLength-d.config.MaxContentLength)/float64(d.config.MaxContentLength), 1.0),
-			Confidence:     0.95,
-			Threshold:      float64(d.config.MaxContentLength),
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentSize,
+			Severity:        anomaly.SeverityMedium,
+			Status:          anomaly.StatusDetected,
+			Title:           "Content Too Large",
+			Description:     fmt.Sprintf("Content length (%d chars) exceeds maximum threshold (%d chars)", contentLength, d.config.MaxContentLength),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           math.Min(float64(contentLength-d.config.MaxContentLength)/float64(d.config.MaxContentLength), 1.0),
+			Confidence:      0.95,
+			Threshold:       float64(d.config.MaxContentLength),
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"content_length": contentLength,
@@ -242,22 +241,22 @@ func (d *ContentDetector) detectBasicContentAnomalies(ctx context.Context, input
 	trimmedContent := strings.TrimSpace(input.Content)
 	if len(trimmedContent) == 0 && contentLength > 0 {
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeContentStructure,
-			Severity:       anomaly.SeverityMedium,
-			Status:         anomaly.StatusDetected,
-			Title:          "Empty Content with Size",
-			Description:    fmt.Sprintf("Document has size (%d chars) but contains only whitespace", contentLength),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			ChunkID:        input.ChunkID,
-			UserID:         input.UserID,
-			Score:          0.8,
-			Confidence:     0.95,
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentStructure,
+			Severity:        anomaly.SeverityMedium,
+			Status:          anomaly.StatusDetected,
+			Title:           "Empty Content with Size",
+			Description:     fmt.Sprintf("Document has size (%d chars) but contains only whitespace", contentLength),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           0.8,
+			Confidence:      0.95,
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"content_length":         contentLength,
@@ -288,7 +287,7 @@ func (d *ContentDetector) detectSuspiciousPatterns(ctx context.Context, input *a
 			// Determine severity based on pattern type
 			severity := anomaly.SeverityMedium
 			patternType := "unknown"
-			
+
 			if strings.Contains(pattern, "password|pwd|pass") {
 				severity = anomaly.SeverityHigh
 				patternType = "password"
@@ -307,27 +306,27 @@ func (d *ContentDetector) detectSuspiciousPatterns(ctx context.Context, input *a
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeSuspiciousContent,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Suspicious Pattern Detected",
-				Description:    fmt.Sprintf("Found %d matches of potentially sensitive pattern (%s)", len(matches), patternType),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          math.Min(float64(len(matches))/5.0, 1.0),
-				Confidence:     0.85,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeSuspiciousContent,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Suspicious Pattern Detected",
+				Description:     fmt.Sprintf("Found %d matches of potentially sensitive pattern (%s)", len(matches), patternType),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           math.Min(float64(len(matches))/5.0, 1.0),
+				Confidence:      0.85,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
-					"pattern_type":  patternType,
-					"match_count":   len(matches),
-					"first_match":   matches[0],
+					"pattern_type": patternType,
+					"match_count":  len(matches),
+					"first_match":  matches[0],
 				},
 				Metadata: map[string]interface{}{
 					"detection_method": "regex_pattern",
@@ -347,12 +346,12 @@ func (d *ContentDetector) detectContentDuplication(ctx context.Context, input *a
 
 	// Generate content hash (simplified)
 	contentHash := d.generateContentHash(input.Content)
-	
+
 	// Check for duplicates
 	if existingDocuments, exists := d.duplicateCache[contentHash]; exists {
 		// Found duplicate content
 		similarity := 1.0 // Exact match in this simplified implementation
-		
+
 		if similarity >= d.config.DuplicateThreshold {
 			severity := anomaly.SeverityLow
 			if len(existingDocuments) > 2 {
@@ -363,28 +362,28 @@ func (d *ContentDetector) detectContentDuplication(ctx context.Context, input *a
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeContentDuplication,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Duplicate Content Detected",
-				Description:    fmt.Sprintf("Content is %.1f%% similar to %d existing documents", similarity*100, len(existingDocuments)),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          similarity,
-				Confidence:     0.9,
-				Threshold:      d.config.DuplicateThreshold,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeContentDuplication,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Duplicate Content Detected",
+				Description:     fmt.Sprintf("Content is %.1f%% similar to %d existing documents", similarity*100, len(existingDocuments)),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           similarity,
+				Confidence:      0.9,
+				Threshold:       d.config.DuplicateThreshold,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
-					"similarity_score":     similarity,
-					"duplicate_count":      len(existingDocuments),
-					"existing_documents":   existingDocuments,
+					"similarity_score":   similarity,
+					"duplicate_count":    len(existingDocuments),
+					"existing_documents": existingDocuments,
 				},
 				Metadata: map[string]interface{}{
 					"detection_method": "content_hash",
@@ -411,78 +410,76 @@ func (d *ContentDetector) detectSentimentAnomalies(ctx context.Context, input *a
 	}
 
 	sentiment := input.SentimentResult
-	
-	// Check sentiment score deviation
-	if baselineScore, exists := baseline.SentimentBaseline["avg_score"]; exists {
-		if avgScore, ok := baselineScore.(float64); ok {
-			deviation := math.Abs(sentiment.Score - avgScore)
-			
-			if deviation > d.config.SentimentDeviationThreshold {
-				severity := anomaly.SeverityLow
-				if deviation > 0.8 {
-					severity = anomaly.SeverityMedium
-				}
-				if deviation > 0.9 {
-					severity = anomaly.SeverityHigh
-				}
 
-				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeContentSentiment,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "Unusual Sentiment Score",
-					Description:    fmt.Sprintf("Sentiment score (%.2f) deviates significantly from baseline (%.2f), deviation: %.2f", sentiment.Score, avgScore, deviation),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					ChunkID:        input.ChunkID,
-					UserID:         input.UserID,
-					Score:          deviation,
-					Confidence:     0.75,
-					Threshold:      d.config.SentimentDeviationThreshold,
-					DetectorName:   d.name,
-					DetectorVersion: d.version,
-					Baseline: map[string]interface{}{
-						"avg_sentiment_score": avgScore,
-					},
-					Detected: map[string]interface{}{
-						"sentiment_score": sentiment.Score,
-						"sentiment_label": sentiment.Label,
-						"magnitude":       sentiment.Magnitude,
-						"deviation":       deviation,
-					},
-					Metadata: map[string]interface{}{
-						"detection_method": "sentiment_deviation",
-					},
-				}
-				anomalies = append(anomalies, anomaly)
+	// Check sentiment score deviation
+	if avgScore, exists := baseline.SentimentBaseline["avg_score"]; exists {
+		deviation := math.Abs(sentiment.Score - avgScore)
+
+		if deviation > d.config.SentimentDeviationThreshold {
+			severity := anomaly.SeverityLow
+			if deviation > 0.8 {
+				severity = anomaly.SeverityMedium
 			}
+			if deviation > 0.9 {
+				severity = anomaly.SeverityHigh
+			}
+
+			anomaly := &anomaly.Anomaly{
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeContentSentiment,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Unusual Sentiment Score",
+				Description:     fmt.Sprintf("Sentiment score (%.2f) deviates significantly from baseline (%.2f), deviation: %.2f", sentiment.Score, avgScore, deviation),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           deviation,
+				Confidence:      0.75,
+				Threshold:       d.config.SentimentDeviationThreshold,
+				DetectorName:    d.name,
+				DetectorVersion: d.version,
+				Baseline: map[string]interface{}{
+					"avg_sentiment_score": avgScore,
+				},
+				Detected: map[string]interface{}{
+					"sentiment_score": sentiment.Score,
+					"sentiment_label": sentiment.Label,
+					"magnitude":       sentiment.Magnitude,
+					"deviation":       deviation,
+				},
+				Metadata: map[string]interface{}{
+					"detection_method": "sentiment_deviation",
+				},
+			}
+			anomalies = append(anomalies, anomaly)
 		}
 	}
 
 	// Check for extreme sentiment with high magnitude
 	if sentiment.Magnitude > 0.9 && (sentiment.Label == "positive" || sentiment.Label == "negative") {
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeContentSentiment,
-			Severity:       anomaly.SeverityMedium,
-			Status:         anomaly.StatusDetected,
-			Title:          "Extreme Sentiment Detected",
-			Description:    fmt.Sprintf("Document has extreme %s sentiment with high magnitude (%.2f)", sentiment.Label, sentiment.Magnitude),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			ChunkID:        input.ChunkID,
-			UserID:         input.UserID,
-			Score:          sentiment.Magnitude,
-			Confidence:     0.8,
-			Threshold:      0.9,
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentSentiment,
+			Severity:        anomaly.SeverityMedium,
+			Status:          anomaly.StatusDetected,
+			Title:           "Extreme Sentiment Detected",
+			Description:     fmt.Sprintf("Document has extreme %s sentiment with high magnitude (%.2f)", sentiment.Label, sentiment.Magnitude),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           sentiment.Magnitude,
+			Confidence:      0.8,
+			Threshold:       0.9,
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"sentiment_label": sentiment.Label,
@@ -507,68 +504,66 @@ func (d *ContentDetector) detectLanguageAnomalies(ctx context.Context, input *an
 	}
 
 	language := input.LanguageResult
-	
-	// Check if detected language is uncommon for this tenant
-	if languageFreq, exists := baseline.CommonLanguages[language.Language]; exists {
-		if freq, ok := languageFreq.(float64); ok && freq < d.config.LanguageConsistencyThreshold {
-			severity := anomaly.SeverityLow
-			if freq < 0.1 {
-				severity = anomaly.SeverityMedium
-			}
 
-			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeContentLanguage,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Unusual Language Detected",
-				Description:    fmt.Sprintf("Document language (%s) is uncommon for this tenant (frequency: %.2f%%)", language.Language, freq*100),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          1.0 - freq,
-				Confidence:     language.Confidence,
-				Threshold:      d.config.LanguageConsistencyThreshold,
-				DetectorName:   d.name,
-				DetectorVersion: d.version,
-				Baseline: map[string]interface{}{
-					"common_languages": baseline.CommonLanguages,
-				},
-				Detected: map[string]interface{}{
-					"language":      language.Language,
-					"confidence":    language.Confidence,
-					"dialect":       language.Dialect,
-					"script":        language.Script,
-				},
-				Metadata: map[string]interface{}{
-					"detection_method": "language_consistency",
-				},
-			}
-			anomalies = append(anomalies, anomaly)
+	// Check if detected language is uncommon for this tenant
+	if freq, exists := baseline.CommonLanguages[language.Language]; exists && freq < d.config.LanguageConsistencyThreshold {
+		severity := anomaly.SeverityLow
+		if freq < 0.1 {
+			severity = anomaly.SeverityMedium
 		}
+
+		anomaly := &anomaly.Anomaly{
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentLanguage,
+			Severity:        severity,
+			Status:          anomaly.StatusDetected,
+			Title:           "Unusual Language Detected",
+			Description:     fmt.Sprintf("Document language (%s) is uncommon for this tenant (frequency: %.2f%%)", language.Language, freq*100),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           1.0 - freq,
+			Confidence:      language.Confidence,
+			Threshold:       d.config.LanguageConsistencyThreshold,
+			DetectorName:    d.name,
+			DetectorVersion: d.version,
+			Baseline: map[string]interface{}{
+				"common_languages": baseline.CommonLanguages,
+			},
+			Detected: map[string]interface{}{
+				"language":   language.Language,
+				"confidence": language.Confidence,
+				"dialect":    language.Dialect,
+				"script":     language.Script,
+			},
+			Metadata: map[string]interface{}{
+				"detection_method": "language_consistency",
+			},
+		}
+		anomalies = append(anomalies, anomaly)
 	} else {
 		// Language not seen before in baseline
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeContentLanguage,
-			Severity:       anomaly.SeverityMedium,
-			Status:         anomaly.StatusDetected,
-			Title:          "New Language Detected",
-			Description:    fmt.Sprintf("Document language (%s) has not been seen before for this tenant", language.Language),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			ChunkID:        input.ChunkID,
-			UserID:         input.UserID,
-			Score:          0.8,
-			Confidence:     language.Confidence,
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentLanguage,
+			Severity:        anomaly.SeverityMedium,
+			Status:          anomaly.StatusDetected,
+			Title:           "New Language Detected",
+			Description:     fmt.Sprintf("Document language (%s) has not been seen before for this tenant", language.Language),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           0.8,
+			Confidence:      language.Confidence,
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"language":   language.Language,
@@ -606,23 +601,23 @@ func (d *ContentDetector) detectQualityAnomalies(ctx context.Context, input *ano
 		}
 
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeContentQuality,
-			Severity:       severity,
-			Status:         anomaly.StatusDetected,
-			Title:          "Low Content Quality",
-			Description:    fmt.Sprintf("Content quality score (%.2f) is below threshold (%.2f)", quality.OverallScore, d.config.QualityThreshold),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			ChunkID:        input.ChunkID,
-			UserID:         input.UserID,
-			Score:          1.0 - quality.OverallScore,
-			Confidence:     0.7,
-			Threshold:      d.config.QualityThreshold,
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentQuality,
+			Severity:        severity,
+			Status:          anomaly.StatusDetected,
+			Title:           "Low Content Quality",
+			Description:     fmt.Sprintf("Content quality score (%.2f) is below threshold (%.2f)", quality.OverallScore, d.config.QualityThreshold),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           1.0 - quality.OverallScore,
+			Confidence:      0.7,
+			Threshold:       d.config.QualityThreshold,
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"overall_score":      quality.OverallScore,
@@ -643,23 +638,23 @@ func (d *ContentDetector) detectQualityAnomalies(ctx context.Context, input *ano
 	// High redundancy
 	if quality.Redundancy > 0.8 {
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeContentQuality,
-			Severity:       anomaly.SeverityLow,
-			Status:         anomaly.StatusDetected,
-			Title:          "High Content Redundancy",
-			Description:    fmt.Sprintf("Content has high redundancy score (%.2f), indicating repetitive content", quality.Redundancy),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			ChunkID:        input.ChunkID,
-			UserID:         input.UserID,
-			Score:          quality.Redundancy,
-			Confidence:     0.75,
-			Threshold:      0.8,
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeContentQuality,
+			Severity:        anomaly.SeverityLow,
+			Status:          anomaly.StatusDetected,
+			Title:           "High Content Redundancy",
+			Description:     fmt.Sprintf("Content has high redundancy score (%.2f), indicating repetitive content", quality.Redundancy),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			ChunkID:         input.ChunkID,
+			UserID:          input.UserID,
+			Score:           quality.Redundancy,
+			Confidence:      0.75,
+			Threshold:       0.8,
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"redundancy": quality.Redundancy,
@@ -690,23 +685,23 @@ func (d *ContentDetector) detectTopicAnomalies(ctx context.Context, input *anoma
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeContentStructure,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Low Topic Coherence",
-				Description:    fmt.Sprintf("Topic '%s' has low coherence score (%.2f)", topic.Topic, topic.Coherence),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          1.0 - topic.Coherence,
-				Confidence:     topic.Probability,
-				Threshold:      d.config.TopicCoherenceThreshold,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeContentStructure,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Low Topic Coherence",
+				Description:     fmt.Sprintf("Topic '%s' has low coherence score (%.2f)", topic.Topic, topic.Coherence),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           1.0 - topic.Coherence,
+				Confidence:      topic.Probability,
+				Threshold:       d.config.TopicCoherenceThreshold,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"topic":       topic.Topic,
@@ -722,40 +717,38 @@ func (d *ContentDetector) detectTopicAnomalies(ctx context.Context, input *anoma
 		}
 
 		// Check if topic is uncommon for this tenant
-		if topicFreq, exists := baseline.CommonTopics[topic.Topic]; exists {
-			if freq, ok := topicFreq.(float64); ok && freq < 0.1 && topic.Probability > 0.7 {
-				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeContentStructure,
-					Severity:       anomaly.SeverityLow,
-					Status:         anomaly.StatusDetected,
-					Title:          "Unusual Topic Detected",
-					Description:    fmt.Sprintf("High-probability topic '%s' (%.2f) is uncommon for this tenant (frequency: %.2f%%)", topic.Topic, topic.Probability, freq*100),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					ChunkID:        input.ChunkID,
-					UserID:         input.UserID,
-					Score:          topic.Probability * (1.0 - freq),
-					Confidence:     0.6,
-					DetectorName:   d.name,
-					DetectorVersion: d.version,
-					Baseline: map[string]interface{}{
-						"topic_frequency": freq,
-					},
-					Detected: map[string]interface{}{
-						"topic":       topic.Topic,
-						"probability": topic.Probability,
-						"keywords":    topic.Keywords,
-					},
-					Metadata: map[string]interface{}{
-						"detection_method": "unusual_topic",
-					},
-				}
-				anomalies = append(anomalies, anomaly)
+		if freq, exists := baseline.CommonTopics[topic.Topic]; exists && freq < 0.1 && topic.Probability > 0.7 {
+			anomaly := &anomaly.Anomaly{
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeContentStructure,
+				Severity:        anomaly.SeverityLow,
+				Status:          anomaly.StatusDetected,
+				Title:           "Unusual Topic Detected",
+				Description:     fmt.Sprintf("High-probability topic '%s' (%.2f) is uncommon for this tenant (frequency: %.2f%%)", topic.Topic, topic.Probability, freq*100),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           topic.Probability * (1.0 - freq),
+				Confidence:      0.6,
+				DetectorName:    d.name,
+				DetectorVersion: d.version,
+				Baseline: map[string]interface{}{
+					"topic_frequency": freq,
+				},
+				Detected: map[string]interface{}{
+					"topic":       topic.Topic,
+					"probability": topic.Probability,
+					"keywords":    topic.Keywords,
+				},
+				Metadata: map[string]interface{}{
+					"detection_method": "unusual_topic",
+				},
 			}
+			anomalies = append(anomalies, anomaly)
 		}
 	}
 
@@ -766,13 +759,13 @@ func (d *ContentDetector) detectStructureAnomalies(ctx context.Context, input *a
 	var anomalies []*anomaly.Anomaly
 
 	content := input.Content
-	
+
 	// Detect unusual character patterns
 	nonPrintableCount := 0
 	specialCharCount := 0
 	digitCount := 0
 	letterCount := 0
-	
+
 	for _, r := range content {
 		if r < 32 || r > 126 {
 			nonPrintableCount++
@@ -789,7 +782,7 @@ func (d *ContentDetector) detectStructureAnomalies(ctx context.Context, input *a
 	if totalChars > 0 {
 		nonPrintableRatio := float64(nonPrintableCount) / float64(totalChars)
 		digitRatio := float64(digitCount) / float64(totalChars)
-		
+
 		// High non-printable character ratio
 		if nonPrintableRatio > 0.1 {
 			severity := anomaly.SeverityMedium
@@ -798,23 +791,23 @@ func (d *ContentDetector) detectStructureAnomalies(ctx context.Context, input *a
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeContentStructure,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "High Non-Printable Character Ratio",
-				Description:    fmt.Sprintf("Content contains %.1f%% non-printable characters", nonPrintableRatio*100),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          nonPrintableRatio,
-				Confidence:     0.85,
-				Threshold:      0.1,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeContentStructure,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "High Non-Printable Character Ratio",
+				Description:     fmt.Sprintf("Content contains %.1f%% non-printable characters", nonPrintableRatio*100),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           nonPrintableRatio,
+				Confidence:      0.85,
+				Threshold:       0.1,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"non_printable_ratio": nonPrintableRatio,
@@ -831,23 +824,23 @@ func (d *ContentDetector) detectStructureAnomalies(ctx context.Context, input *a
 		// Unusually high digit ratio (might indicate data dumps, encoded content, etc.)
 		if digitRatio > 0.7 && totalChars > 100 {
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeContentStructure,
-				Severity:       anomaly.SeverityLow,
-				Status:         anomaly.StatusDetected,
-				Title:          "High Digit Density",
-				Description:    fmt.Sprintf("Content contains %.1f%% digits, suggesting data or encoded content", digitRatio*100),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          digitRatio,
-				Confidence:     0.7,
-				Threshold:      0.7,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeContentStructure,
+				Severity:        anomaly.SeverityLow,
+				Status:          anomaly.StatusDetected,
+				Title:           "High Digit Density",
+				Description:     fmt.Sprintf("Content contains %.1f%% digits, suggesting data or encoded content", digitRatio*100),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           digitRatio,
+				Confidence:      0.7,
+				Threshold:       0.7,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"digit_ratio": digitRatio,

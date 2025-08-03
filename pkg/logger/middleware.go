@@ -13,8 +13,8 @@ import (
 
 // HTTPLogger wraps an HTTP handler with structured logging
 type HTTPLogger struct {
-	logger  *Logger
-	config  *HTTPLogConfig
+	logger *Logger
+	config *HTTPLogConfig
 }
 
 // HTTPLogConfig configures HTTP logging behavior
@@ -75,7 +75,7 @@ func (hl *HTTPLogger) Middleware() func(next http.Handler) http.Handler {
 
 			// Extract request ID from context or headers
 			requestID := hl.getRequestID(r)
-			
+
 			// Create context with request ID
 			ctx := context.WithValue(r.Context(), "request_id", requestID)
 			r = r.WithContext(ctx)
@@ -122,7 +122,7 @@ func (hl *HTTPLogger) Middleware() func(next http.Handler) http.Handler {
 				if err := recover(); err != nil {
 					stack := debug.Stack()
 					reqLogger.WithFields(map[string]interface{}{
-						"panic":      err,
+						"panic":       err,
 						"stack_trace": string(stack),
 					}).Error("HTTP request panicked")
 
@@ -229,7 +229,7 @@ func (hl *HTTPLogger) sanitizeHeaders(headers http.Header) map[string]interface{
 
 	for name, values := range headers {
 		lowerName := strings.ToLower(name)
-		
+
 		// Check if this header should be sanitized
 		shouldSanitize := false
 		for _, sensitive := range hl.config.SanitizeHeaders {

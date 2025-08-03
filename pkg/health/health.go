@@ -19,14 +19,14 @@ const (
 
 // CheckResult represents the result of a health check
 type CheckResult struct {
-	Name        string            `json:"name"`
-	Status      Status            `json:"status"`
-	Message     string            `json:"message,omitempty"`
-	Error       string            `json:"error,omitempty"`
-	Duration    time.Duration     `json:"duration"`
-	Timestamp   time.Time         `json:"timestamp"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	Critical    bool              `json:"critical"`
+	Name      string            `json:"name"`
+	Status    Status            `json:"status"`
+	Message   string            `json:"message,omitempty"`
+	Error     string            `json:"error,omitempty"`
+	Duration  time.Duration     `json:"duration"`
+	Timestamp time.Time         `json:"timestamp"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	Critical  bool              `json:"critical"`
 }
 
 // Checker represents a health check function
@@ -102,20 +102,20 @@ func (hc *HealthChecker) RemoveChecker(name string) {
 
 // HealthReport represents the overall health status
 type HealthReport struct {
-	Status      Status                   `json:"status"`
-	Timestamp   time.Time                `json:"timestamp"`
-	Duration    time.Duration            `json:"duration"`
-	Version     string                   `json:"version"`
-	Service     string                   `json:"service"`
-	Checks      map[string]CheckResult   `json:"checks"`
-	Summary     map[string]int           `json:"summary"`
-	Critical    bool                     `json:"critical"`
+	Status    Status                 `json:"status"`
+	Timestamp time.Time              `json:"timestamp"`
+	Duration  time.Duration          `json:"duration"`
+	Version   string                 `json:"version"`
+	Service   string                 `json:"service"`
+	Checks    map[string]CheckResult `json:"checks"`
+	Summary   map[string]int         `json:"summary"`
+	Critical  bool                   `json:"critical"`
 }
 
 // Check performs all health checks and returns a report
 func (hc *HealthChecker) Check(ctx context.Context, service, version string) HealthReport {
 	start := time.Now()
-	
+
 	// Create context with timeout
 	checkCtx, cancel := context.WithTimeout(ctx, hc.timeout)
 	defer cancel()
@@ -184,7 +184,7 @@ func (hc *HealthChecker) Check(ctx context.Context, service, version string) Hea
 // runSingleCheck runs a single health check with proper error handling
 func (hc *HealthChecker) runSingleCheck(ctx context.Context, checker Checker) CheckResult {
 	start := time.Now()
-	
+
 	defer func() {
 		if r := recover(); r != nil {
 			// Handle panics in health checks
@@ -300,20 +300,20 @@ func DiskSpaceChecker(name, path string, minFreePercent float64) Checker {
 func CustomChecker(name string, critical bool, checkFn func(ctx context.Context) (Status, string, error)) Checker {
 	return NewChecker(name, critical, func(ctx context.Context) CheckResult {
 		status, message, err := checkFn(ctx)
-		
+
 		result := CheckResult{
 			Name:    name,
 			Status:  status,
 			Message: message,
 		}
-		
+
 		if err != nil {
 			result.Error = err.Error()
 			if status == StatusHealthy {
 				result.Status = StatusUnhealthy
 			}
 		}
-		
+
 		return result
 	})
 }

@@ -13,28 +13,28 @@ import (
 
 // MLAnalysisResult represents the result of ML-based content analysis
 type MLAnalysisResult struct {
-	DocumentID          string                 `json:"document_id"`
-	ChunkID             string                 `json:"chunk_id,omitempty"`
-	Sentiment           SentimentResult        `json:"sentiment"`
-	Topics              []TopicResult          `json:"topics"`
-	Entities            []EntityResult         `json:"entities"`
-	Summary             SummaryResult          `json:"summary"`
-	QualityMetrics      QualityMetrics         `json:"quality_metrics"`
-	ContentType         ContentTypeResult      `json:"content_type"`
-	KeyPhrases          []KeyPhraseResult      `json:"key_phrases"`
-	ReadabilityScore    ReadabilityScore       `json:"readability"`
-	LanguageDetection   LanguageResult         `json:"language"`
-	EmotionalTone       EmotionalToneResult    `json:"emotional_tone"`
-	ProcessingTime      int64                  `json:"processing_time_ms"`
-	ModelVersions       map[string]string      `json:"model_versions"`
-	Confidence          float64                `json:"overall_confidence"`
+	DocumentID        string              `json:"document_id"`
+	ChunkID           string              `json:"chunk_id,omitempty"`
+	Sentiment         SentimentResult     `json:"sentiment"`
+	Topics            []TopicResult       `json:"topics"`
+	Entities          []EntityResult      `json:"entities"`
+	Summary           SummaryResult       `json:"summary"`
+	QualityMetrics    QualityMetrics      `json:"quality_metrics"`
+	ContentType       ContentTypeResult   `json:"content_type"`
+	KeyPhrases        []KeyPhraseResult   `json:"key_phrases"`
+	ReadabilityScore  ReadabilityScore    `json:"readability"`
+	LanguageDetection LanguageResult      `json:"language"`
+	EmotionalTone     EmotionalToneResult `json:"emotional_tone"`
+	ProcessingTime    int64               `json:"processing_time_ms"`
+	ModelVersions     map[string]string   `json:"model_versions"`
+	Confidence        float64             `json:"overall_confidence"`
 }
 
 // SentimentResult represents sentiment analysis results
 type SentimentResult struct {
-	Label      string  `json:"label"`      // positive, negative, neutral
-	Score      float64 `json:"score"`      // confidence score 0-1
-	Magnitude  float64 `json:"magnitude"`  // strength of emotion 0-1
+	Label        string  `json:"label"`        // positive, negative, neutral
+	Score        float64 `json:"score"`        // confidence score 0-1
+	Magnitude    float64 `json:"magnitude"`    // strength of emotion 0-1
 	Subjectivity float64 `json:"subjectivity"` // objective vs subjective 0-1
 }
 
@@ -49,32 +49,32 @@ type TopicResult struct {
 // EntityResult represents named entity recognition results
 type EntityResult struct {
 	Text       string  `json:"text"`
-	Label      string  `json:"label"`      // PERSON, ORG, LOC, MISC, etc.
+	Label      string  `json:"label"` // PERSON, ORG, LOC, MISC, etc.
 	StartPos   int     `json:"start_pos"`
 	EndPos     int     `json:"end_pos"`
 	Confidence float64 `json:"confidence"`
-	Context    string  `json:"context"`    // surrounding text
+	Context    string  `json:"context"` // surrounding text
 }
 
 // SummaryResult represents document summarization results
 type SummaryResult struct {
-	ExtractiveSummary   string   `json:"extractive_summary"`
-	AbstractiveSummary  string   `json:"abstractive_summary"`
-	KeySentences        []string `json:"key_sentences"`
-	SummaryRatio        float64  `json:"summary_ratio"`
-	CompressionScore    float64  `json:"compression_score"`
+	ExtractiveSummary  string   `json:"extractive_summary"`
+	AbstractiveSummary string   `json:"abstractive_summary"`
+	KeySentences       []string `json:"key_sentences"`
+	SummaryRatio       float64  `json:"summary_ratio"`
+	CompressionScore   float64  `json:"compression_score"`
 }
 
 // QualityMetrics represents content quality assessment
 type QualityMetrics struct {
-	Coherence           float64  `json:"coherence"`
-	Clarity             float64  `json:"clarity"`
-	Completeness        float64  `json:"completeness"`
-	Informativeness     float64  `json:"informativeness"`
-	Redundancy          float64  `json:"redundancy"`
-	StructuralQuality   float64  `json:"structural_quality"`
-	Issues              []string `json:"issues"`
-	OverallScore        float64  `json:"overall_score"`
+	Coherence         float64  `json:"coherence"`
+	Clarity           float64  `json:"clarity"`
+	Completeness      float64  `json:"completeness"`
+	Informativeness   float64  `json:"informativeness"`
+	Redundancy        float64  `json:"redundancy"`
+	StructuralQuality float64  `json:"structural_quality"`
+	Issues            []string `json:"issues"`
+	OverallScore      float64  `json:"overall_score"`
 }
 
 // ContentTypeResult represents advanced content classification
@@ -89,32 +89,32 @@ type ContentTypeResult struct {
 
 // KeyPhraseResult represents key phrase extraction
 type KeyPhraseResult struct {
-	Phrase     string  `json:"phrase"`
-	Score      float64 `json:"score"`
-	Frequency  int     `json:"frequency"`
-	Position   int     `json:"position"`
-	IsNoun     bool    `json:"is_noun"`
-	IsAcronym  bool    `json:"is_acronym"`
+	Phrase    string  `json:"phrase"`
+	Score     float64 `json:"score"`
+	Frequency int     `json:"frequency"`
+	Position  int     `json:"position"`
+	IsNoun    bool    `json:"is_noun"`
+	IsAcronym bool    `json:"is_acronym"`
 }
 
 // ReadabilityScore represents text readability metrics
 type ReadabilityScore struct {
-	FleschKincaid    float64 `json:"flesch_kincaid"`
-	FleschReading    float64 `json:"flesch_reading"`
-	GunningFog       float64 `json:"gunning_fog"`
-	SMOG             float64 `json:"smog"`
-	ColemanLiau      float64 `json:"coleman_liau"`
-	GradeLevel       float64 `json:"grade_level"`
-	ReadingTime      int     `json:"reading_time_seconds"`
+	FleschKincaid float64 `json:"flesch_kincaid"`
+	FleschReading float64 `json:"flesch_reading"`
+	GunningFog    float64 `json:"gunning_fog"`
+	SMOG          float64 `json:"smog"`
+	ColemanLiau   float64 `json:"coleman_liau"`
+	GradeLevel    float64 `json:"grade_level"`
+	ReadingTime   int     `json:"reading_time_seconds"`
 }
 
 // LanguageResult represents language detection with dialects
 type LanguageResult struct {
-	Language    string             `json:"language"`
-	Dialect     string             `json:"dialect"`
-	Confidence  float64            `json:"confidence"`
+	Language     string                `json:"language"`
+	Dialect      string                `json:"dialect"`
+	Confidence   float64               `json:"confidence"`
 	Alternatives []LanguageAlternative `json:"alternatives"`
-	Script      string             `json:"script"`
+	Script       string                `json:"script"`
 }
 
 // LanguageAlternative represents alternative language predictions
@@ -137,33 +137,33 @@ type EmotionalToneResult struct {
 
 // MLAnalyzer performs advanced ML-based content analysis
 type MLAnalyzer struct {
-	config            *MLAnalysisConfig
-	sentimentModel    SentimentModel
-	topicModel        TopicModel
-	entityModel       EntityModel
-	summaryModel      SummaryModel
-	qualityModel      QualityModel
-	languageModel     LanguageModel
-	emotionModel      EmotionModel
+	config         *MLAnalysisConfig
+	sentimentModel SentimentModel
+	topicModel     TopicModel
+	entityModel    EntityModel
+	summaryModel   SummaryModel
+	qualityModel   QualityModel
+	languageModel  LanguageModel
+	emotionModel   EmotionModel
 }
 
 // MLAnalysisConfig configures the ML analysis pipeline
 type MLAnalysisConfig struct {
-	EnableSentiment      bool   `json:"enable_sentiment"`
-	EnableTopics         bool   `json:"enable_topics"`
-	EnableEntities       bool   `json:"enable_entities"`
-	EnableSummary        bool   `json:"enable_summary"`
-	EnableQuality        bool   `json:"enable_quality"`
-	EnableLanguage       bool   `json:"enable_language"`
-	EnableEmotion        bool   `json:"enable_emotion"`
-	MaxTopics            int    `json:"max_topics"`
-	SummaryRatio         float64 `json:"summary_ratio"`
-	MinConfidence        float64 `json:"min_confidence"`
-	ModelTimeout         time.Duration `json:"model_timeout"`
-	CacheEnabled         bool   `json:"cache_enabled"`
-	CacheTTL             time.Duration `json:"cache_ttl"`
-	ParallelProcessing   bool   `json:"parallel_processing"`
-	BatchSize            int    `json:"batch_size"`
+	EnableSentiment    bool          `json:"enable_sentiment"`
+	EnableTopics       bool          `json:"enable_topics"`
+	EnableEntities     bool          `json:"enable_entities"`
+	EnableSummary      bool          `json:"enable_summary"`
+	EnableQuality      bool          `json:"enable_quality"`
+	EnableLanguage     bool          `json:"enable_language"`
+	EnableEmotion      bool          `json:"enable_emotion"`
+	MaxTopics          int           `json:"max_topics"`
+	SummaryRatio       float64       `json:"summary_ratio"`
+	MinConfidence      float64       `json:"min_confidence"`
+	ModelTimeout       time.Duration `json:"model_timeout"`
+	CacheEnabled       bool          `json:"cache_enabled"`
+	CacheTTL           time.Duration `json:"cache_ttl"`
+	ParallelProcessing bool          `json:"parallel_processing"`
+	BatchSize          int           `json:"batch_size"`
 }
 
 // SentimentModel interface for sentiment analysis
@@ -512,7 +512,7 @@ func (a *MLAnalyzer) computeReadabilityScore(text string) ReadabilityScore {
 	sentences := a.countSentences(text)
 	words := a.countWords(text)
 	syllables := a.countSyllables(text)
-	
+
 	if sentences == 0 || words == 0 {
 		return ReadabilityScore{}
 	}
@@ -555,18 +555,18 @@ func (a *MLAnalyzer) computeReadabilityScore(text string) ReadabilityScore {
 // classifyContentType performs advanced content type classification
 func (a *MLAnalyzer) classifyContentType(text string) ContentTypeResult {
 	features := make(map[string]float64)
-	
+
 	// Extract features
 	features["avg_sentence_length"] = float64(a.countWords(text)) / float64(a.countSentences(text))
 	features["question_ratio"] = float64(strings.Count(text, "?")) / float64(len(text))
 	features["exclamation_ratio"] = float64(strings.Count(text, "!")) / float64(len(text))
 	features["number_ratio"] = float64(len(regexp.MustCompile(`\d+`).FindAllString(text, -1))) / float64(a.countWords(text))
 	features["capital_ratio"] = float64(len(regexp.MustCompile(`[A-Z]`).FindAllString(text, -1))) / float64(len(text))
-	
+
 	// Simple rule-based classification
 	primaryType := "general"
 	confidence := 0.7
-	
+
 	if features["question_ratio"] > 0.05 {
 		primaryType = "faq"
 		confidence = 0.8
@@ -591,7 +591,7 @@ func (a *MLAnalyzer) classifyContentType(text string) ContentTypeResult {
 // computeOverallConfidence computes an overall confidence score
 func (a *MLAnalyzer) computeOverallConfidence(result *MLAnalysisResult) float64 {
 	confidences := []float64{}
-	
+
 	if result.Sentiment.Score > 0 {
 		confidences = append(confidences, result.Sentiment.Score)
 	}
@@ -601,16 +601,16 @@ func (a *MLAnalyzer) computeOverallConfidence(result *MLAnalysisResult) float64 
 	if result.LanguageDetection.Confidence > 0 {
 		confidences = append(confidences, result.LanguageDetection.Confidence)
 	}
-	
+
 	if len(confidences) == 0 {
 		return 0.5 // Default confidence
 	}
-	
+
 	sum := 0.0
 	for _, conf := range confidences {
 		sum += conf
 	}
-	
+
 	return sum / float64(len(confidences))
 }
 
@@ -634,11 +634,11 @@ func (a *MLAnalyzer) countLetters(text string) int {
 func (a *MLAnalyzer) countSyllables(text string) int {
 	words := strings.Fields(strings.ToLower(text))
 	syllables := 0
-	
+
 	for _, word := range words {
 		syllables += a.countSyllablesInWord(word)
 	}
-	
+
 	return syllables
 }
 
@@ -647,40 +647,40 @@ func (a *MLAnalyzer) countSyllablesInWord(word string) int {
 	if len(word) == 0 {
 		return 0
 	}
-	
+
 	vowels := regexp.MustCompile(`[aeiouy]`)
 	matches := vowels.FindAllString(word, -1)
 	syllables := len(matches)
-	
+
 	// Adjust for silent e
 	if strings.HasSuffix(word, "e") {
 		syllables--
 	}
-	
+
 	if syllables == 0 {
 		syllables = 1
 	}
-	
+
 	return syllables
 }
 
 func (a *MLAnalyzer) countComplexWords(text string) int {
 	words := strings.Fields(strings.ToLower(text))
 	complexCount := 0
-	
+
 	for _, word := range words {
 		if a.countSyllablesInWord(word) >= 3 {
 			complexCount++
 		}
 	}
-	
+
 	return complexCount
 }
 
 func (a *MLAnalyzer) isLikelyNoun(phrase string) bool {
 	// Simple heuristic: check if phrase starts with capital letter or contains common noun patterns
-	return regexp.MustCompile(`^[A-Z]`).MatchString(phrase) || 
-		   regexp.MustCompile(`(tion|sion|ness|ment|ity)$`).MatchString(phrase)
+	return regexp.MustCompile(`^[A-Z]`).MatchString(phrase) ||
+		regexp.MustCompile(`(tion|sion|ness|ment|ity)$`).MatchString(phrase)
 }
 
 func (a *MLAnalyzer) isAcronym(phrase string) bool {

@@ -75,3 +75,7 @@ __pycache__/
 # Local development
 dev/
 local/
+
+# Kubernetes controller packages (dependency issues)
+pkg/controllers/
+cmd/operator/

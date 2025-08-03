@@ -46,18 +46,18 @@ func (s *LastWriteStrategy) Resolve(ctx context.Context, conflict *SyncConflict)
 		RequiresSync:    true,
 		Actions: []ConflictResolutionAction{
 			{
-				Type:        "update",
-				Source:      latestVersion.ConnectorType,
-				Target:      conflict.FilePath,
-				Description: fmt.Sprintf("Updated to latest version from %s (modified: %s)", 
+				Type:   "update",
+				Source: latestVersion.ConnectorType,
+				Target: conflict.FilePath,
+				Description: fmt.Sprintf("Updated to latest version from %s (modified: %s)",
 					latestVersion.ConnectorType, latestVersion.ModifiedTime.Format(time.RFC3339)),
 			},
 		},
 		Metadata: map[string]interface{}{
-			"strategy":        "last_write",
-			"chosen_version":  latestVersion.DataSourceID.String(),
-			"modified_time":   latestVersion.ModifiedTime,
-			"rejected_count":  len(conflict.FileVersions) - 1,
+			"strategy":       "last_write",
+			"chosen_version": latestVersion.DataSourceID.String(),
+			"modified_time":  latestVersion.ModifiedTime,
+			"rejected_count": len(conflict.FileVersions) - 1,
 		},
 	}
 
@@ -171,17 +171,17 @@ func (s *LargestFileStrategy) Resolve(ctx context.Context, conflict *SyncConflic
 		RequiresSync:    true,
 		Actions: []ConflictResolutionAction{
 			{
-				Type:        "update",
-				Source:      largestVersion.ConnectorType,
-				Target:      conflict.FilePath,
-				Description: fmt.Sprintf("Updated to largest version from %s (%d bytes)", 
+				Type:   "update",
+				Source: largestVersion.ConnectorType,
+				Target: conflict.FilePath,
+				Description: fmt.Sprintf("Updated to largest version from %s (%d bytes)",
 					largestVersion.ConnectorType, largestVersion.FileSize),
 			},
 		},
 		Metadata: map[string]interface{}{
-			"strategy":      "largest_file",
+			"strategy":       "largest_file",
 			"chosen_version": largestVersion.DataSourceID.String(),
-			"file_size":     largestVersion.FileSize,
+			"file_size":      largestVersion.FileSize,
 		},
 	}
 
@@ -209,7 +209,7 @@ func (s *PreserveBothStrategy) Resolve(ctx context.Context, conflict *SyncConfli
 
 	// Choose the first version as the "main" version
 	mainVersion := conflict.FileVersions[0]
-	
+
 	var additionalVersions []*ConflictFileVersion
 	var actions []ConflictResolutionAction
 
@@ -223,10 +223,10 @@ func (s *PreserveBothStrategy) Resolve(ctx context.Context, conflict *SyncConfli
 		}
 
 		// Generate versioned filename
-		versionedName := fmt.Sprintf("%s_%s_%d%s", 
-			baseName, 
-			version.ConnectorType, 
-			i, 
+		versionedName := fmt.Sprintf("%s_%s_%d%s",
+			baseName,
+			version.ConnectorType,
+			i,
 			extension)
 
 		// Create a new version record with the versioned name
@@ -292,7 +292,7 @@ func (s *SourcePriorityStrategy) CanResolve(conflict *SyncConflict) bool {
 			"notion":      40,
 		}
 	}
-	
+
 	// Can resolve if we have priority info for at least one source
 	for _, version := range conflict.FileVersions {
 		if _, exists := s.sourcePriorities[version.ConnectorType]; exists {
@@ -336,10 +336,10 @@ func (s *SourcePriorityStrategy) Resolve(ctx context.Context, conflict *SyncConf
 			},
 		},
 		Metadata: map[string]interface{}{
-			"strategy":         "source_priority",
-			"chosen_version":   selectedVersion.DataSourceID.String(),
-			"source_priority":  highestPriority,
-			"winning_source":   selectedVersion.ConnectorType,
+			"strategy":        "source_priority",
+			"chosen_version":  selectedVersion.DataSourceID.String(),
+			"source_priority": highestPriority,
+			"winning_source":  selectedVersion.ConnectorType,
 		},
 	}
 
@@ -466,10 +466,10 @@ func (s *MergeStrategy) Resolve(ctx context.Context, conflict *SyncConflict) (*C
 			},
 		},
 		Metadata: map[string]interface{}{
-			"strategy":       "merge",
-			"merged_count":   len(conflict.FileVersions),
-			"merge_type":     "text",
-			"base_version":   baseVersion.DataSourceID.String(),
+			"strategy":     "merge",
+			"merged_count": len(conflict.FileVersions),
+			"merge_type":   "text",
+			"base_version": baseVersion.DataSourceID.String(),
 		},
 	}
 

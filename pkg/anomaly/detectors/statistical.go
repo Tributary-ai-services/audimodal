@@ -5,34 +5,33 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/TAS/audimodal/pkg/anomaly"
+	"github.com/jscharber/eAIIngest/pkg/anomaly"
 )
 
 // StatisticalDetector implements statistical anomaly detection methods
 type StatisticalDetector struct {
-	name           string
-	version        string
-	enabled        bool
-	config         *StatisticalConfig
-	baselines      map[string]*anomaly.BaselineData
-	lastUpdate     time.Time
+	name       string
+	version    string
+	enabled    bool
+	config     *StatisticalConfig
+	baselines  map[string]*anomaly.BaselineData
+	lastUpdate time.Time
 }
 
 // StatisticalConfig contains configuration for statistical detection
 type StatisticalConfig struct {
-	ZScoreThreshold     float64 `json:"z_score_threshold"`
-	IQRMultiplier       float64 `json:"iqr_multiplier"`
-	ModifiedZThreshold  float64 `json:"modified_z_threshold"`
-	MinSampleSize       int     `json:"min_sample_size"`
-	ConfidenceLevel     float64 `json:"confidence_level"`
-	SlidingWindowSize   int     `json:"sliding_window_size"`
-	UpdateFrequency     time.Duration `json:"update_frequency"`
-	EnableTrendDetection bool   `json:"enable_trend_detection"`
-	EnableSeasonalDetection bool `json:"enable_seasonal_detection"`
+	ZScoreThreshold         float64       `json:"z_score_threshold"`
+	IQRMultiplier           float64       `json:"iqr_multiplier"`
+	ModifiedZThreshold      float64       `json:"modified_z_threshold"`
+	MinSampleSize           int           `json:"min_sample_size"`
+	ConfidenceLevel         float64       `json:"confidence_level"`
+	SlidingWindowSize       int           `json:"sliding_window_size"`
+	UpdateFrequency         time.Duration `json:"update_frequency"`
+	EnableTrendDetection    bool          `json:"enable_trend_detection"`
+	EnableSeasonalDetection bool          `json:"enable_seasonal_detection"`
 }
 
 // NewStatisticalDetector creates a new statistical anomaly detector
@@ -42,14 +41,14 @@ func NewStatisticalDetector() *StatisticalDetector {
 		version: "1.0.0",
 		enabled: true,
 		config: &StatisticalConfig{
-			ZScoreThreshold:     2.5,
-			IQRMultiplier:       1.5,
-			ModifiedZThreshold:  3.5,
-			MinSampleSize:       30,
-			ConfidenceLevel:     0.95,
-			SlidingWindowSize:   100,
-			UpdateFrequency:     24 * time.Hour,
-			EnableTrendDetection: true,
+			ZScoreThreshold:         2.5,
+			IQRMultiplier:           1.5,
+			ModifiedZThreshold:      3.5,
+			MinSampleSize:           30,
+			ConfidenceLevel:         0.95,
+			SlidingWindowSize:       100,
+			UpdateFrequency:         24 * time.Hour,
+			EnableTrendDetection:    true,
 			EnableSeasonalDetection: true,
 		},
 		baselines: make(map[string]*anomaly.BaselineData),
@@ -150,26 +149,26 @@ func (d *StatisticalDetector) detectContentAnomalies(ctx context.Context, input 
 	contentLength := float64(len(input.Content))
 	if baseline.AvgContentLength > 0 {
 		zScore := (contentLength - baseline.AvgContentLength) / baseline.StandardDev
-		
+
 		if math.Abs(zScore) > d.config.ZScoreThreshold {
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeContentSize,
-				Severity:       d.calculateSeverity(math.Abs(zScore)),
-				Status:         anomaly.StatusDetected,
-				Title:          "Unusual Content Size",
-				Description:    fmt.Sprintf("Content size (%d chars) deviates significantly from baseline (avg: %.0f chars, z-score: %.2f)", int(contentLength), baseline.AvgContentLength, zScore),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				ChunkID:        input.ChunkID,
-				UserID:         input.UserID,
-				Score:          math.Abs(zScore) / 5.0, // Normalize to 0-1 scale
-				Confidence:     d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
-				Threshold:      d.config.ZScoreThreshold,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeContentSize,
+				Severity:        d.calculateSeverity(math.Abs(zScore)),
+				Status:          anomaly.StatusDetected,
+				Title:           "Unusual Content Size",
+				Description:     fmt.Sprintf("Content size (%d chars) deviates significantly from baseline (avg: %.0f chars, z-score: %.2f)", int(contentLength), baseline.AvgContentLength, zScore),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				ChunkID:         input.ChunkID,
+				UserID:          input.UserID,
+				Score:           math.Abs(zScore) / 5.0, // Normalize to 0-1 scale
+				Confidence:      d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
+				Threshold:       d.config.ZScoreThreshold,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Baseline: map[string]interface{}{
 					"avg_content_length": baseline.AvgContentLength,
@@ -197,25 +196,25 @@ func (d *StatisticalDetector) detectContentAnomalies(ctx context.Context, input 
 					if stdDevInterface, exists := baseline.Metadata["file_size_std_dev"]; exists {
 						if stdDev, ok := stdDevInterface.(float64); ok && stdDev > 0 {
 							zScore := (fileSizeMB - avgSize) / stdDev
-							
+
 							if math.Abs(zScore) > d.config.ZScoreThreshold {
 								anomaly := &anomaly.Anomaly{
-									ID:             uuid.New(),
-									Type:           anomaly.AnomalyTypeContentSize,
-									Severity:       d.calculateSeverity(math.Abs(zScore)),
-									Status:         anomaly.StatusDetected,
-									Title:          "Unusual File Size",
-									Description:    fmt.Sprintf("File size (%.2f MB) deviates significantly from baseline (avg: %.2f MB, z-score: %.2f)", fileSizeMB, avgSize, zScore),
-									DetectedAt:     time.Now(),
-									UpdatedAt:      time.Now(),
-									TenantID:       input.TenantID,
-									DataSourceID:   input.DataSourceID,
-									DocumentID:     input.DocumentID,
-									UserID:         input.UserID,
-									Score:          math.Abs(zScore) / 5.0,
-									Confidence:     d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
-									Threshold:      d.config.ZScoreThreshold,
-									DetectorName:   d.name,
+									ID:              uuid.New(),
+									Type:            anomaly.AnomalyTypeContentSize,
+									Severity:        d.calculateSeverity(math.Abs(zScore)),
+									Status:          anomaly.StatusDetected,
+									Title:           "Unusual File Size",
+									Description:     fmt.Sprintf("File size (%.2f MB) deviates significantly from baseline (avg: %.2f MB, z-score: %.2f)", fileSizeMB, avgSize, zScore),
+									DetectedAt:      time.Now(),
+									UpdatedAt:       time.Now(),
+									TenantID:        input.TenantID,
+									DataSourceID:    input.DataSourceID,
+									DocumentID:      input.DocumentID,
+									UserID:          input.UserID,
+									Score:           math.Abs(zScore) / 5.0,
+									Confidence:      d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
+									Threshold:       d.config.ZScoreThreshold,
+									DetectorName:    d.name,
 									DetectorVersion: d.version,
 									Baseline: map[string]interface{}{
 										"avg_file_size_mb": avgSize,
@@ -250,7 +249,7 @@ func (d *StatisticalDetector) detectPerformanceAnomalies(ctx context.Context, in
 	}
 
 	metrics := input.UsageMetrics
-	
+
 	// Processing time anomaly
 	if baseline.Metadata != nil {
 		if avgProcessingInterface, exists := baseline.Metadata["avg_processing_time_ms"]; exists {
@@ -259,26 +258,26 @@ func (d *StatisticalDetector) detectPerformanceAnomalies(ctx context.Context, in
 					if stdDev, ok := stdDevInterface.(float64); ok && stdDev > 0 {
 						processingTimeMs := float64(metrics.ProcessingTime.Milliseconds())
 						zScore := (processingTimeMs - avgProcessing) / stdDev
-						
+
 						if math.Abs(zScore) > d.config.ZScoreThreshold {
 							anomaly := &anomaly.Anomaly{
-								ID:             uuid.New(),
-								Type:           anomaly.AnomalyTypePerformance,
-								Severity:       d.calculateSeverity(math.Abs(zScore)),
-								Status:         anomaly.StatusDetected,
-								Title:          "Processing Time Anomaly",
-								Description:    fmt.Sprintf("Processing time (%.0f ms) deviates significantly from baseline (avg: %.0f ms, z-score: %.2f)", processingTimeMs, avgProcessing, zScore),
-								DetectedAt:     time.Now(),
-								UpdatedAt:      time.Now(),
-								TenantID:       input.TenantID,
-								DataSourceID:   input.DataSourceID,
-								DocumentID:     input.DocumentID,
-								ChunkID:        input.ChunkID,
-								UserID:         input.UserID,
-								Score:          math.Abs(zScore) / 5.0,
-								Confidence:     d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
-								Threshold:      d.config.ZScoreThreshold,
-								DetectorName:   d.name,
+								ID:              uuid.New(),
+								Type:            anomaly.AnomalyTypePerformance,
+								Severity:        d.calculateSeverity(math.Abs(zScore)),
+								Status:          anomaly.StatusDetected,
+								Title:           "Processing Time Anomaly",
+								Description:     fmt.Sprintf("Processing time (%.0f ms) deviates significantly from baseline (avg: %.0f ms, z-score: %.2f)", processingTimeMs, avgProcessing, zScore),
+								DetectedAt:      time.Now(),
+								UpdatedAt:       time.Now(),
+								TenantID:        input.TenantID,
+								DataSourceID:    input.DataSourceID,
+								DocumentID:      input.DocumentID,
+								ChunkID:         input.ChunkID,
+								UserID:          input.UserID,
+								Score:           math.Abs(zScore) / 5.0,
+								Confidence:      d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
+								Threshold:       d.config.ZScoreThreshold,
+								DetectorName:    d.name,
 								DetectorVersion: d.version,
 								Baseline: map[string]interface{}{
 									"avg_processing_time_ms": avgProcessing,
@@ -307,22 +306,22 @@ func (d *StatisticalDetector) detectPerformanceAnomalies(ctx context.Context, in
 				if stdDevInterface, exists := baseline.Metadata["cpu_usage_std_dev"]; exists {
 					if stdDev, ok := stdDevInterface.(float64); ok && stdDev > 0 {
 						zScore := (metrics.CPUUsage - avgCPU) / stdDev
-						
+
 						if math.Abs(zScore) > d.config.ZScoreThreshold {
 							anomaly := &anomaly.Anomaly{
-								ID:             uuid.New(),
-								Type:           anomaly.AnomalyTypePerformance,
-								Severity:       d.calculateSeverity(math.Abs(zScore)),
-								Status:         anomaly.StatusDetected,
-								Title:          "CPU Usage Anomaly",
-								Description:    fmt.Sprintf("CPU usage (%.2f%%) deviates significantly from baseline (avg: %.2f%%, z-score: %.2f)", metrics.CPUUsage*100, avgCPU*100, zScore),
-								DetectedAt:     time.Now(),
-								UpdatedAt:      time.Now(),
-								TenantID:       input.TenantID,
-								Score:          math.Abs(zScore) / 5.0,
-								Confidence:     d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
-								Threshold:      d.config.ZScoreThreshold,
-								DetectorName:   d.name,
+								ID:              uuid.New(),
+								Type:            anomaly.AnomalyTypePerformance,
+								Severity:        d.calculateSeverity(math.Abs(zScore)),
+								Status:          anomaly.StatusDetected,
+								Title:           "CPU Usage Anomaly",
+								Description:     fmt.Sprintf("CPU usage (%.2f%%) deviates significantly from baseline (avg: %.2f%%, z-score: %.2f)", metrics.CPUUsage*100, avgCPU*100, zScore),
+								DetectedAt:      time.Now(),
+								UpdatedAt:       time.Now(),
+								TenantID:        input.TenantID,
+								Score:           math.Abs(zScore) / 5.0,
+								Confidence:      d.calculateConfidence(math.Abs(zScore), baseline.SampleCount),
+								Threshold:       d.config.ZScoreThreshold,
+								DetectorName:    d.name,
 								DetectorVersion: d.version,
 								Baseline: map[string]interface{}{
 									"avg_cpu_usage": avgCPU,
@@ -352,11 +351,11 @@ func (d *StatisticalDetector) detectBehavioralAnomalies(ctx context.Context, inp
 	}
 
 	pattern := input.AccessPattern
-	
+
 	// Access frequency anomaly
 	if baseline.TypicalAccess != nil {
 		typical := baseline.TypicalAccess
-		
+
 		// View count anomaly
 		if typical.ViewCount > 0 {
 			ratio := float64(pattern.ViewCount) / float64(typical.ViewCount)
@@ -365,24 +364,24 @@ func (d *StatisticalDetector) detectBehavioralAnomalies(ctx context.Context, inp
 				if ratio > 5.0 || ratio < 0.1 {
 					severity = anomaly.SeverityHigh
 				}
-				
+
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeAccessPattern,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "Unusual View Pattern",
-					Description:    fmt.Sprintf("View count (%d) is %.1fx the typical count (%d)", pattern.ViewCount, ratio, typical.ViewCount),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					UserID:         input.UserID,
-					Score:          math.Min(math.Abs(math.Log(ratio))/2.0, 1.0),
-					Confidence:     0.8,
-					Threshold:      3.0,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeAccessPattern,
+					Severity:        severity,
+					Status:          anomaly.StatusDetected,
+					Title:           "Unusual View Pattern",
+					Description:     fmt.Sprintf("View count (%d) is %.1fx the typical count (%d)", pattern.ViewCount, ratio, typical.ViewCount),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					UserID:          input.UserID,
+					Score:           math.Min(math.Abs(math.Log(ratio))/2.0, 1.0),
+					Confidence:      0.8,
+					Threshold:       3.0,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Baseline: map[string]interface{}{
 						"typical_view_count": typical.ViewCount,
@@ -407,23 +406,23 @@ func (d *StatisticalDetector) detectBehavioralAnomalies(ctx context.Context, inp
 				if ratio > 4.0 || ratio < 0.25 {
 					severity = anomaly.SeverityMedium
 				}
-				
+
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeAccessPattern,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "Unusual User Access Pattern",
-					Description:    fmt.Sprintf("Unique user count (%d) is %.1fx the typical count (%d)", pattern.UniqueUsers, ratio, typical.UniqueUsers),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					Score:          math.Min(math.Abs(math.Log(ratio))/1.5, 1.0),
-					Confidence:     0.7,
-					Threshold:      2.0,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeAccessPattern,
+					Severity:        severity,
+					Status:          anomaly.StatusDetected,
+					Title:           "Unusual User Access Pattern",
+					Description:     fmt.Sprintf("Unique user count (%d) is %.1fx the typical count (%d)", pattern.UniqueUsers, ratio, typical.UniqueUsers),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					Score:           math.Min(math.Abs(math.Log(ratio))/1.5, 1.0),
+					Confidence:      0.7,
+					Threshold:       2.0,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Baseline: map[string]interface{}{
 						"typical_unique_users": typical.UniqueUsers,
@@ -448,15 +447,15 @@ func (d *StatisticalDetector) detectTrendAnomalies(ctx context.Context, input *a
 	if baseline.HourlyPattern != nil && len(baseline.HourlyPattern) == 24 {
 		currentHour := input.Timestamp.Hour()
 		expectedValue := baseline.HourlyPattern[currentHour]
-		
+
 		// For trend detection, we need a metric to compare against the pattern
 		// Using access frequency as an example
 		if input.AccessPattern != nil {
 			actualValue := input.AccessPattern.AccessFrequency
-			
+
 			if expectedValue > 0 {
 				deviation := math.Abs(actualValue-expectedValue) / expectedValue
-				
+
 				if deviation > 0.5 { // 50% deviation from expected hourly pattern
 					severity := anomaly.SeverityLow
 					if deviation > 1.0 {
@@ -465,23 +464,23 @@ func (d *StatisticalDetector) detectTrendAnomalies(ctx context.Context, input *a
 					if deviation > 2.0 {
 						severity = anomaly.SeverityHigh
 					}
-					
+
 					anomaly := &anomaly.Anomaly{
-						ID:             uuid.New(),
-						Type:           anomaly.AnomalyTypeTrend,
-						Severity:       severity,
-						Status:         anomaly.StatusDetected,
-						Title:          "Hourly Pattern Deviation",
-						Description:    fmt.Sprintf("Access frequency (%.2f) deviates %.1f%% from expected hourly pattern (%.2f) for hour %d", actualValue, deviation*100, expectedValue, currentHour),
-						DetectedAt:     time.Now(),
-						UpdatedAt:      time.Now(),
-						TenantID:       input.TenantID,
-						DataSourceID:   input.DataSourceID,
-						DocumentID:     input.DocumentID,
-						Score:          math.Min(deviation/2.0, 1.0),
-						Confidence:     0.75,
-						Threshold:      0.5,
-						DetectorName:   d.name,
+						ID:              uuid.New(),
+						Type:            anomaly.AnomalyTypeTrend,
+						Severity:        severity,
+						Status:          anomaly.StatusDetected,
+						Title:           "Hourly Pattern Deviation",
+						Description:     fmt.Sprintf("Access frequency (%.2f) deviates %.1f%% from expected hourly pattern (%.2f) for hour %d", actualValue, deviation*100, expectedValue, currentHour),
+						DetectedAt:      time.Now(),
+						UpdatedAt:       time.Now(),
+						TenantID:        input.TenantID,
+						DataSourceID:    input.DataSourceID,
+						DocumentID:      input.DocumentID,
+						Score:           math.Min(deviation/2.0, 1.0),
+						Confidence:      0.75,
+						Threshold:       0.5,
+						DetectorName:    d.name,
 						DetectorVersion: d.version,
 						Baseline: map[string]interface{}{
 							"expected_hourly_value": expectedValue,
@@ -492,7 +491,7 @@ func (d *StatisticalDetector) detectTrendAnomalies(ctx context.Context, input *a
 							"deviation":    deviation,
 						},
 						Metadata: map[string]interface{}{
-							"pattern_type": "hourly",
+							"pattern_type":     "hourly",
 							"detection_method": "pattern_deviation",
 						},
 					}
@@ -512,33 +511,33 @@ func (d *StatisticalDetector) detectSeasonalAnomalies(ctx context.Context, input
 	if baseline.WeeklyPattern != nil && len(baseline.WeeklyPattern) == 7 {
 		dayOfWeek := int(input.Timestamp.Weekday())
 		expectedValue := baseline.WeeklyPattern[dayOfWeek]
-		
+
 		if input.AccessPattern != nil && expectedValue > 0 {
 			actualValue := input.AccessPattern.AccessFrequency
 			deviation := math.Abs(actualValue-expectedValue) / expectedValue
-			
+
 			if deviation > 0.6 { // 60% deviation from expected weekly pattern
 				severity := anomaly.SeverityLow
 				if deviation > 1.2 {
 					severity = anomaly.SeverityMedium
 				}
-				
+
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeSeasonality,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "Weekly Pattern Deviation",
-					Description:    fmt.Sprintf("Access frequency (%.2f) deviates %.1f%% from expected weekly pattern (%.2f) for %s", actualValue, deviation*100, expectedValue, input.Timestamp.Weekday().String()),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					Score:          math.Min(deviation/2.0, 1.0),
-					Confidence:     0.7,
-					Threshold:      0.6,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeSeasonality,
+					Severity:        severity,
+					Status:          anomaly.StatusDetected,
+					Title:           "Weekly Pattern Deviation",
+					Description:     fmt.Sprintf("Access frequency (%.2f) deviates %.1f%% from expected weekly pattern (%.2f) for %s", actualValue, deviation*100, expectedValue, input.Timestamp.Weekday().String()),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					Score:           math.Min(deviation/2.0, 1.0),
+					Confidence:      0.7,
+					Threshold:       0.6,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Baseline: map[string]interface{}{
 						"expected_weekly_value": expectedValue,
@@ -549,7 +548,7 @@ func (d *StatisticalDetector) detectSeasonalAnomalies(ctx context.Context, input
 						"deviation":    deviation,
 					},
 					Metadata: map[string]interface{}{
-						"pattern_type": "weekly",
+						"pattern_type":     "weekly",
 						"detection_method": "seasonal_deviation",
 					},
 				}
@@ -599,16 +598,16 @@ func (d *StatisticalDetector) calculateSeverity(zScore float64) anomaly.AnomalyS
 func (d *StatisticalDetector) calculateConfidence(zScore float64, sampleCount int64) float64 {
 	// Confidence increases with higher z-score and larger sample size
 	absZScore := math.Abs(zScore)
-	
+
 	// Base confidence from z-score
 	zScoreConfidence := math.Min(absZScore/5.0, 0.9)
-	
+
 	// Sample size confidence factor
 	sampleFactor := math.Min(float64(sampleCount)/100.0, 1.0)
-	
+
 	// Combined confidence
 	confidence := zScoreConfidence * (0.5 + 0.5*sampleFactor)
-	
+
 	return math.Max(0.1, math.Min(confidence, 0.95))
 }
 
@@ -670,7 +669,7 @@ func (d *ModifiedZScoreDetector) DetectOutliers(values []float64) []int {
 	sorted := make([]float64, len(values))
 	copy(sorted, values)
 	sort.Float64s(sorted)
-	
+
 	var median float64
 	n := len(sorted)
 	if n%2 == 0 {
@@ -684,7 +683,7 @@ func (d *ModifiedZScoreDetector) DetectOutliers(values []float64) []int {
 	for i, value := range values {
 		deviations[i] = math.Abs(value - median)
 	}
-	
+
 	sort.Float64s(deviations)
 	var mad float64
 	if n%2 == 0 {

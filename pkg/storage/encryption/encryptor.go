@@ -14,7 +14,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -23,10 +22,10 @@ import (
 
 // Encryptor provides document encryption capabilities
 type Encryptor struct {
-	config      *EncryptionConfig
-	keyManager  *KeyManager
-	tracer      trace.Tracer
-	metrics     *EncryptionMetrics
+	config     *EncryptionConfig
+	keyManager *KeyManager
+	tracer     trace.Tracer
+	metrics    *EncryptionMetrics
 }
 
 // NewEncryptor creates a new encryptor
@@ -226,16 +225,16 @@ func (e *Encryptor) encryptData(algorithm EncryptionAlgorithm, key, nonce, plain
 	switch algorithm {
 	case AlgorithmAES256GCM:
 		return e.encryptAESGCM(key, nonce, plaintext, e.buildAAD(encCtx))
-		
+
 	case AlgorithmAES256CBC:
 		return e.encryptAESCBC(key, nonce, plaintext)
-		
+
 	case AlgorithmChaCha20:
 		return e.encryptChaCha20(key, nonce, plaintext, e.buildAAD(encCtx))
-		
+
 	case AlgorithmXChaCha20:
 		return e.encryptXChaCha20(key, nonce, plaintext, e.buildAAD(encCtx))
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported encryption algorithm: %s", algorithm)
 	}
@@ -246,16 +245,16 @@ func (e *Encryptor) decryptData(algorithm EncryptionAlgorithm, key, nonce, ciphe
 	switch algorithm {
 	case AlgorithmAES256GCM:
 		return e.decryptAESGCM(key, nonce, ciphertext, e.buildAADFromMap(additionalData))
-		
+
 	case AlgorithmAES256CBC:
 		return e.decryptAESCBC(key, nonce, ciphertext)
-		
+
 	case AlgorithmChaCha20:
 		return e.decryptChaCha20(key, nonce, ciphertext, e.buildAADFromMap(additionalData))
-		
+
 	case AlgorithmXChaCha20:
 		return e.decryptXChaCha20(key, nonce, ciphertext, e.buildAADFromMap(additionalData))
-		
+
 	default:
 		return nil, fmt.Errorf("unsupported decryption algorithm: %s", algorithm)
 	}
@@ -439,12 +438,12 @@ func (e *Encryptor) getNonceSize(algorithm EncryptionAlgorithm) int {
 func (e *Encryptor) buildAAD(ctx *EncryptionContext) []byte {
 	// Build additional authenticated data from context
 	var aad bytes.Buffer
-	
+
 	binary.Write(&aad, binary.BigEndian, ctx.TenantID)
 	aad.WriteString(ctx.ResourceID)
 	aad.WriteString(ctx.ResourceType)
 	aad.WriteString(string(ctx.Purpose))
-	
+
 	return aad.Bytes()
 }
 
@@ -452,7 +451,7 @@ func (e *Encryptor) buildAADFromMap(data map[string]string) []byte {
 	if data == nil {
 		return nil
 	}
-	
+
 	var aad bytes.Buffer
 	for k, v := range data {
 		aad.WriteString(k)
@@ -460,22 +459,22 @@ func (e *Encryptor) buildAADFromMap(data map[string]string) []byte {
 		aad.WriteString(v)
 		aad.WriteString(";")
 	}
-	
+
 	return aad.Bytes()
 }
 
 func (e *Encryptor) compress(data []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	w := gzip.NewWriter(&buf)
-	
+
 	if _, err := w.Write(data); err != nil {
 		return nil, err
 	}
-	
+
 	if err := w.Close(); err != nil {
 		return nil, err
 	}
-	
+
 	return buf.Bytes(), nil
 }
 
@@ -485,7 +484,7 @@ func (e *Encryptor) decompress(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	defer r.Close()
-	
+
 	return io.ReadAll(r)
 }
 
@@ -506,26 +505,26 @@ func (e *Encryptor) unpadPKCS7(data []byte) ([]byte, error) {
 	if length == 0 {
 		return nil, fmt.Errorf("empty data")
 	}
-	
+
 	padding := int(data[length-1])
 	if padding > length || padding == 0 {
 		return nil, fmt.Errorf("invalid padding")
 	}
-	
+
 	for i := length - padding; i < length; i++ {
 		if data[i] != byte(padding) {
 			return nil, fmt.Errorf("invalid padding")
 		}
 	}
-	
+
 	return data[:length-padding], nil
 }
 
 // StreamEncryptor provides streaming encryption for large files
 type StreamEncryptor struct {
-	encryptor *Encryptor
-	key       []byte
-	algorithm EncryptionAlgorithm
+	encryptor  *Encryptor
+	key        []byte
+	algorithm  EncryptionAlgorithm
 	bufferSize int
 }
 

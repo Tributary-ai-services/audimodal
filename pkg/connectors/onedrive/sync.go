@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,11 +20,11 @@ type OneDriveSyncManager struct {
 	connector *OneDriveConnector
 	config    *OneDriveSyncConfig
 	tracer    trace.Tracer
-	
+
 	// Sync state
-	syncJobs     map[uuid.UUID]*sync.SyncJob
-	webhookUrls  map[string]string // File ID -> Webhook URL for change notifications
-	
+	syncJobs    map[uuid.UUID]*sync.SyncJob
+	webhookUrls map[string]string // File ID -> Webhook URL for change notifications
+
 	// Delta tracking
 	deltaTokens  map[string]string // Path -> Delta token for incremental sync
 	lastSyncTime time.Time
@@ -36,28 +35,28 @@ type OneDriveSyncConfig struct {
 	// Sync intervals
 	IncrementalSyncInterval time.Duration `yaml:"incremental_sync_interval"`
 	FullSyncInterval        time.Duration `yaml:"full_sync_interval"`
-	
+
 	// Batch processing
-	BatchSize               int           `yaml:"batch_size"`
-	MaxConcurrentSyncs      int           `yaml:"max_concurrent_syncs"`
-	
+	BatchSize          int `yaml:"batch_size"`
+	MaxConcurrentSyncs int `yaml:"max_concurrent_syncs"`
+
 	// Change detection
-	UseWebhooks             bool          `yaml:"use_webhooks"`
-	WebhookTimeout          time.Duration `yaml:"webhook_timeout"`
-	UseDeltaAPI             bool          `yaml:"use_delta_api"`
-	
+	UseWebhooks    bool          `yaml:"use_webhooks"`
+	WebhookTimeout time.Duration `yaml:"webhook_timeout"`
+	UseDeltaAPI    bool          `yaml:"use_delta_api"`
+
 	// Conflict resolution
-	ConflictResolution      string        `yaml:"conflict_resolution"` // "latest", "manual", "preserve_both"
-	PreserveBothSuffix      string        `yaml:"preserve_both_suffix"`
-	
+	ConflictResolution string `yaml:"conflict_resolution"` // "latest", "manual", "preserve_both"
+	PreserveBothSuffix string `yaml:"preserve_both_suffix"`
+
 	// Performance
-	EnableParallelSync      bool          `yaml:"enable_parallel_sync"`
-	SyncWorkerCount         int           `yaml:"sync_worker_count"`
-	
+	EnableParallelSync bool `yaml:"enable_parallel_sync"`
+	SyncWorkerCount    int  `yaml:"sync_worker_count"`
+
 	// Filtering
-	SyncSharedFiles         bool          `yaml:"sync_shared_files"`
-	SyncVersionHistory      bool          `yaml:"sync_version_history"`
-	IncludeHiddenFiles      bool          `yaml:"include_hidden_files"`
+	SyncSharedFiles    bool `yaml:"sync_shared_files"`
+	SyncVersionHistory bool `yaml:"sync_version_history"`
+	IncludeHiddenFiles bool `yaml:"include_hidden_files"`
 }
 
 // DefaultOneDriveSyncConfig returns default sync configuration
@@ -65,18 +64,18 @@ func DefaultOneDriveSyncConfig() *OneDriveSyncConfig {
 	return &OneDriveSyncConfig{
 		IncrementalSyncInterval: 5 * time.Minute,
 		FullSyncInterval:        24 * time.Hour,
-		BatchSize:              200,
-		MaxConcurrentSyncs:     5,
-		UseWebhooks:            true,
-		WebhookTimeout:         30 * time.Second,
-		UseDeltaAPI:            true,
-		ConflictResolution:     "latest",
-		PreserveBothSuffix:     "_conflict",
-		EnableParallelSync:     true,
-		SyncWorkerCount:        4,
-		SyncSharedFiles:        true,
-		SyncVersionHistory:     false,
-		IncludeHiddenFiles:     false,
+		BatchSize:               200,
+		MaxConcurrentSyncs:      5,
+		UseWebhooks:             true,
+		WebhookTimeout:          30 * time.Second,
+		UseDeltaAPI:             true,
+		ConflictResolution:      "latest",
+		PreserveBothSuffix:      "_conflict",
+		EnableParallelSync:      true,
+		SyncWorkerCount:         4,
+		SyncSharedFiles:         true,
+		SyncVersionHistory:      false,
+		IncludeHiddenFiles:      false,
 	}
 }
 
@@ -114,22 +113,20 @@ func (sm *OneDriveSyncManager) StartSync(ctx context.Context, request *sync.Star
 		ConnectorType: "onedrive",
 		Options:       request.Options,
 		Status: &sync.SyncJobStatus{
-			State:        sync.SyncStateInitializing,
+			State:        sync.SyncStatePending,
 			StartTime:    time.Now(),
 			LastActivity: time.Now(),
 			Progress: &sync.SyncProgress{
-				Phase:           "initializing",
 				TotalFiles:      0,
 				ProcessedFiles:  0,
 				PercentComplete: 0,
 			},
 			Metrics: &sync.SyncMetrics{
-				FilesScanned:      0,
-				FilesProcessed:    0,
-				BytesTransferred:  0,
+				FilesCreated:        0,
+				FilesUpdated:        0,
+				FilesDeleted:        0,
 				AverageTransferRate: 0,
-				Conflicts:         0,
-				Errors:           0,
+				TotalErrors:         0,
 			},
 		},
 	}
@@ -217,17 +214,17 @@ func (sm *OneDriveSyncManager) RegisterWebhook(ctx context.Context, config *sync
 	}
 
 	span.SetAttributes(
-		attribute.String("webhook_url", config.URL),
-		attribute.String("resource", config.Resource),
+		attribute.String("webhook_url", config.BaseURL),
+		attribute.String("resource", "onedrive"),
 	)
 
 	// Create Microsoft Graph subscription
 	subscription := &GraphSubscription{
 		ChangeType:         "updated,deleted,created",
-		NotificationURL:    config.URL,
-		Resource:          "/me/drive/root",
+		NotificationURL:    config.BaseURL,
+		Resource:           "/me/drive/root",
 		ExpirationDateTime: time.Now().Add(4230 * time.Minute), // Max 3 days for OneDrive
-		ClientState:       config.Secret,
+		ClientState:        config.Secret,
 	}
 
 	subscriptionJSON, err := json.Marshal(subscription)
@@ -237,7 +234,7 @@ func (sm *OneDriveSyncManager) RegisterWebhook(ctx context.Context, config *sync
 	}
 
 	// Register subscription with Microsoft Graph
-	response, err := sm.connector.executeGraphAPICall(ctx, "POST", 
+	response, err := sm.connector.executeGraphAPICall(ctx, "POST",
 		"https://graph.microsoft.com/v1.0/subscriptions", subscriptionJSON)
 	if err != nil {
 		span.RecordError(err)
@@ -251,31 +248,31 @@ func (sm *OneDriveSyncManager) RegisterWebhook(ctx context.Context, config *sync
 	}
 
 	// Store webhook registration
-	sm.webhookUrls[subscriptionResponse.ID] = config.URL
+	sm.webhookUrls[subscriptionResponse.ID] = config.BaseURL
 
 	return nil
 }
 
 // ProcessWebhookEvent processes incoming webhook events
-func (sm *OneDriveSyncManager) ProcessWebhookEvent(ctx context.Context, event *sync.WebhookEvent) error {
+func (sm *OneDriveSyncManager) ProcessWebhookEvent(ctx context.Context, event *sync.StandardWebhookEvent) error {
 	ctx, span := sm.tracer.Start(ctx, "onedrive_sync.process_webhook_event")
 	defer span.End()
 
 	span.SetAttributes(
-		attribute.String("event.type", event.EventType),
-		attribute.String("event.resource", event.Resource),
+		attribute.String("event.type", string(event.EventType)),
+		attribute.String("event.resource", event.Resource.Type),
 	)
 
 	// Parse OneDrive webhook notification
 	var notification GraphNotification
-	if err := json.Unmarshal(event.Data, &notification); err != nil {
+	if err := json.Unmarshal(event.OriginalEvent, &notification); err != nil {
 		span.RecordError(err)
 		return fmt.Errorf("failed to parse webhook notification: %w", err)
 	}
 
 	// Process each change in the notification
 	for _, change := range notification.Value {
-		if err := sm.processFileChange(ctx, &change); err != nil {
+		if err := sm.processFileChange(ctx, change); err != nil {
 			span.RecordError(err)
 			// Log error but continue processing other changes
 			continue
@@ -299,7 +296,7 @@ func (sm *OneDriveSyncManager) executeSyncJob(ctx context.Context, job *sync.Syn
 
 	// Update job state
 	job.Status.State = sync.SyncStateRunning
-	job.Status.Progress.Phase = "scanning"
+	// Note: Phase field removed from SyncProgress structure
 
 	// Execute sync based on type
 	switch job.Options.SyncType {
@@ -331,7 +328,7 @@ func (sm *OneDriveSyncManager) executeFullSync(ctx context.Context, job *sync.Sy
 	}
 
 	job.Status.Progress.TotalFiles = len(files)
-	job.Status.Progress.Phase = "processing"
+	// Note: Phase field removed from SyncProgress structure
 
 	// Process files in batches
 	batchSize := sm.config.BatchSize
@@ -354,7 +351,7 @@ func (sm *OneDriveSyncManager) executeFullSync(ctx context.Context, job *sync.Sy
 		job.Status.LastActivity = time.Now()
 
 		// Check for cancellation
-		if job.IsCanceled() {
+		if job.Status.State == sync.SyncStateCancelled {
 			job.Status.State = sync.SyncStateCancelled
 			return
 		}
@@ -375,7 +372,7 @@ func (sm *OneDriveSyncManager) executeIncrementalSync(ctx context.Context, job *
 
 	// Use Microsoft Graph delta API
 	deltaURL := "https://graph.microsoft.com/v1.0/me/drive/root/delta"
-	
+
 	// Use stored delta token if available
 	if token, exists := sm.deltaTokens["root"]; exists {
 		deltaURL = token
@@ -405,7 +402,9 @@ func (sm *OneDriveSyncManager) executeIncrementalSync(ctx context.Context, job *
 			return
 		}
 
-		allChanges = append(allChanges, deltaResponse.Value...)
+		for _, item := range deltaResponse.Value {
+			allChanges = append(allChanges, &item)
+		}
 
 		// Check for next page or delta link
 		if deltaResponse.ODataNextLink != "" {
@@ -420,15 +419,15 @@ func (sm *OneDriveSyncManager) executeIncrementalSync(ctx context.Context, job *
 	}
 
 	job.Status.Progress.TotalFiles = len(allChanges)
-	job.Status.Progress.Phase = "processing"
+	// Note: Phase field removed from SyncProgress structure
 
 	// Process changes
 	for i, change := range allChanges {
 		if err := sm.processFileChange(ctx, change); err != nil {
-			job.Status.Metrics.Errors++
+			job.Status.Metrics.TotalErrors++
 			// Continue processing other files
 		} else {
-			job.Status.Metrics.FilesProcessed++
+			job.Status.Metrics.FilesUpdated++
 		}
 
 		// Update progress
@@ -437,7 +436,7 @@ func (sm *OneDriveSyncManager) executeIncrementalSync(ctx context.Context, job *
 		job.Status.LastActivity = time.Now()
 
 		// Check for cancellation
-		if job.IsCanceled() {
+		if job.Status.State == sync.SyncStateCancelled {
 			job.Status.State = sync.SyncStateCancelled
 			return
 		}
@@ -460,7 +459,7 @@ func (sm *OneDriveSyncManager) executeRealtimeSync(ctx context.Context, job *syn
 	// This method would typically set up the necessary webhook subscriptions
 	// and maintain a persistent connection for receiving notifications
 
-	job.Status.Progress.Phase = "monitoring"
+	// Note: Phase field removed from SyncProgress structure
 	job.Status.Progress.PercentComplete = 100 // Always "complete" for realtime monitoring
 
 	// Keep the sync job alive for realtime monitoring
@@ -477,7 +476,7 @@ func (sm *OneDriveSyncManager) executeRealtimeSync(ctx context.Context, job *syn
 			// Webhook events are processed separately via ProcessWebhookEvent
 		}
 
-		if job.IsCanceled() {
+		if job.Status.State == sync.SyncStateCancelled {
 			job.Status.State = sync.SyncStateCancelled
 			return
 		}
@@ -487,13 +486,12 @@ func (sm *OneDriveSyncManager) executeRealtimeSync(ctx context.Context, job *syn
 func (sm *OneDriveSyncManager) executeTimestampBasedSync(ctx context.Context, job *sync.SyncJob) {
 	// Get files modified since last sync
 	cutoffTime := sm.lastSyncTime
-	if job.Options.Since != nil {
-		cutoffTime = *job.Options.Since
+	if job.Options.Filters != nil && job.Options.Filters.ModifiedAfter != nil {
+		cutoffTime = *job.Options.Filters.ModifiedAfter
 	}
 
 	files, err := sm.connector.ListFiles(ctx, "", &storage.ConnectorListOptions{
 		Recursive: true,
-		Since:     &cutoffTime,
 	})
 	if err != nil {
 		job.Status.State = sync.SyncStateFailed
@@ -502,15 +500,15 @@ func (sm *OneDriveSyncManager) executeTimestampBasedSync(ctx context.Context, jo
 	}
 
 	job.Status.Progress.TotalFiles = len(files)
-	job.Status.Progress.Phase = "processing"
+	// Note: Phase field removed from SyncProgress structure
 
 	// Process modified files
 	for i, file := range files {
 		if file.ModifiedAt.After(cutoffTime) {
 			if err := sm.processFileUpdate(ctx, file); err != nil {
-				job.Status.Metrics.Errors++
+				job.Status.Metrics.TotalErrors++
 			} else {
-				job.Status.Metrics.FilesProcessed++
+				job.Status.Metrics.FilesUpdated++
 			}
 		}
 
@@ -520,7 +518,7 @@ func (sm *OneDriveSyncManager) executeTimestampBasedSync(ctx context.Context, jo
 		job.Status.LastActivity = time.Now()
 
 		// Check for cancellation
-		if job.IsCanceled() {
+		if job.Status.State == sync.SyncStateCancelled {
 			job.Status.State = sync.SyncStateCancelled
 			return
 		}
@@ -538,13 +536,13 @@ func (sm *OneDriveSyncManager) processBatch(ctx context.Context, job *sync.SyncJ
 	// Sequential processing
 	for _, file := range files {
 		if err := sm.processFileUpdate(ctx, file); err != nil {
-			job.Status.Metrics.Errors++
+			job.Status.Metrics.TotalErrors++
 			// Continue processing other files
 		} else {
-			job.Status.Metrics.FilesProcessed++
+			job.Status.Metrics.FilesUpdated++
 		}
 
-		job.Status.Metrics.BytesTransferred += file.Size
+		job.Status.Metrics.BytesDownloaded += file.Size
 	}
 
 	return nil
@@ -576,9 +574,9 @@ func (sm *OneDriveSyncManager) processBatchParallel(ctx context.Context, job *sy
 	for i := 0; i < len(files); i++ {
 		if err := <-errorChan; err != nil {
 			errors = append(errors, err)
-			job.Status.Metrics.Errors++
+			job.Status.Metrics.TotalErrors++
 		} else {
-			job.Status.Metrics.FilesProcessed++
+			job.Status.Metrics.FilesUpdated++
 		}
 	}
 
@@ -591,7 +589,7 @@ func (sm *OneDriveSyncManager) processBatchParallel(ctx context.Context, job *sy
 
 func (sm *OneDriveSyncManager) syncWorker(ctx context.Context, job *sync.SyncJob, fileChan <-chan *storage.ConnectorFileInfo, errorChan chan<- error) {
 	for file := range fileChan {
-		if job.IsCanceled() {
+		if job.Status.State == sync.SyncStateCancelled {
 			errorChan <- fmt.Errorf("sync cancelled")
 			return
 		}
@@ -600,7 +598,7 @@ func (sm *OneDriveSyncManager) syncWorker(ctx context.Context, job *sync.SyncJob
 		errorChan <- err
 
 		if err == nil {
-			job.Status.Metrics.BytesTransferred += file.Size
+			job.Status.Metrics.BytesDownloaded += file.Size
 		}
 	}
 }
@@ -643,9 +641,9 @@ func (sm *OneDriveSyncManager) cleanupCompletedJobs() {
 
 	for jobID, job := range sm.syncJobs {
 		if job.Status.State == sync.SyncStateCompleted ||
-		   job.Status.State == sync.SyncStateFailed ||
-		   job.Status.State == sync.SyncStateCancelled {
-			
+			job.Status.State == sync.SyncStateFailed ||
+			job.Status.State == sync.SyncStateCancelled {
+
 			if job.Status.EndTime != nil && job.Status.EndTime.Before(cutoff) {
 				delete(sm.syncJobs, jobID)
 			}

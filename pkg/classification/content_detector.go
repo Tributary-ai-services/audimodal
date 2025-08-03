@@ -11,23 +11,23 @@ import (
 
 // ContentTypeDetector provides advanced content type detection
 type ContentTypeDetector struct {
-	name                string
-	version             string
-	mimePatterns        map[string]ContentType
-	extensionPatterns   map[string]ContentType
-	contentPatterns     map[ContentType][]*regexp.Regexp
-	magicBytes          map[string]ContentType
-	confidenceWeights   map[string]float64
+	name              string
+	version           string
+	mimePatterns      map[string]ContentType
+	extensionPatterns map[string]ContentType
+	contentPatterns   map[ContentType][]*regexp.Regexp
+	magicBytes        map[string]ContentType
+	confidenceWeights map[string]float64
 }
 
 // ContentTypeResult represents content type detection result
 type ContentTypeResult struct {
-	ContentType    ContentType `json:"content_type"`
-	DocumentType   DocumentType `json:"document_type"`
-	Confidence     float64     `json:"confidence"`
-	DetectionMethod string     `json:"detection_method"`
-	MimeType       string      `json:"mime_type"`
-	FileExtension  string      `json:"file_extension"`
+	ContentType     ContentType            `json:"content_type"`
+	DocumentType    DocumentType           `json:"document_type"`
+	Confidence      float64                `json:"confidence"`
+	DetectionMethod string                 `json:"detection_method"`
+	MimeType        string                 `json:"mime_type"`
+	FileExtension   string                 `json:"file_extension"`
 	Characteristics map[string]interface{} `json:"characteristics"`
 }
 
@@ -41,14 +41,14 @@ func NewContentTypeDetector() *ContentTypeDetector {
 		contentPatterns:   make(map[ContentType][]*regexp.Regexp),
 		magicBytes:        make(map[string]ContentType),
 		confidenceWeights: map[string]float64{
-			"magic_bytes":    1.0,
-			"mime_type":      0.9,
-			"file_extension": 0.7,
+			"magic_bytes":     1.0,
+			"mime_type":       0.9,
+			"file_extension":  0.7,
 			"content_pattern": 0.8,
-			"structure":      0.6,
+			"structure":       0.6,
 		},
 	}
-	
+
 	detector.initializePatterns()
 	return detector
 }
@@ -62,15 +62,15 @@ func (d *ContentTypeDetector) DetectContentType(ctx context.Context, input *Clas
 		DetectionMethod: "multi-factor",
 		Characteristics: make(map[string]interface{}),
 	}
-	
+
 	// Multiple detection strategies with confidence scoring
 	detectionResults := []detectionResult{}
-	
+
 	// 1. Magic bytes detection (highest confidence)
 	if magicResult := d.detectByMagicBytes(input.Content); magicResult != nil {
 		detectionResults = append(detectionResults, *magicResult)
 	}
-	
+
 	// 2. MIME type detection
 	if input.MimeType != "" {
 		if mimeResult := d.detectByMimeType(input.MimeType); mimeResult != nil {
@@ -86,7 +86,7 @@ func (d *ContentTypeDetector) DetectContentType(ctx context.Context, input *Clas
 			}
 		}
 	}
-	
+
 	// 3. File extension detection
 	if input.Filename != "" {
 		if extResult := d.detectByFileExtension(input.Filename); extResult != nil {
@@ -94,17 +94,17 @@ func (d *ContentTypeDetector) DetectContentType(ctx context.Context, input *Clas
 		}
 		result.FileExtension = strings.ToLower(filepath.Ext(input.Filename))
 	}
-	
+
 	// 4. Content pattern detection
 	if patternResult := d.detectByContentPatterns(input.Content); patternResult != nil {
 		detectionResults = append(detectionResults, *patternResult)
 	}
-	
+
 	// 5. Structure analysis
 	if structResult := d.detectByStructure(input.Content); structResult != nil {
 		detectionResults = append(detectionResults, *structResult)
 	}
-	
+
 	// Combine results using weighted confidence
 	if len(detectionResults) > 0 {
 		finalResult := d.combineDetectionResults(detectionResults)
@@ -113,10 +113,10 @@ func (d *ContentTypeDetector) DetectContentType(ctx context.Context, input *Clas
 		result.Confidence = finalResult.confidence
 		result.DetectionMethod = finalResult.methods
 	}
-	
+
 	// Add content characteristics
 	d.analyzeContentCharacteristics(input.Content, result)
-	
+
 	return result, nil
 }
 
@@ -137,32 +137,32 @@ func (d *ContentTypeDetector) combineDetectionResults(results []detectionResult)
 	// Group results by content type
 	typeScores := make(map[ContentType]float64)
 	typeMethods := make(map[ContentType][]string)
-	
+
 	for _, result := range results {
 		weightedScore := result.confidence * result.weight
 		typeScores[result.contentType] += weightedScore
 		typeMethods[result.contentType] = append(typeMethods[result.contentType], result.method)
 	}
-	
+
 	// Find the highest scoring type
 	var bestType ContentType
 	var bestScore float64
-	
+
 	for contentType, score := range typeScores {
 		if score > bestScore {
 			bestScore = score
 			bestType = contentType
 		}
 	}
-	
+
 	// Normalize confidence
 	normalizedConfidence := bestScore / 4.0 // Max possible weighted score
 	if normalizedConfidence > 1.0 {
 		normalizedConfidence = 1.0
 	}
-	
+
 	methods := strings.Join(typeMethods[bestType], "+")
-	
+
 	return struct {
 		contentType ContentType
 		confidence  float64
@@ -179,21 +179,21 @@ func (d *ContentTypeDetector) detectByMagicBytes(content string) *detectionResul
 	if len(content) < 8 {
 		return nil
 	}
-	
+
 	contentBytes := []byte(content)
-	
+
 	// Check common file signatures
 	signatures := map[string]ContentType{
-		"%PDF":     ContentTypeDocument,
-		"PK\x03\x04": ContentTypeDocument, // ZIP-based formats (DOCX, XLSX, etc.)
-		"\xFF\xD8\xFF": ContentTypeImage,   // JPEG
-		"\x89PNG":   ContentTypeImage,      // PNG
-		"GIF8":      ContentTypeImage,      // GIF
-		"<html":     ContentTypeWeb,        // HTML
-		"<?xml":     ContentTypeDocument,   // XML
-		"{":         ContentTypeDocument,   // Likely JSON
+		"%PDF":         ContentTypeDocument,
+		"PK\x03\x04":   ContentTypeDocument, // ZIP-based formats (DOCX, XLSX, etc.)
+		"\xFF\xD8\xFF": ContentTypeImage,    // JPEG
+		"\x89PNG":      ContentTypeImage,    // PNG
+		"GIF8":         ContentTypeImage,    // GIF
+		"<html":        ContentTypeWeb,      // HTML
+		"<?xml":        ContentTypeDocument, // XML
+		"{":            ContentTypeDocument, // Likely JSON
 	}
-	
+
 	for signature, contentType := range signatures {
 		if len(contentBytes) >= len(signature) {
 			if string(contentBytes[:len(signature)]) == signature ||
@@ -207,7 +207,7 @@ func (d *ContentTypeDetector) detectByMagicBytes(content string) *detectionResul
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -221,7 +221,7 @@ func (d *ContentTypeDetector) detectByMimeType(mimeType string) *detectionResult
 			weight:      d.confidenceWeights["mime_type"],
 		}
 	}
-	
+
 	// Check MIME type patterns
 	switch {
 	case strings.HasPrefix(mimeType, "text/"):
@@ -267,7 +267,7 @@ func (d *ContentTypeDetector) detectByMimeType(mimeType string) *detectionResult
 			weight:      d.confidenceWeights["mime_type"],
 		}
 	}
-	
+
 	return nil
 }
 
@@ -277,9 +277,9 @@ func (d *ContentTypeDetector) detectByFileExtension(filename string) *detectionR
 	if ext == "" {
 		return nil
 	}
-	
+
 	ext = ext[1:] // Remove the dot
-	
+
 	if contentType, exists := d.extensionPatterns[ext]; exists {
 		return &detectionResult{
 			contentType: contentType,
@@ -288,7 +288,7 @@ func (d *ContentTypeDetector) detectByFileExtension(filename string) *detectionR
 			weight:      d.confidenceWeights["file_extension"],
 		}
 	}
-	
+
 	return nil
 }
 
@@ -297,11 +297,11 @@ func (d *ContentTypeDetector) detectByContentPatterns(content string) *detection
 	if len(content) == 0 {
 		return nil
 	}
-	
+
 	// Test each content type's patterns
 	bestMatch := ContentTypeUnknown
 	bestScore := 0.0
-	
+
 	for contentType, patterns := range d.contentPatterns {
 		score := d.calculatePatternScore(content, patterns)
 		if score > bestScore {
@@ -309,7 +309,7 @@ func (d *ContentTypeDetector) detectByContentPatterns(content string) *detection
 			bestMatch = contentType
 		}
 	}
-	
+
 	if bestScore > 0.3 {
 		return &detectionResult{
 			contentType: bestMatch,
@@ -318,7 +318,7 @@ func (d *ContentTypeDetector) detectByContentPatterns(content string) *detection
 			weight:      d.confidenceWeights["content_pattern"],
 		}
 	}
-	
+
 	return nil
 }
 
@@ -327,14 +327,14 @@ func (d *ContentTypeDetector) calculatePatternScore(content string, patterns []*
 	if len(patterns) == 0 {
 		return 0.0
 	}
-	
+
 	matches := 0
 	for _, pattern := range patterns {
 		if pattern.MatchString(content) {
 			matches++
 		}
 	}
-	
+
 	return float64(matches) / float64(len(patterns))
 }
 
@@ -343,18 +343,18 @@ func (d *ContentTypeDetector) detectByStructure(content string) *detectionResult
 	if len(content) < 50 {
 		return nil
 	}
-	
+
 	// Analyze structural characteristics
 	characteristics := d.analyzeStructure(content)
-	
+
 	// Score different content types based on structure
 	scores := map[ContentType]float64{}
-	
+
 	// JSON structure
 	if characteristics["json_like"] > 0.8 {
 		scores[ContentTypeDocument] = 0.9
 	}
-	
+
 	// XML/HTML structure
 	if characteristics["markup_like"] > 0.7 {
 		if characteristics["html_tags"] > 0.5 {
@@ -363,33 +363,33 @@ func (d *ContentTypeDetector) detectByStructure(content string) *detectionResult
 			scores[ContentTypeDocument] = 0.7
 		}
 	}
-	
+
 	// Code structure
 	if characteristics["code_like"] > 0.6 {
 		scores[ContentTypeCode] = 0.8
 	}
-	
+
 	// Email structure
 	if characteristics["email_like"] > 0.7 {
 		scores[ContentTypeEmail] = 0.9
 	}
-	
+
 	// Log structure
 	if characteristics["log_like"] > 0.6 {
 		scores[ContentTypeLog] = 0.8
 	}
-	
+
 	// Find best match
 	bestType := ContentTypeUnknown
 	bestScore := 0.0
-	
+
 	for contentType, score := range scores {
 		if score > bestScore {
 			bestScore = score
 			bestType = contentType
 		}
 	}
-	
+
 	if bestScore > 0.5 {
 		return &detectionResult{
 			contentType: bestType,
@@ -398,14 +398,14 @@ func (d *ContentTypeDetector) detectByStructure(content string) *detectionResult
 			weight:      d.confidenceWeights["structure"],
 		}
 	}
-	
+
 	return nil
 }
 
 // analyzeStructure analyzes document structure
 func (d *ContentTypeDetector) analyzeStructure(content string) map[string]float64 {
 	characteristics := make(map[string]float64)
-	
+
 	// JSON-like characteristics
 	jsonIndicators := 0
 	if strings.Contains(content, "{") && strings.Contains(content, "}") {
@@ -418,7 +418,7 @@ func (d *ContentTypeDetector) analyzeStructure(content string) map[string]float6
 		jsonIndicators++
 	}
 	characteristics["json_like"] = float64(jsonIndicators) / 3.0
-	
+
 	// Markup-like characteristics
 	markupIndicators := 0
 	if strings.Contains(content, "<") && strings.Contains(content, ">") {
@@ -428,7 +428,7 @@ func (d *ContentTypeDetector) analyzeStructure(content string) map[string]float6
 		markupIndicators++
 	}
 	characteristics["markup_like"] = float64(markupIndicators) / 2.0
-	
+
 	// HTML-specific tags
 	htmlTags := []string{"html", "head", "body", "div", "span", "p", "a", "img"}
 	htmlCount := 0
@@ -439,7 +439,7 @@ func (d *ContentTypeDetector) analyzeStructure(content string) map[string]float6
 		}
 	}
 	characteristics["html_tags"] = float64(htmlCount) / float64(len(htmlTags))
-	
+
 	// Code-like characteristics
 	codeIndicators := 0
 	codePatterns := []string{
@@ -452,7 +452,7 @@ func (d *ContentTypeDetector) analyzeStructure(content string) map[string]float6
 		}
 	}
 	characteristics["code_like"] = float64(codeIndicators) / float64(len(codePatterns))
-	
+
 	// Email-like characteristics
 	emailIndicators := 0
 	emailPatterns := []string{"from:", "to:", "subject:", "date:", "reply-to:"}
@@ -462,7 +462,7 @@ func (d *ContentTypeDetector) analyzeStructure(content string) map[string]float6
 		}
 	}
 	characteristics["email_like"] = float64(emailIndicators) / float64(len(emailPatterns))
-	
+
 	// Log-like characteristics
 	logIndicators := 0
 	logPatterns := []string{"[info]", "[error]", "[warn]", "[debug]", "timestamp", "log", "trace"}
@@ -472,7 +472,7 @@ func (d *ContentTypeDetector) analyzeStructure(content string) map[string]float6
 		}
 	}
 	characteristics["log_like"] = float64(logIndicators) / float64(len(logPatterns))
-	
+
 	return characteristics
 }
 
@@ -501,7 +501,7 @@ func (d *ContentTypeDetector) mapContentToDocumentType(contentType ContentType, 
 				return DocumentTypeRTF
 			}
 		}
-		
+
 		// Check by file extension
 		if input.Filename != "" {
 			ext := strings.ToLower(filepath.Ext(input.Filename))
@@ -524,7 +524,7 @@ func (d *ContentTypeDetector) mapContentToDocumentType(contentType ContentType, 
 				return DocumentTypeRTF
 			}
 		}
-		
+
 		return DocumentTypeText
 	default:
 		return DocumentTypeText
@@ -536,18 +536,18 @@ func (d *ContentTypeDetector) analyzeContentCharacteristics(content string, resu
 	if len(content) == 0 {
 		return
 	}
-	
+
 	// Basic statistics
 	result.Characteristics["length"] = len(content)
 	result.Characteristics["lines"] = len(strings.Split(content, "\n"))
 	result.Characteristics["words"] = len(strings.Fields(content))
-	
+
 	// Character analysis
 	letterCount := 0
 	digitCount := 0
 	punctuationCount := 0
 	whitespaceCount := 0
-	
+
 	for _, r := range content {
 		if unicode.IsLetter(r) {
 			letterCount++
@@ -559,7 +559,7 @@ func (d *ContentTypeDetector) analyzeContentCharacteristics(content string, resu
 			whitespaceCount++
 		}
 	}
-	
+
 	totalChars := len(content)
 	if totalChars > 0 {
 		result.Characteristics["letter_ratio"] = float64(letterCount) / float64(totalChars)
@@ -567,12 +567,12 @@ func (d *ContentTypeDetector) analyzeContentCharacteristics(content string, resu
 		result.Characteristics["punctuation_ratio"] = float64(punctuationCount) / float64(totalChars)
 		result.Characteristics["whitespace_ratio"] = float64(whitespaceCount) / float64(totalChars)
 	}
-	
+
 	// Language indicators
 	result.Characteristics["has_uppercase"] = strings.ToLower(content) != content
 	result.Characteristics["has_numbers"] = regexp.MustCompile(`\d`).MatchString(content)
 	result.Characteristics["has_special_chars"] = regexp.MustCompile(`[^a-zA-Z0-9\s]`).MatchString(content)
-	
+
 	// Structure indicators based on content type
 	switch result.ContentType {
 	case ContentTypeDocument:
@@ -591,30 +591,30 @@ func (d *ContentTypeDetector) analyzeContentCharacteristics(content string, resu
 func (d *ContentTypeDetector) initializePatterns() {
 	// MIME type mappings
 	d.mimePatterns = map[string]ContentType{
-		"text/plain":       ContentTypeDocument,
-		"text/html":        ContentTypeWeb,
-		"text/xml":         ContentTypeDocument,
-		"text/csv":         ContentTypeSpreadsheet,
-		"text/markdown":    ContentTypeDocument,
-		"application/pdf":  ContentTypeDocument,
-		"application/json": ContentTypeDocument,
-		"application/xml":  ContentTypeDocument,
+		"text/plain":         ContentTypeDocument,
+		"text/html":          ContentTypeWeb,
+		"text/xml":           ContentTypeDocument,
+		"text/csv":           ContentTypeSpreadsheet,
+		"text/markdown":      ContentTypeDocument,
+		"application/pdf":    ContentTypeDocument,
+		"application/json":   ContentTypeDocument,
+		"application/xml":    ContentTypeDocument,
 		"application/msword": ContentTypeDocument,
 		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": ContentTypeDocument,
 		"application/vnd.ms-excel": ContentTypeSpreadsheet,
-		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ContentTypeSpreadsheet,
-		"application/vnd.ms-powerpoint": ContentTypePresentation,
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":         ContentTypeSpreadsheet,
+		"application/vnd.ms-powerpoint":                                             ContentTypePresentation,
 		"application/vnd.openxmlformats-officedocument.presentationml.presentation": ContentTypePresentation,
-		"image/jpeg":     ContentTypeImage,
-		"image/png":      ContentTypeImage,
-		"image/gif":      ContentTypeImage,
-		"image/svg+xml":  ContentTypeImage,
-		"video/mp4":      ContentTypeVideo,
-		"video/avi":      ContentTypeVideo,
-		"audio/mp3":      ContentTypeAudio,
-		"audio/wav":      ContentTypeAudio,
+		"image/jpeg":    ContentTypeImage,
+		"image/png":     ContentTypeImage,
+		"image/gif":     ContentTypeImage,
+		"image/svg+xml": ContentTypeImage,
+		"video/mp4":     ContentTypeVideo,
+		"video/avi":     ContentTypeVideo,
+		"audio/mp3":     ContentTypeAudio,
+		"audio/wav":     ContentTypeAudio,
 	}
-	
+
 	// File extension mappings
 	d.extensionPatterns = map[string]ContentType{
 		"txt":  ContentTypeDocument,
@@ -654,7 +654,7 @@ func (d *ContentTypeDetector) initializePatterns() {
 		"sql":  ContentTypeDatabase,
 		"db":   ContentTypeDatabase,
 	}
-	
+
 	// Content pattern regexes
 	d.contentPatterns = map[ContentType][]*regexp.Regexp{
 		ContentTypeWeb: {

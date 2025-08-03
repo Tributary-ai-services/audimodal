@@ -15,9 +15,9 @@ import (
 
 // LocalResolver implements StorageResolver for local file system
 type LocalResolver struct {
-	name       string
-	version    string
-	basePath   string // Base path for security (optional)
+	name        string
+	version     string
+	basePath    string   // Base path for security (optional)
 	allowedDirs []string // Allowed directories for security
 }
 

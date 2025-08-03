@@ -26,28 +26,28 @@ func NewTenantHandler(db *database.Database) *TenantHandler {
 
 // TenantRequest represents a tenant creation/update request
 type TenantRequest struct {
-	Name        string                     `json:"name"`
-	DisplayName string                     `json:"display_name"`
-	BillingPlan string                     `json:"billing_plan"`
-	BillingEmail string                    `json:"billing_email"`
-	Quotas      models.TenantQuotas        `json:"quotas"`
-	Compliance  models.TenantCompliance    `json:"compliance"`
-	ContactInfo models.TenantContactInfo   `json:"contact_info"`
+	Name         string                   `json:"name"`
+	DisplayName  string                   `json:"display_name"`
+	BillingPlan  string                   `json:"billing_plan"`
+	BillingEmail string                   `json:"billing_email"`
+	Quotas       models.TenantQuotas      `json:"quotas"`
+	Compliance   models.TenantCompliance  `json:"compliance"`
+	ContactInfo  models.TenantContactInfo `json:"contact_info"`
 }
 
 // TenantResponse represents a tenant response
 type TenantResponse struct {
-	ID          uuid.UUID                  `json:"id"`
-	Name        string                     `json:"name"`
-	DisplayName string                     `json:"display_name"`
-	BillingPlan string                     `json:"billing_plan"`
-	BillingEmail string                    `json:"billing_email"`
-	Quotas      models.TenantQuotas        `json:"quotas"`
-	Compliance  models.TenantCompliance    `json:"compliance"`
-	ContactInfo models.TenantContactInfo   `json:"contact_info"`
-	Status      string                     `json:"status"`
-	CreatedAt   string                     `json:"created_at"`
-	UpdatedAt   string                     `json:"updated_at"`
+	ID           uuid.UUID                `json:"id"`
+	Name         string                   `json:"name"`
+	DisplayName  string                   `json:"display_name"`
+	BillingPlan  string                   `json:"billing_plan"`
+	BillingEmail string                   `json:"billing_email"`
+	Quotas       models.TenantQuotas      `json:"quotas"`
+	Compliance   models.TenantCompliance  `json:"compliance"`
+	ContactInfo  models.TenantContactInfo `json:"contact_info"`
+	Status       string                   `json:"status"`
+	CreatedAt    string                   `json:"created_at"`
+	UpdatedAt    string                   `json:"updated_at"`
 }
 
 // ListTenants handles GET /api/v1/tenants
@@ -58,7 +58,7 @@ func (h *TenantHandler) ListTenants(w http.ResponseWriter, r *http.Request) {
 	}
 
 	page, pageSize, offset := getPagination(r.Context())
-	
+
 	tenantService := h.db.NewTenantService()
 	tenants, err := tenantService.ListTenants(r.Context(), pageSize, offset)
 	if err != nil {
@@ -80,7 +80,7 @@ func (h *TenantHandler) ListTenants(w http.ResponseWriter, r *http.Request) {
 // HandleTenant handles tenant-specific routes
 func (h *TenantHandler) HandleTenant(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/tenants")
-	
+
 	if path == "" || path == "/" {
 		// Handle /api/v1/tenants
 		switch r.Method {
@@ -144,14 +144,14 @@ func (h *TenantHandler) CreateTenant(w http.ResponseWriter, r *http.Request) {
 
 	// Convert request to model
 	tenant := &models.Tenant{
-		Name:        req.Name,
-		DisplayName: req.DisplayName,
-		BillingPlan: req.BillingPlan,
+		Name:         req.Name,
+		DisplayName:  req.DisplayName,
+		BillingPlan:  req.BillingPlan,
 		BillingEmail: req.BillingEmail,
-		Quotas:      req.Quotas,
-		Compliance:  req.Compliance,
-		ContactInfo: req.ContactInfo,
-		Status:      models.TenantStatusActive,
+		Quotas:       req.Quotas,
+		Compliance:   req.Compliance,
+		ContactInfo:  req.ContactInfo,
+		Status:       models.TenantStatusActive,
 	}
 
 	// Create tenant
@@ -191,7 +191,7 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request, ten
 	}
 
 	tenantService := h.db.NewTenantService()
-	
+
 	// Get existing tenant
 	tenant, err := tenantService.GetTenant(r.Context(), tenantID)
 	if err != nil {
@@ -225,7 +225,7 @@ func (h *TenantHandler) UpdateTenant(w http.ResponseWriter, r *http.Request, ten
 // DeleteTenant handles DELETE /api/v1/tenants/{id}
 func (h *TenantHandler) DeleteTenant(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	tenantService := h.db.NewTenantService()
-	
+
 	// Check if tenant exists
 	_, err := tenantService.GetTenant(r.Context(), tenantID)
 	if err != nil {
@@ -284,10 +284,10 @@ func (h *TenantHandler) GetTenantQuotas(w http.ResponseWriter, r *http.Request, 
 		"usage": map[string]interface{}{
 			// This would be populated with actual usage data
 			"files_processed_this_hour": 0,
-			"storage_used_gb":          0,
-			"compute_hours_used":       0,
-			"api_requests_this_minute": 0,
-			"concurrent_jobs":          0,
+			"storage_used_gb":           0,
+			"compute_hours_used":        0,
+			"api_requests_this_minute":  0,
+			"concurrent_jobs":           0,
 		},
 		"compliance": tenant.Compliance,
 	}
@@ -326,17 +326,17 @@ func (h *TenantHandler) ExportTenantData(w http.ResponseWriter, r *http.Request,
 
 func (h *TenantHandler) toTenantResponse(tenant *models.Tenant) TenantResponse {
 	return TenantResponse{
-		ID:          tenant.ID,
-		Name:        tenant.Name,
-		DisplayName: tenant.DisplayName,
-		BillingPlan: tenant.BillingPlan,
+		ID:           tenant.ID,
+		Name:         tenant.Name,
+		DisplayName:  tenant.DisplayName,
+		BillingPlan:  tenant.BillingPlan,
 		BillingEmail: tenant.BillingEmail,
-		Quotas:      tenant.Quotas,
-		Compliance:  tenant.Compliance,
-		ContactInfo: tenant.ContactInfo,
-		Status:      tenant.Status,
-		CreatedAt:   tenant.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:   tenant.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		Quotas:       tenant.Quotas,
+		Compliance:   tenant.Compliance,
+		ContactInfo:  tenant.ContactInfo,
+		Status:       tenant.Status,
+		CreatedAt:    tenant.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:    tenant.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 }
 

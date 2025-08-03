@@ -63,17 +63,17 @@ func (tr *TestRunner) RunAllTests() {
 		{"WorkflowExecution", tr.testWorkflowExecution},
 		{"EndToEndPipeline", tr.testEndToEndPipeline},
 	}
-	
+
 	fmt.Printf("Running %d integration tests...\n\n", len(tests))
-	
+
 	successCount := 0
 	for _, test := range tests {
 		fmt.Printf("Running test: %s... ", test.name)
-		
+
 		start := time.Now()
 		err := test.fn()
 		duration := time.Since(start)
-		
+
 		success := err == nil
 		if success {
 			successCount++
@@ -81,7 +81,7 @@ func (tr *TestRunner) RunAllTests() {
 		} else {
 			fmt.Printf("FAIL (%v): %v\n", duration, err)
 		}
-		
+
 		tr.results[test.name] = TestResult{
 			Name:     test.name,
 			Success:  success,
@@ -89,9 +89,9 @@ func (tr *TestRunner) RunAllTests() {
 			Error:    err,
 		}
 	}
-	
+
 	fmt.Printf("\nTest Results: %d/%d passed\n", successCount, len(tests))
-	
+
 	if successCount == len(tests) {
 		fmt.Println("All tests passed! ✅")
 	} else {
@@ -108,7 +108,7 @@ func (tr *TestRunner) GetResults() map[string]TestResult {
 
 func (tr *TestRunner) testAuthentication() error {
 	ctx := context.Background()
-	
+
 	// Test user creation
 	createReq := &auth.CreateUserRequest{
 		Username:  "runner_test_user",
@@ -118,34 +118,34 @@ func (tr *TestRunner) testAuthentication() error {
 		LastName:  "Test",
 		Roles:     []auth.Role{auth.RoleUser},
 	}
-	
+
 	user, err := tr.env.AuthService.CreateUser(ctx, createReq)
 	if err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
-	
+
 	// Test authentication
 	authReq := &auth.AuthRequest{
 		Type:     auth.AuthTypePassword,
 		Username: "runner_test_user",
 		Password: "RunnerPass123!",
 	}
-	
+
 	authResp, err := tr.env.AuthService.Authenticate(ctx, authReq)
 	if err != nil {
 		return fmt.Errorf("failed to authenticate: %w", err)
 	}
-	
+
 	// Test token validation
 	claims, err := tr.env.AuthService.ValidateToken(ctx, authResp.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to validate token: %w", err)
 	}
-	
+
 	if claims.UserID != user.ID {
 		return fmt.Errorf("token user ID mismatch")
 	}
-	
+
 	return nil
 }
 
@@ -158,7 +158,7 @@ func (tr *TestRunner) testFileReading() error {
 	if csvData.Type != "csv" {
 		return fmt.Errorf("incorrect CSV data type")
 	}
-	
+
 	// Test JSON reading
 	jsonData, err := tr.env.JSONReader.Read(tr.env.TestFiles["json"])
 	if err != nil {
@@ -167,7 +167,7 @@ func (tr *TestRunner) testFileReading() error {
 	if jsonData.Type != "json" {
 		return fmt.Errorf("incorrect JSON data type")
 	}
-	
+
 	// Test text reading
 	textData, err := tr.env.TextReader.Read(tr.env.TestFiles["text"])
 	if err != nil {
@@ -176,67 +176,67 @@ func (tr *TestRunner) testFileReading() error {
 	if textData.Type != "text" {
 		return fmt.Errorf("incorrect text data type")
 	}
-	
+
 	return nil
 }
 
 func (tr *TestRunner) testContentChunking() error {
 	content := "This is a test document that will be chunked into smaller pieces for processing. Each chunk should be manageable and contain relevant content."
-	
+
 	chunks, err := tr.env.Chunker.Chunk(content)
 	if err != nil {
 		return fmt.Errorf("failed to chunk content: %w", err)
 	}
-	
+
 	if len(chunks) == 0 {
 		return fmt.Errorf("no chunks produced")
 	}
-	
+
 	return nil
 }
 
 func (tr *TestRunner) testContentClassification() error {
 	ctx := context.Background()
 	testContent := "This is a business document about quarterly financial reports and earnings data."
-	
+
 	// Create proper classification input
 	input := &classification.ClassificationInput{
 		Content:  testContent,
 		TenantID: uuid.New(),
 	}
-	
+
 	result, err := tr.env.Classifier.Classify(ctx, input)
 	if err != nil {
 		return fmt.Errorf("failed to classify content: %w", err)
 	}
-	
+
 	if result.ContentType == "" {
 		return fmt.Errorf("content type not detected")
 	}
-	
+
 	if result.Language == "" {
 		return fmt.Errorf("language not detected")
 	}
-	
+
 	return nil
 }
 
 func (tr *TestRunner) testDLPDetection() error {
 	testContent := "Employee SSN: 123-45-6789, Credit Card: 4532-1234-5678-9012"
-	
+
 	results, err := tr.env.DLPEngine.ScanText(testContent)
 	if err != nil {
 		return fmt.Errorf("failed to scan for PII: %w", err)
 	}
-	
+
 	if len(results) == 0 {
 		return fmt.Errorf("no PII detected in test content")
 	}
-	
+
 	// Verify we found the expected PII types
 	foundSSN := false
 	foundCC := false
-	
+
 	for _, result := range results {
 		switch result.Type {
 		case string(types.PIITypeSSN):
@@ -245,15 +245,15 @@ func (tr *TestRunner) testDLPDetection() error {
 			foundCC = true
 		}
 	}
-	
+
 	if !foundSSN {
 		return fmt.Errorf("SSN not detected")
 	}
-	
+
 	if !foundCC {
 		return fmt.Errorf("credit card not detected")
 	}
-	
+
 	return nil
 }
 
@@ -268,13 +268,13 @@ func (tr *TestRunner) testEventSystem() error {
 		},
 		CreatedAt: time.Now(),
 	}
-	
+
 	// Publish event
 	err := tr.env.EventBus.Publish(event)
 	if err != nil {
 		return fmt.Errorf("failed to publish event: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -285,37 +285,37 @@ func (tr *TestRunner) testStorageResolvers() error {
 	if err != nil {
 		return fmt.Errorf("failed to get local resolver: %w", err)
 	}
-	
+
 	parsedURL, err := resolver.ParseURL(localURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse local URL: %w", err)
 	}
-	
+
 	if parsedURL.Provider != storage.ProviderLocal {
 		return fmt.Errorf("incorrect URL provider parsed")
 	}
-	
+
 	// Test S3 URL parsing
 	s3URL := "s3://test-bucket/path/file.txt"
 	s3ParsedURL, err := tr.env.StorageRegistry.ParseURL(s3URL)
 	if err != nil {
 		return fmt.Errorf("failed to parse S3 URL: %w", err)
 	}
-	
+
 	if s3ParsedURL.Provider != storage.ProviderAWS {
 		return fmt.Errorf("incorrect S3 provider")
 	}
-	
+
 	if s3ParsedURL.Bucket != "test-bucket" {
 		return fmt.Errorf("incorrect S3 bucket")
 	}
-	
+
 	return nil
 }
 
 func (tr *TestRunner) testWorkflowExecution() error {
 	ctx := context.Background()
-	
+
 	// Create a simple test workflow
 	testWorkflow := &workflow.WorkflowDefinition{
 		ID:   workflow.GenerateWorkflowID(),
@@ -333,47 +333,47 @@ func (tr *TestRunner) testWorkflowExecution() error {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	
+
 	// Register workflow
 	err := tr.env.WorkflowEngine.RegisterWorkflow(testWorkflow)
 	if err != nil {
 		return fmt.Errorf("failed to register workflow: %w", err)
 	}
-	
+
 	// Execute workflow
 	input := map[string]interface{}{
 		"test": "input",
 	}
-	
+
 	executionID, err := tr.env.WorkflowEngine.ExecuteWorkflow(ctx, testWorkflow.ID, input)
 	if err != nil {
 		return fmt.Errorf("failed to execute workflow: %w", err)
 	}
-	
+
 	if executionID == (workflow.ExecutionID{}) {
 		return fmt.Errorf("invalid execution ID returned")
 	}
-	
+
 	return nil
 }
 
 func (tr *TestRunner) testEndToEndPipeline() error {
 	ctx := context.Background()
-	
+
 	// Read a test file
 	textData, err := tr.env.TextReader.Read(tr.env.TestFiles["text"])
 	if err != nil {
 		return fmt.Errorf("failed to read test file: %w", err)
 	}
-	
+
 	content := string(textData.Content)
-	
+
 	// Chunk the content
 	chunks, err := tr.env.Chunker.Chunk(content)
 	if err != nil {
 		return fmt.Errorf("failed to chunk content: %w", err)
 	}
-	
+
 	// Classify content
 	input := &classification.ClassificationInput{
 		Content:  content,
@@ -383,52 +383,52 @@ func (tr *TestRunner) testEndToEndPipeline() error {
 	if err != nil {
 		return fmt.Errorf("failed to classify content: %w", err)
 	}
-	
+
 	// Scan for PII
 	dlpResults, err := tr.env.DLPEngine.ScanText(content)
 	if err != nil {
 		return fmt.Errorf("failed to scan for PII: %w", err)
 	}
-	
+
 	// Verify pipeline results
 	if len(chunks) == 0 {
 		return fmt.Errorf("no chunks produced")
 	}
-	
+
 	if classificationResult.ContentType == "" {
 		return fmt.Errorf("no content type classified")
 	}
-	
+
 	if len(dlpResults) == 0 {
 		return fmt.Errorf("no PII detected in test content")
 	}
-	
+
 	return nil
 }
 
 // Main function for running tests programmatically
 func RunIntegrationTests() {
 	runner := NewTestRunner()
-	
+
 	fmt.Println("Setting up test environment...")
 	if err := runner.Setup(); err != nil {
 		log.Fatalf("Failed to setup test environment: %v", err)
 	}
-	
+
 	fmt.Println("Test environment ready.")
-	
+
 	runner.RunAllTests()
-	
+
 	// Print detailed results
 	fmt.Println("\nDetailed Results:")
 	fmt.Println("================")
-	
+
 	for name, result := range runner.GetResults() {
 		status := "PASS"
 		if !result.Success {
 			status = "FAIL"
 		}
-		
+
 		fmt.Printf("%-20s: %s (%v)\n", name, status, result.Duration)
 		if result.Error != nil {
 			fmt.Printf("    Error: %v\n", result.Error)

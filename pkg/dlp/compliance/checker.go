@@ -41,54 +41,54 @@ func NewBasicComplianceChecker() *BasicComplianceChecker {
 		version: "1.0.0",
 		rules:   make(map[string]ComplianceRuleSet),
 	}
-	
+
 	// Register built-in compliance rule sets
 	checker.registerGDPRRules()
 	checker.registerHIPAARules()
 	checker.registerPCIDSSRules()
 	checker.registerCCPARules()
-	
+
 	return checker
 }
 
 // CheckCompliance validates content against specific compliance requirements
 func (c *BasicComplianceChecker) CheckCompliance(ctx context.Context, scanResult *types.ScanResult, rules []types.ComplianceRule) (*types.ComplianceResult, error) {
 	startTime := time.Now()
-	
+
 	result := &types.ComplianceResult{
 		IsCompliant:     true,
 		Violations:      []types.ComplianceViolation{},
 		CheckedAt:       startTime,
 		RequiredActions: []string{},
 	}
-	
+
 	// Group rules by regulation
 	rulesByRegulation := make(map[string][]types.ComplianceRule)
 	for _, rule := range rules {
 		rulesByRegulation[rule.Regulation] = append(rulesByRegulation[rule.Regulation], rule)
 	}
-	
+
 	// Check each regulation
 	for regulation, regulationRules := range rulesByRegulation {
 		regulationResult, err := c.checkRegulation(scanResult, regulation, regulationRules)
 		if err != nil {
 			continue // Skip problematic regulations
 		}
-		
+
 		// Merge results
 		if !regulationResult.IsCompliant {
 			result.IsCompliant = false
 		}
-		
+
 		result.Violations = append(result.Violations, regulationResult.Violations...)
 		result.RequiredActions = append(result.RequiredActions, regulationResult.RequiredActions...)
-		
+
 		// Set regulation if this is the first one
 		if result.Regulation == "" {
 			result.Regulation = regulation
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -107,7 +107,7 @@ func (c *BasicComplianceChecker) checkRegulation(scanResult *types.ScanResult, r
 	if !exists {
 		return nil, fmt.Errorf("unsupported regulation: %s", regulation)
 	}
-	
+
 	result := &types.ComplianceResult{
 		IsCompliant:     true,
 		Violations:      []types.ComplianceViolation{},
@@ -115,27 +115,27 @@ func (c *BasicComplianceChecker) checkRegulation(scanResult *types.ScanResult, r
 		CheckedAt:       time.Now(),
 		RequiredActions: []string{},
 	}
-	
+
 	// Check each rule definition
 	for _, ruleDef := range ruleSet.Rules {
 		// Check if this rule is enabled
 		if !c.isRuleEnabled(ruleDef.RuleID, rules) {
 			continue
 		}
-		
+
 		// Apply rule validator
 		violations := ruleDef.Validator(scanResult)
-		
+
 		if len(violations) > 0 {
 			result.IsCompliant = false
 			result.Violations = append(result.Violations, violations...)
-			
+
 			// Add required actions based on rule
 			actions := c.generateRequiredActions(ruleDef, violations)
 			result.RequiredActions = append(result.RequiredActions, actions...)
 		}
 	}
-	
+
 	return result, nil
 }
 
@@ -156,7 +156,7 @@ func (c *BasicComplianceChecker) registerGDPRRules() {
 				Validator:   c.validateGDPRPersonalData,
 			},
 			{
-				RuleID:      "GDPR-002", 
+				RuleID:      "GDPR-002",
 				Name:        "Special Category Data",
 				Description: "Detect special category personal data requiring extra protection",
 				PIITypes:    []types.PIIType{types.PIITypeDateOfBirth, types.PIITypeSSN},
@@ -166,7 +166,7 @@ func (c *BasicComplianceChecker) registerGDPRRules() {
 			},
 		},
 	}
-	
+
 	c.rules["GDPR"] = gdprRules
 }
 
@@ -186,7 +186,7 @@ func (c *BasicComplianceChecker) registerHIPAARules() {
 			},
 		},
 	}
-	
+
 	c.rules["HIPAA"] = hipaaRules
 }
 
@@ -206,7 +206,7 @@ func (c *BasicComplianceChecker) registerPCIDSSRules() {
 			},
 		},
 	}
-	
+
 	c.rules["PCI-DSS"] = pciRules
 }
 
@@ -226,7 +226,7 @@ func (c *BasicComplianceChecker) registerCCPARules() {
 			},
 		},
 	}
-	
+
 	c.rules["CCPA"] = ccpaRules
 }
 
@@ -234,9 +234,9 @@ func (c *BasicComplianceChecker) registerCCPARules() {
 
 func (c *BasicComplianceChecker) validateGDPRPersonalData(scanResult *types.ScanResult) []types.ComplianceViolation {
 	var violations []types.ComplianceViolation
-	
+
 	personalDataTypes := []types.PIIType{types.PIITypeEmail, types.PIITypeName, types.PIITypeAddress, types.PIITypePhoneNumber}
-	
+
 	for _, finding := range scanResult.Findings {
 		for _, dataType := range personalDataTypes {
 			if finding.Type == dataType && finding.RiskLevel != types.RiskLevelLow {
@@ -250,15 +250,15 @@ func (c *BasicComplianceChecker) validateGDPRPersonalData(scanResult *types.Scan
 			}
 		}
 	}
-	
+
 	return violations
 }
 
 func (c *BasicComplianceChecker) validateGDPRSpecialCategory(scanResult *types.ScanResult) []types.ComplianceViolation {
 	var violations []types.ComplianceViolation
-	
+
 	specialDataTypes := []types.PIIType{types.PIITypeDateOfBirth, types.PIITypeSSN}
-	
+
 	for _, finding := range scanResult.Findings {
 		for _, dataType := range specialDataTypes {
 			if finding.Type == dataType {
@@ -272,15 +272,15 @@ func (c *BasicComplianceChecker) validateGDPRSpecialCategory(scanResult *types.S
 			}
 		}
 	}
-	
+
 	return violations
 }
 
 func (c *BasicComplianceChecker) validateHIPAAPHI(scanResult *types.ScanResult) []types.ComplianceViolation {
 	var violations []types.ComplianceViolation
-	
+
 	phiTypes := []types.PIIType{types.PIITypeSSN, types.PIITypeDateOfBirth, types.PIITypeName, types.PIITypeEmail}
-	
+
 	for _, finding := range scanResult.Findings {
 		for _, phiType := range phiTypes {
 			if finding.Type == phiType {
@@ -294,13 +294,13 @@ func (c *BasicComplianceChecker) validateHIPAAPHI(scanResult *types.ScanResult) 
 			}
 		}
 	}
-	
+
 	return violations
 }
 
 func (c *BasicComplianceChecker) validatePCICardholderData(scanResult *types.ScanResult) []types.ComplianceViolation {
 	var violations []types.ComplianceViolation
-	
+
 	for _, finding := range scanResult.Findings {
 		if finding.Type == types.PIITypeCreditCard {
 			violations = append(violations, types.ComplianceViolation{
@@ -312,15 +312,15 @@ func (c *BasicComplianceChecker) validatePCICardholderData(scanResult *types.Sca
 			})
 		}
 	}
-	
+
 	return violations
 }
 
 func (c *BasicComplianceChecker) validateCCPAPersonalInfo(scanResult *types.ScanResult) []types.ComplianceViolation {
 	var violations []types.ComplianceViolation
-	
+
 	ccpaTypes := []types.PIIType{types.PIITypeEmail, types.PIITypeName, types.PIITypeAddress, types.PIITypeSSN, types.PIITypeIPAddress}
-	
+
 	for _, finding := range scanResult.Findings {
 		for _, ccpaType := range ccpaTypes {
 			if finding.Type == ccpaType {
@@ -334,7 +334,7 @@ func (c *BasicComplianceChecker) validateCCPAPersonalInfo(scanResult *types.Scan
 			}
 		}
 	}
-	
+
 	return violations
 }
 
@@ -355,24 +355,24 @@ func (c *BasicComplianceChecker) isRuleEnabled(ruleID string, rules []types.Comp
 
 func (c *BasicComplianceChecker) generateRequiredActions(ruleDef ComplianceRuleDefinition, violations []types.ComplianceViolation) []string {
 	var actions []string
-	
+
 	switch ruleDef.RuleID {
 	case "GDPR-001", "GDPR-002":
 		actions = append(actions, "Implement data protection measures")
 		actions = append(actions, "Document legal basis for processing")
-		
+
 	case "HIPAA-001":
 		actions = append(actions, "Apply HIPAA safeguards")
 		actions = append(actions, "Implement access controls")
-		
+
 	case "PCI-001":
 		actions = append(actions, "Encrypt cardholder data")
 		actions = append(actions, "Implement PCI DSS controls")
-		
+
 	case "CCPA-001":
 		actions = append(actions, "Enable consumer rights mechanisms")
 		actions = append(actions, "Implement data deletion capabilities")
 	}
-	
+
 	return actions
 }

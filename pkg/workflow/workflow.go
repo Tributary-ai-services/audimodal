@@ -26,16 +26,16 @@ type Engine interface {
 
 // WorkflowDefinition represents a workflow definition
 type WorkflowDefinition struct {
-	ID          uuid.UUID       `json:"id"`
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	Version     string          `json:"version"`
-	Steps       []WorkflowStep  `json:"steps"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
-	CreatedBy   string          `json:"created_by"`
-	Tags        []string        `json:"tags"`
-	Status      WorkflowStatus  `json:"status"`
+	ID          uuid.UUID      `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Version     string         `json:"version"`
+	Steps       []WorkflowStep `json:"steps"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	CreatedBy   string         `json:"created_by"`
+	Tags        []string       `json:"tags"`
+	Status      WorkflowStatus `json:"status"`
 }
 
 // WorkflowStep represents a single step in a workflow
@@ -52,16 +52,16 @@ type WorkflowStep struct {
 
 // WorkflowExecution represents a workflow execution instance
 type WorkflowExecution struct {
-	ID           ExecutionID            `json:"id"`
-	WorkflowID   uuid.UUID              `json:"workflow_id"`
-	Status       ExecutionStatus        `json:"status"`
-	Input        map[string]interface{} `json:"input"`
-	Output       map[string]interface{} `json:"output,omitempty"`
-	StepResults  map[string]StepResult  `json:"step_results"`
-	StartedAt    time.Time              `json:"started_at"`
-	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
-	Error        *string                `json:"error,omitempty"`
-	Context      map[string]interface{} `json:"context,omitempty"`
+	ID          ExecutionID            `json:"id"`
+	WorkflowID  uuid.UUID              `json:"workflow_id"`
+	Status      ExecutionStatus        `json:"status"`
+	Input       map[string]interface{} `json:"input"`
+	Output      map[string]interface{} `json:"output,omitempty"`
+	StepResults map[string]StepResult  `json:"step_results"`
+	StartedAt   time.Time              `json:"started_at"`
+	CompletedAt *time.Time             `json:"completed_at,omitempty"`
+	Error       *string                `json:"error,omitempty"`
+	Context     map[string]interface{} `json:"context,omitempty"`
 }
 
 // StepResult represents the result of a workflow step execution
@@ -120,16 +120,16 @@ const (
 	StepStatusSkipped   StepStatus = "skipped"
 
 	// Step types
-	StepTypeFileRead   StepType = "file_read"
-	StepTypeClassify   StepType = "classify"
-	StepTypeDLPScan    StepType = "dlp_scan"
-	StepTypeChunk      StepType = "chunk"
-	StepTypeTransform  StepType = "transform"
-	StepTypeValidate   StepType = "validate"
-	StepTypeNotify     StepType = "notify"
-	StepTypeScript     StepType = "script"
-	StepTypeAPI        StepType = "api"
-	StepTypeCondition  StepType = "condition"
+	StepTypeFileRead  StepType = "file_read"
+	StepTypeClassify  StepType = "classify"
+	StepTypeDLPScan   StepType = "dlp_scan"
+	StepTypeChunk     StepType = "chunk"
+	StepTypeTransform StepType = "transform"
+	StepTypeValidate  StepType = "validate"
+	StepTypeNotify    StepType = "notify"
+	StepTypeScript    StepType = "script"
+	StepTypeAPI       StepType = "api"
+	StepTypeCondition StepType = "condition"
 
 	// Backoff types
 	BackoffTypeLinear      BackoffType = "linear"
@@ -244,9 +244,9 @@ func (e *SimpleWorkflowEngine) executeWorkflowAsync(ctx context.Context, executi
 		Type:     "workflow.started",
 		TenantID: uuid.Nil, // Default tenant
 		Payload: map[string]interface{}{
-			"execution_id":   execution.ID,
-			"workflow_id":    execution.WorkflowID,
-			"workflow_name":  workflow.Name,
+			"execution_id":  execution.ID,
+			"workflow_id":   execution.WorkflowID,
+			"workflow_name": workflow.Name,
 		},
 		CreatedAt: time.Now(),
 	}
@@ -299,16 +299,16 @@ func (e *SimpleWorkflowEngine) executeSteps(ctx context.Context, execution *Work
 
 	// Track completed steps
 	completed := make(map[string]bool)
-	
+
 	// Execute steps in topological order
 	for len(completed) < len(workflow.Steps) {
 		progress := false
-		
+
 		for _, step := range workflow.Steps {
 			if completed[step.ID] {
 				continue
 			}
-			
+
 			// Check if all dependencies are completed
 			canExecute := true
 			for _, depID := range step.Dependencies {
@@ -317,7 +317,7 @@ func (e *SimpleWorkflowEngine) executeSteps(ctx context.Context, execution *Work
 					break
 				}
 			}
-			
+
 			if canExecute {
 				err := e.executeStep(ctx, execution, &step)
 				if err != nil {
@@ -327,12 +327,12 @@ func (e *SimpleWorkflowEngine) executeSteps(ctx context.Context, execution *Work
 				progress = true
 			}
 		}
-		
+
 		if !progress {
 			return fmt.Errorf("circular dependency detected or missing dependencies")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -398,38 +398,38 @@ func (e *SimpleWorkflowEngine) executeFileReadStep(ctx context.Context, step *Wo
 	}
 
 	return map[string]interface{}{
-		"file_path": path,
+		"file_path":    path,
 		"content_type": "text/plain",
-		"size_bytes": 1024,
-		"message": "File read simulated",
+		"size_bytes":   1024,
+		"message":      "File read simulated",
 	}, nil
 }
 
 func (e *SimpleWorkflowEngine) executeClassifyStep(ctx context.Context, step *WorkflowStep, execution *WorkflowExecution) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"content_type": "document",
-		"language": "en",
-		"sentiment": "neutral",
-		"confidence": 0.85,
-		"message": "Classification completed",
+		"language":     "en",
+		"sentiment":    "neutral",
+		"confidence":   0.85,
+		"message":      "Classification completed",
 	}, nil
 }
 
 func (e *SimpleWorkflowEngine) executeDLPScanStep(ctx context.Context, step *WorkflowStep, execution *WorkflowExecution) (map[string]interface{}, error) {
 	return map[string]interface{}{
-		"pii_found": true,
-		"pii_types": []string{"ssn", "email"},
+		"pii_found":  true,
+		"pii_types":  []string{"ssn", "email"},
 		"risk_score": 0.7,
-		"message": "DLP scan completed",
+		"message":    "DLP scan completed",
 	}, nil
 }
 
 func (e *SimpleWorkflowEngine) executeChunkStep(ctx context.Context, step *WorkflowStep, execution *WorkflowExecution) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"chunks_created": 5,
-		"total_size": 2048,
-		"strategy": "fixed_size",
-		"message": "Content chunked successfully",
+		"total_size":     2048,
+		"strategy":       "fixed_size",
+		"message":        "Content chunked successfully",
 	}, nil
 }
 

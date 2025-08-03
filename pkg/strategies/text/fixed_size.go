@@ -130,9 +130,9 @@ func (s *FixedSizeStrategy) TestConnection(ctx context.Context, config map[strin
 		Success: true,
 		Message: "Fixed-size text strategy configuration is valid",
 		Details: map[string]any{
-			"chunk_size":    config["chunk_size"],
-			"overlap_size":  config["overlap_size"],
-			"split_method":  "fixed_size",
+			"chunk_size":   config["chunk_size"],
+			"overlap_size": config["overlap_size"],
+			"split_method": "fixed_size",
 		},
 	}
 }
@@ -165,7 +165,7 @@ func (s *FixedSizeStrategy) ConfigureReader(readerConfig map[string]any) (map[st
 	for k, v := range readerConfig {
 		configured[k] = v
 	}
-	
+
 	configured["skip_empty_lines"] = false
 	return configured, nil
 }
@@ -215,7 +215,7 @@ func (s *FixedSizeStrategy) GetOptimalChunkSize(sourceSchema core.SchemaInfo) in
 	if sourceSchema.Format == "unstructured" {
 		return 1000
 	}
-	
+
 	// For other formats, use smaller chunks
 	return 500
 }
@@ -247,22 +247,22 @@ func (s *FixedSizeStrategy) getDefaultConfig() chunkConfig {
 
 func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	// Remove excessive whitespace but preserve paragraph breaks
 	text = normalizeText(text)
-	
+
 	if len(text) <= config.ChunkSize {
 		// Text is smaller than chunk size, return as single chunk
 		chunk := core.Chunk{
 			Data: text,
 			Metadata: core.ChunkMetadata{
-				SourcePath:    metadata.SourcePath,
-				ChunkID:       fmt.Sprintf("%s:chunk:1", metadata.ChunkID),
-				ChunkType:     "text",
-				SizeBytes:     int64(len(text)),
-				ProcessedAt:   metadata.ProcessedAt,
-				ProcessedBy:   s.name,
-				Quality:       s.calculateQuality(text),
+				SourcePath:  metadata.SourcePath,
+				ChunkID:     fmt.Sprintf("%s:chunk:1", metadata.ChunkID),
+				ChunkType:   "text",
+				SizeBytes:   int64(len(text)),
+				ProcessedAt: metadata.ProcessedAt,
+				ProcessedBy: s.name,
+				Quality:     s.calculateQuality(text),
 				Context: map[string]string{
 					"chunk_strategy": "fixed_size",
 					"chunk_number":   "1",
@@ -277,30 +277,30 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 	// Split text into chunks
 	chunkNumber := 1
 	start := 0
-	
+
 	for start < len(text) {
 		end := start + config.ChunkSize
-		
+
 		// Don't go beyond text length
 		if end > len(text) {
 			end = len(text)
 		}
-		
+
 		// Try to find better break point if requested
 		if config.SplitOnSentences && end < len(text) {
 			betterEnd := s.findSentenceBreak(text, start, end)
-			if betterEnd > start + config.MinChunkSize {
+			if betterEnd > start+config.MinChunkSize {
 				end = betterEnd
 			}
 		}
-		
+
 		if config.PreserveParagraphs && end < len(text) {
 			betterEnd := s.findParagraphBreak(text, start, end)
-			if betterEnd > start + config.MinChunkSize {
+			if betterEnd > start+config.MinChunkSize {
 				end = betterEnd
 			}
 		}
-		
+
 		// Safety check for slice bounds
 		if start < 0 {
 			start = 0
@@ -311,10 +311,10 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 		if start >= end {
 			break
 		}
-		
+
 		chunkText := text[start:end]
 		chunkText = strings.TrimSpace(chunkText)
-		
+
 		// Only create chunk if it meets minimum size
 		if len(chunkText) >= config.MinChunkSize {
 			chunk := core.Chunk{
@@ -340,25 +340,25 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 			chunks = append(chunks, chunk)
 			chunkNumber++
 		}
-		
+
 		// Move to next chunk with overlap
 		if config.OverlapSize > 0 && end < len(text) {
 			start = end - config.OverlapSize
 		} else {
 			start = end
 		}
-		
+
 		// Avoid infinite loop
 		if start >= len(text) {
 			break
 		}
 	}
-	
+
 	// Update total chunks in context
 	for i := range chunks {
 		chunks[i].Metadata.Context["total_chunks"] = fmt.Sprintf("%d", len(chunks))
 	}
-	
+
 	return chunks
 }
 
@@ -373,10 +373,10 @@ func (s *FixedSizeStrategy) findSentenceBreak(text string, start, end int) int {
 	if start >= end {
 		return end
 	}
-	
+
 	// Look for sentence-ending punctuation
 	sentenceEnders := []rune{'.', '!', '?'}
-	
+
 	// Search backwards from end position
 	for i := end - 1; i > start; i-- {
 		char := rune(text[i])
@@ -389,7 +389,7 @@ func (s *FixedSizeStrategy) findSentenceBreak(text string, start, end int) int {
 			}
 		}
 	}
-	
+
 	return end
 }
 
@@ -404,14 +404,14 @@ func (s *FixedSizeStrategy) findParagraphBreak(text string, start, end int) int 
 	if start >= end {
 		return end
 	}
-	
+
 	// Look for double newlines (paragraph breaks)
 	for i := end - 1; i > start+1; i-- {
 		if text[i] == '\n' && text[i-1] == '\n' {
 			return i + 1
 		}
 	}
-	
+
 	return end
 }
 
@@ -423,13 +423,13 @@ func (s *FixedSizeStrategy) calculateQuality(text string) *core.QualityMetrics {
 			Readability:  0.0,
 		}
 	}
-	
+
 	// Simple quality metrics
 	words := strings.Fields(text)
 	sentences := strings.FieldsFunc(text, func(r rune) bool {
 		return r == '.' || r == '!' || r == '?'
 	})
-	
+
 	// Completeness: based on sentence completeness
 	completeness := 1.0
 	if len(text) > 0 && !strings.HasSuffix(strings.TrimSpace(text), ".") &&
@@ -437,7 +437,7 @@ func (s *FixedSizeStrategy) calculateQuality(text string) *core.QualityMetrics {
 		!strings.HasSuffix(strings.TrimSpace(text), "?") {
 		completeness = 0.8 // Incomplete sentence
 	}
-	
+
 	// Coherence: based on word-to-sentence ratio
 	coherence := 0.5 // Default
 	if len(sentences) > 0 {
@@ -448,13 +448,13 @@ func (s *FixedSizeStrategy) calculateQuality(text string) *core.QualityMetrics {
 			coherence = 0.7 // Acceptable
 		}
 	}
-	
+
 	// Readability: simple approximation based on word and sentence length
 	readability := 0.5 // Default
 	if len(words) > 0 && len(sentences) > 0 {
 		avgWordLength := float64(len(text)) / float64(len(words))
 		avgSentenceLength := float64(len(words)) / float64(len(sentences))
-		
+
 		// Flesch-like approximation
 		if avgWordLength < 6 && avgSentenceLength < 20 {
 			readability = 0.8
@@ -462,7 +462,7 @@ func (s *FixedSizeStrategy) calculateQuality(text string) *core.QualityMetrics {
 			readability = 0.6
 		}
 	}
-	
+
 	return &core.QualityMetrics{
 		Completeness: completeness,
 		Coherence:    coherence,
@@ -478,10 +478,10 @@ func normalizeText(text string) string {
 	// Replace multiple spaces with single space
 	words := strings.Fields(text)
 	result := strings.Join(words, " ")
-	
+
 	// Preserve paragraph breaks
 	result = strings.ReplaceAll(result, " \n ", "\n\n")
-	
+
 	return result
 }
 

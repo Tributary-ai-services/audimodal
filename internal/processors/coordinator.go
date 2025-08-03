@@ -37,31 +37,31 @@ type CoordinatorConfig struct {
 
 // ProcessingJob represents a high-level processing job
 type ProcessingJob struct {
-	ID              uuid.UUID              `json:"id"`
-	TenantID        uuid.UUID              `json:"tenant_id"`
-	Type            string                 `json:"type"`
-	Status          string                 `json:"status"`
-	CreatedAt       time.Time              `json:"created_at"`
-	StartedAt       *time.Time             `json:"started_at,omitempty"`
-	CompletedAt     *time.Time             `json:"completed_at,omitempty"`
-	Priority        string                 `json:"priority"`
-	Configuration   map[string]any         `json:"configuration"`
-	Files           []uuid.UUID            `json:"files"`
-	SessionID       *uuid.UUID             `json:"session_id,omitempty"`
-	Progress        float64                `json:"progress"`
-	ErrorMessage    string                 `json:"error_message,omitempty"`
-	Results         *ProcessingJobResults  `json:"results,omitempty"`
+	ID            uuid.UUID             `json:"id"`
+	TenantID      uuid.UUID             `json:"tenant_id"`
+	Type          string                `json:"type"`
+	Status        string                `json:"status"`
+	CreatedAt     time.Time             `json:"created_at"`
+	StartedAt     *time.Time            `json:"started_at,omitempty"`
+	CompletedAt   *time.Time            `json:"completed_at,omitempty"`
+	Priority      string                `json:"priority"`
+	Configuration map[string]any        `json:"configuration"`
+	Files         []uuid.UUID           `json:"files"`
+	SessionID     *uuid.UUID            `json:"session_id,omitempty"`
+	Progress      float64               `json:"progress"`
+	ErrorMessage  string                `json:"error_message,omitempty"`
+	Results       *ProcessingJobResults `json:"results,omitempty"`
 }
 
 // ProcessingJobResults contains the aggregated results of a processing job
 type ProcessingJobResults struct {
-	FilesProcessed     int                  `json:"files_processed"`
-	FilesFailed        int                  `json:"files_failed"`
-	ChunksCreated      int                  `json:"chunks_created"`
-	BytesProcessed     int64                `json:"bytes_processed"`
-	AverageQuality     float64              `json:"average_quality"`
-	ProcessingTime     time.Duration        `json:"processing_time"`
-	FileResults        []*ProcessingResult  `json:"file_results,omitempty"`
+	FilesProcessed int                 `json:"files_processed"`
+	FilesFailed    int                 `json:"files_failed"`
+	ChunksCreated  int                 `json:"chunks_created"`
+	BytesProcessed int64               `json:"bytes_processed"`
+	AverageQuality float64             `json:"average_quality"`
+	ProcessingTime time.Duration       `json:"processing_time"`
+	FileResults    []*ProcessingResult `json:"file_results,omitempty"`
 }
 
 // NewCoordinator creates a new processing coordinator
@@ -152,13 +152,13 @@ func (c *Coordinator) ProcessSingleFile(ctx context.Context, tenantID uuid.UUID,
 func (c *Coordinator) ProcessMultipleFiles(ctx context.Context, tenantID uuid.UUID, fileIDs []uuid.UUID, options map[string]any) (*ProcessingJob, error) {
 	// Create processing job
 	job := &ProcessingJob{
-		ID:        uuid.New(),
-		TenantID:  tenantID,
-		Type:      "batch_processing",
-		Status:    "created",
-		CreatedAt: time.Now(),
-		Priority:  "normal",
-		Files:     fileIDs,
+		ID:            uuid.New(),
+		TenantID:      tenantID,
+		Type:          "batch_processing",
+		Status:        "created",
+		CreatedAt:     time.Now(),
+		Priority:      "normal",
+		Files:         fileIDs,
 		Configuration: options,
 	}
 
@@ -360,7 +360,7 @@ func (c *Coordinator) EstimateProcessingTime(ctx context.Context, tenantID uuid.
 
 	// Simple estimation based on historical averages
 	metrics := c.pipeline.GetMetrics()
-	
+
 	var estimatedTime time.Duration
 	if metrics.AverageFileTime > 0 {
 		// Use historical average
@@ -385,7 +385,7 @@ func (c *Coordinator) EstimateProcessingTime(ctx context.Context, tenantID uuid.
 func (c *Coordinator) registerPlugins() {
 	// Register readers
 	readers.RegisterBasicReaders()
-	
+
 	// Register strategies
 	strategies.RegisterBasicStrategies()
 }
@@ -420,7 +420,7 @@ func (c *Coordinator) performHealthCheck() {
 	// Check plugin registry
 	readers := c.pipeline.registry.ListReaders()
 	strategies := c.pipeline.registry.ListStrategies()
-	
+
 	if len(readers) == 0 || len(strategies) == 0 {
 		// Log warning in production
 		return
@@ -447,7 +447,7 @@ func (c *Coordinator) performCleanup() {
 func (c *Coordinator) GetSystemStatus() map[string]any {
 	metrics := c.pipeline.GetMetrics()
 	activeSessions := c.sessionManager.ListActiveSessions()
-	
+
 	readerCount, strategyCount, _ := c.pipeline.registry.Count()
 
 	status := map[string]any{

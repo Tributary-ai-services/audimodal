@@ -28,54 +28,54 @@ func (r *BasicRedactionEngine) RedactContent(content string, scanResult *types.S
 	if strategy == types.RedactionNone {
 		return content, nil
 	}
-	
+
 	// Sort findings by position (descending) to avoid position shifts during redaction
 	findings := make([]types.Finding, len(scanResult.Findings))
 	copy(findings, scanResult.Findings)
 	sort.Slice(findings, func(i, j int) bool {
 		return findings[i].StartPos > findings[j].StartPos
 	})
-	
+
 	redactedContent := content
-	
+
 	for _, finding := range findings {
 		// Skip if already redacted
 		if finding.Redacted {
 			continue
 		}
-		
+
 		// Apply redaction strategy
 		redactedValue, err := r.applyRedactionStrategy(finding.Value, finding.Type, strategy)
 		if err != nil {
 			continue // Skip problematic redactions
 		}
-		
+
 		// Replace in content
 		before := redactedContent[:finding.StartPos]
 		after := redactedContent[finding.EndPos:]
 		redactedContent = before + redactedValue + after
 	}
-	
+
 	return redactedContent, nil
 }
 
 // GenerateRedactionMap creates a mapping of original to redacted values
 func (r *BasicRedactionEngine) GenerateRedactionMap(scanResult *types.ScanResult, strategy types.RedactionStrategy) map[string]string {
 	redactionMap := make(map[string]string)
-	
+
 	for _, finding := range scanResult.Findings {
 		if finding.Redacted {
 			continue
 		}
-		
+
 		redactedValue, err := r.applyRedactionStrategy(finding.Value, finding.Type, strategy)
 		if err != nil {
 			continue
 		}
-		
+
 		redactionMap[finding.Value] = redactedValue
 	}
-	
+
 	return redactionMap
 }
 
@@ -84,22 +84,22 @@ func (r *BasicRedactionEngine) applyRedactionStrategy(value string, piiType type
 	switch strategy {
 	case types.RedactionNone:
 		return value, nil
-		
+
 	case types.RedactionMask:
 		return r.maskValue(value, piiType), nil
-		
+
 	case types.RedactionReplace:
 		return r.replaceValue(value, piiType), nil
-		
+
 	case types.RedactionHash:
 		return r.hashValue(value), nil
-		
+
 	case types.RedactionRemove:
 		return "", nil
-		
+
 	case types.RedactionTokenize:
 		return r.tokenizeValue(value, piiType), nil
-		
+
 	default:
 		return "", fmt.Errorf("unsupported redaction strategy: %s", strategy)
 	}
@@ -164,7 +164,7 @@ func (r *BasicRedactionEngine) tokenizeValue(value string, piiType types.PIIType
 	// Simple tokenization - in production, use proper tokenization
 	hash := sha256.Sum256([]byte(value))
 	token := fmt.Sprintf("%x", hash[:4])
-	
+
 	switch piiType {
 	case types.PIITypeSSN:
 		return fmt.Sprintf("SSN_%s", token)
@@ -184,7 +184,7 @@ func (r *BasicRedactionEngine) tokenizeValue(value string, piiType types.PIIType
 func (r *BasicRedactionEngine) maskSSN(ssn string) string {
 	// Remove formatting
 	digits := strings.ReplaceAll(strings.ReplaceAll(ssn, "-", ""), " ", "")
-	
+
 	if len(digits) == 9 {
 		// Show last 4 digits: XXX-XX-1234
 		if strings.Contains(ssn, "-") {
@@ -195,28 +195,28 @@ func (r *BasicRedactionEngine) maskSSN(ssn string) string {
 			return "XXXXX" + digits[5:]
 		}
 	}
-	
+
 	return strings.Repeat("X", len(ssn))
 }
 
 func (r *BasicRedactionEngine) maskCreditCard(cc string) string {
 	// Remove formatting
 	digits := strings.ReplaceAll(strings.ReplaceAll(cc, "-", ""), " ", "")
-	
+
 	if len(digits) >= 12 {
 		// Show last 4 digits: XXXX-XXXX-XXXX-1234
 		masked := strings.Repeat("X", len(digits)-4) + digits[len(digits)-4:]
-		
+
 		// Preserve original formatting
 		if strings.Contains(cc, "-") {
 			return r.formatWithSeparator(masked, "-", 4)
 		} else if strings.Contains(cc, " ") {
 			return r.formatWithSeparator(masked, " ", 4)
 		}
-		
+
 		return masked
 	}
-	
+
 	return strings.Repeat("X", len(cc))
 }
 
@@ -225,10 +225,10 @@ func (r *BasicRedactionEngine) maskEmail(email string) string {
 	if len(parts) != 2 {
 		return strings.Repeat("X", len(email))
 	}
-	
+
 	username := parts[0]
 	domain := parts[1]
-	
+
 	// Mask username but keep first and last character if long enough
 	var maskedUsername string
 	if len(username) <= 2 {
@@ -236,7 +236,7 @@ func (r *BasicRedactionEngine) maskEmail(email string) string {
 	} else {
 		maskedUsername = string(username[0]) + strings.Repeat("X", len(username)-2) + string(username[len(username)-1])
 	}
-	
+
 	return maskedUsername + "@" + domain
 }
 
@@ -244,7 +244,7 @@ func (r *BasicRedactionEngine) maskPhoneNumber(phone string) string {
 	// Keep area code visible, mask the rest
 	digits := strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(phone, "(", ""), ")", ""), "-", "")
 	digits = strings.ReplaceAll(strings.ReplaceAll(digits, " ", ""), ".", "")
-	
+
 	if len(digits) >= 10 {
 		// Show area code: (555) XXX-XXXX
 		areaCode := digits[:3]
@@ -255,7 +255,7 @@ func (r *BasicRedactionEngine) maskPhoneNumber(phone string) string {
 		}
 		return areaCode + "XXXXXXX"
 	}
-	
+
 	return strings.Repeat("X", len(phone))
 }
 
@@ -265,7 +265,7 @@ func (r *BasicRedactionEngine) maskIPAddress(ip string) string {
 		// Show first octet: 192.XXX.XXX.XXX
 		return parts[0] + ".XXX.XXX.XXX"
 	}
-	
+
 	return strings.Repeat("X", len(ip))
 }
 
@@ -274,7 +274,7 @@ func (r *BasicRedactionEngine) maskGeneric(value string) string {
 	if length <= 4 {
 		return strings.Repeat("X", length)
 	}
-	
+
 	// Show first and last character for longer values
 	return string(value[0]) + strings.Repeat("X", length-2) + string(value[length-1])
 }
@@ -282,13 +282,13 @@ func (r *BasicRedactionEngine) maskGeneric(value string) string {
 // Helper function to format masked values with separators
 func (r *BasicRedactionEngine) formatWithSeparator(value, separator string, groupSize int) string {
 	var formatted strings.Builder
-	
+
 	for i, char := range value {
 		if i > 0 && i%groupSize == 0 {
 			formatted.WriteString(separator)
 		}
 		formatted.WriteRune(char)
 	}
-	
+
 	return formatted.String()
 }

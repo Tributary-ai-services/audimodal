@@ -14,11 +14,11 @@ import (
 
 // UsageMonitor provides comprehensive storage usage monitoring and alerting
 type UsageMonitor struct {
-	config         *AnalyticsConfig
-	metricsStore   MetricsStore
-	alertStore     AlertStore
-	notifier       AlertNotifier
-	tracer         trace.Tracer
+	config       *AnalyticsConfig
+	metricsStore MetricsStore
+	alertStore   AlertStore
+	notifier     AlertNotifier
+	tracer       trace.Tracer
 
 	// Alert management
 	alertConditions map[uuid.UUID]*AlertCondition
@@ -26,14 +26,14 @@ type UsageMonitor struct {
 	alertRules      []*AlertRule
 
 	// Monitoring state
-	isRunning       bool
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	mu              sync.RWMutex
+	isRunning bool
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
+	mu        sync.RWMutex
 
 	// Thresholds and limits
-	thresholds      *MonitoringThresholds
-	usageLimits     *UsageLimits
+	thresholds  *MonitoringThresholds
+	usageLimits *UsageLimits
 
 	// Analytics
 	trendAnalyzer   *TrendAnalyzer
@@ -47,7 +47,7 @@ type AlertStore interface {
 	GetAlert(ctx context.Context, alertID uuid.UUID) (*Alert, error)
 	ListActiveAlerts(ctx context.Context, tenantID uuid.UUID) ([]*Alert, error)
 	GetAlertHistory(ctx context.Context, filters AlertHistoryFilters) ([]*Alert, error)
-	
+
 	StoreAlertCondition(ctx context.Context, condition *AlertCondition) error
 	UpdateAlertCondition(ctx context.Context, condition *AlertCondition) error
 	GetAlertCondition(ctx context.Context, conditionID uuid.UUID) (*AlertCondition, error)
@@ -62,37 +62,37 @@ type AlertNotifier interface {
 
 // AlertRule represents a rule for generating alerts
 type AlertRule struct {
-	ID              uuid.UUID         `json:"id"`
-	Name            string            `json:"name"`
-	Description     string            `json:"description"`
-	MetricQuery     *MetricsQuery     `json:"metric_query"`
-	Condition       string            `json:"condition"`       // expression like "value > 1000"
-	TimeWindow      time.Duration     `json:"time_window"`
-	EvaluationInterval time.Duration  `json:"evaluation_interval"`
-	Severity        string            `json:"severity"`
-	Enabled         bool              `json:"enabled"`
-	NotificationChannels []string     `json:"notification_channels"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	ID                   uuid.UUID         `json:"id"`
+	Name                 string            `json:"name"`
+	Description          string            `json:"description"`
+	MetricQuery          *MetricsQuery     `json:"metric_query"`
+	Condition            string            `json:"condition"` // expression like "value > 1000"
+	TimeWindow           time.Duration     `json:"time_window"`
+	EvaluationInterval   time.Duration     `json:"evaluation_interval"`
+	Severity             string            `json:"severity"`
+	Enabled              bool              `json:"enabled"`
+	NotificationChannels []string          `json:"notification_channels"`
+	Labels               map[string]string `json:"labels,omitempty"`
+	CreatedAt            time.Time         `json:"created_at"`
+	UpdatedAt            time.Time         `json:"updated_at"`
 }
 
 // MonitoringThresholds defines various monitoring thresholds
 type MonitoringThresholds struct {
-	StorageUsageWarning     float64 `json:"storage_usage_warning"`     // 80%
-	StorageUsageCritical    float64 `json:"storage_usage_critical"`    // 95%
-	CostIncreaseWarning     float64 `json:"cost_increase_warning"`     // 20%
-	CostIncreaseCritical    float64 `json:"cost_increase_critical"`    // 50%
-	PerformanceDegradation  float64 `json:"performance_degradation"`   // 30%
-	ErrorRateWarning        float64 `json:"error_rate_warning"`        // 5%
-	ErrorRateCritical       float64 `json:"error_rate_critical"`       // 10%
-	LatencyWarningMs        int64   `json:"latency_warning_ms"`        // 1000ms
-	LatencyCriticalMs       int64   `json:"latency_critical_ms"`       // 5000ms
+	StorageUsageWarning    float64 `json:"storage_usage_warning"`   // 80%
+	StorageUsageCritical   float64 `json:"storage_usage_critical"`  // 95%
+	CostIncreaseWarning    float64 `json:"cost_increase_warning"`   // 20%
+	CostIncreaseCritical   float64 `json:"cost_increase_critical"`  // 50%
+	PerformanceDegradation float64 `json:"performance_degradation"` // 30%
+	ErrorRateWarning       float64 `json:"error_rate_warning"`      // 5%
+	ErrorRateCritical      float64 `json:"error_rate_critical"`     // 10%
+	LatencyWarningMs       int64   `json:"latency_warning_ms"`      // 1000ms
+	LatencyCriticalMs      int64   `json:"latency_critical_ms"`     // 5000ms
 }
 
 // UsageLimits defines usage limits and quotas
 type UsageLimits struct {
-	MaxStorageBytes         int64   `json:"max_storage_bytes"`
+	MaxStorageBytes        int64   `json:"max_storage_bytes"`
 	MaxFiles               int64   `json:"max_files"`
 	MaxMonthlyCost         float64 `json:"max_monthly_cost"`
 	MaxDailyCost           float64 `json:"max_daily_cost"`
@@ -102,13 +102,13 @@ type UsageLimits struct {
 
 // AlertHistoryFilters for querying alert history
 type AlertHistoryFilters struct {
-	TenantID    *uuid.UUID  `json:"tenant_id,omitempty"`
-	Severity    *string     `json:"severity,omitempty"`
-	Status      *string     `json:"status,omitempty"`
-	StartTime   *time.Time  `json:"start_time,omitempty"`
-	EndTime     *time.Time  `json:"end_time,omitempty"`
-	Limit       int         `json:"limit,omitempty"`
-	Offset      int         `json:"offset,omitempty"`
+	TenantID  *uuid.UUID `json:"tenant_id,omitempty"`
+	Severity  *string    `json:"severity,omitempty"`
+	Status    *string    `json:"status,omitempty"`
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
+	Limit     int        `json:"limit,omitempty"`
+	Offset    int        `json:"offset,omitempty"`
 }
 
 // NewUsageMonitor creates a new usage monitor
@@ -251,9 +251,9 @@ func (m *UsageMonitor) CheckUsageLimits(ctx context.Context, tenantID uuid.UUID)
 	span.SetAttributes(attribute.String("tenant.id", tenantID.String()))
 
 	status := &UsageLimitStatus{
-		TenantID:    tenantID,
-		CheckedAt:   time.Now(),
-		Violations:  []UsageLimitViolation{},
+		TenantID:      tenantID,
+		CheckedAt:     time.Now(),
+		Violations:    []UsageLimitViolation{},
 		OverallStatus: "ok",
 	}
 
@@ -288,7 +288,7 @@ func (m *UsageMonitor) CheckUsageLimits(ctx context.Context, tenantID uuid.UUID)
 				hasWarning = true
 			}
 		}
-		
+
 		if hasCritical {
 			status.OverallStatus = "critical"
 		} else if hasWarning {
@@ -310,11 +310,11 @@ func (m *UsageMonitor) GetUsageInsights(ctx context.Context, tenantID uuid.UUID)
 	defer span.End()
 
 	insights := &UsageInsights{
-		TenantID:      tenantID,
-		GeneratedAt:   time.Now(),
+		TenantID:        tenantID,
+		GeneratedAt:     time.Now(),
 		Recommendations: []UsageRecommendation{},
-		Patterns:       []UsagePattern{},
-		Predictions:    []UsagePrediction{},
+		Patterns:        []UsagePattern{},
+		Predictions:     []UsagePrediction{},
 	}
 
 	// Analyze usage trends
@@ -644,11 +644,11 @@ func DefaultMonitoringThresholds() *MonitoringThresholds {
 func DefaultUsageLimits() *UsageLimits {
 	return &UsageLimits{
 		MaxStorageBytes:        1024 * 1024 * 1024 * 1024, // 1TB
-		MaxFiles:              1000000,                     // 1M files
-		MaxMonthlyCost:         10000.0,                    // $10,000
-		MaxDailyCost:           500.0,                      // $500
+		MaxFiles:               1000000,                   // 1M files
+		MaxMonthlyCost:         10000.0,                   // $10,000
+		MaxDailyCost:           500.0,                     // $500
 		MaxTransferBytesDaily:  100 * 1024 * 1024 * 1024,  // 100GB daily
-		MaxOperationsPerSecond: 1000,                       // 1000 ops/sec
+		MaxOperationsPerSecond: 1000,                      // 1000 ops/sec
 	}
 }
 
@@ -692,36 +692,36 @@ func (m *UsageMonitor) generateUsageRecommendations(ctx context.Context, tenantI
 
 // Placeholder types for insights
 type UsageLimitStatus struct {
-	TenantID      uuid.UUID              `json:"tenant_id"`
-	CheckedAt     time.Time              `json:"checked_at"`
-	OverallStatus string                 `json:"overall_status"`
-	Violations    []UsageLimitViolation  `json:"violations"`
+	TenantID      uuid.UUID             `json:"tenant_id"`
+	CheckedAt     time.Time             `json:"checked_at"`
+	OverallStatus string                `json:"overall_status"`
+	Violations    []UsageLimitViolation `json:"violations"`
 }
 
 type UsageLimitViolation struct {
-	Type        string    `json:"type"`
-	CurrentValue float64  `json:"current_value"`
-	LimitValue   float64  `json:"limit_value"`
-	Severity     string   `json:"severity"`
-	Message      string   `json:"message"`
+	Type         string    `json:"type"`
+	CurrentValue float64   `json:"current_value"`
+	LimitValue   float64   `json:"limit_value"`
+	Severity     string    `json:"severity"`
+	Message      string    `json:"message"`
 	DetectedAt   time.Time `json:"detected_at"`
 }
 
 type UsageInsights struct {
-	TenantID        uuid.UUID              `json:"tenant_id"`
-	GeneratedAt     time.Time              `json:"generated_at"`
-	Recommendations []UsageRecommendation  `json:"recommendations"`
-	Patterns        []UsagePattern         `json:"patterns"`
-	Predictions     []UsagePrediction      `json:"predictions"`
+	TenantID        uuid.UUID             `json:"tenant_id"`
+	GeneratedAt     time.Time             `json:"generated_at"`
+	Recommendations []UsageRecommendation `json:"recommendations"`
+	Patterns        []UsagePattern        `json:"patterns"`
+	Predictions     []UsagePrediction     `json:"predictions"`
 }
 
 type UsageRecommendation struct {
-	Type            string    `json:"type"`
-	Title           string    `json:"title"`
-	Description     string    `json:"description"`
-	Priority        string    `json:"priority"`
-	EstimatedSavings float64  `json:"estimated_savings"`
-	Confidence      float64   `json:"confidence"`
+	Type             string  `json:"type"`
+	Title            string  `json:"title"`
+	Description      string  `json:"description"`
+	Priority         string  `json:"priority"`
+	EstimatedSavings float64 `json:"estimated_savings"`
+	Confidence       float64 `json:"confidence"`
 }
 
 type UsagePattern struct {
@@ -732,18 +732,20 @@ type UsagePattern struct {
 }
 
 type UsagePrediction struct {
-	Metric      string    `json:"metric"`
-	CurrentValue float64  `json:"current_value"`
+	Metric         string  `json:"metric"`
+	CurrentValue   float64 `json:"current_value"`
 	PredictedValue float64 `json:"predicted_value"`
-	TimeHorizon string    `json:"time_horizon"`
-	Confidence  float64   `json:"confidence"`
+	TimeHorizon    string  `json:"time_horizon"`
+	Confidence     float64 `json:"confidence"`
 }
 
 // Placeholder analyzer types
 type TrendAnalyzer struct{}
-func NewTrendAnalyzer() *TrendAnalyzer { return &TrendAnalyzer{} }
+
+func NewTrendAnalyzer() *TrendAnalyzer                            { return &TrendAnalyzer{} }
 func (ta *TrendAnalyzer) AnalyzeTrends(ctx context.Context) error { return nil }
 
 type AnomalyDetector struct{}
-func NewAnomalyDetector() *AnomalyDetector { return &AnomalyDetector{} }
+
+func NewAnomalyDetector() *AnomalyDetector                            { return &AnomalyDetector{} }
 func (ad *AnomalyDetector) DetectAnomalies(ctx context.Context) error { return nil }

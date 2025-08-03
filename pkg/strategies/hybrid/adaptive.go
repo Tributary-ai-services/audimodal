@@ -137,10 +137,10 @@ func (s *AdaptiveStrategy) TestConnection(ctx context.Context, config map[string
 		Success: true,
 		Message: "Adaptive hybrid strategy configuration is valid",
 		Details: map[string]any{
-			"auto_detect":         config["auto_detect_type"],
-			"mixed_strategy":      config["mixed_content_strategy"],
-			"preserve_structure":  config["preserve_structure"],
-			"split_method":        "adaptive",
+			"auto_detect":        config["auto_detect_type"],
+			"mixed_strategy":     config["mixed_content_strategy"],
+			"preserve_structure": config["preserve_structure"],
+			"split_method":       "adaptive",
 		},
 	}
 }
@@ -171,11 +171,11 @@ func (s *AdaptiveStrategy) ConfigureReader(readerConfig map[string]any) (map[str
 	for k, v := range readerConfig {
 		configured[k] = v
 	}
-	
+
 	// Adaptive strategy needs to preserve all data
 	configured["skip_empty_lines"] = false
 	configured["has_header"] = true
-	
+
 	return configured, nil
 }
 
@@ -189,7 +189,7 @@ func (s *AdaptiveStrategy) ProcessChunk(ctx context.Context, rawData any, metada
 
 	// Analyze data type and choose appropriate strategy
 	dataType := s.analyzeDataType(rawData)
-	
+
 	// Process based on detected type
 	switch dataType {
 	case "text":
@@ -211,7 +211,7 @@ func (s *AdaptiveStrategy) GetOptimalChunkSize(sourceSchema core.SchemaInfo) int
 	case "structured":
 		// For structured data, optimize for row count
 		if len(sourceSchema.Fields) > 20 {
-			return 50  // Fewer rows for wide tables
+			return 50 // Fewer rows for wide tables
 		}
 		return 100
 	case "unstructured":
@@ -233,22 +233,22 @@ func (s *AdaptiveStrategy) SupportsParallelProcessing() bool {
 // Internal types and methods
 
 type adaptiveConfig struct {
-	AutoDetectType         bool
-	DefaultTextChunkSize   int
-	DefaultRowsPerChunk    int
-	MixedContentStrategy   string
-	PreserveStructure      bool
-	QualityThreshold       float64
+	AutoDetectType       bool
+	DefaultTextChunkSize int
+	DefaultRowsPerChunk  int
+	MixedContentStrategy string
+	PreserveStructure    bool
+	QualityThreshold     float64
 }
 
 func (s *AdaptiveStrategy) getDefaultConfig() *adaptiveConfig {
 	return &adaptiveConfig{
-		AutoDetectType:         true,
-		DefaultTextChunkSize:   1000,
-		DefaultRowsPerChunk:    100,
-		MixedContentStrategy:   "separate",
-		PreserveStructure:      true,
-		QualityThreshold:       0.5,
+		AutoDetectType:       true,
+		DefaultTextChunkSize: 1000,
+		DefaultRowsPerChunk:  100,
+		MixedContentStrategy: "separate",
+		PreserveStructure:    true,
+		QualityThreshold:     0.5,
 	}
 }
 
@@ -318,7 +318,7 @@ func (s *AdaptiveStrategy) processAsText(rawData any, config *adaptiveConfig, me
 func (s *AdaptiveStrategy) processAsStructured(rawData any, config *adaptiveConfig, metadata core.ChunkMetadata) ([]core.Chunk, error) {
 	// Convert to standard record format
 	var records []map[string]any
-	
+
 	switch data := rawData.(type) {
 	case map[string]any:
 		records = []map[string]any{data}
@@ -375,24 +375,24 @@ func (s *AdaptiveStrategy) processAsGeneric(rawData any, config *adaptiveConfig,
 
 func (s *AdaptiveStrategy) chunkTextAdaptively(text string, config *adaptiveConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	// Detect text structure
 	structure := s.analyzeTextStructure(text)
-	
+
 	// Chunk based on structure
 	chunkNumber := 1
 	currentChunk := ""
 	currentStart := 0
-	
+
 	for _, section := range structure.Sections {
-		if len(currentChunk) + len(section.Content) > config.DefaultTextChunkSize && len(currentChunk) > 0 {
+		if len(currentChunk)+len(section.Content) > config.DefaultTextChunkSize && len(currentChunk) > 0 {
 			// Create chunk with current content
 			if s.meetsQualityThreshold(currentChunk, config.QualityThreshold) {
 				chunk := s.createTextChunk(currentChunk, currentStart, chunkNumber, metadata)
 				chunks = append(chunks, chunk)
 				chunkNumber++
 			}
-			
+
 			// Start new chunk
 			currentChunk = section.Content
 			currentStart = section.Start
@@ -407,28 +407,28 @@ func (s *AdaptiveStrategy) chunkTextAdaptively(text string, config *adaptiveConf
 			}
 		}
 	}
-	
+
 	// Add final chunk
 	if len(currentChunk) > 0 && s.meetsQualityThreshold(currentChunk, config.QualityThreshold) {
 		chunk := s.createTextChunk(currentChunk, currentStart, chunkNumber, metadata)
 		chunks = append(chunks, chunk)
 	}
-	
+
 	return chunks
 }
 
 func (s *AdaptiveStrategy) chunkRecordsAdaptively(records []map[string]any, config *adaptiveConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	chunkNumber := 1
 	for i := 0; i < len(records); i += config.DefaultRowsPerChunk {
 		end := i + config.DefaultRowsPerChunk
 		if end > len(records) {
 			end = len(records)
 		}
-		
+
 		chunkRecords := records[i:end]
-		
+
 		chunk := core.Chunk{
 			Data: chunkRecords,
 			Metadata: core.ChunkMetadata{
@@ -451,18 +451,18 @@ func (s *AdaptiveStrategy) chunkRecordsAdaptively(records []map[string]any, conf
 				},
 			},
 		}
-		
+
 		chunks = append(chunks, chunk)
 		chunkNumber++
 	}
-	
+
 	return chunks
 }
 
 func (s *AdaptiveStrategy) chunkJSONAdaptively(jsonText string, config *adaptiveConfig, metadata core.ChunkMetadata) []core.Chunk {
 	// Simple JSON chunking - split by objects/arrays
 	var chunks []core.Chunk
-	
+
 	// For now, treat as single chunk (could be enhanced with JSON parsing)
 	chunk := core.Chunk{
 		Data: jsonText,
@@ -485,7 +485,7 @@ func (s *AdaptiveStrategy) chunkJSONAdaptively(jsonText string, config *adaptive
 			},
 		},
 	}
-	
+
 	chunks = append(chunks, chunk)
 	return chunks
 }
@@ -493,13 +493,13 @@ func (s *AdaptiveStrategy) chunkJSONAdaptively(jsonText string, config *adaptive
 func (s *AdaptiveStrategy) processMixedSeparately(array []any, config *adaptiveConfig, metadata core.ChunkMetadata) ([]core.Chunk, error) {
 	var chunks []core.Chunk
 	chunkNumber := 1
-	
+
 	for _, item := range array {
 		dataType := s.analyzeDataType(item)
-		
+
 		var itemChunks []core.Chunk
 		var err error
-		
+
 		switch dataType {
 		case "text":
 			itemChunks, err = s.processAsText(item, config, metadata)
@@ -510,11 +510,11 @@ func (s *AdaptiveStrategy) processMixedSeparately(array []any, config *adaptiveC
 		default:
 			itemChunks, err = s.processAsGeneric(item, config, metadata)
 		}
-		
+
 		if err != nil {
 			continue // Skip problematic items
 		}
-		
+
 		// Update chunk IDs to maintain sequence
 		for _, chunk := range itemChunks {
 			chunk.Metadata.ChunkID = fmt.Sprintf("%s:adaptive:mixed:%d", metadata.ChunkID, chunkNumber)
@@ -523,54 +523,54 @@ func (s *AdaptiveStrategy) processMixedSeparately(array []any, config *adaptiveC
 			chunkNumber++
 		}
 	}
-	
+
 	return chunks, nil
 }
 
 func (s *AdaptiveStrategy) processMixedCombined(array []any, config *adaptiveConfig, metadata core.ChunkMetadata) ([]core.Chunk, error) {
 	// Combine all items into a single representation
 	var combined strings.Builder
-	
+
 	for i, item := range array {
 		if i > 0 {
 			combined.WriteString("\n---\n")
 		}
 		combined.WriteString(fmt.Sprintf("%v", item))
 	}
-	
+
 	return s.processAsText(combined.String(), config, metadata)
 }
 
 func (s *AdaptiveStrategy) processMixedTextOnly(array []any, config *adaptiveConfig, metadata core.ChunkMetadata) ([]core.Chunk, error) {
 	var textItems []string
-	
+
 	for _, item := range array {
 		if text, ok := item.(string); ok {
 			textItems = append(textItems, text)
 		}
 	}
-	
+
 	if len(textItems) == 0 {
 		return []core.Chunk{}, nil
 	}
-	
+
 	combinedText := strings.Join(textItems, "\n\n")
 	return s.processAsText(combinedText, config, metadata)
 }
 
 func (s *AdaptiveStrategy) processMixedStructuredOnly(array []any, config *adaptiveConfig, metadata core.ChunkMetadata) ([]core.Chunk, error) {
 	var structuredItems []map[string]any
-	
+
 	for _, item := range array {
 		if record, ok := item.(map[string]any); ok {
 			structuredItems = append(structuredItems, record)
 		}
 	}
-	
+
 	if len(structuredItems) == 0 {
 		return []core.Chunk{}, nil
 	}
-	
+
 	return s.processAsStructured(structuredItems, config, metadata)
 }
 
@@ -589,34 +589,34 @@ type textSection struct {
 
 func (s *AdaptiveStrategy) analyzeTextStructure(text string) *textStructure {
 	structure := &textStructure{}
-	
+
 	// Simple paragraph-based structure
 	paragraphs := strings.Split(text, "\n\n")
 	currentPos := 0
-	
+
 	for _, paragraph := range paragraphs {
 		paragraph = strings.TrimSpace(paragraph)
 		if paragraph == "" {
 			currentPos += 2
 			continue
 		}
-		
+
 		sectionType := "paragraph"
 		if s.looksLikeHeader(paragraph) {
 			sectionType = "header"
 		}
-		
+
 		section := textSection{
 			Content: paragraph,
 			Start:   currentPos,
 			End:     currentPos + len(paragraph),
 			Type:    sectionType,
 		}
-		
+
 		structure.Sections = append(structure.Sections, section)
 		currentPos += len(paragraph) + 2
 	}
-	
+
 	return structure
 }
 
@@ -649,10 +649,10 @@ func (s *AdaptiveStrategy) convertTableToRecords(table [][]string) []map[string]
 	if len(table) == 0 {
 		return []map[string]any{}
 	}
-	
+
 	headers := table[0]
 	var records []map[string]any
-	
+
 	for _, row := range table[1:] {
 		record := make(map[string]any)
 		for i, value := range row {
@@ -662,13 +662,13 @@ func (s *AdaptiveStrategy) convertTableToRecords(table [][]string) []map[string]
 		}
 		records = append(records, record)
 	}
-	
+
 	return records
 }
 
 func (s *AdaptiveStrategy) meetsQualityThreshold(content string, threshold float64) bool {
 	quality := s.calculateAdaptiveQuality(content, "text")
-	
+
 	// Simple quality check
 	avgQuality := (quality.Completeness + quality.Coherence + quality.Readability) / 3.0
 	return avgQuality >= threshold
@@ -695,7 +695,7 @@ func (s *AdaptiveStrategy) calculateTextQuality(text string) *core.QualityMetric
 	sentences := strings.FieldsFunc(text, func(r rune) bool {
 		return r == '.' || r == '!' || r == '?'
 	})
-	
+
 	// Basic quality metrics
 	completeness := 1.0
 	if len(text) > 0 && !strings.HasSuffix(strings.TrimSpace(text), ".") &&
@@ -703,7 +703,7 @@ func (s *AdaptiveStrategy) calculateTextQuality(text string) *core.QualityMetric
 		!strings.HasSuffix(strings.TrimSpace(text), "?") {
 		completeness = 0.8
 	}
-	
+
 	coherence := 0.5
 	if len(sentences) > 0 && len(words) > 0 {
 		avgWordsPerSentence := float64(len(words)) / float64(len(sentences))
@@ -711,7 +711,7 @@ func (s *AdaptiveStrategy) calculateTextQuality(text string) *core.QualityMetric
 			coherence = 0.8
 		}
 	}
-	
+
 	readability := 0.7
 	if len(words) > 0 {
 		avgWordLength := float64(len(text)) / float64(len(words))
@@ -719,7 +719,7 @@ func (s *AdaptiveStrategy) calculateTextQuality(text string) *core.QualityMetric
 			readability = 0.8
 		}
 	}
-	
+
 	return &core.QualityMetrics{
 		Completeness: completeness,
 		Coherence:    coherence,
@@ -733,11 +733,11 @@ func (s *AdaptiveStrategy) calculateStructuredQuality(records []map[string]any) 
 	if len(records) == 0 {
 		return &core.QualityMetrics{}
 	}
-	
+
 	// Calculate field completeness
 	totalFields := 0
 	nonEmptyFields := 0
-	
+
 	for _, record := range records {
 		for _, value := range record {
 			totalFields++
@@ -746,12 +746,12 @@ func (s *AdaptiveStrategy) calculateStructuredQuality(records []map[string]any) 
 			}
 		}
 	}
-	
+
 	completeness := 0.0
 	if totalFields > 0 {
 		completeness = float64(nonEmptyFields) / float64(totalFields)
 	}
-	
+
 	return &core.QualityMetrics{
 		Completeness: completeness,
 		Coherence:    0.9, // Structured data is inherently coherent
@@ -767,7 +767,7 @@ func (s *AdaptiveStrategy) calculateJSONQuality(jsonText string) *core.QualityMe
 	if !strings.HasPrefix(strings.TrimSpace(jsonText), "{") && !strings.HasPrefix(strings.TrimSpace(jsonText), "[") {
 		completeness = 0.5
 	}
-	
+
 	return &core.QualityMetrics{
 		Completeness: completeness,
 		Coherence:    0.8,
@@ -782,7 +782,7 @@ func (s *AdaptiveStrategy) calculateJSONQuality(jsonText string) *core.QualityMe
 func (s *AdaptiveStrategy) looksLikeJSON(text string) bool {
 	text = strings.TrimSpace(text)
 	return (strings.HasPrefix(text, "{") && strings.HasSuffix(text, "}")) ||
-		   (strings.HasPrefix(text, "[") && strings.HasSuffix(text, "]"))
+		(strings.HasPrefix(text, "[") && strings.HasSuffix(text, "]"))
 }
 
 func (s *AdaptiveStrategy) looksLikeCSV(text string) bool {
@@ -790,11 +790,11 @@ func (s *AdaptiveStrategy) looksLikeCSV(text string) bool {
 	if len(lines) < 2 {
 		return false
 	}
-	
+
 	// Check if first two lines have same number of commas
 	firstCommas := strings.Count(lines[0], ",")
 	secondCommas := strings.Count(lines[1], ",")
-	
+
 	return firstCommas > 0 && firstCommas == secondCommas
 }
 

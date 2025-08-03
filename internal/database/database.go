@@ -16,10 +16,10 @@ import (
 
 // Database represents the main database interface for the application
 type Database struct {
-	conn      *Connection
-	migrator  *Migrator
-	tenant    *TenantDatabase
-	config    *Config
+	conn     *Connection
+	migrator *Migrator
+	tenant   *TenantDatabase
+	config   *Config
 }
 
 // New creates a new database instance with all components
@@ -273,11 +273,11 @@ func (r *Repository[T]) Count(ctx context.Context) (int64, error) {
 func (r *Repository[T]) FindWhere(ctx context.Context, conditions map[string]interface{}) ([]T, error) {
 	var records []T
 	query := r.db.WithContext(ctx)
-	
+
 	for key, value := range conditions {
 		query = query.Where(fmt.Sprintf("%s = ?", key), value)
 	}
-	
+
 	err := query.Find(&records).Error
 	return records, err
 }
@@ -314,7 +314,7 @@ func ParseConnectionString(connectionString string) (*Config, error) {
 // WaitForDatabase waits for the database to become available
 func WaitForDatabase(ctx context.Context, config *Config, maxRetries int, retryInterval time.Duration) error {
 	var lastErr error
-	
+
 	for i := 0; i < maxRetries; i++ {
 		db, err := New(config)
 		if err != nil {
@@ -348,7 +348,7 @@ func NewBatchProcessor(db *gorm.DB, batchSize int) *BatchProcessor {
 	if batchSize <= 0 {
 		batchSize = 100
 	}
-	
+
 	return &BatchProcessor{
 		db:        db,
 		batchSize: batchSize,
@@ -358,35 +358,35 @@ func NewBatchProcessor(db *gorm.DB, batchSize int) *BatchProcessor {
 // ProcessInBatches processes records in batches
 func (bp *BatchProcessor) ProcessInBatches(ctx context.Context, tableName string, processor func([]map[string]interface{}) error) error {
 	offset := 0
-	
+
 	for {
 		var batch []map[string]interface{}
-		
+
 		err := bp.db.WithContext(ctx).
 			Table(tableName).
 			Limit(bp.batchSize).
 			Offset(offset).
 			Find(&batch).Error
-			
+
 		if err != nil {
 			return fmt.Errorf("failed to fetch batch: %w", err)
 		}
-		
+
 		if len(batch) == 0 {
 			break
 		}
-		
+
 		if err := processor(batch); err != nil {
 			return fmt.Errorf("batch processing failed: %w", err)
 		}
-		
+
 		offset += len(batch)
-		
+
 		if len(batch) < bp.batchSize {
 			break
 		}
 	}
-	
+
 	return nil
 }
 

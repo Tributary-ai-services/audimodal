@@ -218,21 +218,21 @@ func (r *MSGReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 			},
 		},
 		Metadata: map[string]any{
-			"from":              msgInfo.From,
-			"to":                msgInfo.To,
-			"cc":                msgInfo.CC,
-			"bcc":               msgInfo.BCC,
-			"subject":           msgInfo.Subject,
-			"date":              msgInfo.Date,
-			"message_class":     msgInfo.MessageClass,
-			"has_attachments":   msgInfo.HasAttachments,
-			"attachment_count":  msgInfo.AttachmentCount,
-			"has_html_body":     msgInfo.HasHTMLBody,
-			"has_rtf_body":      msgInfo.HasRTFBody,
-			"has_plain_body":    msgInfo.HasPlainBody,
-			"priority":          msgInfo.Priority,
-			"sensitivity":       msgInfo.Sensitivity,
-			"outlook_version":   msgInfo.OutlookVersion,
+			"from":             msgInfo.From,
+			"to":               msgInfo.To,
+			"cc":               msgInfo.CC,
+			"bcc":              msgInfo.BCC,
+			"subject":          msgInfo.Subject,
+			"date":             msgInfo.Date,
+			"message_class":    msgInfo.MessageClass,
+			"has_attachments":  msgInfo.HasAttachments,
+			"attachment_count": msgInfo.AttachmentCount,
+			"has_html_body":    msgInfo.HasHTMLBody,
+			"has_rtf_body":     msgInfo.HasRTFBody,
+			"has_plain_body":   msgInfo.HasPlainBody,
+			"priority":         msgInfo.Priority,
+			"sensitivity":      msgInfo.Sensitivity,
+			"outlook_version":  msgInfo.OutlookVersion,
 		},
 	}
 
@@ -278,7 +278,7 @@ func (r *MSGReader) EstimateSize(ctx context.Context, sourcePath string) (core.S
 	}
 	estimatedChunks += msgInfo.AttachmentCount
 
-	complexity := "medium" // MSG files are inherently more complex due to OLE format
+	complexity := "medium"                                         // MSG files are inherently more complex due to OLE format
 	if stat.Size() > 5*1024*1024 || msgInfo.AttachmentCount > 10 { // > 5MB or > 10 attachments
 		complexity = "high"
 	}
@@ -331,33 +331,33 @@ func (r *MSGReader) GetSupportedFormats() []string {
 
 // MSGInfo contains extracted MSG information
 type MSGInfo struct {
-	From             string
-	To               string
-	CC               string
-	BCC              string
-	Subject          string
-	Date             string
-	MessageClass     string
-	HasAttachments   bool
-	AttachmentCount  int
-	HasHTMLBody      bool
-	HasRTFBody       bool
-	HasPlainBody     bool
-	Priority         string
-	Sensitivity      string
-	OutlookVersion   string
+	From            string
+	To              string
+	CC              string
+	BCC             string
+	Subject         string
+	Date            string
+	MessageClass    string
+	HasAttachments  bool
+	AttachmentCount int
+	HasHTMLBody     bool
+	HasRTFBody      bool
+	HasPlainBody    bool
+	Priority        string
+	Sensitivity     string
+	OutlookVersion  string
 }
 
 // MSGPart represents a part of an MSG message
 type MSGPart struct {
-	ContentType     string
-	Content         string
-	Properties      map[string]string
-	IsAttachment    bool
-	AttachmentName  string
-	AttachmentType  string
-	MAPIProperty    string
-	Size            int64
+	ContentType    string
+	Content        string
+	Properties     map[string]string
+	IsAttachment   bool
+	AttachmentName string
+	AttachmentType string
+	MAPIProperty   string
+	Size           int64
 }
 
 // isMSGFile checks if the file is a valid MSG file by checking OLE signature
@@ -383,7 +383,7 @@ func (r *MSGReader) isMSGFile(filePath string) bool {
 func (r *MSGReader) extractMSGInfo(filePath string) (MSGInfo, error) {
 	// This is a simplified MSG parser
 	// In production, you'd need a full OLE compound document parser
-	
+
 	info := MSGInfo{
 		MessageClass:    "IPM.Note", // Default message class
 		HasPlainBody:    true,       // Assume basic content
@@ -398,7 +398,7 @@ func (r *MSGReader) extractMSGInfo(filePath string) (MSGInfo, error) {
 	// 1. Parse the OLE compound document structure
 	// 2. Extract MAPI properties from streams
 	// 3. Decode property values according to their types
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return info, err
@@ -417,7 +417,7 @@ func (r *MSGReader) extractMSGInfo(filePath string) (MSGInfo, error) {
 	info.From = "sender@example.com"
 	info.To = "recipient@example.com"
 	info.Date = time.Now().Format("2006-01-02 15:04:05")
-	
+
 	// Check file size to estimate attachments
 	if stat, err := os.Stat(filePath); err == nil {
 		if stat.Size() > 50*1024 { // > 50KB likely has attachments
@@ -522,13 +522,13 @@ func (r *MSGReader) createMSGHeadersPart(info MSGInfo) MSGPart {
 	headers = append(headers, fmt.Sprintf("Sensitivity: %s", info.Sensitivity))
 
 	properties := map[string]string{
-		"PR_SENDER_EMAIL_ADDRESS":  info.From,
-		"PR_RECEIVED_BY_EMAIL":     info.To,
-		"PR_SUBJECT":               info.Subject,
-		"PR_CLIENT_SUBMIT_TIME":    info.Date,
-		"PR_MESSAGE_CLASS":         info.MessageClass,
-		"PR_PRIORITY":              info.Priority,
-		"PR_SENSITIVITY":           info.Sensitivity,
+		"PR_SENDER_EMAIL_ADDRESS": info.From,
+		"PR_RECEIVED_BY_EMAIL":    info.To,
+		"PR_SUBJECT":              info.Subject,
+		"PR_CLIENT_SUBMIT_TIME":   info.Date,
+		"PR_MESSAGE_CLASS":        info.MessageClass,
+		"PR_PRIORITY":             info.Priority,
+		"PR_SENSITIVITY":          info.Sensitivity,
 	}
 
 	return MSGPart{
@@ -585,7 +585,7 @@ func (it *MSGIterator) Next(ctx context.Context) (core.Chunk, error) {
 	if part.MAPIProperty != "" {
 		chunk.Metadata.Context["mapi_property"] = part.MAPIProperty
 	}
-	
+
 	// Add email properties from headers part
 	if part.ContentType == "headers" {
 		if from := part.Properties["PR_SENDER_EMAIL_ADDRESS"]; from != "" {

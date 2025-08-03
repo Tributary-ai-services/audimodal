@@ -2,7 +2,6 @@ package anomaly
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -17,23 +16,23 @@ import (
 
 // AlertingService provides real-time anomaly alerting capabilities
 type AlertingService struct {
-	config          *AlertingConfig
-	channels        map[string]AlertChannel
-	rules           map[uuid.UUID]*AlertRule
-	subscriptions   map[uuid.UUID]*AlertSubscription
-	alertHistory    map[uuid.UUID][]*Alert
-	ruleEngine      *RuleEngine
-	tracer          trace.Tracer
-	mutex           sync.RWMutex
-	
+	config        *AlertingConfig
+	channels      map[string]AlertChannel
+	rules         map[uuid.UUID]*AlertRule
+	subscriptions map[uuid.UUID]*AlertSubscription
+	alertHistory  map[uuid.UUID][]*Alert
+	ruleEngine    *RuleEngine
+	tracer        trace.Tracer
+	mutex         sync.RWMutex
+
 	// Real-time processing
-	alertQueue      chan *Alert
-	stopChan        chan struct{}
-	workers         []*AlertWorker
-	
+	alertQueue chan *Alert
+	stopChan   chan struct{}
+	workers    []*AlertWorker
+
 	// Rate limiting and throttling
-	rateLimiters    map[string]*RateLimiter
-	alertThrottler  *AlertThrottler
+	rateLimiters   map[string]*RateLimiter
+	alertThrottler *AlertThrottler
 }
 
 // AlertingConfig contains configuration for the alerting system
@@ -109,53 +108,53 @@ const (
 
 // AlertRecipient represents a recipient of an alert
 type AlertRecipient struct {
-	ID       uuid.UUID `json:"id"`
-	Type     string    `json:"type"` // user, group, role, external
-	Address  string    `json:"address"`
-	Name     string    `json:"name,omitempty"`
+	ID       uuid.UUID              `json:"id"`
+	Type     string                 `json:"type"` // user, group, role, external
+	Address  string                 `json:"address"`
+	Name     string                 `json:"name,omitempty"`
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // DeliveryStatus represents the delivery status for a specific channel
 type DeliveryStatus struct {
-	Channel       string     `json:"channel"`
-	Status        string     `json:"status"`
-	AttemptedAt   time.Time  `json:"attempted_at"`
-	DeliveredAt   *time.Time `json:"delivered_at,omitempty"`
-	Error         string     `json:"error,omitempty"`
-	ResponseCode  int        `json:"response_code,omitempty"`
-	ResponseBody  string     `json:"response_body,omitempty"`
+	Channel      string     `json:"channel"`
+	Status       string     `json:"status"`
+	AttemptedAt  time.Time  `json:"attempted_at"`
+	DeliveredAt  *time.Time `json:"delivered_at,omitempty"`
+	Error        string     `json:"error,omitempty"`
+	ResponseCode int        `json:"response_code,omitempty"`
+	ResponseBody string     `json:"response_body,omitempty"`
 }
 
 // AlertRule defines conditions and actions for generating alerts
 type AlertRule struct {
-	ID                 uuid.UUID             `json:"id"`
-	Name               string                `json:"name"`
-	Description        string                `json:"description"`
-	TenantID           uuid.UUID             `json:"tenant_id"`
-	Enabled            bool                  `json:"enabled"`
-	Priority           int                   `json:"priority"`
-	Conditions         []AlertCondition      `json:"conditions"`
-	Actions            []AlertAction         `json:"actions"`
-	CooldownPeriod     time.Duration         `json:"cooldown_period"`
-	EscalationRules    []EscalationRule      `json:"escalation_rules,omitempty"`
-	SuppressionRules   []SuppressionRule     `json:"suppression_rules,omitempty"`
-	Tags               []string              `json:"tags"`
-	CreatedAt          time.Time             `json:"created_at"`
-	UpdatedAt          time.Time             `json:"updated_at"`
-	CreatedBy          uuid.UUID             `json:"created_by"`
-	LastTriggered      *time.Time            `json:"last_triggered,omitempty"`
-	TriggerCount       int64                 `json:"trigger_count"`
-	Schedule           *AlertSchedule        `json:"schedule,omitempty"`
+	ID               uuid.UUID         `json:"id"`
+	Name             string            `json:"name"`
+	Description      string            `json:"description"`
+	TenantID         uuid.UUID         `json:"tenant_id"`
+	Enabled          bool              `json:"enabled"`
+	Priority         int               `json:"priority"`
+	Conditions       []AlertCondition  `json:"conditions"`
+	Actions          []AlertAction     `json:"actions"`
+	CooldownPeriod   time.Duration     `json:"cooldown_period"`
+	EscalationRules  []EscalationRule  `json:"escalation_rules,omitempty"`
+	SuppressionRules []SuppressionRule `json:"suppression_rules,omitempty"`
+	Tags             []string          `json:"tags"`
+	CreatedAt        time.Time         `json:"created_at"`
+	UpdatedAt        time.Time         `json:"updated_at"`
+	CreatedBy        uuid.UUID         `json:"created_by"`
+	LastTriggered    *time.Time        `json:"last_triggered,omitempty"`
+	TriggerCount     int64             `json:"trigger_count"`
+	Schedule         *AlertSchedule    `json:"schedule,omitempty"`
 }
 
 // AlertCondition defines a condition that must be met to trigger an alert
 type AlertCondition struct {
-	Field     string                 `json:"field"`
-	Operator  string                 `json:"operator"`
-	Value     interface{}            `json:"value"`
-	DataType  string                 `json:"data_type"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Field    string                 `json:"field"`
+	Operator string                 `json:"operator"`
+	Value    interface{}            `json:"value"`
+	DataType string                 `json:"data_type"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // AlertAction defines an action to take when an alert is triggered
@@ -170,42 +169,42 @@ type AlertAction struct {
 
 // EscalationRule defines how alerts should be escalated
 type EscalationRule struct {
-	Level      int           `json:"level"`
-	Delay      time.Duration `json:"delay"`
+	Level      int              `json:"level"`
+	Delay      time.Duration    `json:"delay"`
 	Recipients []AlertRecipient `json:"recipients"`
-	Channels   []string      `json:"channels"`
-	Condition  string        `json:"condition,omitempty"`
+	Channels   []string         `json:"channels"`
+	Condition  string           `json:"condition,omitempty"`
 }
 
 // SuppressionRule defines conditions for suppressing alerts
 type SuppressionRule struct {
-	ID         uuid.UUID             `json:"id"`
-	Conditions []AlertCondition      `json:"conditions"`
-	Duration   time.Duration         `json:"duration"`
-	Reason     string                `json:"reason"`
+	ID         uuid.UUID        `json:"id"`
+	Conditions []AlertCondition `json:"conditions"`
+	Duration   time.Duration    `json:"duration"`
+	Reason     string           `json:"reason"`
 }
 
 // AlertSchedule defines when alert rules are active
 type AlertSchedule struct {
-	Timezone    string    `json:"timezone"`
-	ActiveHours []int     `json:"active_hours,omitempty"`
-	ActiveDays  []int     `json:"active_days,omitempty"`
+	Timezone    string     `json:"timezone"`
+	ActiveHours []int      `json:"active_hours,omitempty"`
+	ActiveDays  []int      `json:"active_days,omitempty"`
 	StartDate   *time.Time `json:"start_date,omitempty"`
 	EndDate     *time.Time `json:"end_date,omitempty"`
 }
 
 // AlertSubscription represents a subscription to alerts
 type AlertSubscription struct {
-	ID          uuid.UUID        `json:"id"`
-	TenantID    uuid.UUID        `json:"tenant_id"`
-	UserID      uuid.UUID        `json:"user_id"`
-	Name        string           `json:"name"`
-	Filters     []AlertCondition `json:"filters"`
-	Channels    []string         `json:"channels"`
-	Frequency   string           `json:"frequency"` // immediate, batch, digest
-	Enabled     bool             `json:"enabled"`
-	CreatedAt   time.Time        `json:"created_at"`
-	UpdatedAt   time.Time        `json:"updated_at"`
+	ID        uuid.UUID        `json:"id"`
+	TenantID  uuid.UUID        `json:"tenant_id"`
+	UserID    uuid.UUID        `json:"user_id"`
+	Name      string           `json:"name"`
+	Filters   []AlertCondition `json:"filters"`
+	Channels  []string         `json:"channels"`
+	Frequency string           `json:"frequency"` // immediate, batch, digest
+	Enabled   bool             `json:"enabled"`
+	CreatedAt time.Time        `json:"created_at"`
+	UpdatedAt time.Time        `json:"updated_at"`
 }
 
 // AlertChannel defines the interface for alert delivery channels
@@ -238,16 +237,16 @@ type RateLimiter struct {
 
 // AlertThrottler implements alert throttling and deduplication
 type AlertThrottler struct {
-	config           *AlertingConfig
-	recentAlerts     map[string]time.Time
-	alertCounts      map[string]int
-	mutex            sync.RWMutex
+	config       *AlertingConfig
+	recentAlerts map[string]time.Time
+	alertCounts  map[string]int
+	mutex        sync.RWMutex
 }
 
 // AlertWorker processes alerts from the queue
 type AlertWorker struct {
-	id      int
-	service *AlertingService
+	id       int
+	service  *AlertingService
 	stopChan chan struct{}
 }
 
@@ -273,16 +272,16 @@ func NewAlertingService(config *AlertingConfig) *AlertingService {
 	}
 
 	service := &AlertingService{
-		config:        config,
-		channels:      make(map[string]AlertChannel),
-		rules:         make(map[uuid.UUID]*AlertRule),
-		subscriptions: make(map[uuid.UUID]*AlertSubscription),
-		alertHistory:  make(map[uuid.UUID][]*Alert),
-		rateLimiters:  make(map[string]*RateLimiter),
-		alertQueue:    make(chan *Alert, config.AlertQueueSize),
-		stopChan:      make(chan struct{}),
-		tracer:        otel.Tracer("anomaly-alerting"),
-		ruleEngine:    NewRuleEngine(),
+		config:         config,
+		channels:       make(map[string]AlertChannel),
+		rules:          make(map[uuid.UUID]*AlertRule),
+		subscriptions:  make(map[uuid.UUID]*AlertSubscription),
+		alertHistory:   make(map[uuid.UUID][]*Alert),
+		rateLimiters:   make(map[string]*RateLimiter),
+		alertQueue:     make(chan *Alert, config.AlertQueueSize),
+		stopChan:       make(chan struct{}),
+		tracer:         otel.Tracer("anomaly-alerting"),
+		ruleEngine:     NewRuleEngine(),
 		alertThrottler: NewAlertThrottler(config),
 	}
 
@@ -311,7 +310,7 @@ func (s *AlertingService) ProcessAnomaly(ctx context.Context, anomaly *Anomaly) 
 
 	// Find matching rules
 	matchingRules := s.ruleEngine.FindMatchingRules(anomaly)
-	
+
 	// Generate alerts for matching rules
 	for _, rule := range matchingRules {
 		alert, err := s.createAlertFromRule(ctx, anomaly, rule)
@@ -561,22 +560,22 @@ func (s *AlertingService) ResolveAlert(ctx context.Context, alertID uuid.UUID, u
 
 func (s *AlertingService) createAlertFromRule(ctx context.Context, anomaly *Anomaly, rule *AlertRule) (*Alert, error) {
 	alert := &Alert{
-		ID:               uuid.New(),
-		AnomalyID:        anomaly.ID,
-		RuleID:           rule.ID,
-		Title:            s.generateAlertTitle(anomaly, rule),
-		Message:          s.generateAlertMessage(anomaly, rule),
-		Severity:         s.mapAnomalySeverityToAlert(anomaly.Severity),
-		Status:           AlertStatusPending,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
-		TenantID:         anomaly.TenantID,
-		DataSourceID:     anomaly.DataSourceID,
-		UserID:           anomaly.UserID,
-		Tags:             rule.Tags,
-		Metadata:         make(map[string]interface{}),
-		DeliveryStatus:   make(map[string]DeliveryStatus),
-		EscalationLevel:  0,
+		ID:              uuid.New(),
+		AnomalyID:       anomaly.ID,
+		RuleID:          rule.ID,
+		Title:           s.generateAlertTitle(anomaly, rule),
+		Message:         s.generateAlertMessage(anomaly, rule),
+		Severity:        s.mapAnomalySeverityToAlert(anomaly.Severity),
+		Status:          AlertStatusPending,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		TenantID:        anomaly.TenantID,
+		DataSourceID:    anomaly.DataSourceID,
+		UserID:          anomaly.UserID,
+		Tags:            rule.Tags,
+		Metadata:        make(map[string]interface{}),
+		DeliveryStatus:  make(map[string]DeliveryStatus),
+		EscalationLevel: 0,
 	}
 
 	// Extract channels and recipients from actions
@@ -595,9 +594,9 @@ func (s *AlertingService) createAlertFromRule(ctx context.Context, anomaly *Anom
 }
 
 func (s *AlertingService) generateAlertTitle(anomaly *Anomaly, rule *AlertRule) string {
-	return fmt.Sprintf("[%s] %s - %s", 
-		s.mapAnomalySeverityToAlert(anomaly.Severity), 
-		rule.Name, 
+	return fmt.Sprintf("[%s] %s - %s",
+		s.mapAnomalySeverityToAlert(anomaly.Severity),
+		rule.Name,
 		anomaly.Title)
 }
 
@@ -699,7 +698,7 @@ func (s *AlertingService) startWorkerPool() {
 	}
 
 	s.workers = make([]*AlertWorker, workerCount)
-	
+
 	for i := 0; i < workerCount; i++ {
 		worker := &AlertWorker{
 			id:       i,
@@ -732,7 +731,7 @@ func (s *AlertingService) Shutdown(ctx context.Context) error {
 
 func (w *AlertWorker) start() {
 	log.Printf("Starting alert worker %d", w.id)
-	
+
 	for {
 		select {
 		case <-w.stopChan:
@@ -785,7 +784,7 @@ func (re *RuleEngine) FindMatchingRules(anomaly *Anomaly) []*AlertRule {
 	defer re.mutex.RUnlock()
 
 	var matchingRules []*AlertRule
-	
+
 	for _, rule := range re.rules {
 		if !rule.Enabled {
 			continue
@@ -886,11 +885,11 @@ func (re *RuleEngine) compareValues(actual interface{}, operator string, expecte
 func (re *RuleEngine) compareNumeric(actual, expected interface{}, operator string) bool {
 	actualFloat, ok1 := actual.(float64)
 	expectedFloat, ok2 := expected.(float64)
-	
+
 	if !ok1 || !ok2 {
 		return false
 	}
-	
+
 	switch operator {
 	case ">":
 		return actualFloat > expectedFloat
@@ -921,7 +920,7 @@ func (at *AlertThrottler) ShouldThrottle(alert *Alert) bool {
 
 	// Create deduplication key
 	dedupKey := fmt.Sprintf("%s:%s", alert.AnomalyID, alert.RuleID)
-	
+
 	// Check deduplication window
 	if lastSeen, exists := at.recentAlerts[dedupKey]; exists {
 		if time.Since(lastSeen) < at.config.DeduplicationWindow {

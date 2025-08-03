@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,39 +19,39 @@ import (
 
 // EncryptedStorageResolver wraps a storage resolver with encryption capabilities
 type EncryptedStorageResolver struct {
-	baseResolver   storage.StorageResolver
-	policyManager  *PolicyManager
-	encryptor      *Encryptor
-	cache          cache.Cache
-	config         *EncryptionIntegrationConfig
-	tracer         trace.Tracer
+	baseResolver  storage.StorageResolver
+	policyManager *PolicyManager
+	encryptor     *Encryptor
+	cache         cache.Cache
+	config        *EncryptionIntegrationConfig
+	tracer        trace.Tracer
 }
 
 // EncryptionIntegrationConfig contains configuration for storage integration
 type EncryptionIntegrationConfig struct {
 	// Encryption settings
-	EnableEncryption      bool          `yaml:"enable_encryption"`
-	TransparentMode       bool          `yaml:"transparent_mode"`      // Auto encrypt/decrypt
-	CacheDecrypted        bool          `yaml:"cache_decrypted"`       // Cache decrypted content
-	
+	EnableEncryption bool `yaml:"enable_encryption"`
+	TransparentMode  bool `yaml:"transparent_mode"` // Auto encrypt/decrypt
+	CacheDecrypted   bool `yaml:"cache_decrypted"`  // Cache decrypted content
+
 	// Performance settings
-	EncryptionThreshold   int64         `yaml:"encryption_threshold"`  // Min file size to encrypt
-	MaxConcurrentOps      int           `yaml:"max_concurrent_ops"`
-	StreamingThreshold    int64         `yaml:"streaming_threshold"`   // Use streaming for large files
-	
+	EncryptionThreshold int64 `yaml:"encryption_threshold"` // Min file size to encrypt
+	MaxConcurrentOps    int   `yaml:"max_concurrent_ops"`
+	StreamingThreshold  int64 `yaml:"streaming_threshold"` // Use streaming for large files
+
 	// Storage settings
-	EncryptedPrefix       string        `yaml:"encrypted_prefix"`      // Prefix for encrypted files
-	MetadataPrefix        string        `yaml:"metadata_prefix"`       // Prefix for encryption metadata
-	KeyMetadataPrefix     string        `yaml:"key_metadata_prefix"`   // Prefix for key metadata
-	
+	EncryptedPrefix   string `yaml:"encrypted_prefix"`    // Prefix for encrypted files
+	MetadataPrefix    string `yaml:"metadata_prefix"`     // Prefix for encryption metadata
+	KeyMetadataPrefix string `yaml:"key_metadata_prefix"` // Prefix for key metadata
+
 	// Security settings
-	RequireEncryption     bool          `yaml:"require_encryption"`    // Fail if encryption not possible
-	AuditAllOperations    bool          `yaml:"audit_all_operations"`
-	SecureDelete          bool          `yaml:"secure_delete"`
-	
+	RequireEncryption  bool `yaml:"require_encryption"` // Fail if encryption not possible
+	AuditAllOperations bool `yaml:"audit_all_operations"`
+	SecureDelete       bool `yaml:"secure_delete"`
+
 	// Cache settings
-	CacheTTL              time.Duration `yaml:"cache_ttl"`
-	MaxCacheSize          int64         `yaml:"max_cache_size"`
+	CacheTTL     time.Duration `yaml:"cache_ttl"`
+	MaxCacheSize int64         `yaml:"max_cache_size"`
 }
 
 // DefaultEncryptionIntegrationConfig returns default integration configuration
@@ -59,7 +60,7 @@ func DefaultEncryptionIntegrationConfig() *EncryptionIntegrationConfig {
 		EnableEncryption:    true,
 		TransparentMode:     true,
 		CacheDecrypted:      true,
-		EncryptionThreshold: 0,        // Encrypt all files
+		EncryptionThreshold: 0, // Encrypt all files
 		MaxConcurrentOps:    10,
 		StreamingThreshold:  10 * 1024 * 1024, // 10MB
 		EncryptedPrefix:     ".encrypted/",
@@ -112,7 +113,7 @@ func (r *EncryptedStorageResolver) GetFileInfo(ctx context.Context, storageURL *
 
 	// Check if this is an encrypted file
 	encryptedURL := r.buildEncryptedURL(storageURL)
-	encryptedInfo, err := r.baseResolver.GetFileInfo(ctx, encryptedURL, credentials)
+	encryptedInfo, err := r.baseResolver.GetFileInfo(ctx, encryptedURL, &credentials)
 	if err == nil {
 		// File is encrypted, load metadata
 		metadata, err := r.loadEncryptionMetadata(ctx, storageURL, credentials)
@@ -126,18 +127,18 @@ func (r *EncryptedStorageResolver) GetFileInfo(ctx context.Context, storageURL *
 			fileInfo.Metadata["encryption_key_id"] = metadata.KeyID.String()
 			fileInfo.Metadata["original_size"] = fmt.Sprintf("%d", metadata.OriginalSize)
 			fileInfo.Metadata["encrypted_size"] = fmt.Sprintf("%d", metadata.EncryptedSize)
-			
+
 			span.SetAttributes(
 				attribute.Bool("file.encrypted", true),
 				attribute.String("encryption.algorithm", string(metadata.Algorithm)),
 			)
-			
+
 			return &fileInfo, nil
 		}
 	}
 
 	// Fall back to unencrypted file
-	return r.baseResolver.GetFileInfo(ctx, storageURL, credentials)
+	return r.baseResolver.GetFileInfo(ctx, storageURL, &credentials)
 }
 
 // DownloadFile downloads a file, decrypting if necessary
@@ -163,7 +164,7 @@ func (r *EncryptedStorageResolver) DownloadFile(ctx context.Context, storageURL 
 	}
 
 	// Download unencrypted file
-	return r.baseResolver.DownloadFile(ctx, storageURL, credentials, options)
+	return r.baseResolver.DownloadFile(ctx, storageURL, &credentials, options)
 }
 
 // downloadEncryptedFile downloads and decrypts an encrypted file
@@ -189,7 +190,7 @@ func (r *EncryptedStorageResolver) downloadEncryptedFile(ctx context.Context, st
 
 	// Download encrypted file
 	encryptedURL := r.buildEncryptedURL(storageURL)
-	reader, err := r.baseResolver.DownloadFile(ctx, encryptedURL, credentials, options)
+	reader, err := r.baseResolver.DownloadFile(ctx, encryptedURL, &credentials, options)
 	if err != nil {
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to download encrypted file: %w", err)
@@ -247,9 +248,9 @@ func (r *EncryptedStorageResolver) UploadFile(ctx context.Context, storageURL *s
 
 	// Create file info for policy evaluation
 	fileInfo := &storage.FileInfo{
-		URL:  storageURL.String(),
-		Size: int64(len(data)),
-		Name: storageURL.Path,
+		URL:      storageURL.String(),
+		Size:     int64(len(data)),
+		Name:     storageURL.Path,
 		Metadata: make(map[string]string),
 	}
 
@@ -298,7 +299,7 @@ func (r *EncryptedStorageResolver) ListFiles(ctx context.Context, storageURL *st
 	defer span.End()
 
 	// Get base listing
-	result, err := r.baseResolver.ListFiles(ctx, storageURL, credentials, options)
+	result, err := r.baseResolver.ListFiles(ctx, storageURL, &credentials, options)
 	if err != nil {
 		span.RecordError(err)
 		return nil, err
@@ -311,8 +312,8 @@ func (r *EncryptedStorageResolver) ListFiles(ctx context.Context, storageURL *st
 	for _, file := range result.Files {
 		// Skip internal encrypted files and metadata
 		if strings.HasPrefix(file.Name, r.config.EncryptedPrefix) ||
-		   strings.HasPrefix(file.Name, r.config.MetadataPrefix) ||
-		   strings.HasPrefix(file.Name, r.config.KeyMetadataPrefix) {
+			strings.HasPrefix(file.Name, r.config.MetadataPrefix) ||
+			strings.HasPrefix(file.Name, r.config.KeyMetadataPrefix) {
 			continue
 		}
 
@@ -354,12 +355,12 @@ func (r *EncryptedStorageResolver) GeneratePresignedURL(ctx context.Context, sto
 		return nil, fmt.Errorf("presigned URLs not supported for encrypted files")
 	}
 
-	return r.baseResolver.GeneratePresignedURL(ctx, storageURL, credentials, options)
+	return r.baseResolver.GeneratePresignedURL(ctx, storageURL, &credentials, options)
 }
 
 // ValidateAccess validates access to storage
 func (r *EncryptedStorageResolver) ValidateAccess(ctx context.Context, storageURL *storage.StorageURL, credentials storage.Credentials) error {
-	return r.baseResolver.ValidateAccess(ctx, storageURL, credentials)
+	return r.baseResolver.ValidateAccess(ctx, storageURL, &credentials)
 }
 
 // GetSupportedProviders returns supported providers
@@ -387,7 +388,7 @@ func (r *EncryptedStorageResolver) buildContentCacheKey(url, checksum string) st
 
 func (r *EncryptedStorageResolver) loadEncryptionMetadata(ctx context.Context, storageURL *storage.StorageURL, credentials storage.Credentials) (*EncryptionMetadata, error) {
 	metadataURL := r.buildMetadataURL(storageURL)
-	reader, err := r.baseResolver.DownloadFile(ctx, metadataURL, credentials, nil)
+	reader, err := r.baseResolver.DownloadFile(ctx, metadataURL, &credentials, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -433,11 +434,11 @@ func (rc *readCloser) Read(p []byte) (n int, err error) {
 	if rc.closed {
 		return 0, fmt.Errorf("reader is closed")
 	}
-	
+
 	if rc.pos >= len(rc.data) {
 		return 0, io.EOF
 	}
-	
+
 	n = copy(p, rc.data[rc.pos:])
 	rc.pos += n
 	return n, nil

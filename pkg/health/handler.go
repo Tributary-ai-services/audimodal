@@ -33,7 +33,7 @@ func (h *Handler) HealthCheckHandler() http.HandlerFunc {
 
 		// Parse query parameters
 		detailed := r.URL.Query().Get("detailed") == "true"
-		
+
 		// Perform health check
 		report := h.checker.Check(r.Context(), h.service, h.version)
 

@@ -117,8 +117,8 @@ func (r *OneNoteReader) TestConnection(ctx context.Context, config map[string]an
 		Message: "OneNote reader ready",
 		Latency: time.Since(start),
 		Details: map[string]any{
-			"extract_page_hierarchy":     config["extract_page_hierarchy"],
-			"include_handwritten_notes":  config["include_handwritten_notes"],
+			"extract_page_hierarchy":    config["extract_page_hierarchy"],
+			"include_handwritten_notes": config["include_handwritten_notes"],
 			"include_tags":              config["include_tags"],
 		},
 	}
@@ -180,7 +180,7 @@ func (r *OneNoteReader) DiscoverSchema(ctx context.Context, sourcePath string) (
 			},
 			{
 				Name:        "page_number",
-				Type:        "integer", 
+				Type:        "integer",
 				Nullable:    false,
 				Description: "Page number in the notebook",
 			},
@@ -204,17 +204,17 @@ func (r *OneNoteReader) DiscoverSchema(ctx context.Context, sourcePath string) (
 			},
 		},
 		Metadata: map[string]any{
-			"total_pages":         metadata.TotalPages,
-			"total_sections":      metadata.TotalSections,
-			"notebook_name":       metadata.NotebookName,
-			"created_date":        metadata.CreatedDate,
-			"modified_date":       metadata.ModifiedDate,
-			"onenote_version":     metadata.OneNoteVersion,
-			"has_handwritten":     metadata.HasHandwritten,
-			"has_embedded_files":  metadata.HasEmbeddedFiles,
-			"has_tables":          metadata.HasTables,
-			"has_images":          metadata.HasImages,
-			"total_words":         metadata.TotalWords,
+			"total_pages":        metadata.TotalPages,
+			"total_sections":     metadata.TotalSections,
+			"notebook_name":      metadata.NotebookName,
+			"created_date":       metadata.CreatedDate,
+			"modified_date":      metadata.ModifiedDate,
+			"onenote_version":    metadata.OneNoteVersion,
+			"has_handwritten":    metadata.HasHandwritten,
+			"has_embedded_files": metadata.HasEmbeddedFiles,
+			"has_tables":         metadata.HasTables,
+			"has_images":         metadata.HasImages,
+			"total_words":        metadata.TotalWords,
 		},
 	}
 
@@ -448,7 +448,7 @@ func (r *OneNoteReader) extractOneNoteMetadata(sourcePath string) (OneNoteMetada
 
 	// Check for specific OneNote features (simplified heuristics)
 	buffer := make([]byte, 2048)
-	n, err := file.Read(buffer)
+	_, err = file.Read(buffer)
 	if err != nil && err != io.EOF {
 		return metadata, err
 	}
@@ -580,12 +580,12 @@ func (it *OneNoteIterator) Next(ctx context.Context) (core.Chunk, error) {
 
 	// Build page content
 	var contentParts []string
-	
+
 	if extractHierarchy, ok := it.config["extract_page_hierarchy"]; !ok || extractHierarchy.(bool) {
 		contentParts = append(contentParts, fmt.Sprintf("Notebook: %s", it.notebook.Metadata.NotebookName))
 		contentParts = append(contentParts, fmt.Sprintf("Section: %s", currentSection))
 	}
-	
+
 	contentParts = append(contentParts, fmt.Sprintf("Page Title: %s", currentPage.Title))
 	contentParts = append(contentParts, fmt.Sprintf("Content: %s", currentPage.Content))
 
@@ -609,17 +609,17 @@ func (it *OneNoteIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "onenote_reader",
 			Context: map[string]string{
-				"page_title":     currentPage.Title,
-				"page_number":    strconv.Itoa(currentPage.PageNumber),
-				"section_name":   currentSection,
-				"notebook_name":  it.notebook.Metadata.NotebookName,
-				"created_date":   currentPage.CreatedDate.Format("2006-01-02 15:04:05"),
-				"modified_date":  currentPage.ModifiedDate.Format("2006-01-02 15:04:05"),
-				"has_ink":        strconv.FormatBool(currentPage.HasInk),
-				"has_images":     strconv.FormatBool(currentPage.HasImages),
-				"has_tables":     strconv.FormatBool(currentPage.HasTables),
-				"tag_count":      strconv.Itoa(len(currentPage.Tags)),
-				"file_type":      "onenote",
+				"page_title":    currentPage.Title,
+				"page_number":   strconv.Itoa(currentPage.PageNumber),
+				"section_name":  currentSection,
+				"notebook_name": it.notebook.Metadata.NotebookName,
+				"created_date":  currentPage.CreatedDate.Format("2006-01-02 15:04:05"),
+				"modified_date": currentPage.ModifiedDate.Format("2006-01-02 15:04:05"),
+				"has_ink":       strconv.FormatBool(currentPage.HasInk),
+				"has_images":    strconv.FormatBool(currentPage.HasImages),
+				"has_tables":    strconv.FormatBool(currentPage.HasTables),
+				"tag_count":     strconv.Itoa(len(currentPage.Tags)),
+				"file_type":     "onenote",
 			},
 		},
 	}
@@ -645,7 +645,7 @@ func (it *OneNoteIterator) Progress() float64 {
 	for _, section := range it.notebook.Sections {
 		totalPages += len(section.Pages)
 	}
-	
+
 	if totalPages == 0 {
 		return 1.0
 	}

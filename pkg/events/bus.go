@@ -19,42 +19,42 @@ type InMemoryEventBus struct {
 	eventQueue  chan *Event
 	tracer      trace.Tracer
 	metrics     *EventBusMetrics
-	
+
 	// Configuration
-	config      EventBusConfig
-	
+	config EventBusConfig
+
 	// Lifecycle
-	running     bool
-	stopChan    chan struct{}
-	wg          sync.WaitGroup
-	mu          sync.RWMutex
+	running  bool
+	stopChan chan struct{}
+	wg       sync.WaitGroup
+	mu       sync.RWMutex
 }
 
 // EventBusConfig contains configuration for the event bus
 type EventBusConfig struct {
-	QueueSize           int           `yaml:"queue_size"`
-	WorkerCount         int           `yaml:"worker_count"`
-	ProcessingTimeout   time.Duration `yaml:"processing_timeout"`
-	EnableMetrics       bool          `yaml:"enable_metrics"`
-	EnableTracing       bool          `yaml:"enable_tracing"`
-	RetryAttempts       int           `yaml:"retry_attempts"`
-	RetryDelay          time.Duration `yaml:"retry_delay"`
-	MaxRetryDelay       time.Duration `yaml:"max_retry_delay"`
-	DeadLetterEnabled   bool          `yaml:"dead_letter_enabled"`
+	QueueSize         int           `yaml:"queue_size"`
+	WorkerCount       int           `yaml:"worker_count"`
+	ProcessingTimeout time.Duration `yaml:"processing_timeout"`
+	EnableMetrics     bool          `yaml:"enable_metrics"`
+	EnableTracing     bool          `yaml:"enable_tracing"`
+	RetryAttempts     int           `yaml:"retry_attempts"`
+	RetryDelay        time.Duration `yaml:"retry_delay"`
+	MaxRetryDelay     time.Duration `yaml:"max_retry_delay"`
+	DeadLetterEnabled bool          `yaml:"dead_letter_enabled"`
 }
 
 // DefaultEventBusConfig returns default configuration
 func DefaultEventBusConfig() EventBusConfig {
 	return EventBusConfig{
-		QueueSize:           10000,
-		WorkerCount:         10,
-		ProcessingTimeout:   30 * time.Second,
-		EnableMetrics:       true,
-		EnableTracing:       true,
-		RetryAttempts:       3,
-		RetryDelay:          1 * time.Second,
-		MaxRetryDelay:       60 * time.Second,
-		DeadLetterEnabled:   true,
+		QueueSize:         10000,
+		WorkerCount:       10,
+		ProcessingTimeout: 30 * time.Second,
+		EnableMetrics:     true,
+		EnableTracing:     true,
+		RetryAttempts:     3,
+		RetryDelay:        1 * time.Second,
+		MaxRetryDelay:     60 * time.Second,
+		DeadLetterEnabled: true,
 	}
 }
 
@@ -73,42 +73,42 @@ func NewInMemoryEventBus(config EventBusConfig) *InMemoryEventBus {
 
 // Event represents a unified event structure for the bus
 type Event struct {
-	ID          uuid.UUID   `json:"id"`
-	Type        string      `json:"type"`
-	TenantID    uuid.UUID   `json:"tenant_id"`
-	SessionID   *uuid.UUID  `json:"session_id,omitempty"`
-	FileID      *uuid.UUID  `json:"file_id,omitempty"`
-	ChunkID     *uuid.UUID  `json:"chunk_id,omitempty"`
-	SourceID    *uuid.UUID  `json:"source_id,omitempty"`
-	
+	ID        uuid.UUID  `json:"id"`
+	Type      string     `json:"type"`
+	TenantID  uuid.UUID  `json:"tenant_id"`
+	SessionID *uuid.UUID `json:"session_id,omitempty"`
+	FileID    *uuid.UUID `json:"file_id,omitempty"`
+	ChunkID   *uuid.UUID `json:"chunk_id,omitempty"`
+	SourceID  *uuid.UUID `json:"source_id,omitempty"`
+
 	// Event metadata
-	Priority    int           `json:"priority"`
-	Version     int           `json:"version"`
-	
+	Priority int `json:"priority"`
+	Version  int `json:"version"`
+
 	// Event payload - flexible JSON data
-	Payload     map[string]interface{} `json:"payload"`
-	Metadata    map[string]interface{} `json:"metadata"`
-	
+	Payload  map[string]interface{} `json:"payload"`
+	Metadata map[string]interface{} `json:"metadata"`
+
 	// Workflow context
-	WorkflowID  *uuid.UUID `json:"workflow_id,omitempty"`
-	StepName    string     `json:"step_name,omitempty"`
-	RetryCount  int        `json:"retry_count"`
-	MaxRetries  int        `json:"max_retries"`
-	
+	WorkflowID *uuid.UUID `json:"workflow_id,omitempty"`
+	StepName   string     `json:"step_name,omitempty"`
+	RetryCount int        `json:"retry_count"`
+	MaxRetries int        `json:"max_retries"`
+
 	// Timestamps
 	CreatedAt   time.Time  `json:"created_at"`
 	ProcessedAt *time.Time `json:"processed_at,omitempty"`
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
-	
+
 	// Error tracking
-	LastError   *string    `json:"last_error,omitempty"`
-	ErrorCount  int        `json:"error_count"`
-	
+	LastError  *string `json:"last_error,omitempty"`
+	ErrorCount int     `json:"error_count"`
+
 	// Correlation and tracing
-	CorrelationID string   `json:"correlation_id,omitempty"`
-	TraceID       string   `json:"trace_id,omitempty"`
-	SpanID        string   `json:"span_id,omitempty"`
+	CorrelationID string     `json:"correlation_id,omitempty"`
+	TraceID       string     `json:"trace_id,omitempty"`
+	SpanID        string     `json:"span_id,omitempty"`
 	ParentEventID *uuid.UUID `json:"parent_event_id,omitempty"`
 }
 
@@ -135,20 +135,20 @@ func (bus *InMemoryEventBus) Publish(event *Event) error {
 	if !bus.running {
 		return fmt.Errorf("event bus is not running")
 	}
-	
+
 	// Add tracing information
 	if bus.config.EnableTracing {
 		event.TraceID = uuid.New().String()
 		event.SpanID = uuid.New().String()
 	}
-	
+
 	// Update metrics
 	if bus.config.EnableMetrics {
 		bus.mu.Lock()
 		bus.metrics.EventsPublished++
 		bus.mu.Unlock()
 	}
-	
+
 	// Queue the event
 	select {
 	case bus.eventQueue <- event:
@@ -163,14 +163,14 @@ func (bus *InMemoryEventBus) PublishBatch(events []*Event) error {
 	if !bus.running {
 		return fmt.Errorf("event bus is not running")
 	}
-	
+
 	// For in-memory implementation, publish events sequentially
 	for _, event := range events {
 		if err := bus.Publish(event); err != nil {
 			return fmt.Errorf("failed to publish event %s: %w", event.ID, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -178,7 +178,7 @@ func (bus *InMemoryEventBus) PublishBatch(events []*Event) error {
 func (bus *InMemoryEventBus) Subscribe(handler EventHandler, eventTypes ...string) error {
 	bus.mu.Lock()
 	defer bus.mu.Unlock()
-	
+
 	// Register handler for each event type
 	for _, eventType := range eventTypes {
 		if bus.handlers[eventType] == nil {
@@ -186,17 +186,17 @@ func (bus *InMemoryEventBus) Subscribe(handler EventHandler, eventTypes ...strin
 		}
 		bus.handlers[eventType] = append(bus.handlers[eventType], handler)
 	}
-	
+
 	// Track subscription
 	bus.subscribers[handler] = append(bus.subscribers[handler], eventTypes...)
-	
+
 	// Initialize handler metrics
 	if bus.config.EnableMetrics {
 		if bus.metrics.HandlerMetrics[handler.GetName()] == nil {
 			bus.metrics.HandlerMetrics[handler.GetName()] = &HandlerMetrics{}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -204,7 +204,7 @@ func (bus *InMemoryEventBus) Subscribe(handler EventHandler, eventTypes ...strin
 func (bus *InMemoryEventBus) Unsubscribe(handler EventHandler, eventTypes ...string) error {
 	bus.mu.Lock()
 	defer bus.mu.Unlock()
-	
+
 	// Remove handler from each event type
 	for _, eventType := range eventTypes {
 		handlers := bus.handlers[eventType]
@@ -216,7 +216,7 @@ func (bus *InMemoryEventBus) Unsubscribe(handler EventHandler, eventTypes ...str
 			}
 		}
 	}
-	
+
 	// Update subscription tracking
 	if subscriptions, exists := bus.subscribers[handler]; exists {
 		filtered := make([]string, 0, len(subscriptions))
@@ -234,7 +234,7 @@ func (bus *InMemoryEventBus) Unsubscribe(handler EventHandler, eventTypes ...str
 		}
 		bus.subscribers[handler] = filtered
 	}
-	
+
 	return nil
 }
 
@@ -243,9 +243,9 @@ func (bus *InMemoryEventBus) Start() error {
 	if bus.running {
 		return fmt.Errorf("event bus is already running")
 	}
-	
+
 	bus.running = true
-	
+
 	// Start worker goroutines
 	for i := 0; i < bus.config.WorkerCount; i++ {
 		bus.wg.Add(1)
@@ -254,7 +254,7 @@ func (bus *InMemoryEventBus) Start() error {
 			bus.worker(workerID)
 		}(i)
 	}
-	
+
 	// Start metrics update routine if enabled
 	if bus.config.EnableMetrics {
 		bus.wg.Add(1)
@@ -263,7 +263,7 @@ func (bus *InMemoryEventBus) Start() error {
 			bus.metricsRoutine()
 		}()
 	}
-	
+
 	return nil
 }
 
@@ -272,16 +272,16 @@ func (bus *InMemoryEventBus) Stop() error {
 	if !bus.running {
 		return nil
 	}
-	
+
 	close(bus.stopChan)
 	bus.running = false
-	
+
 	// Close event queue
 	close(bus.eventQueue)
-	
+
 	// Wait for workers to finish
 	bus.wg.Wait()
-	
+
 	return nil
 }
 
@@ -295,7 +295,7 @@ func (bus *InMemoryEventBus) worker(workerID int) {
 			if !ok {
 				return // Channel closed
 			}
-			
+
 			bus.processEvent(event, workerID)
 		}
 	}
@@ -304,13 +304,13 @@ func (bus *InMemoryEventBus) worker(workerID int) {
 // processEvent processes a single event
 func (bus *InMemoryEventBus) processEvent(event *Event, workerID int) {
 	ctx := context.Background()
-	
+
 	// Add tracing if enabled
 	if bus.config.EnableTracing {
 		var span trace.Span
 		ctx, span = bus.tracer.Start(ctx, "process_event")
 		defer span.End()
-		
+
 		span.SetAttributes(
 			attribute.String("event.id", event.ID.String()),
 			attribute.String("event.type", event.Type),
@@ -318,21 +318,21 @@ func (bus *InMemoryEventBus) processEvent(event *Event, workerID int) {
 			attribute.Int("worker.id", workerID),
 		)
 	}
-	
+
 	// Add processing timeout
 	ctx, cancel := context.WithTimeout(ctx, bus.config.ProcessingTimeout)
 	defer cancel()
-	
+
 	// Find handlers for this event type
 	bus.mu.RLock()
 	handlers := bus.handlers[event.Type]
 	bus.mu.RUnlock()
-	
+
 	if len(handlers) == 0 {
 		// No handlers for this event type
 		return
 	}
-	
+
 	// Process event with each handler
 	for _, handler := range handlers {
 		if err := bus.processEventWithHandler(ctx, event, handler); err != nil {
@@ -340,11 +340,11 @@ func (bus *InMemoryEventBus) processEvent(event *Event, workerID int) {
 			bus.handleProcessingError(ctx, event, handler, err)
 		}
 	}
-	
+
 	// Update processed timestamp
 	now := time.Now()
 	event.ProcessedAt = &now
-	
+
 	// Update metrics
 	if bus.config.EnableMetrics {
 		bus.mu.Lock()
@@ -357,7 +357,7 @@ func (bus *InMemoryEventBus) processEvent(event *Event, workerID int) {
 // processEventWithHandler processes an event with a specific handler
 func (bus *InMemoryEventBus) processEventWithHandler(ctx context.Context, event *Event, handler EventHandler) error {
 	startTime := time.Now()
-	
+
 	// Convert event to expected format for handler
 	var eventInterface interface{}
 	switch event.Type {
@@ -371,15 +371,15 @@ func (bus *InMemoryEventBus) processEventWithHandler(ctx context.Context, event 
 		// For workflow events, pass the event directly
 		eventInterface = event
 	}
-	
+
 	// Process event
 	err := handler.HandleEvent(ctx, eventInterface)
-	
+
 	// Update handler metrics
 	if bus.config.EnableMetrics {
 		bus.updateHandlerMetrics(handler.GetName(), startTime, err)
 	}
-	
+
 	return err
 }
 
@@ -404,16 +404,16 @@ func (bus *InMemoryEventBus) convertToFileDiscoveredEvent(event *Event) *FileDis
 		}
 		data.DiscoveredAt = event.CreatedAt
 	}
-	
+
 	return &FileDiscoveredEvent{
 		BaseEvent: BaseEvent{
-			ID:        event.ID.String(),
-			Type:      event.Type,
-			Source:    "event-bus",
-			Time:      event.CreatedAt,
-			TenantID:  event.TenantID.String(),
-			TraceID:   event.TraceID,
-			Metadata:  event.Metadata,
+			ID:       event.ID.String(),
+			Type:     event.Type,
+			Source:   "event-bus",
+			Time:     event.CreatedAt,
+			TenantID: event.TenantID.String(),
+			TraceID:  event.TraceID,
+			Metadata: event.Metadata,
 		},
 		Data: data,
 	}
@@ -437,16 +437,16 @@ func (bus *InMemoryEventBus) convertToFileClassifiedEvent(event *Event) *FileCla
 			}
 		}
 	}
-	
+
 	return &FileClassifiedEvent{
 		BaseEvent: BaseEvent{
-			ID:        event.ID.String(),
-			Type:      event.Type,
-			Source:    "event-bus",
-			Time:      event.CreatedAt,
-			TenantID:  event.TenantID.String(),
-			TraceID:   event.TraceID,
-			Metadata:  event.Metadata,
+			ID:       event.ID.String(),
+			Type:     event.Type,
+			Source:   "event-bus",
+			Time:     event.CreatedAt,
+			TenantID: event.TenantID.String(),
+			TraceID:  event.TraceID,
+			Metadata: event.Metadata,
 		},
 		Data: data,
 	}
@@ -469,16 +469,16 @@ func (bus *InMemoryEventBus) convertToDLPViolationEvent(event *Event) *DLPViolat
 			data.Severity = severity
 		}
 	}
-	
+
 	return &DLPViolationEvent{
 		BaseEvent: BaseEvent{
-			ID:        event.ID.String(),
-			Type:      event.Type,
-			Source:    "event-bus",
-			Time:      event.CreatedAt,
-			TenantID:  event.TenantID.String(),
-			TraceID:   event.TraceID,
-			Metadata:  event.Metadata,
+			ID:       event.ID.String(),
+			Type:     event.Type,
+			Source:   "event-bus",
+			Time:     event.CreatedAt,
+			TenantID: event.TenantID.String(),
+			TraceID:  event.TraceID,
+			Metadata: event.Metadata,
 		},
 		Data: data,
 	}
@@ -488,7 +488,7 @@ func (bus *InMemoryEventBus) convertToDLPViolationEvent(event *Event) *DLPViolat
 func (bus *InMemoryEventBus) handleProcessingError(ctx context.Context, event *Event, handler EventHandler, err error) {
 	event.ErrorCount++
 	event.LastError = &[]string{err.Error()}[0]
-	
+
 	// Update metrics
 	if bus.config.EnableMetrics {
 		bus.mu.Lock()
@@ -498,17 +498,17 @@ func (bus *InMemoryEventBus) handleProcessingError(ctx context.Context, event *E
 		}
 		bus.mu.Unlock()
 	}
-	
+
 	// Check if we should retry
 	if event.RetryCount < event.MaxRetries {
 		event.RetryCount++
-		
+
 		// Calculate retry delay with exponential backoff
 		retryDelay := bus.config.RetryDelay * time.Duration(event.RetryCount)
 		if retryDelay > bus.config.MaxRetryDelay {
 			retryDelay = bus.config.MaxRetryDelay
 		}
-		
+
 		// Schedule retry
 		go func() {
 			time.Sleep(retryDelay)
@@ -527,22 +527,22 @@ func (bus *InMemoryEventBus) handleProcessingError(ctx context.Context, event *E
 func (bus *InMemoryEventBus) updateHandlerMetrics(handlerName string, startTime time.Time, err error) {
 	bus.mu.Lock()
 	defer bus.mu.Unlock()
-	
+
 	metrics := bus.metrics.HandlerMetrics[handlerName]
 	if metrics == nil {
 		metrics = &HandlerMetrics{}
 		bus.metrics.HandlerMetrics[handlerName] = metrics
 	}
-	
+
 	processingTime := time.Since(startTime)
 	metrics.EventsHandled++
 	metrics.AvgProcessingTime = (metrics.AvgProcessingTime*time.Duration(metrics.EventsHandled-1) + processingTime) / time.Duration(metrics.EventsHandled)
 	metrics.LastHandledAt = &[]time.Time{time.Now()}[0]
-	
+
 	if err != nil {
 		metrics.EventsFailed++
 	}
-	
+
 	if metrics.EventsHandled > 0 {
 		metrics.ErrorRate = float64(metrics.EventsFailed) / float64(metrics.EventsHandled)
 	}
@@ -552,7 +552,7 @@ func (bus *InMemoryEventBus) updateHandlerMetrics(handlerName string, startTime 
 func (bus *InMemoryEventBus) metricsRoutine() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-bus.stopChan:
@@ -567,18 +567,18 @@ func (bus *InMemoryEventBus) metricsRoutine() {
 func (bus *InMemoryEventBus) updateBusMetrics() {
 	bus.mu.Lock()
 	defer bus.mu.Unlock()
-	
+
 	// Update queue depth
 	bus.metrics.QueueDepth = len(bus.eventQueue)
-	
+
 	// Update active handlers count
 	bus.metrics.HandlersActive = len(bus.metrics.HandlerMetrics)
-	
+
 	// Calculate overall error rate
 	if bus.metrics.EventsProcessed > 0 {
 		bus.metrics.ErrorRate = float64(bus.metrics.EventsFailed) / float64(bus.metrics.EventsProcessed)
 	}
-	
+
 	// Calculate throughput (events per second)
 	if bus.metrics.LastProcessedAt != nil {
 		duration := time.Since(*bus.metrics.LastProcessedAt)
@@ -592,21 +592,21 @@ func (bus *InMemoryEventBus) updateBusMetrics() {
 func (bus *InMemoryEventBus) GetMetrics() *EventBusMetrics {
 	bus.mu.RLock()
 	defer bus.mu.RUnlock()
-	
+
 	// Create a copy of metrics to avoid race conditions
 	metricsCopy := &EventBusMetrics{
-		EventsPublished:   bus.metrics.EventsPublished,
-		EventsProcessed:   bus.metrics.EventsProcessed,
-		EventsFailed:      bus.metrics.EventsFailed,
-		HandlersActive:    bus.metrics.HandlersActive,
-		QueueDepth:        bus.metrics.QueueDepth,
-		ProcessingTime:    bus.metrics.ProcessingTime,
-		LastProcessedAt:   bus.metrics.LastProcessedAt,
-		ErrorRate:         bus.metrics.ErrorRate,
-		ThroughputPerSec:  bus.metrics.ThroughputPerSec,
-		HandlerMetrics:    make(map[string]*HandlerMetrics),
+		EventsPublished:  bus.metrics.EventsPublished,
+		EventsProcessed:  bus.metrics.EventsProcessed,
+		EventsFailed:     bus.metrics.EventsFailed,
+		HandlersActive:   bus.metrics.HandlersActive,
+		QueueDepth:       bus.metrics.QueueDepth,
+		ProcessingTime:   bus.metrics.ProcessingTime,
+		LastProcessedAt:  bus.metrics.LastProcessedAt,
+		ErrorRate:        bus.metrics.ErrorRate,
+		ThroughputPerSec: bus.metrics.ThroughputPerSec,
+		HandlerMetrics:   make(map[string]*HandlerMetrics),
 	}
-	
+
 	// Copy handler metrics
 	for name, metrics := range bus.metrics.HandlerMetrics {
 		metricsCopy.HandlerMetrics[name] = &HandlerMetrics{
@@ -617,7 +617,7 @@ func (bus *InMemoryEventBus) GetMetrics() *EventBusMetrics {
 			ErrorRate:         metrics.ErrorRate,
 		}
 	}
-	
+
 	return metricsCopy
 }
 

@@ -16,9 +16,9 @@ import (
 
 // MLAnalysisHandler handles ML analysis HTTP requests
 type MLAnalysisHandler struct {
-	db        *database.Database
-	service   *services.MLAnalysisService
-	logger    *logger.Logger
+	db      *database.Database
+	service *services.MLAnalysisService
+	logger  *logger.Logger
 }
 
 // NewMLAnalysisHandler creates a new ML analysis handler
@@ -155,7 +155,7 @@ func (h *MLAnalysisHandler) AnalyzeBatch(w http.ResponseWriter, r *http.Request,
 	// Convert to service requests
 	batchID := uuid.New()
 	serviceRequests := make([]services.MLAnalysisRequest, len(req.Requests))
-	
+
 	for i, contentReq := range req.Requests {
 		documentID := uuid.New() // Generate temporary document IDs for batch analysis
 		serviceRequests[i] = services.MLAnalysisRequest{
@@ -248,12 +248,12 @@ func (h *MLAnalysisHandler) ListAnalysisResults(w http.ResponseWriter, r *http.R
 
 	// Parse pagination parameters
 	page, pageSize := parsePaginationParams(r)
-	
+
 	// Parse filter parameters
 	documentID := r.URL.Query().Get("document_id")
 	analysisType := r.URL.Query().Get("analysis_type")
 	status := r.URL.Query().Get("status")
-	
+
 	// Get tenant repository
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
@@ -264,17 +264,17 @@ func (h *MLAnalysisHandler) ListAnalysisResults(w http.ResponseWriter, r *http.R
 
 	// Build query
 	query := tenantRepo.DB().Model(&services.MLAnalysisResponse{})
-	
+
 	if documentID != "" {
 		if docUUID, err := uuid.Parse(documentID); err == nil {
 			query = query.Where("document_id = ?", docUUID)
 		}
 	}
-	
+
 	if analysisType != "" {
 		query = query.Where("analysis_type = ?", analysisType)
 	}
-	
+
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
@@ -338,7 +338,7 @@ func (h *MLAnalysisHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Parse path to determine action
 	path := r.URL.Path
 	basePath := "/api/v1/tenants/" + tenantCtx.TenantID.String() + "/ml-analysis"
-	
+
 	switch {
 	case path == basePath+"/analyze":
 		h.AnalyzeContent(w, r, tenantCtx.TenantID)
@@ -414,9 +414,9 @@ func (h *MLAnalysisHandler) calculateAnalysisStats(tenantRepo *database.TenantRe
 	// This is a simplified version for demonstration
 
 	stats := map[string]interface{}{
-		"timeframe":         timeframe,
-		"total_analyses":    0,
-		"avg_confidence":    0.0,
+		"timeframe":           timeframe,
+		"total_analyses":      0,
+		"avg_confidence":      0.0,
 		"avg_processing_time": 0,
 		"sentiment_distribution": map[string]int{
 			"positive": 0,
@@ -430,9 +430,9 @@ func (h *MLAnalysisHandler) calculateAnalysisStats(tenantRepo *database.TenantRe
 			"fr": 0,
 		},
 		"quality_scores": map[string]float64{
-			"avg_coherence":     0.0,
-			"avg_clarity":       0.0,
-			"avg_completeness":  0.0,
+			"avg_coherence":    0.0,
+			"avg_clarity":      0.0,
+			"avg_completeness": 0.0,
 		},
 	}
 

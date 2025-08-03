@@ -267,7 +267,7 @@ func (r *HTMLReader) EstimateSize(ctx context.Context, sourcePath string) (core.
 	// Remove tags for text size estimation
 	textContent := r.stripHTMLTags(string(content))
 	textSize := int64(len(textContent))
-	
+
 	// Estimate chunks based on text size
 	chunkSize := int64(1000)
 	estimatedChunks := int((textSize + chunkSize - 1) / chunkSize)
@@ -306,7 +306,7 @@ func (r *HTMLReader) CreateIterator(ctx context.Context, sourcePath string, stra
 	}
 
 	elements := r.parseHTMLElements(string(content), strategyConfig)
-	
+
 	iterator := &HTMLIterator{
 		sourcePath:     sourcePath,
 		config:         strategyConfig,
@@ -374,49 +374,49 @@ func (r *HTMLReader) extractHTMLMetadata(content string) HTMLMetadata {
 	metaRegex := regexp.MustCompile(`<meta\s+([^>]+)>`)
 	for _, match := range metaRegex.FindAllStringSubmatch(content, -1) {
 		attrs := match[1]
-		
+
 		// Extract description
 		if strings.Contains(attrs, `name="description"`) || strings.Contains(attrs, `name='description'`) {
 			if contentMatch := regexp.MustCompile(`content=["']([^"']+)["']`).FindStringSubmatch(attrs); len(contentMatch) > 1 {
 				metadata.Description = contentMatch[1]
 			}
 		}
-		
+
 		// Extract keywords
 		if strings.Contains(attrs, `name="keywords"`) || strings.Contains(attrs, `name='keywords'`) {
 			if contentMatch := regexp.MustCompile(`content=["']([^"']+)["']`).FindStringSubmatch(attrs); len(contentMatch) > 1 {
 				metadata.Keywords = contentMatch[1]
 			}
 		}
-		
+
 		// Extract author
 		if strings.Contains(attrs, `name="author"`) || strings.Contains(attrs, `name='author'`) {
 			if contentMatch := regexp.MustCompile(`content=["']([^"']+)["']`).FindStringSubmatch(attrs); len(contentMatch) > 1 {
 				metadata.Author = contentMatch[1]
 			}
 		}
-		
+
 		// Extract charset
 		if strings.Contains(attrs, `charset=`) {
 			if charsetMatch := regexp.MustCompile(`charset=["']?([^"'\s>]+)`).FindStringSubmatch(attrs); len(charsetMatch) > 1 {
 				metadata.Charset = charsetMatch[1]
 			}
 		}
-		
+
 		// Extract viewport
 		if strings.Contains(attrs, `name="viewport"`) || strings.Contains(attrs, `name='viewport'`) {
 			if contentMatch := regexp.MustCompile(`content=["']([^"']+)["']`).FindStringSubmatch(attrs); len(contentMatch) > 1 {
 				metadata.Viewport = contentMatch[1]
 			}
 		}
-		
+
 		// Extract Open Graph tags
 		if strings.Contains(attrs, `property="og:title"`) || strings.Contains(attrs, `property='og:title'`) {
 			if contentMatch := regexp.MustCompile(`content=["']([^"']+)["']`).FindStringSubmatch(attrs); len(contentMatch) > 1 {
 				metadata.OGTitle = contentMatch[1]
 			}
 		}
-		
+
 		if strings.Contains(attrs, `property="og:description"`) || strings.Contains(attrs, `property='og:description'`) {
 			if contentMatch := regexp.MustCompile(`content=["']([^"']+)["']`).FindStringSubmatch(attrs); len(contentMatch) > 1 {
 				metadata.OGDescription = contentMatch[1]
@@ -461,13 +461,13 @@ func (r *HTMLReader) stripHTMLTags(content string) string {
 	// Remove script and style content
 	content = regexp.MustCompile(`<script[^>]*>[\s\S]*?</script>`).ReplaceAllString(content, "")
 	content = regexp.MustCompile(`<style[^>]*>[\s\S]*?</style>`).ReplaceAllString(content, "")
-	
+
 	// Remove all HTML tags
 	content = regexp.MustCompile(`<[^>]+>`).ReplaceAllString(content, " ")
-	
+
 	// Clean up whitespace
 	content = regexp.MustCompile(`\s+`).ReplaceAllString(content, " ")
-	
+
 	return strings.TrimSpace(content)
 }
 
@@ -481,7 +481,7 @@ func (r *HTMLReader) extractSampleText(content string) string {
 		}
 		return text
 	}
-	
+
 	// Fall back to stripping all tags and taking first 200 chars
 	text := r.stripHTMLTags(content)
 	if len(text) > 200 {
@@ -493,21 +493,21 @@ func (r *HTMLReader) extractSampleText(content string) string {
 // countHTMLElements counts significant HTML elements
 func (r *HTMLReader) countHTMLElements(content string) int {
 	count := 0
-	
+
 	// Count various block elements
 	elements := []string{"p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "section", "article"}
 	for _, elem := range elements {
 		regex := regexp.MustCompile(fmt.Sprintf(`<%s[^>]*>`, elem))
 		count += len(regex.FindAllString(content, -1))
 	}
-	
+
 	return count
 }
 
 // parseHTMLElements parses HTML into processable elements
 func (r *HTMLReader) parseHTMLElements(content string, config map[string]any) []HTMLElement {
 	var elements []HTMLElement
-	
+
 	// Remove scripts and styles if configured
 	if removeScripts, ok := config["remove_scripts"].(bool); !ok || removeScripts {
 		content = regexp.MustCompile(`<script[^>]*>[\s\S]*?</script>`).ReplaceAllString(content, "")
@@ -518,14 +518,14 @@ func (r *HTMLReader) parseHTMLElements(content string, config map[string]any) []
 
 	// For mock implementation, extract basic elements
 	// In production, use a proper HTML parser like golang.org/x/net/html
-	
+
 	// Track element positions for proper ordering
 	type elementPos struct {
 		element HTMLElement
 		pos     int
 	}
 	var elementsWithPos []elementPos
-	
+
 	// Extract headings
 	for i := 1; i <= 6; i++ {
 		headingRegex := regexp.MustCompile(fmt.Sprintf(`<h%d[^>]*>([^<]+)</h%d>`, i, i))
@@ -541,7 +541,7 @@ func (r *HTMLReader) parseHTMLElements(content string, config map[string]any) []
 			}
 		}
 	}
-	
+
 	// Extract paragraphs
 	paragraphRegex := regexp.MustCompile(`<p[^>]*>([^<]+)</p>`)
 	for _, match := range paragraphRegex.FindAllStringSubmatchIndex(content, -1) {
@@ -555,7 +555,7 @@ func (r *HTMLReader) parseHTMLElements(content string, config map[string]any) []
 			})
 		}
 	}
-	
+
 	// Sort elements by position
 	for i := 0; i < len(elementsWithPos); i++ {
 		for j := i + 1; j < len(elementsWithPos); j++ {
@@ -564,12 +564,12 @@ func (r *HTMLReader) parseHTMLElements(content string, config map[string]any) []
 			}
 		}
 	}
-	
+
 	// Extract sorted elements
 	for _, ep := range elementsWithPos {
 		elements = append(elements, ep.element)
 	}
-	
+
 	// If no elements found, treat entire content as one element
 	if len(elements) == 0 {
 		text := r.stripHTMLTags(content)
@@ -580,7 +580,7 @@ func (r *HTMLReader) parseHTMLElements(content string, config map[string]any) []
 			})
 		}
 	}
-	
+
 	return elements
 }
 
@@ -618,10 +618,10 @@ func (it *HTMLIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "html_reader",
 			Context: map[string]string{
-				"element_type":  element.Type,
-				"element_index": strconv.Itoa(it.currentElement),
+				"element_type":   element.Type,
+				"element_index":  strconv.Itoa(it.currentElement),
 				"total_elements": strconv.Itoa(len(it.elements)),
-				"file_type":     "html",
+				"file_type":      "html",
 			},
 		},
 	}

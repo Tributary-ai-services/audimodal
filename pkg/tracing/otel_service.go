@@ -3,10 +3,12 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -27,48 +29,48 @@ type TracingService struct {
 // TracingConfig contains configuration for OpenTelemetry tracing
 type TracingConfig struct {
 	// Service identification
-	ServiceName     string `yaml:"service_name"`
-	ServiceVersion  string `yaml:"service_version"`
-	Environment     string `yaml:"environment"`
-	
+	ServiceName    string `yaml:"service_name"`
+	ServiceVersion string `yaml:"service_version"`
+	Environment    string `yaml:"environment"`
+
 	// Tracing settings
-	Enabled         bool    `yaml:"enabled"`
-	SampleRate      float64 `yaml:"sample_rate"`
-	MaxSpansPerTrace int    `yaml:"max_spans_per_trace"`
-	
+	Enabled          bool    `yaml:"enabled"`
+	SampleRate       float64 `yaml:"sample_rate"`
+	MaxSpansPerTrace int     `yaml:"max_spans_per_trace"`
+
 	// Export configuration
-	ExportType      string `yaml:"export_type"` // jaeger, otlp, console
-	ExportEndpoint  string `yaml:"export_endpoint"`
+	ExportType      string        `yaml:"export_type"` // jaeger, otlp, console
+	ExportEndpoint  string        `yaml:"export_endpoint"`
 	ExportTimeout   time.Duration `yaml:"export_timeout"`
-	ExportBatchSize int    `yaml:"export_batch_size"`
-	
+	ExportBatchSize int           `yaml:"export_batch_size"`
+
 	// Jaeger specific
 	JaegerAgentHost string `yaml:"jaeger_agent_host"`
 	JaegerAgentPort string `yaml:"jaeger_agent_port"`
-	
+
 	// OTLP specific
-	OTLPHeaders     map[string]string `yaml:"otlp_headers"`
-	OTLPInsecure    bool              `yaml:"otlp_insecure"`
-	
+	OTLPHeaders  map[string]string `yaml:"otlp_headers"`
+	OTLPInsecure bool              `yaml:"otlp_insecure"`
+
 	// Resource attributes
 	ResourceAttributes map[string]string `yaml:"resource_attributes"`
 }
 
 // SpanInfo contains information about a span for monitoring
 type SpanInfo struct {
-	TraceID     string            `json:"trace_id"`
-	SpanID      string            `json:"span_id"`
-	ParentID    string            `json:"parent_id,omitempty"`
-	Name        string            `json:"name"`
-	Service     string            `json:"service"`
-	Operation   string            `json:"operation"`
-	StartTime   time.Time         `json:"start_time"`
-	EndTime     *time.Time        `json:"end_time,omitempty"`
-	Duration    *time.Duration    `json:"duration,omitempty"`
-	Status      string            `json:"status"`
-	Attributes  map[string]interface{} `json:"attributes"`
-	Events      []SpanEvent       `json:"events,omitempty"`
-	Error       *SpanError        `json:"error,omitempty"`
+	TraceID    string                 `json:"trace_id"`
+	SpanID     string                 `json:"span_id"`
+	ParentID   string                 `json:"parent_id,omitempty"`
+	Name       string                 `json:"name"`
+	Service    string                 `json:"service"`
+	Operation  string                 `json:"operation"`
+	StartTime  time.Time              `json:"start_time"`
+	EndTime    *time.Time             `json:"end_time,omitempty"`
+	Duration   *time.Duration         `json:"duration,omitempty"`
+	Status     string                 `json:"status"`
+	Attributes map[string]interface{} `json:"attributes"`
+	Events     []SpanEvent            `json:"events,omitempty"`
+	Error      *SpanError             `json:"error,omitempty"`
 }
 
 // SpanEvent represents an event within a span
@@ -87,32 +89,32 @@ type SpanError struct {
 
 // TraceMetrics contains metrics about tracing
 type TraceMetrics struct {
-	SpansCreated     int64   `json:"spans_created"`
-	SpansExported    int64   `json:"spans_exported"`
-	SpansDropped     int64   `json:"spans_dropped"`
-	ExportErrors     int64   `json:"export_errors"`
-	AverageSpanTime  float64 `json:"avg_span_time_ms"`
-	SampleRate       float64 `json:"sample_rate"`
-	ActiveTraces     int     `json:"active_traces"`
-	TracesPerSecond  float64 `json:"traces_per_second"`
+	SpansCreated    int64   `json:"spans_created"`
+	SpansExported   int64   `json:"spans_exported"`
+	SpansDropped    int64   `json:"spans_dropped"`
+	ExportErrors    int64   `json:"export_errors"`
+	AverageSpanTime float64 `json:"avg_span_time_ms"`
+	SampleRate      float64 `json:"sample_rate"`
+	ActiveTraces    int     `json:"active_traces"`
+	TracesPerSecond float64 `json:"traces_per_second"`
 }
 
 // DefaultTracingConfig returns default tracing configuration
 func DefaultTracingConfig() *TracingConfig {
 	return &TracingConfig{
-		ServiceName:     "audimodal-api",
-		ServiceVersion:  "1.0.0",
-		Environment:     "development",
-		Enabled:         true,
-		SampleRate:      1.0, // Sample all traces in development
+		ServiceName:      "audimodal-api",
+		ServiceVersion:   "1.0.0",
+		Environment:      "development",
+		Enabled:          true,
+		SampleRate:       1.0, // Sample all traces in development
 		MaxSpansPerTrace: 1000,
-		ExportType:      "jaeger",
-		ExportEndpoint:  "http://localhost:14268/api/traces",
-		ExportTimeout:   30 * time.Second,
-		ExportBatchSize: 512,
-		JaegerAgentHost: "localhost",
-		JaegerAgentPort: "6832",
-		OTLPInsecure:    true,
+		ExportType:       "jaeger",
+		ExportEndpoint:   "http://localhost:14268/api/traces",
+		ExportTimeout:    30 * time.Second,
+		ExportBatchSize:  512,
+		JaegerAgentHost:  "localhost",
+		JaegerAgentPort:  "6832",
+		OTLPInsecure:     true,
 		ResourceAttributes: map[string]string{
 			"deployment.environment": "development",
 			"service.namespace":      "audimodal",
@@ -359,7 +361,7 @@ func (ts *TracingService) RecordError(span trace.Span, err error, attrs map[stri
 		span.SetAttributes(otelAttrs...)
 	}
 
-	span.SetStatus(trace.StatusError, err.Error())
+	span.SetStatus(codes.Error, err.Error())
 }
 
 // convertToOTELAttribute converts various types to OTEL attributes
@@ -491,7 +493,7 @@ func (ts *TracingService) TracingMiddleware(next http.Handler) http.Handler {
 
 		// Set span status based on HTTP status code
 		if wrapped.statusCode >= 400 {
-			span.SetStatus(trace.StatusError, fmt.Sprintf("HTTP %d", wrapped.statusCode))
+			span.SetStatus(codes.Error, fmt.Sprintf("HTTP %d", wrapped.statusCode))
 		}
 	})
 }

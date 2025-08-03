@@ -23,12 +23,12 @@ type DeepLakeAPIClient struct {
 
 // DeepLakeAPIConfig holds configuration for the DeepLake API client
 type DeepLakeAPIConfig struct {
-	BaseURL    string        `json:"base_url"`
-	APIKey     string        `json:"api_key"`
-	TenantID   string        `json:"tenant_id,omitempty"`
-	Timeout    time.Duration `json:"timeout"`
-	Retries    int           `json:"retries"`
-	UserAgent  string        `json:"user_agent,omitempty"`
+	BaseURL   string        `json:"base_url"`
+	APIKey    string        `json:"api_key"`
+	TenantID  string        `json:"tenant_id,omitempty"`
+	Timeout   time.Duration `json:"timeout"`
+	Retries   int           `json:"retries"`
+	UserAgent string        `json:"user_agent,omitempty"`
 }
 
 // NewDeepLakeAPIClient creates a new DeepLake API client
@@ -130,10 +130,10 @@ type VectorCreateRequest struct {
 
 // VectorBatchInsertRequest represents a batch vector insertion request
 type VectorBatchInsertRequest struct {
-	Vectors       []VectorCreateRequest `json:"vectors"`
-	SkipExisting  bool                  `json:"skip_existing,omitempty"`
-	Overwrite     bool                  `json:"overwrite,omitempty"`
-	BatchSize     *int                  `json:"batch_size,omitempty"`
+	Vectors      []VectorCreateRequest `json:"vectors"`
+	SkipExisting bool                  `json:"skip_existing,omitempty"`
+	Overwrite    bool                  `json:"overwrite,omitempty"`
+	BatchSize    *int                  `json:"batch_size,omitempty"`
 }
 
 // VectorResponse represents a vector response
@@ -188,21 +188,21 @@ type SearchOptions struct {
 
 // SearchResponse represents a search response
 type SearchResponse struct {
-	Results          []SearchResultItem `json:"results"`
-	TotalFound       int                `json:"total_found"`
-	HasMore          bool               `json:"has_more"`
-	QueryTimeMs      float64            `json:"query_time_ms"`
-	EmbeddingTimeMs  float64            `json:"embedding_time_ms"`
-	Stats            SearchStats        `json:"stats"`
+	Results         []SearchResultItem `json:"results"`
+	TotalFound      int                `json:"total_found"`
+	HasMore         bool               `json:"has_more"`
+	QueryTimeMs     float64            `json:"query_time_ms"`
+	EmbeddingTimeMs float64            `json:"embedding_time_ms"`
+	Stats           SearchStats        `json:"stats"`
 }
 
 // SearchResultItem represents a single search result
 type SearchResultItem struct {
-	Vector      VectorResponse         `json:"vector"`
-	Score       float32                `json:"score"`
-	Distance    float32                `json:"distance"`
-	Rank        int                    `json:"rank"`
-	Explanation map[string]string      `json:"explanation,omitempty"`
+	Vector      VectorResponse    `json:"vector"`
+	Score       float32           `json:"score"`
+	Distance    float32           `json:"distance"`
+	Rank        int               `json:"rank"`
+	Explanation map[string]string `json:"explanation,omitempty"`
 }
 
 // SearchStats represents search statistics
@@ -217,11 +217,11 @@ type SearchStats struct {
 
 // DatasetStats represents dataset statistics
 type DatasetStats struct {
-	Dataset       DatasetResponse            `json:"dataset"`
-	VectorCount   int                        `json:"vector_count"`
-	StorageSize   int64                      `json:"storage_size"`
-	MetadataStats map[string]int             `json:"metadata_stats"`
-	IndexStats    map[string]interface{}     `json:"index_stats,omitempty"`
+	Dataset       DatasetResponse        `json:"dataset"`
+	VectorCount   int                    `json:"vector_count"`
+	StorageSize   int64                  `json:"storage_size"`
+	MetadataStats map[string]int         `json:"metadata_stats"`
+	IndexStats    map[string]interface{} `json:"index_stats,omitempty"`
 }
 
 // VectorBatchResponse represents a batch operation response
@@ -432,16 +432,16 @@ func (c *DeepLakeAPIClient) GetDatasetStats(ctx context.Context, datasetName str
 
 	// Convert to map format expected by the interface
 	stats := map[string]interface{}{
-		"name":          response.Dataset.Name,
-		"vector_count":  response.VectorCount,
-		"dimensions":    response.Dataset.Dimensions,
-		"storage_size":  response.StorageSize,
-		"metric_type":   response.Dataset.MetricType,
-		"index_type":    response.Dataset.IndexType,
-		"created_at":    response.Dataset.CreatedAt,
-		"updated_at":    response.Dataset.UpdatedAt,
+		"name":           response.Dataset.Name,
+		"vector_count":   response.VectorCount,
+		"dimensions":     response.Dataset.Dimensions,
+		"storage_size":   response.StorageSize,
+		"metric_type":    response.Dataset.MetricType,
+		"index_type":     response.Dataset.IndexType,
+		"created_at":     response.Dataset.CreatedAt,
+		"updated_at":     response.Dataset.UpdatedAt,
 		"metadata_stats": response.MetadataStats,
-		"index_stats":   response.IndexStats,
+		"index_stats":    response.IndexStats,
 	}
 
 	return stats, nil
@@ -582,7 +582,7 @@ func convertMetadata(metadata map[string]interface{}) map[string]string {
 	if metadata == nil {
 		return nil
 	}
-	
+
 	result := make(map[string]string)
 	for k, v := range metadata {
 		result[k] = fmt.Sprintf("%v", v)

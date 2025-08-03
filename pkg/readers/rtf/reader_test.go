@@ -95,7 +95,7 @@ func TestRTFReader_ValidateConfig(t *testing.T) {
 
 func TestRTFReader_ExtractMetadata(t *testing.T) {
 	reader := &RTFReader{}
-	
+
 	testRTF := `{\rtf1\ansi\deff0 {\fonttbl{\f0 Times New Roman;}}
 {\info
 {\title Test Document Title}
@@ -143,7 +143,7 @@ func TestRTFReader_ExtractMetadata(t *testing.T) {
 
 func TestRTFReader_AnalyzeStructure(t *testing.T) {
 	reader := &RTFReader{}
-	
+
 	testRTF := `{\rtf1\ansi\deff0
 First paragraph.\par
 Second paragraph.\par
@@ -172,7 +172,7 @@ Third paragraph.\par
 
 func TestRTFReader_ExtractPlainText(t *testing.T) {
 	reader := &RTFReader{}
-	
+
 	tests := []struct {
 		name     string
 		input    string
@@ -217,7 +217,7 @@ func TestRTFReader_ExtractPlainText(t *testing.T) {
 
 func TestRTFReader_ParseParagraphs(t *testing.T) {
 	reader := &RTFReader{}
-	
+
 	testRTF := `{\rtf1\ansi\deff0
 {\b\fs28 Heading}\par
 First paragraph with normal text.\par
@@ -258,7 +258,7 @@ func TestRTFReader_CreateIterator(t *testing.T) {
 	// Create temporary RTF file
 	tempDir := t.TempDir()
 	rtfPath := filepath.Join(tempDir, "test.rtf")
-	
+
 	testRTF := `{\rtf1\ansi\deff0 {\fonttbl{\f0 Times New Roman;}}
 {\info{\title Test RTF Document}}
 \f0\fs24
@@ -266,7 +266,7 @@ This is the first paragraph.\par
 This is the second paragraph.\par
 This is the third paragraph.\par
 }`
-	
+
 	err := os.WriteFile(rtfPath, []byte(testRTF), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
@@ -293,7 +293,7 @@ This is the third paragraph.\par
 			t.Errorf("Unexpected error during iteration: %v", err)
 		}
 		chunkCount++
-		
+
 		if chunk.Data == "" {
 			t.Error("Expected non-empty chunk data")
 		}
@@ -321,11 +321,11 @@ This is the third paragraph.\par
 
 func TestRTFReader_InvalidFile(t *testing.T) {
 	reader := NewRTFReader()
-	
+
 	// Create temporary non-RTF file
 	tempDir := t.TempDir()
 	notRTFPath := filepath.Join(tempDir, "test.txt")
-	
+
 	err := os.WriteFile(notRTFPath, []byte("This is not an RTF file"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)

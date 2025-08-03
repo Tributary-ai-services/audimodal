@@ -65,7 +65,7 @@ func (h *ProcessingSessionHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 
 	path := r.URL.Path
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	
+
 	// Find sessions in the path
 	var sessionIndex int = -1
 	for i, part := range parts {
@@ -143,7 +143,7 @@ func (h *ProcessingSessionHandler) ServeHTTP(w http.ResponseWriter, r *http.Requ
 // ListSessions handles GET /api/v1/tenants/{tenant_id}/sessions
 func (h *ProcessingSessionHandler) ListSessions(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	page, pageSize, offset := getPagination(r.Context())
-	
+
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
 	if err != nil {
@@ -153,12 +153,12 @@ func (h *ProcessingSessionHandler) ListSessions(w http.ResponseWriter, r *http.R
 
 	var sessions []models.ProcessingSession
 	query := tenantRepo.DB().Limit(pageSize).Offset(offset).Order("created_at DESC")
-	
+
 	// Filter by status if provided
 	if status := r.URL.Query().Get("status"); status != "" {
 		query = query.Where("status = ?", status)
 	}
-	
+
 	err = query.Find(&sessions).Error
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to list sessions", err.Error())
@@ -283,7 +283,7 @@ func (h *ProcessingSessionHandler) UpdateSession(w http.ResponseWriter, r *http.
 	session.FileSpecs = req.Files
 	session.Options = req.Options
 	session.TotalFiles = len(req.Files)
-	
+
 	var totalBytes int64
 	for _, file := range req.Files {
 		totalBytes += file.Size
@@ -361,14 +361,14 @@ func (h *ProcessingSessionHandler) StartSession(w http.ResponseWriter, r *http.R
 
 	// Start the session
 	session.Start()
-	
+
 	if err := tenantRepo.DB().Save(&session).Error; err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to start session", err.Error())
 		return
 	}
 
 	// TODO: Trigger actual processing pipeline
-	
+
 	responseData := h.toSessionResponse(&session)
 	response.WriteSuccess(w, getRequestID(r), responseData, nil)
 }
@@ -401,7 +401,7 @@ func (h *ProcessingSessionHandler) StopSession(w http.ResponseWriter, r *http.Re
 
 	// Cancel the session
 	session.Cancel()
-	
+
 	if err := tenantRepo.DB().Save(&session).Error; err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to stop session", err.Error())
 		return
@@ -446,7 +446,7 @@ func (h *ProcessingSessionHandler) RetrySession(w http.ResponseWriter, r *http.R
 	session.StartedAt = nil
 	session.CompletedAt = nil
 	session.LastError = nil
-	
+
 	if err := tenantRepo.DB().Save(&session).Error; err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to retry session", err.Error())
 		return

@@ -2,10 +2,8 @@ package insights
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -18,106 +16,106 @@ import (
 
 // InsightsEngine provides ML-powered document insights and reporting
 type InsightsEngine struct {
-	config              *InsightsConfig
-	documentAnalyzer    *DocumentAnalyzer
-	trendAnalyzer       *TrendAnalyzer
-	contentAnalyzer     *ContentAnalyzer
+	config               *InsightsConfig
+	documentAnalyzer     *DocumentAnalyzer
+	trendAnalyzer        *TrendAnalyzer
+	contentAnalyzer      *ContentAnalyzer
 	userBehaviorAnalyzer *UserBehaviorAnalyzer
-	insightsRepository  *InsightsRepository
-	reportGenerator     *ReportGenerator
-	tracer              trace.Tracer
-	mutex               sync.RWMutex
+	insightsRepository   *InsightsRepository
+	reportGenerator      *ReportGenerator
+	tracer               trace.Tracer
+	mutex                sync.RWMutex
 }
 
 // InsightsConfig contains configuration for insights generation
 type InsightsConfig struct {
-	Enabled                    bool          `json:"enabled"`
-	AnalysisInterval           time.Duration `json:"analysis_interval"`
-	InsightRetentionPeriod     time.Duration `json:"insight_retention_period"`
-	MinDocumentsForTrend       int           `json:"min_documents_for_trend"`
-	MinUsersForBehaviorAnalysis int          `json:"min_users_for_behavior_analysis"`
-	EnableRealTimeInsights     bool          `json:"enable_real_time_insights"`
-	EnablePredictiveInsights   bool          `json:"enable_predictive_insights"`
-	EnableAnomalyDetection     bool          `json:"enable_anomaly_detection"`
-	EnableContentRecommendations bool        `json:"enable_content_recommendations"`
-	InsightConfidenceThreshold float64       `json:"insight_confidence_threshold"`
-	MaxInsightsPerCategory     int           `json:"max_insights_per_category"`
-	NotificationThreshold      int           `json:"notification_threshold"`
-	CacheSize                  int           `json:"cache_size"`
-	CacheTTL                   time.Duration `json:"cache_ttl"`
+	Enabled                      bool          `json:"enabled"`
+	AnalysisInterval             time.Duration `json:"analysis_interval"`
+	InsightRetentionPeriod       time.Duration `json:"insight_retention_period"`
+	MinDocumentsForTrend         int           `json:"min_documents_for_trend"`
+	MinUsersForBehaviorAnalysis  int           `json:"min_users_for_behavior_analysis"`
+	EnableRealTimeInsights       bool          `json:"enable_real_time_insights"`
+	EnablePredictiveInsights     bool          `json:"enable_predictive_insights"`
+	EnableAnomalyDetection       bool          `json:"enable_anomaly_detection"`
+	EnableContentRecommendations bool          `json:"enable_content_recommendations"`
+	InsightConfidenceThreshold   float64       `json:"insight_confidence_threshold"`
+	MaxInsightsPerCategory       int           `json:"max_insights_per_category"`
+	NotificationThreshold        int           `json:"notification_threshold"`
+	CacheSize                    int           `json:"cache_size"`
+	CacheTTL                     time.Duration `json:"cache_ttl"`
 }
 
 // DocumentInsight represents insights about documents
 type DocumentInsight struct {
-	ID              uuid.UUID                 `json:"id"`
-	TenantID        uuid.UUID                 `json:"tenant_id"`
-	DocumentID      *uuid.UUID                `json:"document_id,omitempty"`
-	InsightType     InsightType               `json:"insight_type"`
-	Category        InsightCategory           `json:"category"`
-	Title           string                    `json:"title"`
-	Description     string                    `json:"description"`
-	Severity        InsightSeverity           `json:"severity"`
-	Confidence      float64                   `json:"confidence"`
-	
+	ID          uuid.UUID       `json:"id"`
+	TenantID    uuid.UUID       `json:"tenant_id"`
+	DocumentID  *uuid.UUID      `json:"document_id,omitempty"`
+	InsightType InsightType     `json:"insight_type"`
+	Category    InsightCategory `json:"category"`
+	Title       string          `json:"title"`
+	Description string          `json:"description"`
+	Severity    InsightSeverity `json:"severity"`
+	Confidence  float64         `json:"confidence"`
+
 	// Insight data
-	Data            map[string]interface{}    `json:"data"`
-	Metrics         []InsightMetric           `json:"metrics"`
-	Recommendations []InsightRecommendation   `json:"recommendations"`
-	
+	Data            map[string]interface{}  `json:"data"`
+	Metrics         []InsightMetric         `json:"metrics"`
+	Recommendations []InsightRecommendation `json:"recommendations"`
+
 	// Context
-	TimeRange       *TimeRange                `json:"time_range,omitempty"`
-	AffectedEntities []EntityReference        `json:"affected_entities,omitempty"`
-	RelatedInsights []uuid.UUID               `json:"related_insights,omitempty"`
-	
+	TimeRange        *TimeRange        `json:"time_range,omitempty"`
+	AffectedEntities []EntityReference `json:"affected_entities,omitempty"`
+	RelatedInsights  []uuid.UUID       `json:"related_insights,omitempty"`
+
 	// Metadata
-	GeneratedAt     time.Time                 `json:"generated_at"`
-	GeneratedBy     string                    `json:"generated_by"`
-	ValidUntil      *time.Time                `json:"valid_until,omitempty"`
-	Tags            []string                  `json:"tags,omitempty"`
-	Status          InsightStatus             `json:"status"`
-	
+	GeneratedAt time.Time     `json:"generated_at"`
+	GeneratedBy string        `json:"generated_by"`
+	ValidUntil  *time.Time    `json:"valid_until,omitempty"`
+	Tags        []string      `json:"tags,omitempty"`
+	Status      InsightStatus `json:"status"`
+
 	// Actions
-	ActionTaken     bool                      `json:"action_taken"`
-	ActionDetails   *InsightAction            `json:"action_details,omitempty"`
-	
+	ActionTaken   bool           `json:"action_taken"`
+	ActionDetails *InsightAction `json:"action_details,omitempty"`
+
 	// Custom metadata
-	Metadata        map[string]interface{}    `json:"metadata,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // DocumentReport represents comprehensive document analysis reports
 type DocumentReport struct {
-	ID              uuid.UUID                 `json:"id"`
-	TenantID        uuid.UUID                 `json:"tenant_id"`
-	ReportType      ReportType                `json:"report_type"`
-	Title           string                    `json:"title"`
-	Description     string                    `json:"description"`
-	GeneratedAt     time.Time                 `json:"generated_at"`
-	GeneratedBy     uuid.UUID                 `json:"generated_by"`
-	
+	ID          uuid.UUID  `json:"id"`
+	TenantID    uuid.UUID  `json:"tenant_id"`
+	ReportType  ReportType `json:"report_type"`
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	GeneratedAt time.Time  `json:"generated_at"`
+	GeneratedBy uuid.UUID  `json:"generated_by"`
+
 	// Report period
-	TimeRange       TimeRange                 `json:"time_range"`
-	
+	TimeRange TimeRange `json:"time_range"`
+
 	// Summary statistics
-	Summary         *ReportSummary            `json:"summary"`
-	
+	Summary *ReportSummary `json:"summary"`
+
 	// Detailed sections
-	DocumentMetrics *DocumentMetricsSection   `json:"document_metrics,omitempty"`
-	UserMetrics     *UserMetricsSection       `json:"user_metrics,omitempty"`
-	ContentAnalysis *ContentAnalysisSection   `json:"content_analysis,omitempty"`
-	TrendAnalysis   *TrendAnalysisSection     `json:"trend_analysis,omitempty"`
-	Insights        []DocumentInsight         `json:"insights"`
-	
+	DocumentMetrics *DocumentMetricsSection `json:"document_metrics,omitempty"`
+	UserMetrics     *UserMetricsSection     `json:"user_metrics,omitempty"`
+	ContentAnalysis *ContentAnalysisSection `json:"content_analysis,omitempty"`
+	TrendAnalysis   *TrendAnalysisSection   `json:"trend_analysis,omitempty"`
+	Insights        []DocumentInsight       `json:"insights"`
+
 	// Visualizations
-	Charts          []ChartData               `json:"charts,omitempty"`
-	Tables          []TableData               `json:"tables,omitempty"`
-	
+	Charts []ChartData `json:"charts,omitempty"`
+	Tables []TableData `json:"tables,omitempty"`
+
 	// Export metadata
-	Format          string                    `json:"format"`
-	FilePath        string                    `json:"file_path,omitempty"`
-	ExportedAt      *time.Time                `json:"exported_at,omitempty"`
-	
+	Format     string     `json:"format"`
+	FilePath   string     `json:"file_path,omitempty"`
+	ExportedAt *time.Time `json:"exported_at,omitempty"`
+
 	// Custom metadata
-	Metadata        map[string]interface{}    `json:"metadata,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // Enums and supporting types
@@ -140,16 +138,16 @@ const (
 type InsightCategory string
 
 const (
-	InsightCategoryDocumentHealth    InsightCategory = "document_health"
-	InsightCategoryUserEngagement    InsightCategory = "user_engagement"
-	InsightCategoryContentQuality    InsightCategory = "content_quality"
-	InsightCategoryAccessPatterns    InsightCategory = "access_patterns"
+	InsightCategoryDocumentHealth      InsightCategory = "document_health"
+	InsightCategoryUserEngagement      InsightCategory = "user_engagement"
+	InsightCategoryContentQuality      InsightCategory = "content_quality"
+	InsightCategoryAccessPatterns      InsightCategory = "access_patterns"
 	InsightCategoryStorageOptimization InsightCategory = "storage_optimization"
-	InsightCategorySecurityRisk      InsightCategory = "security_risk"
-	InsightCategoryComplianceGap     InsightCategory = "compliance_gap"
-	InsightCategoryPerformanceIssue  InsightCategory = "performance_issue"
+	InsightCategorySecurityRisk        InsightCategory = "security_risk"
+	InsightCategoryComplianceGap       InsightCategory = "compliance_gap"
+	InsightCategoryPerformanceIssue    InsightCategory = "performance_issue"
 	InsightCategoryResourceUtilization InsightCategory = "resource_utilization"
-	InsightCategoryDataGovernance    InsightCategory = "data_governance"
+	InsightCategoryDataGovernance      InsightCategory = "data_governance"
 )
 
 type InsightSeverity string
@@ -174,38 +172,38 @@ const (
 type ReportType string
 
 const (
-	ReportTypeDocumentSummary    ReportType = "document_summary"
-	ReportTypeUsageAnalysis      ReportType = "usage_analysis"
-	ReportTypeContentAnalysis    ReportType = "content_analysis"
-	ReportTypeTrendAnalysis      ReportType = "trend_analysis"
-	ReportTypeSecurityAudit      ReportType = "security_audit"
-	ReportTypeComplianceReport   ReportType = "compliance_report"
-	ReportTypePerformanceReport  ReportType = "performance_report"
-	ReportTypeCustom             ReportType = "custom"
+	ReportTypeDocumentSummary   ReportType = "document_summary"
+	ReportTypeUsageAnalysis     ReportType = "usage_analysis"
+	ReportTypeContentAnalysis   ReportType = "content_analysis"
+	ReportTypeTrendAnalysis     ReportType = "trend_analysis"
+	ReportTypeSecurityAudit     ReportType = "security_audit"
+	ReportTypeComplianceReport  ReportType = "compliance_report"
+	ReportTypePerformanceReport ReportType = "performance_report"
+	ReportTypeCustom            ReportType = "custom"
 )
 
 type InsightMetric struct {
-	Name        string      `json:"name"`
-	Value       float64     `json:"value"`
-	Unit        string      `json:"unit,omitempty"`
-	Trend       string      `json:"trend,omitempty"` // up, down, stable
-	Change      float64     `json:"change,omitempty"`
-	Benchmark   float64     `json:"benchmark,omitempty"`
-	Target      float64     `json:"target,omitempty"`
-	Description string      `json:"description,omitempty"`
+	Name        string  `json:"name"`
+	Value       float64 `json:"value"`
+	Unit        string  `json:"unit,omitempty"`
+	Trend       string  `json:"trend,omitempty"` // up, down, stable
+	Change      float64 `json:"change,omitempty"`
+	Benchmark   float64 `json:"benchmark,omitempty"`
+	Target      float64 `json:"target,omitempty"`
+	Description string  `json:"description,omitempty"`
 }
 
 type InsightRecommendation struct {
-	ID          uuid.UUID                 `json:"id"`
-	Title       string                    `json:"title"`
-	Description string                    `json:"description"`
-	Action      string                    `json:"action"`
-	Priority    string                    `json:"priority"`
-	Impact      string                    `json:"impact"`
-	Effort      string                    `json:"effort"`
-	Timeline    string                    `json:"timeline"`
-	Resources   []string                  `json:"resources,omitempty"`
-	Parameters  map[string]interface{}    `json:"parameters,omitempty"`
+	ID          uuid.UUID              `json:"id"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Action      string                 `json:"action"`
+	Priority    string                 `json:"priority"`
+	Impact      string                 `json:"impact"`
+	Effort      string                 `json:"effort"`
+	Timeline    string                 `json:"timeline"`
+	Resources   []string               `json:"resources,omitempty"`
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`
 }
 
 type TimeRange struct {
@@ -220,28 +218,28 @@ type EntityReference struct {
 }
 
 type InsightAction struct {
-	ActionType    string                    `json:"action_type"`
-	ActionBy      uuid.UUID                 `json:"action_by"`
-	ActionAt      time.Time                 `json:"action_at"`
-	ActionDetails map[string]interface{}    `json:"action_details"`
-	Result        string                    `json:"result,omitempty"`
-	Notes         string                    `json:"notes,omitempty"`
+	ActionType    string                 `json:"action_type"`
+	ActionBy      uuid.UUID              `json:"action_by"`
+	ActionAt      time.Time              `json:"action_at"`
+	ActionDetails map[string]interface{} `json:"action_details"`
+	Result        string                 `json:"result,omitempty"`
+	Notes         string                 `json:"notes,omitempty"`
 }
 
 type ReportSummary struct {
-	TotalDocuments    int                       `json:"total_documents"`
-	ActiveUsers       int                       `json:"active_users"`
-	TotalViews        int64                     `json:"total_views"`
-	TotalDownloads    int64                     `json:"total_downloads"`
-	StorageUsed       int64                     `json:"storage_used"`
-	KeyInsights       []string                  `json:"key_insights"`
-	TopCategories     []CategoryMetric          `json:"top_categories"`
-	PerformanceMetrics []PerformanceMetric      `json:"performance_metrics"`
+	TotalDocuments     int                 `json:"total_documents"`
+	ActiveUsers        int                 `json:"active_users"`
+	TotalViews         int64               `json:"total_views"`
+	TotalDownloads     int64               `json:"total_downloads"`
+	StorageUsed        int64               `json:"storage_used"`
+	KeyInsights        []string            `json:"key_insights"`
+	TopCategories      []CategoryMetric    `json:"top_categories"`
+	PerformanceMetrics []PerformanceMetric `json:"performance_metrics"`
 }
 
 type CategoryMetric struct {
-	Category string `json:"category"`
-	Count    int    `json:"count"`
+	Category   string  `json:"category"`
+	Count      int     `json:"count"`
 	Percentage float64 `json:"percentage"`
 }
 
@@ -252,38 +250,38 @@ type PerformanceMetric struct {
 }
 
 type DocumentMetricsSection struct {
-	DocumentsByType     []CategoryMetric      `json:"documents_by_type"`
-	DocumentsBySize     []SizeMetric          `json:"documents_by_size"`
-	DocumentsByAge      []AgeMetric           `json:"documents_by_age"`
-	DocumentsByLanguage []LanguageMetric      `json:"documents_by_language"`
-	TopDocuments        []DocumentMetric      `json:"top_documents"`
-	OrphanedDocuments   []OrphanedDocument    `json:"orphaned_documents"`
-	DuplicateDocuments  []DuplicateGroup      `json:"duplicate_documents"`
+	DocumentsByType     []CategoryMetric   `json:"documents_by_type"`
+	DocumentsBySize     []SizeMetric       `json:"documents_by_size"`
+	DocumentsByAge      []AgeMetric        `json:"documents_by_age"`
+	DocumentsByLanguage []LanguageMetric   `json:"documents_by_language"`
+	TopDocuments        []DocumentMetric   `json:"top_documents"`
+	OrphanedDocuments   []OrphanedDocument `json:"orphaned_documents"`
+	DuplicateDocuments  []DuplicateGroup   `json:"duplicate_documents"`
 }
 
 type UserMetricsSection struct {
-	ActiveUsers         []UserMetric          `json:"active_users"`
-	UsersByDepartment   []DepartmentMetric    `json:"users_by_department"`
-	UsersByRole         []RoleMetric          `json:"users_by_role"`
-	AccessPatterns      []AccessPattern       `json:"access_patterns"`
-	UserEngagement      []EngagementMetric    `json:"user_engagement"`
+	ActiveUsers       []UserMetric       `json:"active_users"`
+	UsersByDepartment []DepartmentMetric `json:"users_by_department"`
+	UsersByRole       []RoleMetric       `json:"users_by_role"`
+	AccessPatterns    []AccessPattern    `json:"access_patterns"`
+	UserEngagement    []EngagementMetric `json:"user_engagement"`
 }
 
 type ContentAnalysisSection struct {
-	TopicDistribution   []TopicMetric         `json:"topic_distribution"`
-	SentimentAnalysis   *SentimentMetric      `json:"sentiment_analysis"`
-	ComplexityAnalysis  *ComplexityMetric     `json:"complexity_analysis"`
-	QualityScore        float64               `json:"quality_score"`
-	ContentGaps         []ContentGap          `json:"content_gaps"`
-	RecommendedContent  []ContentRecommendation `json:"recommended_content"`
+	TopicDistribution  []TopicMetric           `json:"topic_distribution"`
+	SentimentAnalysis  *SentimentMetric        `json:"sentiment_analysis"`
+	ComplexityAnalysis *ComplexityMetric       `json:"complexity_analysis"`
+	QualityScore       float64                 `json:"quality_score"`
+	ContentGaps        []ContentGap            `json:"content_gaps"`
+	RecommendedContent []ContentRecommendation `json:"recommended_content"`
 }
 
 type TrendAnalysisSection struct {
-	DocumentCreationTrend []TrendPoint        `json:"document_creation_trend"`
-	AccessTrend           []TrendPoint        `json:"access_trend"`
-	PopularityTrend       []TrendPoint        `json:"popularity_trend"`
-	SeasonalPatterns      []SeasonalPattern   `json:"seasonal_patterns"`
-	PredictedTrends       []PredictedTrend    `json:"predicted_trends"`
+	DocumentCreationTrend []TrendPoint      `json:"document_creation_trend"`
+	AccessTrend           []TrendPoint      `json:"access_trend"`
+	PopularityTrend       []TrendPoint      `json:"popularity_trend"`
+	SeasonalPatterns      []SeasonalPattern `json:"seasonal_patterns"`
+	PredictedTrends       []PredictedTrend  `json:"predicted_trends"`
 }
 
 type SizeMetric struct {
@@ -303,11 +301,11 @@ type LanguageMetric struct {
 }
 
 type DocumentMetric struct {
-	DocumentID   uuid.UUID `json:"document_id"`
-	Title        string    `json:"title"`
-	Views        int64     `json:"views"`
-	Downloads    int64     `json:"downloads"`
-	Score        float64   `json:"score"`
+	DocumentID uuid.UUID `json:"document_id"`
+	Title      string    `json:"title"`
+	Views      int64     `json:"views"`
+	Downloads  int64     `json:"downloads"`
+	Score      float64   `json:"score"`
 }
 
 type OrphanedDocument struct {
@@ -324,29 +322,29 @@ type DuplicateGroup struct {
 }
 
 type UserMetric struct {
-	UserID     uuid.UUID `json:"user_id"`
-	Name       string    `json:"name"`
-	Activity   string    `json:"activity"`
-	Score      float64   `json:"score"`
+	UserID   uuid.UUID `json:"user_id"`
+	Name     string    `json:"name"`
+	Activity string    `json:"activity"`
+	Score    float64   `json:"score"`
 }
 
 type DepartmentMetric struct {
-	Department string `json:"department"`
-	UserCount  int    `json:"user_count"`
+	Department string  `json:"department"`
+	UserCount  int     `json:"user_count"`
 	Activity   float64 `json:"activity"`
 }
 
 type RoleMetric struct {
-	Role      string `json:"role"`
-	UserCount int    `json:"user_count"`
+	Role      string  `json:"role"`
+	UserCount int     `json:"user_count"`
 	Access    float64 `json:"access"`
 }
 
 type AccessPattern struct {
-	Pattern     string    `json:"pattern"`
-	Frequency   int       `json:"frequency"`
-	TimeOfDay   string    `json:"time_of_day"`
-	DayOfWeek   string    `json:"day_of_week"`
+	Pattern   string `json:"pattern"`
+	Frequency int    `json:"frequency"`
+	TimeOfDay string `json:"time_of_day"`
+	DayOfWeek string `json:"day_of_week"`
 }
 
 type EngagementMetric struct {
@@ -357,9 +355,9 @@ type EngagementMetric struct {
 }
 
 type TopicMetric struct {
-	Topic      string  `json:"topic"`
-	Count      int     `json:"count"`
-	Relevance  float64 `json:"relevance"`
+	Topic     string  `json:"topic"`
+	Count     int     `json:"count"`
+	Relevance float64 `json:"relevance"`
 }
 
 type SentimentMetric struct {
@@ -370,9 +368,9 @@ type SentimentMetric struct {
 }
 
 type ComplexityMetric struct {
-	Average    float64 `json:"average"`
+	Average      float64        `json:"average"`
 	Distribution map[string]int `json:"distribution"`
-	Trend      string  `json:"trend"`
+	Trend        string         `json:"trend"`
 }
 
 type ContentGap struct {
@@ -396,32 +394,32 @@ type TrendPoint struct {
 }
 
 type SeasonalPattern struct {
-	Period      string    `json:"period"`
-	Pattern     string    `json:"pattern"`
-	Strength    float64   `json:"strength"`
-	PeakTime    string    `json:"peak_time"`
+	Period   string  `json:"period"`
+	Pattern  string  `json:"pattern"`
+	Strength float64 `json:"strength"`
+	PeakTime string  `json:"peak_time"`
 }
 
 type PredictedTrend struct {
-	Metric      string      `json:"metric"`
-	Prediction  []TrendPoint `json:"prediction"`
-	Confidence  float64     `json:"confidence"`
-	Method      string      `json:"method"`
+	Metric     string       `json:"metric"`
+	Prediction []TrendPoint `json:"prediction"`
+	Confidence float64      `json:"confidence"`
+	Method     string       `json:"method"`
 }
 
 type ChartData struct {
-	ID       string                    `json:"id"`
-	Type     string                    `json:"type"`
-	Title    string                    `json:"title"`
-	Data     map[string]interface{}    `json:"data"`
-	Options  map[string]interface{}    `json:"options,omitempty"`
+	ID      string                 `json:"id"`
+	Type    string                 `json:"type"`
+	Title   string                 `json:"title"`
+	Data    map[string]interface{} `json:"data"`
+	Options map[string]interface{} `json:"options,omitempty"`
 }
 
 type TableData struct {
-	ID      string              `json:"id"`
-	Title   string              `json:"title"`
-	Headers []string            `json:"headers"`
-	Rows    [][]interface{}     `json:"rows"`
+	ID      string                 `json:"id"`
+	Title   string                 `json:"title"`
+	Headers []string               `json:"headers"`
+	Rows    [][]interface{}        `json:"rows"`
 	Options map[string]interface{} `json:"options,omitempty"`
 }
 
@@ -459,17 +457,17 @@ type ReportGenerator struct {
 }
 
 type DocumentMetadata struct {
-	ID           uuid.UUID                 `json:"id"`
-	Title        string                    `json:"title"`
-	Type         string                    `json:"type"`
-	Size         int64                     `json:"size"`
-	Language     string                    `json:"language"`
-	CreatedAt    time.Time                 `json:"created_at"`
-	ModifiedAt   time.Time                 `json:"modified_at"`
-	AccessCount  int64                     `json:"access_count"`
-	DownloadCount int64                    `json:"download_count"`
-	Tags         []string                  `json:"tags"`
-	Metadata     map[string]interface{}    `json:"metadata"`
+	ID            uuid.UUID              `json:"id"`
+	Title         string                 `json:"title"`
+	Type          string                 `json:"type"`
+	Size          int64                  `json:"size"`
+	Language      string                 `json:"language"`
+	CreatedAt     time.Time              `json:"created_at"`
+	ModifiedAt    time.Time              `json:"modified_at"`
+	AccessCount   int64                  `json:"access_count"`
+	DownloadCount int64                  `json:"download_count"`
+	Tags          []string               `json:"tags"`
+	Metadata      map[string]interface{} `json:"metadata"`
 }
 
 type TrendData struct {
@@ -481,47 +479,47 @@ type TrendData struct {
 }
 
 type ContentMetrics struct {
-	DocumentID       uuid.UUID   `json:"document_id"`
-	Topics          []string    `json:"topics"`
-	Sentiment       float64     `json:"sentiment"`
-	Complexity      float64     `json:"complexity"`
-	Readability     float64     `json:"readability"`
-	QualityScore    float64     `json:"quality_score"`
-	Keywords        []string    `json:"keywords"`
-	Entities        []string    `json:"entities"`
-	UpdatedAt       time.Time   `json:"updated_at"`
+	DocumentID   uuid.UUID `json:"document_id"`
+	Topics       []string  `json:"topics"`
+	Sentiment    float64   `json:"sentiment"`
+	Complexity   float64   `json:"complexity"`
+	Readability  float64   `json:"readability"`
+	QualityScore float64   `json:"quality_score"`
+	Keywords     []string  `json:"keywords"`
+	Entities     []string  `json:"entities"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type UserBehaviorData struct {
-	UserID         uuid.UUID                 `json:"user_id"`
-	AccessPatterns []AccessPattern           `json:"access_patterns"`
-	Preferences    map[string]float64        `json:"preferences"`
-	Engagement     float64                   `json:"engagement"`
-	Activity       []ActivityRecord          `json:"activity"`
-	UpdatedAt      time.Time                 `json:"updated_at"`
+	UserID         uuid.UUID          `json:"user_id"`
+	AccessPatterns []AccessPattern    `json:"access_patterns"`
+	Preferences    map[string]float64 `json:"preferences"`
+	Engagement     float64            `json:"engagement"`
+	Activity       []ActivityRecord   `json:"activity"`
+	UpdatedAt      time.Time          `json:"updated_at"`
 }
 
 type ActivityRecord struct {
-	DocumentID uuid.UUID `json:"document_id"`
-	Action     string    `json:"action"`
-	Timestamp  time.Time `json:"timestamp"`
+	DocumentID uuid.UUID     `json:"document_id"`
+	Action     string        `json:"action"`
+	Timestamp  time.Time     `json:"timestamp"`
 	Duration   time.Duration `json:"duration,omitempty"`
 }
 
 type ReportTemplate struct {
-	ID          uuid.UUID                 `json:"id"`
-	Name        string                    `json:"name"`
-	Type        ReportType                `json:"type"`
-	Sections    []string                  `json:"sections"`
-	Parameters  map[string]interface{}    `json:"parameters"`
-	Template    string                    `json:"template"`
+	ID         uuid.UUID              `json:"id"`
+	Name       string                 `json:"name"`
+	Type       ReportType             `json:"type"`
+	Sections   []string               `json:"sections"`
+	Parameters map[string]interface{} `json:"parameters"`
+	Template   string                 `json:"template"`
 }
 
 // NewInsightsEngine creates a new insights engine
 func NewInsightsEngine(config *InsightsConfig) *InsightsEngine {
 	if config == nil {
 		config = &InsightsConfig{
-			Enabled:                       true,
+			Enabled:                      true,
 			AnalysisInterval:             time.Hour,
 			InsightRetentionPeriod:       30 * 24 * time.Hour,
 			MinDocumentsForTrend:         10,
@@ -737,7 +735,7 @@ func (ie *InsightsEngine) generateDocumentHealthInsights(ctx context.Context, te
 		Severity:    InsightSeverityLow,
 		Confidence:  0.75,
 		Data: map[string]interface{}{
-			"duplicate_groups": 8,
+			"duplicate_groups":  8,
 			"potential_savings": "45 MB",
 		},
 		Metrics: []InsightMetric{
@@ -807,7 +805,7 @@ func (ie *InsightsEngine) generateContentQualityInsights(ctx context.Context, te
 		Severity:    InsightSeverityMedium,
 		Confidence:  0.8,
 		Data: map[string]interface{}{
-			"average_quality_score": 7.5,
+			"average_quality_score":     7.5,
 			"documents_below_threshold": 12,
 		},
 		Metrics: []InsightMetric{
@@ -853,9 +851,9 @@ func (ie *InsightsEngine) generateTrendInsights(ctx context.Context, tenantID uu
 		Severity:    InsightSeverityLow,
 		Confidence:  0.85,
 		Data: map[string]interface{}{
-			"current_month": 45,
+			"current_month":  45,
 			"previous_month": 36,
-			"growth_rate": 0.25,
+			"growth_rate":    0.25,
 		},
 		Metrics: []InsightMetric{
 			{
@@ -890,7 +888,7 @@ func (ie *InsightsEngine) generateAnomalyInsights(ctx context.Context, tenantID 
 		Confidence:  0.9,
 		Data: map[string]interface{}{
 			"anomaly_time": "2024-01-15 02:30 AM",
-			"normal_rate": 5,
+			"normal_rate":  5,
 			"anomaly_rate": 45,
 		},
 		Metrics: []InsightMetric{
@@ -1060,7 +1058,7 @@ func NewReportGenerator() *ReportGenerator {
 func (ir *InsightsRepository) StoreInsight(ctx context.Context, insight *DocumentInsight) error {
 	ir.mutex.Lock()
 	defer ir.mutex.Unlock()
-	
+
 	ir.insights[insight.ID] = insight
 	return nil
 }
@@ -1068,7 +1066,7 @@ func (ir *InsightsRepository) StoreInsight(ctx context.Context, insight *Documen
 func (ir *InsightsRepository) StoreReport(ctx context.Context, report *DocumentReport) error {
 	ir.mutex.Lock()
 	defer ir.mutex.Unlock()
-	
+
 	ir.reports[report.ID] = report
 	return nil
 }
@@ -1076,7 +1074,7 @@ func (ir *InsightsRepository) StoreReport(ctx context.Context, report *DocumentR
 func (ir *InsightsRepository) GetInsights(ctx context.Context, tenantID uuid.UUID, filter *InsightFilter) ([]DocumentInsight, error) {
 	ir.mutex.RLock()
 	defer ir.mutex.RUnlock()
-	
+
 	var results []DocumentInsight
 	for _, insight := range ir.insights {
 		if insight.TenantID == tenantID {
@@ -1085,19 +1083,19 @@ func (ir *InsightsRepository) GetInsights(ctx context.Context, tenantID uuid.UUI
 			}
 		}
 	}
-	
+
 	return results, nil
 }
 
 func (ir *InsightsRepository) GetReport(ctx context.Context, reportID uuid.UUID) (*DocumentReport, error) {
 	ir.mutex.RLock()
 	defer ir.mutex.RUnlock()
-	
+
 	report, exists := ir.reports[reportID]
 	if !exists {
 		return nil, fmt.Errorf("report not found: %s", reportID)
 	}
-	
+
 	return report, nil
 }
 

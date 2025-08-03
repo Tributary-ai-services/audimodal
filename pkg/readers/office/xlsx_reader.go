@@ -133,8 +133,8 @@ func (r *XLSXReader) TestConnection(ctx context.Context, config map[string]any) 
 		Message: "XLSX reader ready",
 		Latency: time.Since(start),
 		Details: map[string]any{
-			"extract_formulas":            config["extract_formulas"],
-			"treat_first_row_as_header":   config["treat_first_row_as_header"],
+			"extract_formulas":          config["extract_formulas"],
+			"treat_first_row_as_header": config["treat_first_row_as_header"],
 		},
 	}
 }
@@ -197,13 +197,13 @@ func (r *XLSXReader) DiscoverSchema(ctx context.Context, sourcePath string) (cor
 			},
 		},
 		Metadata: map[string]any{
-			"sheet_count":      len(workbook.Sheets),
-			"total_rows":       workbook.TotalRows,
-			"total_columns":    workbook.TotalColumns,
-			"has_formulas":     workbook.HasFormulas,
-			"created_date":     workbook.CreatedDate,
-			"modified_date":    workbook.ModifiedDate,
-			"creator":          workbook.Creator,
+			"sheet_count":   len(workbook.Sheets),
+			"total_rows":    workbook.TotalRows,
+			"total_columns": workbook.TotalColumns,
+			"has_formulas":  workbook.HasFormulas,
+			"created_date":  workbook.CreatedDate,
+			"modified_date": workbook.ModifiedDate,
+			"creator":       workbook.Creator,
 		},
 	}
 
@@ -211,18 +211,18 @@ func (r *XLSXReader) DiscoverSchema(ctx context.Context, sourcePath string) (cor
 	if len(workbook.Sheets) > 0 {
 		sheet := workbook.Sheets[0]
 		sampleData := make([]map[string]any, 0, min(len(sheet.Rows), 3))
-		
+
 		for i, row := range sheet.Rows {
 			if i >= 3 {
 				break
 			}
 			if len(row.Cells) > 0 {
 				sampleData = append(sampleData, map[string]any{
-					"sheet_name":  sheet.Name,
-					"row_number":  i + 1,
-					"column":      "A",
-					"cell_value":  row.Cells[0].Value,
-					"cell_type":   row.Cells[0].Type,
+					"sheet_name": sheet.Name,
+					"row_number": i + 1,
+					"column":     "A",
+					"cell_value": row.Cells[0].Value,
+					"cell_type":  row.Cells[0].Type,
 				})
 			}
 		}
@@ -308,13 +308,13 @@ func (r *XLSXReader) GetSupportedFormats() []string {
 
 // XLSXWorkbook represents a parsed XLSX workbook
 type XLSXWorkbook struct {
-	Sheets         []XLSXSheet
-	TotalRows      int
-	TotalColumns   int
-	HasFormulas    bool
-	CreatedDate    string
-	ModifiedDate   string
-	Creator        string
+	Sheets       []XLSXSheet
+	TotalRows    int
+	TotalColumns int
+	HasFormulas  bool
+	CreatedDate  string
+	ModifiedDate string
+	Creator      string
 }
 
 // XLSXSheet represents a worksheet
@@ -334,11 +334,11 @@ type XLSXRow struct {
 
 // XLSXCell represents a cell in a worksheet
 type XLSXCell struct {
-	Column   string
-	Value    string
-	Type     string
-	Formula  string
-	Comment  string
+	Column  string
+	Value   string
+	Type    string
+	Formula string
+	Comment string
 }
 
 // parseWorkbook parses the complete XLSX workbook
@@ -424,7 +424,7 @@ func (it *XLSXIterator) Next(ctx context.Context) (core.Chunk, error) {
 	// Find next available row
 	for it.currentSheet < len(it.workbook.Sheets) {
 		sheet := it.workbook.Sheets[it.currentSheet]
-		
+
 		// Skip hidden sheets if not configured to include them
 		if sheet.Hidden {
 			if includeHidden, ok := it.config["include_hidden_sheets"].(bool); !ok || !includeHidden {
@@ -519,4 +519,3 @@ func (it *XLSXIterator) Progress() float64 {
 
 	return float64(processedRows) / float64(totalRows)
 }
-

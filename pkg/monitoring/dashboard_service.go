@@ -22,14 +22,14 @@ type DashboardService struct {
 	alertingService *AlertingService
 	tracer          trace.Tracer
 	config          *DashboardConfig
-	
+
 	// Real-time data storage
-	timeSeriesData  map[string]*TimeSeries
-	dataLock        sync.RWMutex
-	
+	timeSeriesData map[string]*TimeSeries
+	dataLock       sync.RWMutex
+
 	// Dashboard definitions
-	dashboards      map[string]*Dashboard
-	dashboardsLock  sync.RWMutex
+	dashboards     map[string]*Dashboard
+	dashboardsLock sync.RWMutex
 }
 
 // DashboardConfig contains configuration for the dashboard service
@@ -51,57 +51,57 @@ type TimeSeries struct {
 
 // DataPoint represents a single data point in time series
 type DataPoint struct {
-	Timestamp time.Time   `json:"timestamp"`
-	Value     float64     `json:"value"`
+	Timestamp time.Time         `json:"timestamp"`
+	Value     float64           `json:"value"`
 	Labels    map[string]string `json:"labels,omitempty"`
 }
 
 // Dashboard represents a monitoring dashboard
 type Dashboard struct {
-	ID          string      `json:"id"`
-	Name        string      `json:"name"`
-	Description string      `json:"description"`
-	Tags        []string    `json:"tags"`
-	Panels      []Panel     `json:"panels"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
-	IsDefault   bool        `json:"is_default"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Tags        []string  `json:"tags"`
+	Panels      []Panel   `json:"panels"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	IsDefault   bool      `json:"is_default"`
 }
 
 // Panel represents a single panel in a dashboard
 type Panel struct {
-	ID          string            `json:"id"`
-	Title       string            `json:"title"`
-	Type        PanelType         `json:"type"`
-	Query       string            `json:"query"`
-	Visualization VisualizationType `json:"visualization"`
-	Position    PanelPosition     `json:"position"`
-	Options     map[string]interface{} `json:"options,omitempty"`
-	Thresholds  []Threshold       `json:"thresholds,omitempty"`
+	ID            string                 `json:"id"`
+	Title         string                 `json:"title"`
+	Type          PanelType              `json:"type"`
+	Query         string                 `json:"query"`
+	Visualization VisualizationType      `json:"visualization"`
+	Position      PanelPosition          `json:"position"`
+	Options       map[string]interface{} `json:"options,omitempty"`
+	Thresholds    []Threshold            `json:"thresholds,omitempty"`
 }
 
 // PanelType defines the type of panel
 type PanelType string
 
 const (
-	PanelTypeMetric    PanelType = "metric"
-	PanelTypeAlert     PanelType = "alert"
-	PanelTypeLog       PanelType = "log"
-	PanelTypeStatus    PanelType = "status"
-	PanelTypeChart     PanelType = "chart"
+	PanelTypeMetric PanelType = "metric"
+	PanelTypeAlert  PanelType = "alert"
+	PanelTypeLog    PanelType = "log"
+	PanelTypeStatus PanelType = "status"
+	PanelTypeChart  PanelType = "chart"
 )
 
 // VisualizationType defines how data is visualized
 type VisualizationType string
 
 const (
-	VisualizationLine      VisualizationType = "line"
-	VisualizationBar       VisualizationType = "bar"
-	VisualizationGauge     VisualizationType = "gauge"
-	VisualizationCounter   VisualizationType = "counter"
-	VisualizationTable     VisualizationType = "table"
-	VisualizationPie       VisualizationType = "pie"
-	VisualizationHeatmap   VisualizationType = "heatmap"
+	VisualizationLine    VisualizationType = "line"
+	VisualizationBar     VisualizationType = "bar"
+	VisualizationGauge   VisualizationType = "gauge"
+	VisualizationCounter VisualizationType = "counter"
+	VisualizationTable   VisualizationType = "table"
+	VisualizationPie     VisualizationType = "pie"
+	VisualizationHeatmap VisualizationType = "heatmap"
 )
 
 // PanelPosition defines the position and size of a panel
@@ -122,15 +122,15 @@ type Threshold struct {
 
 // SystemOverview provides a high-level system overview
 type SystemOverview struct {
-	Status          string                 `json:"status"`
-	Uptime          time.Duration          `json:"uptime"`
-	Version         string                 `json:"version"`
-	ActiveAlerts    int                    `json:"active_alerts"`
-	CriticalAlerts  int                    `json:"critical_alerts"`
-	ProcessingStats ProcessingOverview     `json:"processing_stats"`
-	SystemMetrics   SystemMetricsOverview  `json:"system_metrics"`
+	Status          string                  `json:"status"`
+	Uptime          time.Duration           `json:"uptime"`
+	Version         string                  `json:"version"`
+	ActiveAlerts    int                     `json:"active_alerts"`
+	CriticalAlerts  int                     `json:"critical_alerts"`
+	ProcessingStats ProcessingOverview      `json:"processing_stats"`
+	SystemMetrics   SystemMetricsOverview   `json:"system_metrics"`
 	ServiceHealth   map[string]HealthStatus `json:"service_health"`
-	LastUpdated     time.Time              `json:"last_updated"`
+	LastUpdated     time.Time               `json:"last_updated"`
 }
 
 // ProcessingOverview provides processing statistics overview
@@ -145,20 +145,20 @@ type ProcessingOverview struct {
 
 // SystemMetricsOverview provides system metrics overview
 type SystemMetricsOverview struct {
-	CPUUsage     float64 `json:"cpu_usage"`
-	MemoryUsage  float64 `json:"memory_usage"`
-	DiskUsage    float64 `json:"disk_usage"`
-	NetworkIO    int64   `json:"network_io_bytes"`
-	Goroutines   int     `json:"goroutines"`
-	GCPauses     int64   `json:"gc_pauses_ms"`
+	CPUUsage    float64 `json:"cpu_usage"`
+	MemoryUsage float64 `json:"memory_usage"`
+	DiskUsage   float64 `json:"disk_usage"`
+	NetworkIO   int64   `json:"network_io_bytes"`
+	Goroutines  int     `json:"goroutines"`
+	GCPauses    int64   `json:"gc_pauses_ms"`
 }
 
 // HealthStatus represents the health status of a service
 type HealthStatus struct {
-	Status      string    `json:"status"` // healthy, degraded, unhealthy
-	LastCheck   time.Time `json:"last_check"`
+	Status       string    `json:"status"` // healthy, degraded, unhealthy
+	LastCheck    time.Time `json:"last_check"`
 	ResponseTime float64   `json:"response_time_ms"`
-	Message     string    `json:"message,omitempty"`
+	Message      string    `json:"message,omitempty"`
 }
 
 // DefaultDashboardConfig returns default dashboard configuration
@@ -433,7 +433,7 @@ func (ds *DashboardService) extractNumericValue(value interface{}) (float64, err
 
 // GetSystemOverview returns a high-level system overview
 func (ds *DashboardService) GetSystemOverview() *SystemOverview {
-	ctx, span := ds.tracer.Start(context.Background(), "get_system_overview")
+	_, span := ds.tracer.Start(context.Background(), "get_system_overview")
 	defer span.End()
 
 	// Get active alerts
@@ -447,17 +447,17 @@ func (ds *DashboardService) GetSystemOverview() *SystemOverview {
 
 	// Get system metrics
 	allMetrics := ds.registry.GetMetrics()
-	
+
 	// Extract specific metrics
 	var memoryUsage, cpuUsage float64
 	var goroutines int
-	
+
 	if metric, exists := allMetrics["go_memstats_heap_alloc_bytes"]; exists {
 		if val, err := ds.extractNumericValue(metric.GetValue()); err == nil {
 			memoryUsage = val / (1024 * 1024 * 1024) // Convert to GB
 		}
 	}
-	
+
 	if metric, exists := allMetrics["go_goroutines"]; exists {
 		if val, err := ds.extractNumericValue(metric.GetValue()); err == nil {
 			goroutines = int(val)
@@ -487,10 +487,10 @@ func (ds *DashboardService) GetSystemOverview() *SystemOverview {
 			GCPauses:    45,
 		},
 		ServiceHealth: map[string]HealthStatus{
-			"kafka":     {Status: "healthy", LastCheck: time.Now(), ResponseTime: 5.2},
-			"database":  {Status: "healthy", LastCheck: time.Now(), ResponseTime: 12.1},
+			"kafka":      {Status: "healthy", LastCheck: time.Now(), ResponseTime: 5.2},
+			"database":   {Status: "healthy", LastCheck: time.Now(), ResponseTime: 12.1},
 			"openai_api": {Status: "healthy", LastCheck: time.Now(), ResponseTime: 850.3},
-			"deeplake":  {Status: "healthy", LastCheck: time.Now(), ResponseTime: 120.5},
+			"deeplake":   {Status: "healthy", LastCheck: time.Now(), ResponseTime: 120.5},
 		},
 		LastUpdated: time.Now(),
 	}
@@ -564,7 +564,7 @@ func (ds *DashboardService) GetTimeSeriesData(metricName string, timeRange time.
 	if timeRange > 0 {
 		cutoff := time.Now().Add(-timeRange)
 		filteredPoints := make([]DataPoint, 0)
-		
+
 		for _, point := range ts.DataPoints {
 			if point.Timestamp.After(cutoff) {
 				filteredPoints = append(filteredPoints, point)
@@ -622,7 +622,7 @@ func (ds *DashboardService) getMetricPanelData(panel *Panel) (map[string]interfa
 	metric, exists := allMetrics[panel.Query]
 	if !exists {
 		return map[string]interface{}{
-			"value": 0,
+			"value":  0,
 			"status": "no_data",
 		}, nil
 	}
@@ -668,7 +668,7 @@ func (ds *DashboardService) getChartPanelData(panel *Panel) (map[string]interfac
 // getAlertPanelData returns data for an alert panel
 func (ds *DashboardService) getAlertPanelData(panel *Panel) (map[string]interface{}, error) {
 	activeAlerts := ds.alertingService.GetActiveAlerts()
-	
+
 	// Filter alerts if needed based on panel query
 	// For now, return all active alerts
 	return map[string]interface{}{
@@ -749,7 +749,7 @@ func (ds *DashboardService) handleDashboards(w http.ResponseWriter, r *http.Requ
 // handleMetrics handles metrics requests
 func (ds *DashboardService) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	allMetrics := ds.registry.GetMetrics()
-	
+
 	// Convert metrics to a more dashboard-friendly format
 	metricsData := make(map[string]interface{})
 	for name, metric := range allMetrics {
