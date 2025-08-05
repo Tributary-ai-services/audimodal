@@ -311,13 +311,13 @@ func (r *Router) setupMiddleware() {
 // setupRoutes configures all API routes
 func (r *Router) setupRoutes() {
 	// Health check endpoints (no auth required)
-	r.HandleFunc(r.config.HealthCheckPath, r.healthHandler.HealthCheckHandler())
-	r.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
-	r.HandleFunc(r.config.HealthCheckPath+"/live", r.healthHandler.LivenessHandler())
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath, r.healthHandler.HealthCheckHandler())
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/live", r.healthHandler.LivenessHandler())
 
 	// Metrics endpoint (no auth required)
 	if r.config.MetricsEnabled {
-		r.HandleFunc(r.config.MetricsPath, r.metricsHandler)
+		r.ServeMux.HandleFunc(r.config.MetricsPath, r.metricsHandler)
 	}
 
 	// API routes with authentication
@@ -337,8 +337,8 @@ func (r *Router) setupRoutes() {
 	authMiddleware := AuthenticationMiddleware(r.config, r.db)
 
 	// Tenant management routes
-	r.Handle(fmt.Sprintf("%s/tenants", apiPrefix), authMiddleware(http.HandlerFunc(tenantHandler.ListTenants)))
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), authMiddleware(http.HandlerFunc(tenantHandler.HandleTenant)))
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants", apiPrefix), authMiddleware(http.HandlerFunc(tenantHandler.ListTenants)))
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), authMiddleware(http.HandlerFunc(tenantHandler.HandleTenant)))
 
 	// Tenant-scoped routes (require tenant context)
 	tenantMiddleware := TenantMiddleware(r.db)
@@ -347,7 +347,7 @@ func (r *Router) setupRoutes() {
 	}
 
 	// Data source routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if isDataSourceRoute(req.URL.Path, apiPrefix) {
 			dataSourceHandler.ServeHTTP(w, req)
 		} else {
@@ -356,7 +356,7 @@ func (r *Router) setupRoutes() {
 	})))
 
 	// Processing session routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if isSessionRoute(req.URL.Path, apiPrefix) {
 			sessionHandler.ServeHTTP(w, req)
 		} else {
@@ -365,7 +365,7 @@ func (r *Router) setupRoutes() {
 	})))
 
 	// DLP policy routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if isDLPRoute(req.URL.Path, apiPrefix) {
 			dlpHandler.ServeHTTP(w, req)
 		} else {
@@ -374,7 +374,7 @@ func (r *Router) setupRoutes() {
 	})))
 
 	// File routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if isFileRoute(req.URL.Path, apiPrefix) {
 			fileHandler.ServeHTTP(w, req)
 		} else {
@@ -383,7 +383,7 @@ func (r *Router) setupRoutes() {
 	})))
 
 	// Chunk routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if isChunkRoute(req.URL.Path, apiPrefix) {
 			chunkHandler.ServeHTTP(w, req)
 		} else {
@@ -392,7 +392,7 @@ func (r *Router) setupRoutes() {
 	})))
 
 	// ML Analysis routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+	r.ServeMux.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if isMLAnalysisRoute(req.URL.Path, apiPrefix) {
 			mlAnalysisHandler.ServeHTTP(w, req)
 		} else {
@@ -401,14 +401,14 @@ func (r *Router) setupRoutes() {
 	})))
 
 	// API documentation route
-	r.HandleFunc(fmt.Sprintf("%s/docs", apiPrefix), r.docsHandler)
-	r.HandleFunc(fmt.Sprintf("%s/", apiPrefix), r.apiRootHandler)
+	r.ServeMux.HandleFunc(fmt.Sprintf("%s/docs", apiPrefix), r.docsHandler)
+	r.ServeMux.HandleFunc(fmt.Sprintf("%s/", apiPrefix), r.apiRootHandler)
 
 	// Web UI routes
-	r.HandleFunc("/", webHandler.RedirectToLogin())
-	r.HandleFunc("/login", webHandler.LoginHandler())
-	r.HandleFunc("/dashboard", webHandler.DashboardHandler())
-	r.HandleFunc("/static/", webHandler.StaticFileHandler())
+	r.ServeMux.HandleFunc("/", webHandler.RedirectToLogin())
+	r.ServeMux.HandleFunc("/login", webHandler.LoginHandler())
+	r.ServeMux.HandleFunc("/dashboard", webHandler.DashboardHandler())
+	r.ServeMux.HandleFunc("/static/", webHandler.StaticFileHandler())
 }
 
 // metricsHandler handles metrics requests
