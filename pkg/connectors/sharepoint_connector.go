@@ -220,10 +220,10 @@ func (sp *SharePointConnector) authenticate(ctx context.Context) error {
 	defer span.End()
 
 	data := url.Values{
-		"client_id":     {sp.config.ClientID},
-		"client_secret": {sp.config.ClientSecret},
-		"scope":         {sp.config.Scope},
-		"grant_type":    {"client_credentials"},
+		"client_id":     []string{sp.config.ClientID},
+		"client_secret": []string{sp.config.ClientSecret},
+		"scope":         []string{sp.config.Scope},
+		"grant_type":    []string{"client_credentials"},
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", sp.config.AuthURL, strings.NewReader(data.Encode()))
