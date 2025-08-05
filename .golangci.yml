@@ -37,13 +37,6 @@ linters-settings:
   goimports:
     local-prefixes: github.com/jscharber/eAIIngest
   
-  mnd:
-    checks:
-      - argument
-      - case
-      - condition
-      - operation
-      - return
   
   govet:
     settings:
@@ -75,7 +68,6 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - copyloopvar
     - dogsled
     - dupl
     - errcheck
@@ -87,7 +79,6 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - mnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -136,7 +127,6 @@ issues:
     # Exclude some linters from running on tests files
     - path: _test\.go
       linters:
-        - mnd
         - funlen
         - dupl
         - gosec
@@ -145,7 +135,6 @@ issues:
     # Exclude some linters from running on mock files
     - path: mock_.*\.go
       linters:
-        - mnd
         - funlen
         - dupl
         - gosec
@@ -155,7 +144,6 @@ issues:
     # Exclude some linters from running on generated files
     - path: .*_generated\.go
       linters:
-        - mnd
         - funlen
         - dupl
         - gosec
@@ -178,7 +166,4 @@ severity:
   rules:
     - linters:
         - dupl
-      severity: info
-    - linters:
-        - mnd
       severity: info

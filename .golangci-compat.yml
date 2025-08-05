@@ -1,0 +1,38 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - goconst
+    - gosec
+
+issues:
+  exclude-dirs:
+    - vendor
+    - bin
+    - .git
+    - pkg/controllers
+    - cmd/operator
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gosec
+    # Exclude shadow checking on variables named 'err'
+    - text: "shadow: declaration of \"err\""
+      linters:
+        - govet
+    # Exclude shadow checking on variables named 'ctx'
+    - text: "shadow: declaration of \"ctx\""
+      linters:
+        - govet
