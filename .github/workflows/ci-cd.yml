@@ -78,10 +78,10 @@ jobs:
         echo "All formatting checks passed!"
     
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v3
+      uses: golangci/golangci-lint-action@v4
       continue-on-error: true
       with:
-        version: latest
+        version: v1.59.1
         args: --timeout=5m
     
     - name: Run Gosec Security Scanner
