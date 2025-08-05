@@ -284,8 +284,8 @@ func (s *Service) authenticateAPIKey(ctx context.Context, req *AuthRequest) (*Au
 	return &AuthResponse{
 		AccessToken: req.APIKey,
 		TokenType:   "Bearer",
-		ExpiresIn:   int64(claims.ExpiresAt.Sub(time.Now()).Seconds()),
-		ExpiresAt:   claims.ExpiresAt.Time,
+		ExpiresIn:   int64(claims.RegisteredClaims.ExpiresAt.Sub(time.Now()).Seconds()),
+		ExpiresAt:   claims.RegisteredClaims.ExpiresAt.Time,
 		User:        user,
 		Tenant:      tenant,
 		Scopes:      claims.Scopes,
@@ -339,8 +339,8 @@ func (s *Service) authenticateToken(ctx context.Context, req *AuthRequest) (*Aut
 	return &AuthResponse{
 		AccessToken: req.Token,
 		TokenType:   "Bearer",
-		ExpiresIn:   int64(claims.ExpiresAt.Sub(time.Now()).Seconds()),
-		ExpiresAt:   claims.ExpiresAt.Time,
+		ExpiresIn:   int64(claims.RegisteredClaims.ExpiresAt.Sub(time.Now()).Seconds()),
+		ExpiresAt:   claims.RegisteredClaims.ExpiresAt.Time,
 		User:        user,
 		Tenant:      tenant,
 		Scopes:      claims.Scopes,
