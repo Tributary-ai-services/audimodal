@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/api/drive/v3"
+	drive "google.golang.org/api/drive/v3"
 
 	"github.com/jscharber/eAIIngest/pkg/storage"
 )
