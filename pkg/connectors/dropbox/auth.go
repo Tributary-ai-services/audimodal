@@ -50,7 +50,7 @@ func (am *AuthManager) GenerateAuthURL() (string, string, error) {
 
 	// Generate authorization URL with additional parameters for Dropbox
 	authURL := am.config.AuthCodeURL(state,
-		oauth2.AccessTypeOffline, // Request refresh token
+		oauth2.AccessTypeOffline,                               // Request refresh token
 		oauth2.SetAuthURLParam("token_access_type", "offline"), // Dropbox-specific parameter
 		oauth2.SetAuthURLParam("force_reapprove", "true"),      // Force user to reapprove
 	)
@@ -82,7 +82,7 @@ func (am *AuthManager) RefreshToken(ctx context.Context, token *oauth2.Token) (*
 
 	// Create token source
 	tokenSource := am.config.TokenSource(ctx, token)
-	
+
 	// Get new token
 	newToken, err := tokenSource.Token()
 	if err != nil {
@@ -147,16 +147,16 @@ func (am *AuthManager) GetUserInfo(ctx context.Context, token *oauth2.Token) (*D
 	}
 
 	userInfo := &DropboxUserInfo{
-		AccountID:    account.AccountID,
-		Name:         account.Name,
-		Email:        account.Email,
-		EmailVerified: account.EmailVerified,
-		Disabled:     account.Disabled,
-		Locale:       account.Locale,
-		ReferralLink: account.ReferralLink,
-		IsPaired:     account.IsPaired,
-		AccountType:  account.AccountType.Tag,
-		Country:      account.Country,
+		AccountID:       account.AccountID,
+		Name:            account.Name,
+		Email:           account.Email,
+		EmailVerified:   account.EmailVerified,
+		Disabled:        account.Disabled,
+		Locale:          account.Locale,
+		ReferralLink:    account.ReferralLink,
+		IsPaired:        account.IsPaired,
+		AccountType:     account.AccountType.Tag,
+		Country:         account.Country,
 		ProfilePhotoURL: account.ProfilePhotoURL,
 	}
 
@@ -273,14 +273,14 @@ type TeamInfo struct {
 
 // DropboxSpaceUsage contains space usage information
 type DropboxSpaceUsage struct {
-	Used      uint64                 `json:"used"`
-	Allocation SpaceAllocation       `json:"allocation"`
+	Used       uint64          `json:"used"`
+	Allocation SpaceAllocation `json:"allocation"`
 }
 
 // SpaceAllocation represents space allocation information
 type SpaceAllocation struct {
-	Tag        string `json:".tag"`
-	Allocated  uint64 `json:"allocated,omitempty"`
+	Tag                          string `json:".tag"`
+	Allocated                    uint64 `json:"allocated,omitempty"`
 	UserWithinTeamSpaceAllocated uint64 `json:"user_within_team_space_allocated,omitempty"`
 	UserWithinTeamSpaceLimitType string `json:"user_within_team_space_limit_type,omitempty"`
 }

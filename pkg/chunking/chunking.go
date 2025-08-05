@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/strategies/text"
 	"github.com/jscharber/eAIIngest/pkg/strategies/hybrid"
+	"github.com/jscharber/eAIIngest/pkg/strategies/text"
 )
 
 // Chunker interface defines chunking functionality
@@ -17,11 +17,11 @@ type Chunker interface {
 
 // Chunk represents a text chunk
 type Chunk struct {
-	Content   string            `json:"content"`
-	Metadata  map[string]string `json:"metadata"`
-	StartPos  int              `json:"start_pos"`
-	EndPos    int              `json:"end_pos"`
-	ChunkNum  int              `json:"chunk_num"`
+	Content  string            `json:"content"`
+	Metadata map[string]string `json:"metadata"`
+	StartPos int               `json:"start_pos"`
+	EndPos   int               `json:"end_pos"`
+	ChunkNum int               `json:"chunk_num"`
 }
 
 // FixedSizeChunker implements fixed-size chunking
@@ -43,7 +43,7 @@ func NewFixedSizeChunker(chunkSize, overlapSize int) *FixedSizeChunker {
 // Chunk splits content into fixed-size chunks
 func (c *FixedSizeChunker) Chunk(content string) ([]Chunk, error) {
 	ctx := context.Background()
-	
+
 	metadata := core.ChunkMetadata{
 		SourcePath:  "memory",
 		ChunkID:     "chunk",
@@ -55,12 +55,12 @@ func (c *FixedSizeChunker) Chunk(content string) ([]Chunk, error) {
 			"overlap_size": fmt.Sprintf("%d", c.overlapSize),
 		},
 	}
-	
+
 	coreChunks, err := c.strategy.ProcessChunk(ctx, content, metadata)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert core chunks to chunking chunks
 	chunks := make([]Chunk, len(coreChunks))
 	for i, coreChunk := range coreChunks {
@@ -69,7 +69,7 @@ func (c *FixedSizeChunker) Chunk(content string) ([]Chunk, error) {
 			Metadata: coreChunk.Metadata.Context,
 			ChunkNum: i + 1,
 		}
-		
+
 		if coreChunk.Metadata.StartPosition != nil {
 			chunks[i].StartPos = int(*coreChunk.Metadata.StartPosition)
 		}
@@ -77,7 +77,7 @@ func (c *FixedSizeChunker) Chunk(content string) ([]Chunk, error) {
 			chunks[i].EndPos = int(*coreChunk.Metadata.EndPosition)
 		}
 	}
-	
+
 	return chunks, nil
 }
 
@@ -100,7 +100,7 @@ func NewSentenceChunker(maxChunkSize, overlapSize int) *SentenceChunker {
 // Chunk splits content into sentence-based chunks
 func (c *SentenceChunker) Chunk(content string) ([]Chunk, error) {
 	ctx := context.Background()
-	
+
 	metadata := core.ChunkMetadata{
 		SourcePath:  "memory",
 		ChunkID:     "chunk",
@@ -113,12 +113,12 @@ func (c *SentenceChunker) Chunk(content string) ([]Chunk, error) {
 			"split_on_sentences": "true",
 		},
 	}
-	
+
 	coreChunks, err := c.strategy.ProcessChunk(ctx, content, metadata)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert core chunks to chunking chunks
 	chunks := make([]Chunk, len(coreChunks))
 	for i, coreChunk := range coreChunks {
@@ -127,7 +127,7 @@ func (c *SentenceChunker) Chunk(content string) ([]Chunk, error) {
 			Metadata: coreChunk.Metadata.Context,
 			ChunkNum: i + 1,
 		}
-		
+
 		if coreChunk.Metadata.StartPosition != nil {
 			chunks[i].StartPos = int(*coreChunk.Metadata.StartPosition)
 		}
@@ -135,15 +135,15 @@ func (c *SentenceChunker) Chunk(content string) ([]Chunk, error) {
 			chunks[i].EndPos = int(*coreChunk.Metadata.EndPosition)
 		}
 	}
-	
+
 	return chunks, nil
 }
 
 // SemanticChunker implements semantic-based chunking
 type SemanticChunker struct {
-	maxChunkSize      int
+	maxChunkSize        int
 	similarityThreshold float64
-	strategy          *hybrid.AdaptiveStrategy
+	strategy            *hybrid.AdaptiveStrategy
 }
 
 // NewSemanticChunker creates a new semantic chunker
@@ -158,7 +158,7 @@ func NewSemanticChunker(maxChunkSize int, similarityThreshold float64) *Semantic
 // Chunk splits content into semantically coherent chunks
 func (c *SemanticChunker) Chunk(content string) ([]Chunk, error) {
 	ctx := context.Background()
-	
+
 	metadata := core.ChunkMetadata{
 		SourcePath:  "memory",
 		ChunkID:     "chunk",
@@ -166,17 +166,17 @@ func (c *SemanticChunker) Chunk(content string) ([]Chunk, error) {
 		ProcessedAt: time.Now(),
 		ProcessedBy: "semantic_chunker",
 		Context: map[string]string{
-			"max_chunk_size":        fmt.Sprintf("%d", c.maxChunkSize),
-			"similarity_threshold":  fmt.Sprintf("%.2f", c.similarityThreshold),
-			"chunking_mode":         "semantic",
+			"max_chunk_size":       fmt.Sprintf("%d", c.maxChunkSize),
+			"similarity_threshold": fmt.Sprintf("%.2f", c.similarityThreshold),
+			"chunking_mode":        "semantic",
 		},
 	}
-	
+
 	coreChunks, err := c.strategy.ProcessChunk(ctx, content, metadata)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert core chunks to chunking chunks
 	chunks := make([]Chunk, len(coreChunks))
 	for i, coreChunk := range coreChunks {
@@ -185,7 +185,7 @@ func (c *SemanticChunker) Chunk(content string) ([]Chunk, error) {
 			Metadata: coreChunk.Metadata.Context,
 			ChunkNum: i + 1,
 		}
-		
+
 		if coreChunk.Metadata.StartPosition != nil {
 			chunks[i].StartPos = int(*coreChunk.Metadata.StartPosition)
 		}
@@ -193,7 +193,7 @@ func (c *SemanticChunker) Chunk(content string) ([]Chunk, error) {
 			chunks[i].EndPos = int(*coreChunk.Metadata.EndPosition)
 		}
 	}
-	
+
 	return chunks, nil
 }
 

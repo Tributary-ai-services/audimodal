@@ -36,15 +36,15 @@ func (auth *NotionAuthenticator) GetAuthorizationURL(state string, ownerType str
 	params.Set("client_id", auth.clientID)
 	params.Set("response_type", "code")
 	params.Set("redirect_uri", auth.redirectURI)
-	
+
 	if state != "" {
 		params.Set("state", state)
 	}
-	
+
 	if ownerType != "" {
 		params.Set("owner", ownerType) // user or workspace
 	}
-	
+
 	return "https://api.notion.com/v1/oauth/authorize?" + params.Encode()
 }
 
@@ -54,23 +54,23 @@ func (auth *NotionAuthenticator) ExchangeCodeForToken(ctx context.Context, code 
 	data.Set("grant_type", "authorization_code")
 	data.Set("code", code)
 	data.Set("redirect_uri", auth.redirectURI)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.notion.com/v1/oauth/token", strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Use basic auth for client credentials
 	req.SetBasicAuth(auth.clientID, auth.clientSecret)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	
+
 	resp, err := auth.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		var errorResp struct {
 			Error            string `json:"error"`
@@ -79,12 +79,12 @@ func (auth *NotionAuthenticator) ExchangeCodeForToken(ctx context.Context, code 
 		json.NewDecoder(resp.Body).Decode(&errorResp)
 		return nil, fmt.Errorf("OAuth error: %s - %s", errorResp.Error, errorResp.ErrorDescription)
 	}
-	
+
 	var tokenResp NotionOAuthToken
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, err
 	}
-	
+
 	return &tokenResp, nil
 }
 
@@ -94,20 +94,20 @@ func (auth *NotionAuthenticator) ValidateToken(ctx context.Context, token string
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Set("Notion-Version", "2022-06-28")
-	
+
 	resp, err := auth.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("token validation failed with status %d", resp.StatusCode)
 	}
-	
+
 	return nil
 }
 
@@ -141,32 +141,32 @@ func NewNotionIntegrationManager(integrationToken string) *NotionIntegrationMana
 func (nim *NotionIntegrationManager) Initialize(ctx context.Context) error {
 	// Test the integration token by making a request to the users endpoint
 	client := &http.Client{Timeout: 30 * time.Second}
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.notion.com/v1/users/me", nil)
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", nim.integrationToken))
 	req.Header.Set("Notion-Version", "2022-06-28")
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("integration token validation failed: status %d", resp.StatusCode)
 	}
-	
+
 	var botUser NotionUser
 	if err := json.NewDecoder(resp.Body).Decode(&botUser); err != nil {
 		return err
 	}
-	
+
 	nim.botUser = &botUser
-	
+
 	// Set default capabilities for integration tokens
 	nim.capabilities = []string{
 		"read_content",
@@ -174,7 +174,7 @@ func (nim *NotionIntegrationManager) Initialize(ctx context.Context) error {
 		"insert_content", // Some integrations can create content
 		"update_content", // Some integrations can update content
 	}
-	
+
 	return nil
 }
 
@@ -206,17 +206,17 @@ func (npv *NotionPermissionValidator) ValidatePermissions(ctx context.Context) e
 	if err := npv.validateBasicAccess(ctx); err != nil {
 		return fmt.Errorf("basic access validation failed: %w", err)
 	}
-	
+
 	// Test content reading permissions
 	if err := npv.validateContentAccess(ctx); err != nil {
 		return fmt.Errorf("content access validation failed: %w", err)
 	}
-	
+
 	// Test user reading permissions
 	if err := npv.validateUserAccess(ctx); err != nil {
 		return fmt.Errorf("user access validation failed: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -232,12 +232,12 @@ func (npv *NotionPermissionValidator) validateContentAccess(ctx context.Context)
 	searchBody := map[string]interface{}{
 		"page_size": 1,
 	}
-	
+
 	bodyBytes, err := json.Marshal(searchBody)
 	if err != nil {
 		return err
 	}
-	
+
 	_, err = npv.connector.callNotionAPI(ctx, "POST", "/search", strings.NewReader(string(bodyBytes)))
 	return err
 }
@@ -273,22 +273,22 @@ func (installer *NotionAppInstaller) CompleteInstallation(ctx context.Context, c
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update configuration with received token
 	installer.config.OAuthToken = tokenResp.AccessToken
 	installer.config.WorkspaceID = tokenResp.WorkspaceID
 	installer.config.WorkspaceName = tokenResp.WorkspaceName
-	
+
 	return tokenResp, nil
 }
 
 // TokenManager manages Notion tokens and their lifecycle
 type TokenManager struct {
-	accessToken   string
+	accessToken      string
 	integrationToken string
-	workspaceID   string
-	botUser       *NotionUser
-	authenticator *NotionAuthenticator
+	workspaceID      string
+	botUser          *NotionUser
+	authenticator    *NotionAuthenticator
 }
 
 // NewTokenManager creates a new token manager
@@ -319,7 +319,7 @@ func (tm *TokenManager) ValidateActiveToken(ctx context.Context) error {
 	if token == "" {
 		return fmt.Errorf("no active token available")
 	}
-	
+
 	return tm.authenticator.ValidateToken(ctx, token)
 }
 
@@ -349,12 +349,12 @@ func NewNotionWebhookValidator(secret string) *NotionWebhookValidator {
 func (nwv *NotionWebhookValidator) ValidateWebhook(r *http.Request, body []byte) error {
 	// Notion doesn't currently support webhook signatures like Slack/GitHub
 	// This is a placeholder for when they add webhook support
-	
+
 	// For now, we can validate the request format and headers
 	if r.Header.Get("Content-Type") != "application/json" {
 		return fmt.Errorf("invalid content type")
 	}
-	
+
 	// Add custom validation logic here when Notion adds webhook support
 	return nil
 }
@@ -374,42 +374,42 @@ func NewNotionCapabilityChecker(connector *NotionConnector) *NotionCapabilityChe
 // CheckCapabilities checks what capabilities are available with the current token
 func (ncc *NotionCapabilityChecker) CheckCapabilities(ctx context.Context) (map[string]bool, error) {
 	capabilities := map[string]bool{
-		"read_users":     false,
-		"search_content": false,
-		"read_pages":     false,
-		"read_databases": false,
-		"read_blocks":    false,
-		"create_pages":   false,
-		"update_pages":   false,
+		"read_users":       false,
+		"search_content":   false,
+		"read_pages":       false,
+		"read_databases":   false,
+		"read_blocks":      false,
+		"create_pages":     false,
+		"update_pages":     false,
 		"create_databases": false,
 		"update_databases": false,
 	}
-	
+
 	// Test user reading
 	if _, err := ncc.connector.callNotionAPI(ctx, "GET", "/users?page_size=1", nil); err == nil {
 		capabilities["read_users"] = true
 	}
-	
+
 	// Test content searching
 	searchBody := `{"page_size": 1}`
 	if _, err := ncc.connector.callNotionAPI(ctx, "POST", "/search", strings.NewReader(searchBody)); err == nil {
 		capabilities["search_content"] = true
 	}
-	
+
 	// Test page creation (this would require creating a test page)
 	// For now, we'll assume this is not available unless explicitly configured
 	capabilities["create_pages"] = false
 	capabilities["update_pages"] = false
 	capabilities["create_databases"] = false
 	capabilities["update_databases"] = false
-	
+
 	// If we can search, we can likely read pages, databases, and blocks
 	if capabilities["search_content"] {
 		capabilities["read_pages"] = true
 		capabilities["read_databases"] = true
 		capabilities["read_blocks"] = true
 	}
-	
+
 	return capabilities, nil
 }
 
@@ -419,6 +419,6 @@ func (ncc *NotionCapabilityChecker) HasCapability(ctx context.Context, capabilit
 	if err != nil {
 		return false, err
 	}
-	
+
 	return capabilities[capability], nil
 }

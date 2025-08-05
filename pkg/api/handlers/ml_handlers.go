@@ -3,22 +3,21 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/audimodal/pkg/analysis/training"
-	"github.com/jscharber/audimodal/pkg/analysis/prediction"
-	"github.com/jscharber/audimodal/pkg/analysis/intelligence"
-	"github.com/jscharber/audimodal/pkg/analysis/search"
-	"github.com/jscharber/audimodal/pkg/analysis/insights"
+	"github.com/jscharber/eAIIngest/pkg/analysis/insights"
+	"github.com/jscharber/eAIIngest/pkg/analysis/intelligence"
+	"github.com/jscharber/eAIIngest/pkg/analysis/prediction"
+	"github.com/jscharber/eAIIngest/pkg/analysis/search"
+	"github.com/jscharber/eAIIngest/pkg/analysis/training"
 )
 
 // MLHandlers contains handlers for ML/AI API endpoints
@@ -134,13 +133,13 @@ func (h *MLHandlers) CreateTrainingJob(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		Name            string                         `json:"name"`
-		Description     string                         `json:"description"`
-		ModelType       training.ModelType             `json:"model_type"`
-		DatasetID       uuid.UUID                      `json:"dataset_id"`
-		Configuration   *training.ModelConfiguration   `json:"configuration"`
-		Parameters      *training.TrainingParameters   `json:"parameters"`
-		Tags            []string                       `json:"tags,omitempty"`
+		Name          string                       `json:"name"`
+		Description   string                       `json:"description"`
+		ModelType     training.ModelType           `json:"model_type"`
+		DatasetID     uuid.UUID                    `json:"dataset_id"`
+		Configuration *training.ModelConfiguration `json:"configuration"`
+		Parameters    *training.TrainingParameters `json:"parameters"`
+		Tags          []string                     `json:"tags,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -152,31 +151,28 @@ func (h *MLHandlers) CreateTrainingJob(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 
 	trainingJob := &training.TrainingJob{
-		Name:          req.Name,
-		Description:   req.Description,
-		TenantID:      tenantID,
-		CreatedBy:     userID,
-		ModelType:     req.ModelType,
-		DatasetID:     req.DatasetID,
-		Configuration: req.Configuration,
-		Parameters:    req.Parameters,
-		Tags:          req.Tags,
+		ModelName:   req.Name,
+		Description: req.Description,
+		TenantID:    tenantID,
+		CreatedBy:   userID,
+		ModelType:   req.ModelType,
+		// Note: DatasetID, Configuration, Parameters, Tags fields not available in TrainingJob struct
+		// These would be configured via TrainingParams, DatasetConfig, ModelConfig
 	}
 
-	jobID, err := h.modelTrainer.StartTraining(ctx, trainingJob)
-	if err != nil {
+	if err := h.modelTrainer.SubmitTrainingJob(ctx, trainingJob); err != nil {
 		span.RecordError(err)
 		http.Error(w, fmt.Sprintf("Failed to start training job: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	response := map[string]interface{}{
-		"job_id": jobID,
-		"status": "started",
+		"job_id": trainingJob.ID,
+		"status": "submitted",
 	}
 
 	span.SetAttributes(
-		attribute.String("job_id", jobID.String()),
+		attribute.String("job_id", trainingJob.ID.String()),
 		attribute.String("model_type", string(req.ModelType)),
 	)
 
@@ -190,7 +186,7 @@ func (h *MLHandlers) ListTrainingJobs(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	tenantID := getTenantID(r)
-	
+
 	// Parse query parameters
 	limit := 50
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -206,7 +202,12 @@ func (h *MLHandlers) ListTrainingJobs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	jobs, err := h.modelTrainer.ListTrainingJobs(ctx, tenantID, limit, offset)
+	filter := &training.TrainingJobFilter{
+		TenantID: tenantID,
+		Limit:    limit,
+		Offset:   offset,
+	}
+	jobs, err := h.modelTrainer.ListTrainingJobs(ctx, filter)
 	if err != nil {
 		span.RecordError(err)
 		http.Error(w, fmt.Sprintf("Failed to list training jobs: %v", err), http.StatusInternalServerError)
@@ -257,7 +258,7 @@ func (h *MLHandlers) CancelTrainingJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.modelTrainer.CancelTraining(ctx, jobID); err != nil {
+	if err := h.modelTrainer.CancelTrainingJob(ctx, jobID); err != nil {
 		span.RecordError(err)
 		http.Error(w, fmt.Sprintf("Failed to cancel training job: %v", err), http.StatusInternalServerError)
 		return
@@ -279,12 +280,12 @@ func (h *MLHandlers) CreateDataset(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		Name         string                        `json:"name"`
-		Description  string                        `json:"description"`
-		DatasetType  training.DatasetType          `json:"dataset_type"`
-		Format       training.DatasetFormat        `json:"format"`
-		SourcePath   string                        `json:"source_path"`
-		Tags         []string                      `json:"tags,omitempty"`
+		Name        string                 `json:"name"`
+		Description string                 `json:"description"`
+		DatasetType training.DatasetType   `json:"dataset_type"`
+		Format      training.DatasetFormat `json:"format"`
+		SourcePath  string                 `json:"source_path"`
+		Tags        []string               `json:"tags,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -323,7 +324,7 @@ func (h *MLHandlers) ListDatasets(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	tenantID := getTenantID(r)
-	
+
 	filter := &training.DatasetFilter{
 		TenantID: tenantID,
 	}
@@ -380,10 +381,10 @@ func (h *MLHandlers) RegisterModel(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		Name        string                    `json:"name"`
-		Description string                    `json:"description"`
-		ModelType   training.ModelType        `json:"model_type"`
-		Tags        []string                  `json:"tags,omitempty"`
+		Name        string             `json:"name"`
+		Description string             `json:"description"`
+		ModelType   training.ModelType `json:"model_type"`
+		Tags        []string           `json:"tags,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -421,9 +422,9 @@ func (h *MLHandlers) MakePrediction(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		ModelName      string                 `json:"model_name"`
-		ModelVersion   string                 `json:"model_version,omitempty"`
-		Input          map[string]interface{} `json:"input"`
+		ModelName      string                    `json:"model_name"`
+		ModelVersion   string                    `json:"model_version,omitempty"`
+		Input          map[string]interface{}    `json:"input"`
 		PredictionType prediction.PredictionType `json:"prediction_type"`
 	}
 
@@ -432,15 +433,40 @@ func (h *MLHandlers) MakePrediction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create prediction input
-	input := &prediction.PredictionInput{
-		ModelName:    req.ModelName,
-		ModelVersion: req.ModelVersion,
-		Features:     req.Input,
-		RequestID:    uuid.New(),
+	// Convert req.Input (map[string]interface{}) to []float64
+	var features []float64
+	var featureNames []string
+	for name, value := range req.Input {
+		featureNames = append(featureNames, name)
+		if floatVal, ok := value.(float64); ok {
+			features = append(features, floatVal)
+		} else {
+			// Try to convert to float64
+			if intVal, ok := value.(int); ok {
+				features = append(features, float64(intVal))
+			} else {
+				// Default to 0 if conversion fails
+				features = append(features, 0.0)
+			}
+		}
 	}
 
-	result, err := h.predictiveEngine.Predict(ctx, req.PredictionType, input)
+	// Create prediction input
+	input := &prediction.PredictionInput{
+		Features:     features,
+		FeatureNames: featureNames,
+		Context:      req.Input, // Store original input in context
+	}
+
+	// Note: Need to get predictorID from req.PredictionType or request
+	// For now, using a placeholder UUID - in real implementation, this would be looked up
+	var predictorID uuid.UUID
+	if req.ModelName != "" {
+		// In a real implementation, you'd look up the predictor by name
+		predictorID = uuid.New() // Placeholder
+	}
+
+	result, err := h.predictiveEngine.Predict(ctx, predictorID, input)
 	if err != nil {
 		span.RecordError(err)
 		http.Error(w, fmt.Sprintf("Failed to make prediction: %v", err), http.StatusInternalServerError)
@@ -456,10 +482,10 @@ func (h *MLHandlers) MakeForecast(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		SeriesType     prediction.TimeSeriesType `json:"series_type"`
-		HistoricalData []prediction.DataPoint     `json:"historical_data"`
-		Horizon        time.Duration              `json:"horizon"`
-		Frequency      string                     `json:"frequency"`
+		SeriesType     prediction.TimeSeriesType    `json:"series_type"`
+		HistoricalData []prediction.TimeSeriesPoint `json:"historical_data"`
+		Horizon        int                          `json:"horizon"`
+		Frequency      string                       `json:"frequency"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -468,14 +494,14 @@ func (h *MLHandlers) MakeForecast(w http.ResponseWriter, r *http.Request) {
 	}
 
 	input := &prediction.ForecastInput{
-		SeriesType:     req.SeriesType,
-		HistoricalData: req.HistoricalData,
-		Horizon:        req.Horizon,
-		Frequency:      req.Frequency,
-		RequestID:      uuid.New(),
+		HistoricalData:  req.HistoricalData,
+		ForecastHorizon: req.Horizon,
+		ConfidenceLevel: 0.95, // Default confidence level
 	}
 
-	result, err := h.predictiveEngine.Forecast(ctx, input)
+	// Note: Forecast method requires forecasterID - using placeholder for now
+	forecasterID := uuid.New() // In real implementation, this would be looked up
+	result, err := h.predictiveEngine.Forecast(ctx, forecasterID, input)
 	if err != nil {
 		span.RecordError(err)
 		http.Error(w, fmt.Sprintf("Failed to make forecast: %v", err), http.StatusInternalServerError)
@@ -491,7 +517,7 @@ func (h *MLHandlers) PredictDocumentLifecycle(w http.ResponseWriter, r *http.Req
 	defer span.End()
 
 	var req struct {
-		DocumentID uuid.UUID `json:"document_id"`
+		DocumentID uuid.UUID     `json:"document_id"`
 		Horizon    time.Duration `json:"horizon,omitempty"`
 	}
 
@@ -504,7 +530,8 @@ func (h *MLHandlers) PredictDocumentLifecycle(w http.ResponseWriter, r *http.Req
 		req.Horizon = 30 * 24 * time.Hour // Default 30 days
 	}
 
-	prediction, err := h.predictiveEngine.PredictDocumentLifecycle(ctx, req.DocumentID, req.Horizon)
+	tenantID := getTenantID(r)
+	prediction, err := h.predictiveEngine.PredictDocumentLifecycle(ctx, req.DocumentID, tenantID)
 	if err != nil {
 		span.RecordError(err)
 		http.Error(w, fmt.Sprintf("Failed to predict document lifecycle: %v", err), http.StatusInternalServerError)
@@ -522,9 +549,9 @@ func (h *MLHandlers) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		Type       intelligence.NodeType      `json:"type"`
-		Label      string                     `json:"label"`
-		Properties map[string]interface{}     `json:"properties"`
+		Type       intelligence.NodeType  `json:"type"`
+		Label      string                 `json:"label"`
+		Properties map[string]interface{} `json:"properties"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -559,11 +586,11 @@ func (h *MLHandlers) SemanticSearch(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		Query      string                  `json:"query"`
-		SearchMode search.SearchMode       `json:"search_mode,omitempty"`
-		Filters    []search.SearchFilter   `json:"filters,omitempty"`
-		Limit      int                     `json:"limit,omitempty"`
-		Offset     int                     `json:"offset,omitempty"`
+		Query      string                `json:"query"`
+		SearchMode search.SearchMode     `json:"search_mode,omitempty"`
+		Filters    []search.SearchFilter `json:"filters,omitempty"`
+		Limit      int                   `json:"limit,omitempty"`
+		Offset     int                   `json:"offset,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -583,14 +610,14 @@ func (h *MLHandlers) SemanticSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	searchQuery := &search.SearchQuery{
-		UserID:      userID,
-		TenantID:    tenantID,
-		QueryText:   req.Query,
-		QueryType:   search.QueryTypeNatural,
-		SearchMode:  req.SearchMode,
-		Filters:     req.Filters,
-		Limit:       req.Limit,
-		Offset:      req.Offset,
+		UserID:     userID,
+		TenantID:   tenantID,
+		QueryText:  req.Query,
+		QueryType:  search.QueryTypeNatural,
+		SearchMode: req.SearchMode,
+		Filters:    req.Filters,
+		Limit:      req.Limit,
+		Offset:     req.Offset,
 	}
 
 	result, err := h.semanticSearch.Search(ctx, searchQuery)
@@ -609,12 +636,12 @@ func (h *MLHandlers) IndexDocument(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		DocumentID   uuid.UUID `json:"document_id"`
-		Title        string    `json:"title"`
-		Content      string    `json:"content"`
-		DocumentType string    `json:"document_type"`
-		Language     string    `json:"language,omitempty"`
-		Tags         []string  `json:"tags,omitempty"`
+		DocumentID   uuid.UUID              `json:"document_id"`
+		Title        string                 `json:"title"`
+		Content      string                 `json:"content"`
+		DocumentType string                 `json:"document_type"`
+		Language     string                 `json:"language,omitempty"`
+		Tags         []string               `json:"tags,omitempty"`
 		Metadata     map[string]interface{} `json:"metadata,omitempty"`
 	}
 
@@ -740,9 +767,9 @@ func (h *MLHandlers) GenerateReport(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 
 	var req struct {
-		ReportType insights.ReportType  `json:"report_type"`
-		TimeRange  insights.TimeRange   `json:"time_range"`
-		Title      string               `json:"title,omitempty"`
+		ReportType insights.ReportType `json:"report_type"`
+		TimeRange  insights.TimeRange  `json:"time_range"`
+		Title      string              `json:"title,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

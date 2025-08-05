@@ -59,13 +59,13 @@ type TokenResponse struct {
 
 // RefreshTokenResponse represents refresh token response
 type RefreshTokenResponse struct {
-	OK          bool   `json:"ok"`
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
+	OK           bool   `json:"ok"`
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	ExpiresIn    int    `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
-	Scope       string `json:"scope"`
-	Error       string `json:"error,omitempty"`
+	Scope        string `json:"scope"`
+	Error        string `json:"error,omitempty"`
 }
 
 // NewSlackAuthenticator creates a new Slack authenticator
@@ -88,15 +88,15 @@ func (auth *SlackAuthenticator) GetAuthorizationURL(state string, userScopes []s
 	params.Set("scope", strings.Join(auth.scopes, ","))
 	params.Set("redirect_uri", auth.redirectURI)
 	params.Set("response_type", "code")
-	
+
 	if state != "" {
 		params.Set("state", state)
 	}
-	
+
 	if len(userScopes) > 0 {
 		params.Set("user_scope", strings.Join(userScopes, ","))
 	}
-	
+
 	return "https://slack.com/oauth/v2/authorize?" + params.Encode()
 }
 
@@ -107,30 +107,30 @@ func (auth *SlackAuthenticator) ExchangeCodeForToken(ctx context.Context, code s
 	data.Set("client_secret", auth.clientSecret)
 	data.Set("code", code)
 	data.Set("redirect_uri", auth.redirectURI)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://slack.com/api/oauth.v2.access", strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	
+
 	resp, err := auth.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var tokenResp TokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
 		return nil, err
 	}
-	
+
 	if !tokenResp.OK {
 		return nil, fmt.Errorf("OAuth error: %s - %s", tokenResp.Error, tokenResp.ErrorDescription)
 	}
-	
+
 	return &tokenResp, nil
 }
 
@@ -141,30 +141,30 @@ func (auth *SlackAuthenticator) RefreshToken(ctx context.Context, refreshToken s
 	data.Set("client_secret", auth.clientSecret)
 	data.Set("grant_type", "refresh_token")
 	data.Set("refresh_token", refreshToken)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://slack.com/api/oauth.v2.access", strings.NewReader(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	
+
 	resp, err := auth.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var refreshResp RefreshTokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&refreshResp); err != nil {
 		return nil, err
 	}
-	
+
 	if !refreshResp.OK {
 		return nil, fmt.Errorf("token refresh error: %s", refreshResp.Error)
 	}
-	
+
 	return &refreshResp, nil
 }
 
@@ -174,25 +174,25 @@ func (auth *SlackAuthenticator) ValidateToken(ctx context.Context, token string)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	
+
 	resp, err := auth.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	
+
 	var authResp SlackAuth
 	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
 		return nil, err
 	}
-	
+
 	if !authResp.OK {
 		return nil, fmt.Errorf("token validation failed")
 	}
-	
+
 	return &authResp, nil
 }
 
@@ -200,35 +200,35 @@ func (auth *SlackAuthenticator) ValidateToken(ctx context.Context, token string)
 func (auth *SlackAuthenticator) RevokeToken(ctx context.Context, token string) error {
 	data := url.Values{}
 	data.Set("token", token)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://slack.com/api/auth.revoke", strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	
+
 	resp, err := auth.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	var revokeResp struct {
-		OK       bool   `json:"ok"`
-		Revoked  bool   `json:"revoked"`
-		Error    string `json:"error,omitempty"`
+		OK      bool   `json:"ok"`
+		Revoked bool   `json:"revoked"`
+		Error   string `json:"error,omitempty"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&revokeResp); err != nil {
 		return err
 	}
-	
+
 	if !revokeResp.OK {
 		return fmt.Errorf("token revocation failed: %s", revokeResp.Error)
 	}
-	
+
 	return nil
 }
 
@@ -317,7 +317,7 @@ func (tm *TokenManager) needsRefresh() bool {
 	if tm.expiresAt.IsZero() {
 		return false // No expiration set
 	}
-	
+
 	// Refresh if token expires within 5 minutes
 	return time.Until(tm.expiresAt) < 5*time.Minute
 }
@@ -327,19 +327,19 @@ func (tm *TokenManager) refreshTokens(ctx context.Context) error {
 	if tm.refreshToken == "" {
 		return fmt.Errorf("no refresh token available")
 	}
-	
+
 	resp, err := tm.authenticator.RefreshToken(ctx, tm.refreshToken)
 	if err != nil {
 		return err
 	}
-	
+
 	tm.botToken = resp.AccessToken
 	tm.refreshToken = resp.RefreshToken
-	
+
 	if resp.ExpiresIn > 0 {
 		tm.expiresAt = time.Now().Add(time.Duration(resp.ExpiresIn) * time.Second)
 	}
-	
+
 	return nil
 }
 
@@ -360,7 +360,7 @@ func NewSlackAppInstaller(authenticator *SlackAuthenticator, config *SlackConfig
 // StartInstallation starts the installation process
 func (installer *SlackAppInstaller) StartInstallation(state string) string {
 	userScopes := GetUserScopes()
-	
+
 	return installer.authenticator.GetAuthorizationURL(state, userScopes)
 }
 
@@ -370,13 +370,13 @@ func (installer *SlackAppInstaller) CompleteInstallation(ctx context.Context, co
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Update configuration with received tokens
 	installer.config.BotToken = tokenResp.AccessToken
 	installer.config.UserToken = tokenResp.AuthedUser.AccessToken
 	installer.config.WorkspaceID = tokenResp.Team.ID
 	installer.config.WorkspaceName = tokenResp.Team.Name
-	
+
 	return tokenResp, nil
 }
 
@@ -398,14 +398,14 @@ func (pv *PermissionValidator) ValidatePermissions(ctx context.Context) error {
 	if err := pv.validateBotPermissions(ctx); err != nil {
 		return fmt.Errorf("bot permissions validation failed: %w", err)
 	}
-	
+
 	// Test user token permissions if available
 	if pv.connector.config.UserToken != "" {
 		if err := pv.validateUserPermissions(ctx); err != nil {
 			return fmt.Errorf("user permissions validation failed: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -419,13 +419,13 @@ func (pv *PermissionValidator) validateBotPermissions(ctx context.Context) error
 		"files.list",
 		"team.info",
 	}
-	
+
 	for _, method := range requiredMethods {
 		if err := pv.testAPIMethod(ctx, method, pv.connector.config.BotToken); err != nil {
 			return fmt.Errorf("missing permission for %s: %w", method, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -435,14 +435,14 @@ func (pv *PermissionValidator) validateUserPermissions(ctx context.Context) erro
 		"auth.test",
 		"search.messages", // User-level search
 	}
-	
+
 	for _, method := range userMethods {
 		if err := pv.testAPIMethod(ctx, method, pv.connector.config.UserToken); err != nil {
 			// User permissions are optional, so we just log warnings
 			continue
 		}
 	}
-	
+
 	return nil
 }
 

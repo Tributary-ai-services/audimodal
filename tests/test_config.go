@@ -8,15 +8,15 @@ import (
 	"testing"
 
 	"github.com/jscharber/eAIIngest/pkg/auth"
-	"github.com/jscharber/eAIIngest/pkg/classification"
 	"github.com/jscharber/eAIIngest/pkg/chunking"
+	"github.com/jscharber/eAIIngest/pkg/classification"
 	"github.com/jscharber/eAIIngest/pkg/events"
 	"github.com/jscharber/eAIIngest/pkg/storage"
 	"github.com/jscharber/eAIIngest/pkg/storage/local"
 	"github.com/jscharber/eAIIngest/pkg/workflow"
 )
 
-// EventBusAdapter adapts the events.EventBusInterface to workflow.EventBus  
+// EventBusAdapter adapts the events.EventBusInterface to workflow.EventBus
 type EventBusAdapter struct {
 	bus events.EventBusInterface
 }
@@ -39,7 +39,7 @@ func (r *TestReader) Read(filePath string) (*TestData, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &TestData{
 		Type:    r.Type,
 		Content: content,
@@ -57,7 +57,7 @@ type TestDLPEngine struct{}
 
 func (e *TestDLPEngine) ScanText(content string) ([]TestPIIResult, error) {
 	var results []TestPIIResult
-	
+
 	// Simple pattern matching for testing
 	if strings.Contains(content, "123-45-6789") {
 		results = append(results, TestPIIResult{
@@ -65,14 +65,14 @@ func (e *TestDLPEngine) ScanText(content string) ([]TestPIIResult, error) {
 			Value: "123-45-6789",
 		})
 	}
-	
+
 	if strings.Contains(content, "4532-1234-5678-9012") {
 		results = append(results, TestPIIResult{
 			Type:  "credit_card",
 			Value: "4532-1234-5678-9012",
 		})
 	}
-	
+
 	return results, nil
 }
 
@@ -95,45 +95,45 @@ func NewTestDLPEngine() *TestDLPEngine {
 // TestEnvironment provides a complete testing environment
 type TestEnvironment struct {
 	// Core services
-	AuthService      auth.AuthService
-	EventBus         *EventBusAdapter
-	WorkflowEngine   workflow.Engine
-	
+	AuthService    auth.AuthService
+	EventBus       *EventBusAdapter
+	WorkflowEngine workflow.Engine
+
 	// Processing components
-	CSVReader        *TestReader
-	JSONReader       *TestReader
-	TextReader       *TestReader
-	Chunker          chunking.Chunker
-	Classifier       *classification.Service
-	DLPEngine        *TestDLPEngine
-	StorageRegistry  *storage.DefaultResolverRegistry
-	
+	CSVReader       *TestReader
+	JSONReader      *TestReader
+	TextReader      *TestReader
+	Chunker         chunking.Chunker
+	Classifier      *classification.Service
+	DLPEngine       *TestDLPEngine
+	StorageRegistry *storage.DefaultResolverRegistry
+
 	// Test data
-	TestDir          string
-	TestFiles        map[string]string
-	TestUsers        []*auth.User
-	TestTenants      []*auth.Tenant
-	
+	TestDir     string
+	TestFiles   map[string]string
+	TestUsers   []*auth.User
+	TestTenants []*auth.Tenant
+
 	// Cleanup functions
-	cleanup          []func() error
+	cleanup []func() error
 }
 
 // SetupTestEnvironment creates a complete test environment
 func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 	ctx := context.Background()
-	
+
 	// Create test directory
 	testDir := t.TempDir()
-	
+
 	// Initialize authentication system
 	jwtManager, err := auth.NewJWTManager(nil)
 	if err != nil {
 		t.Fatalf("Failed to create JWT manager: %v", err)
 	}
-	
+
 	userStore := auth.NewMemoryUserStore()
 	tenantStore := auth.NewMemoryTenantStore()
-	
+
 	// Seed auth data
 	if err := userStore.SeedData(); err != nil {
 		t.Fatalf("Failed to seed user data: %v", err)
@@ -141,17 +141,17 @@ func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 	if err := tenantStore.SeedData(); err != nil {
 		t.Fatalf("Failed to seed tenant data: %v", err)
 	}
-	
+
 	authService := auth.NewService(jwtManager, userStore, tenantStore, nil)
-	
+
 	// Initialize event system
 	eventBus := events.NewDefaultInMemoryEventBus()
 	eventBus.Start()
-	
+
 	// Create adapter for workflow engine
 	adapter := &EventBusAdapter{bus: eventBus}
 	workflowEngine := workflow.NewEngine(adapter)
-	
+
 	// Initialize processing components
 	csvReader := NewTestReader("csv")
 	jsonReader := NewTestReader("json")
@@ -159,19 +159,19 @@ func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 	chunker := chunking.NewFixedSizeChunker(500, 50)
 	classifier := classification.NewService(nil) // Use default config
 	dlpEngine := NewTestDLPEngine()
-	
+
 	// Initialize storage
 	storageRegistry := storage.NewResolverRegistry()
 	localResolver := local.NewLocalResolver("", []string{}) // No base path restrictions for testing
 	storageRegistry.RegisterResolver([]storage.CloudProvider{storage.ProviderLocal}, localResolver)
-	
+
 	// Create test files
 	testFiles := createTestFiles(t, testDir)
-	
+
 	// Create test users and tenants
 	testUsers := createTestUsers(t, ctx, authService)
 	testTenants := createTestTenants(t, ctx, authService)
-	
+
 	env := &TestEnvironment{
 		AuthService:     authService,
 		EventBus:        adapter,
@@ -189,12 +189,12 @@ func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 		TestTenants:     testTenants,
 		cleanup:         []func() error{},
 	}
-	
+
 	// Setup cleanup
 	t.Cleanup(func() {
 		env.Cleanup()
 	})
-	
+
 	return env
 }
 
@@ -232,19 +232,19 @@ func (env *TestEnvironment) AuthenticateTestUser(ctx context.Context, userIndex 
 	if user == nil {
 		return nil, auth.ErrUserNotFound
 	}
-	
+
 	authReq := &auth.AuthRequest{
 		Type:     auth.AuthTypePassword,
 		Username: user.Username,
 		Password: "TestPass123!", // Default password for test users
 	}
-	
+
 	return env.AuthService.Authenticate(ctx, authReq)
 }
 
 func createTestFiles(t *testing.T, testDir string) map[string]string {
 	files := make(map[string]string)
-	
+
 	// CSV test file
 	csvContent := `name,email,ssn,department
 John Doe,john.doe@company.com,123-45-6789,Engineering
@@ -258,7 +258,7 @@ Charlie Wilson,charlie.wilson@company.com,333-11-2222,Finance`
 		t.Fatalf("Failed to create CSV test file: %v", err)
 	}
 	files["csv"] = csvFile
-	
+
 	// JSON test file
 	jsonContent := `{
   "company": "Test Company Inc.",
@@ -294,7 +294,7 @@ Charlie Wilson,charlie.wilson@company.com,333-11-2222,Finance`
 		t.Fatalf("Failed to create JSON test file: %v", err)
 	}
 	files["json"] = jsonFile
-	
+
 	// Text test file with various PII types
 	textContent := `CONFIDENTIAL EMPLOYEE REPORT
 
@@ -341,7 +341,7 @@ DISTRIBUTION: LIMITED - AUTHORIZED PERSONNEL ONLY`
 		t.Fatalf("Failed to create text test file: %v", err)
 	}
 	files["text"] = textFile
-	
+
 	// Large text file for performance testing
 	largeContent := generateLargeTestContent()
 	largeFile := filepath.Join(testDir, "large_document.txt")
@@ -349,7 +349,7 @@ DISTRIBUTION: LIMITED - AUTHORIZED PERSONNEL ONLY`
 		t.Fatalf("Failed to create large test file: %v", err)
 	}
 	files["large"] = largeFile
-	
+
 	// Binary test file (simulated)
 	binaryContent := make([]byte, 1024)
 	for i := range binaryContent {
@@ -360,13 +360,13 @@ DISTRIBUTION: LIMITED - AUTHORIZED PERSONNEL ONLY`
 		t.Fatalf("Failed to create binary test file: %v", err)
 	}
 	files["binary"] = binaryFile
-	
+
 	return files
 }
 
 func createTestUsers(t *testing.T, ctx context.Context, authService auth.AuthService) []*auth.User {
 	users := []*auth.User{}
-	
+
 	userSpecs := []struct {
 		username string
 		email    string
@@ -378,7 +378,7 @@ func createTestUsers(t *testing.T, ctx context.Context, authService auth.AuthSer
 		{"api_client", "api@test.com", auth.RoleAPIClient},
 		{"service_account", "service@test.com", auth.RoleServiceAccount},
 	}
-	
+
 	for _, spec := range userSpecs {
 		createReq := &auth.CreateUserRequest{
 			Username:  spec.username,
@@ -388,21 +388,21 @@ func createTestUsers(t *testing.T, ctx context.Context, authService auth.AuthSer
 			LastName:  "User",
 			Roles:     []auth.Role{spec.role},
 		}
-		
+
 		user, err := authService.CreateUser(ctx, createReq)
 		if err != nil {
 			t.Fatalf("Failed to create test user %s: %v", spec.username, err)
 		}
-		
+
 		users = append(users, user)
 	}
-	
+
 	return users
 }
 
 func createTestTenants(t *testing.T, ctx context.Context, authService auth.AuthService) []*auth.Tenant {
 	tenants := []*auth.Tenant{}
-	
+
 	tenantSpecs := []struct {
 		name        string
 		displayName string
@@ -412,22 +412,22 @@ func createTestTenants(t *testing.T, ctx context.Context, authService auth.AuthS
 		{"tenant2", "Test Tenant Two", "tenant2.test.com"},
 		{"enterprise", "Enterprise Tenant", "enterprise.test.com"},
 	}
-	
+
 	for _, spec := range tenantSpecs {
 		createReq := &auth.CreateTenantRequest{
 			Name:        spec.name,
 			DisplayName: spec.displayName,
 			Domain:      spec.domain,
 		}
-		
+
 		tenant, err := authService.CreateTenant(ctx, createReq)
 		if err != nil {
 			t.Fatalf("Failed to create test tenant %s: %v", spec.name, err)
 		}
-		
+
 		tenants = append(tenants, tenant)
 	}
-	
+
 	return tenants
 }
 
@@ -509,7 +509,7 @@ Section 8: Large Data Simulation
 	for i := 0; i < 20; i++ {
 		result += baseContent + "\n\n"
 	}
-	
+
 	return result
 }
 
@@ -518,12 +518,12 @@ Section 8: Large Data Simulation
 // AssertValidPIIDetection checks that DLP scanning finds expected PII types
 func AssertValidPIIDetection(t *testing.T, results []TestPIIResult, expectedTypes ...string) {
 	t.Helper()
-	
+
 	foundTypes := make(map[string]bool)
 	for _, result := range results {
 		foundTypes[result.Type] = true
 	}
-	
+
 	for _, expectedType := range expectedTypes {
 		if !foundTypes[expectedType] {
 			t.Errorf("Expected to find PII type %s, but it was not detected", expectedType)
@@ -534,15 +534,15 @@ func AssertValidPIIDetection(t *testing.T, results []TestPIIResult, expectedType
 // AssertValidClassification checks that content classification results are valid
 func AssertValidClassification(t *testing.T, result *classification.ClassificationResult) {
 	t.Helper()
-	
+
 	if result.ContentType == "" {
 		t.Error("Content type should not be empty")
 	}
-	
+
 	if result.Language == "" {
 		t.Error("Language should not be empty")
 	}
-	
+
 	if result.SensitivityLevel == "" {
 		t.Error("Sensitivity level should not be empty")
 	}
@@ -551,18 +551,18 @@ func AssertValidClassification(t *testing.T, result *classification.Classificati
 // AssertValidChunks checks that chunking results are valid
 func AssertValidChunks(t *testing.T, chunks []chunking.Chunk, originalContent string) {
 	t.Helper()
-	
+
 	if len(chunks) == 0 {
 		t.Error("Should produce at least one chunk")
 		return
 	}
-	
+
 	// Verify all chunks combined contain the original content
 	combinedContent := ""
 	for _, chunk := range chunks {
 		combinedContent += chunk.Content
 	}
-	
+
 	// Allow for some overlap in chunking
 	if len(combinedContent) < len(originalContent) {
 		t.Error("Combined chunks should contain at least as much content as original")

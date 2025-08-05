@@ -5,12 +5,11 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	redis "github.com/go-redis/redis/v8"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -26,20 +25,20 @@ type RedisCacheConfig struct {
 	DB           int    `yaml:"db"`
 	PoolSize     int    `yaml:"pool_size"`
 	MinIdleConns int    `yaml:"min_idle_conns"`
-	
+
 	// Cache behavior
 	DefaultTTL       time.Duration `yaml:"default_ttl"`
 	FileInfoTTL      time.Duration `yaml:"file_info_ttl"`
 	ContentTTL       time.Duration `yaml:"content_ttl"`
 	MaxContentSize   int64         `yaml:"max_content_size"`
 	CompressionLevel int           `yaml:"compression_level"`
-	
+
 	// Cache keys
-	KeyPrefix        string `yaml:"key_prefix"`
-	FileInfoPrefix   string `yaml:"file_info_prefix"`
-	ContentPrefix    string `yaml:"content_prefix"`
-	MetadataPrefix   string `yaml:"metadata_prefix"`
-	
+	KeyPrefix      string `yaml:"key_prefix"`
+	FileInfoPrefix string `yaml:"file_info_prefix"`
+	ContentPrefix  string `yaml:"content_prefix"`
+	MetadataPrefix string `yaml:"metadata_prefix"`
+
 	// Performance settings
 	EnableCompression bool `yaml:"enable_compression"`
 	EnableMetrics     bool `yaml:"enable_metrics"`
@@ -49,33 +48,33 @@ type RedisCacheConfig struct {
 // DefaultRedisCacheConfig returns default Redis cache configuration
 func DefaultRedisCacheConfig() *RedisCacheConfig {
 	return &RedisCacheConfig{
-		Addr:             "localhost:6379",
-		Password:         "",
-		DB:               0,
-		PoolSize:         10,
-		MinIdleConns:     5,
-		DefaultTTL:       1 * time.Hour,
-		FileInfoTTL:      30 * time.Minute,
-		ContentTTL:       2 * time.Hour,
-		MaxContentSize:   50 * 1024 * 1024, // 50MB
-		CompressionLevel: 6,
-		KeyPrefix:        "audimodal:storage:",
-		FileInfoPrefix:   "fileinfo:",
-		ContentPrefix:    "content:",
-		MetadataPrefix:   "metadata:",
+		Addr:              "localhost:6379",
+		Password:          "",
+		DB:                0,
+		PoolSize:          10,
+		MinIdleConns:      5,
+		DefaultTTL:        1 * time.Hour,
+		FileInfoTTL:       30 * time.Minute,
+		ContentTTL:        2 * time.Hour,
+		MaxContentSize:    50 * 1024 * 1024, // 50MB
+		CompressionLevel:  6,
+		KeyPrefix:         "audimodal:storage:",
+		FileInfoPrefix:    "fileinfo:",
+		ContentPrefix:     "content:",
+		MetadataPrefix:    "metadata:",
 		EnableCompression: true,
-		EnableMetrics:    true,
-		BatchSize:        100,
+		EnableMetrics:     true,
+		BatchSize:         100,
 	}
 }
 
 // RedisCache implements a Redis-based caching layer for storage operations
 type RedisCache struct {
-	client   redis.Cmdable
-	config   *RedisCacheConfig
-	tracer   trace.Tracer
+	client     redis.Cmdable
+	config     *RedisCacheConfig
+	tracer     trace.Tracer
 	compressor Compressor
-	metrics  *CacheMetrics
+	metrics    *CacheMetrics
 }
 
 // NewRedisCache creates a new Redis cache instance
@@ -134,7 +133,7 @@ func (c *RedisCache) GetFileInfo(ctx context.Context, url string) (*storage.File
 	)
 
 	key := c.buildFileInfoKey(url)
-	
+
 	start := time.Now()
 	data, err := c.client.Get(ctx, key).Result()
 	duration := time.Since(start)
@@ -199,7 +198,7 @@ func (c *RedisCache) SetFileInfo(ctx context.Context, url string, fileInfo *stor
 	}
 
 	key := c.buildFileInfoKey(url)
-	
+
 	start := time.Now()
 	err = c.client.Set(ctx, key, compressed, c.config.FileInfoTTL).Err()
 	duration := time.Since(start)
@@ -235,7 +234,7 @@ func (c *RedisCache) GetContent(ctx context.Context, url string, checksum string
 	)
 
 	key := c.buildContentKey(url, checksum)
-	
+
 	start := time.Now()
 	data, err := c.client.Get(ctx, key).Result()
 	duration := time.Since(start)
@@ -296,7 +295,7 @@ func (c *RedisCache) SetContent(ctx context.Context, url string, checksum string
 	}
 
 	key := c.buildContentKey(url, checksum)
-	
+
 	start := time.Now()
 	err = c.client.Set(ctx, key, compressed, c.config.ContentTTL).Err()
 	duration := time.Since(start)
@@ -326,7 +325,7 @@ func (c *RedisCache) GetMetadata(ctx context.Context, key string) (map[string]in
 	defer span.End()
 
 	cacheKey := c.buildMetadataKey(key)
-	
+
 	start := time.Now()
 	data, err := c.client.Get(ctx, cacheKey).Result()
 	duration := time.Since(start)
@@ -367,7 +366,7 @@ func (c *RedisCache) SetMetadata(ctx context.Context, key string, metadata map[s
 	if ttl == 0 {
 		ttl = c.config.DefaultTTL
 	}
-	
+
 	start := time.Now()
 	err = c.client.Set(ctx, cacheKey, data, ttl).Err()
 	duration := time.Since(start)
@@ -416,7 +415,7 @@ func (c *RedisCache) Clear(ctx context.Context) error {
 	defer span.End()
 
 	pattern := c.config.KeyPrefix + "*"
-	
+
 	start := time.Now()
 	keys, err := c.client.Keys(ctx, pattern).Result()
 	if err != nil {
@@ -431,7 +430,7 @@ func (c *RedisCache) Clear(ctx context.Context) error {
 			return fmt.Errorf("failed to delete cache keys: %w", err)
 		}
 	}
-	
+
 	duration := time.Since(start)
 	if c.metrics != nil {
 		c.metrics.RecordOperation("general", "clear", duration, err == nil)
@@ -614,7 +613,7 @@ func (c *RedisCache) BatchSet(ctx context.Context, items map[string][]byte, ttl 
 	}
 
 	pipe := c.client.Pipeline()
-	
+
 	for key, value := range items {
 		pipe.Set(ctx, key, value, ttl)
 	}

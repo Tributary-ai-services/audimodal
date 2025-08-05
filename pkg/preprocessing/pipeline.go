@@ -20,7 +20,7 @@ func NewFileProcessor(tempDir string) *FileProcessor {
 	if tempDir == "" {
 		tempDir = os.TempDir()
 	}
-	
+
 	return &FileProcessor{
 		decompressor:     NewFileDecompressor(tempDir),
 		encodingDetector: NewEncodingDetector(),
@@ -31,16 +31,16 @@ func NewFileProcessor(tempDir string) *FileProcessor {
 
 // ProcessedFile represents a file that has been preprocessed
 type ProcessedFile struct {
-	OriginalPath    string
-	ProcessedPath   string
-	Name            string
-	Size            int64
-	IsCompressed    bool
-	CompressionType string
-	OriginalEncoding string
+	OriginalPath       string
+	ProcessedPath      string
+	Name               string
+	Size               int64
+	IsCompressed       bool
+	CompressionType    string
+	OriginalEncoding   string
 	EncodingConfidence float64
-	IsDirectory     bool
-	SourceArchive   string // Path to original archive if extracted
+	IsDirectory        bool
+	SourceArchive      string // Path to original archive if extracted
 }
 
 // ProcessFile handles decompression and encoding conversion for a single file
@@ -82,7 +82,7 @@ func (fp *FileProcessor) ProcessFile(filePath string) ([]ProcessedFile, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to process encoding for %s: %w", decompFile.Name, err)
 			}
-			
+
 			processedFile.Name = decompFile.Name
 			processedFile.SourceArchive = filePath
 			results = append(results, *processedFile)
@@ -93,12 +93,12 @@ func (fp *FileProcessor) ProcessFile(filePath string) ([]ProcessedFile, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to process encoding: %w", err)
 		}
-		
+
 		stat, err := os.Stat(filePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to stat file: %w", err)
 		}
-		
+
 		processedFile.Name = filepath.Base(filePath)
 		processedFile.Size = stat.Size()
 		processedFile.IsDirectory = stat.IsDir()

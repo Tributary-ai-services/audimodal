@@ -16,7 +16,7 @@ import (
 func TestBasicReadersIntegration(t *testing.T) {
 	// Create a new registry for testing
 	testRegistry := registry.NewRegistry()
-	
+
 	// Register readers with test registry
 	testRegistry.RegisterReader("text", func() core.DataSourceReader {
 		return text.NewTextReader()
@@ -27,15 +27,15 @@ func TestBasicReadersIntegration(t *testing.T) {
 	testRegistry.RegisterReader("json", func() core.DataSourceReader {
 		return json.NewJSONReader()
 	})
-	
+
 	// Test that all readers are registered
 	readers := testRegistry.ListReaders()
 	expectedReaders := []string{"csv", "json", "text"}
-	
+
 	if len(readers) != len(expectedReaders) {
 		t.Errorf("Expected %d readers, got %d", len(expectedReaders), len(readers))
 	}
-	
+
 	for _, expected := range expectedReaders {
 		found := false
 		for _, reader := range readers {
@@ -48,7 +48,7 @@ func TestBasicReadersIntegration(t *testing.T) {
 			t.Errorf("Expected reader '%s' not found", expected)
 		}
 	}
-	
+
 	// Test reader retrieval and validation
 	for _, readerName := range expectedReaders {
 		reader, err := testRegistry.GetReader(readerName)
@@ -56,29 +56,29 @@ func TestBasicReadersIntegration(t *testing.T) {
 			t.Errorf("Failed to get reader '%s': %v", readerName, err)
 			continue
 		}
-		
+
 		// Validate reader implements interface correctly
 		if err := testRegistry.ValidatePlugin("reader", readerName); err != nil {
 			t.Errorf("Reader '%s' failed validation: %v", readerName, err)
 		}
-		
+
 		// Test basic methods
 		if reader.GetName() == "" {
 			t.Errorf("Reader '%s' has empty name", readerName)
 		}
-		
+
 		if reader.GetVersion() == "" {
 			t.Errorf("Reader '%s' has empty version", readerName)
 		}
-		
+
 		if reader.GetType() != "reader" {
 			t.Errorf("Reader '%s' has wrong type: %s", readerName, reader.GetType())
 		}
-		
+
 		if len(reader.GetSupportedFormats()) == 0 {
 			t.Errorf("Reader '%s' has no supported formats", readerName)
 		}
-		
+
 		if len(reader.GetConfigSpec()) == 0 {
 			t.Errorf("Reader '%s' has no config spec", readerName)
 		}
@@ -93,8 +93,8 @@ func TestReaderFormatMapping(t *testing.T) {
 		{".txt", "text"},
 		{".text", "text"},
 		{".log", "text"},
-		{".md", "text"},
-		{".markdown", "text"},
+		{".md", "markdown"},
+		{".markdown", "markdown"},
 		{".csv", "csv"},
 		{".tsv", "csv"},
 		{".json", "json"},
@@ -102,7 +102,7 @@ func TestReaderFormatMapping(t *testing.T) {
 		{".ndjson", "json"},
 		{".unknown", ""},
 	}
-	
+
 	for _, test := range tests {
 		result := GetReaderForExtension(test.extension)
 		if result != test.expected {
@@ -114,9 +114,9 @@ func TestReaderFormatMapping(t *testing.T) {
 func TestEndToEndFileProcessing(t *testing.T) {
 	// Register readers
 	RegisterBasicReaders()
-	
+
 	ctx := context.Background()
-	
+
 	// Test data for different file types
 	testFiles := []struct {
 		name     string
@@ -143,7 +143,7 @@ func TestEndToEndFileProcessing(t *testing.T) {
 			expected: 2,
 		},
 	}
-	
+
 	for _, testFile := range testFiles {
 		t.Run(testFile.name, func(t *testing.T) {
 			// Create temporary file
@@ -152,25 +152,25 @@ func TestEndToEndFileProcessing(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer os.Remove(tmpfile.Name())
-			
+
 			if _, err := tmpfile.Write([]byte(testFile.content)); err != nil {
 				t.Fatal(err)
 			}
 			tmpfile.Close()
-			
+
 			// Get appropriate reader
 			ext := filepath.Ext(testFile.name)
 			readerName := GetReaderForExtension(ext)
 			if readerName != testFile.reader {
 				t.Errorf("Expected reader %s for %s, got %s", testFile.reader, ext, readerName)
 			}
-			
+
 			// Get reader instance
 			reader, err := registry.GlobalRegistry.GetReader(readerName)
 			if err != nil {
 				t.Fatalf("Failed to get reader %s: %v", readerName, err)
 			}
-			
+
 			// Test schema discovery
 			schema, err := reader.DiscoverSchema(ctx, tmpfile.Name())
 			if err != nil {
@@ -180,7 +180,7 @@ func TestEndToEndFileProcessing(t *testing.T) {
 					t.Errorf("No fields discovered for %s", testFile.name)
 				}
 			}
-			
+
 			// Test size estimation
 			estimate, err := reader.EstimateSize(ctx, tmpfile.Name())
 			if err != nil {
@@ -190,14 +190,14 @@ func TestEndToEndFileProcessing(t *testing.T) {
 					t.Errorf("Invalid byte size for %s: %d", testFile.name, estimate.ByteSize)
 				}
 			}
-			
+
 			// Test iteration
 			iterator, err := reader.CreateIterator(ctx, tmpfile.Name(), map[string]any{})
 			if err != nil {
 				t.Fatalf("Failed to create iterator for %s: %v", testFile.name, err)
 			}
 			defer iterator.Close()
-			
+
 			chunkCount := 0
 			for {
 				chunk, err := iterator.Next(ctx)
@@ -205,7 +205,7 @@ func TestEndToEndFileProcessing(t *testing.T) {
 					break
 				}
 				chunkCount++
-				
+
 				// Validate chunk metadata
 				if chunk.Metadata.SourcePath != tmpfile.Name() {
 					t.Errorf("Wrong source path in chunk metadata")
@@ -220,7 +220,7 @@ func TestEndToEndFileProcessing(t *testing.T) {
 					t.Errorf("Nil chunk data")
 				}
 			}
-			
+
 			if chunkCount != testFile.expected {
 				t.Errorf("Expected %d chunks for %s, got %d", testFile.expected, testFile.name, chunkCount)
 			}
@@ -231,7 +231,7 @@ func TestEndToEndFileProcessing(t *testing.T) {
 func TestReaderValidation(t *testing.T) {
 	// Register readers
 	RegisterBasicReaders()
-	
+
 	// Validate all readers
 	if err := ValidateBasicReaders(); err != nil {
 		t.Errorf("Reader validation failed: %v", err)
@@ -241,17 +241,17 @@ func TestReaderValidation(t *testing.T) {
 func TestRegistryStats(t *testing.T) {
 	// Register readers
 	RegisterBasicReaders()
-	
+
 	stats := registry.GlobalRegistry.GetStats()
-	
+
 	if stats.ReaderCount < 3 {
 		t.Errorf("Expected at least 3 readers, got %d", stats.ReaderCount)
 	}
-	
+
 	if stats.TotalPlugins < 3 {
 		t.Errorf("Expected at least 3 total plugins, got %d", stats.TotalPlugins)
 	}
-	
+
 	expectedReaders := []string{"csv", "json", "text"}
 	for _, expected := range expectedReaders {
 		found := false

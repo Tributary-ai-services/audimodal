@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jscharber/eAIIngest/pkg/embeddings"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/providers"
 	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
+	"github.com/jscharber/eAIIngest/pkg/embeddings/providers"
 )
 
 func runEmbeddingsDemo() {
@@ -30,7 +30,7 @@ func runEmbeddingsDemoLogic() error {
 
 	// Step 1: Initialize the embedding provider (OpenAI)
 	fmt.Println("\n📡 Step 1: Initializing OpenAI embedding provider...")
-	
+
 	openaiConfig := &providers.OpenAIConfig{
 		APIKey:     "demo-key", // In real usage, get from environment variable
 		Model:      "text-embedding-3-small",
@@ -50,7 +50,7 @@ func runEmbeddingsDemoLogic() error {
 
 	// Step 2: Initialize the DeepLake API client
 	fmt.Println("\n🗄️  Step 2: Initializing DeepLake API client...")
-	
+
 	apiConfig := &client.DeepLakeAPIConfig{
 		BaseURL:   getEnvOrDefault("DEEPLAKE_API_URL", "http://localhost:8000"),
 		APIKey:    getEnvOrDefault("DEEPLAKE_API_KEY", "dev-key-12345"),
@@ -68,7 +68,7 @@ func runEmbeddingsDemoLogic() error {
 
 	// Step 3: Create the embedding service
 	fmt.Println("\n🔧 Step 3: Creating embedding service...")
-	
+
 	serviceConfig := &embeddings.ServiceConfig{
 		DefaultDataset:   "demo-docs",
 		ChunkSize:        500,
@@ -87,7 +87,7 @@ func runEmbeddingsDemoLogic() error {
 
 	// Step 4: Create a dataset
 	fmt.Println("\n📚 Step 4: Creating demo dataset...")
-	
+
 	datasetConfig := &embeddings.DatasetConfig{
 		Name:        "demo-docs",
 		Description: "Demo dataset for vector embeddings",
@@ -107,7 +107,7 @@ func runEmbeddingsDemoLogic() error {
 
 	// Step 5: Process sample documents
 	fmt.Println("\n📄 Step 5: Processing sample documents...")
-	
+
 	sampleDocuments := []struct {
 		ID      string
 		Content string
@@ -136,10 +136,10 @@ func runEmbeddingsDemoLogic() error {
 	}
 
 	tenantID := uuid.New()
-	
+
 	for i, doc := range sampleDocuments {
 		fmt.Printf("   Processing document %d/%d: %s\n", i+1, len(sampleDocuments), doc.ID)
-		
+
 		request := &embeddings.ProcessDocumentRequest{
 			DocumentID:  doc.ID,
 			TenantID:    tenantID,
@@ -147,9 +147,9 @@ func runEmbeddingsDemoLogic() error {
 			ContentType: "text/plain",
 			Dataset:     "demo-docs",
 			Metadata: map[string]interface{}{
-				"type":       doc.Type,
-				"processed":  time.Now().Format(time.RFC3339),
-				"demo":       true,
+				"type":      doc.Type,
+				"processed": time.Now().Format(time.RFC3339),
+				"demo":      true,
 			},
 		}
 
@@ -158,13 +158,13 @@ func runEmbeddingsDemoLogic() error {
 			return fmt.Errorf("failed to process document %s: %v", doc.ID, err)
 		}
 
-		fmt.Printf("      ✅ Created %d chunks, %d vectors in %.2fms\n", 
+		fmt.Printf("      ✅ Created %d chunks, %d vectors in %.2fms\n",
 			response.ChunksCreated, response.VectorsCreated, response.ProcessingTime)
 	}
 
 	// Step 6: Demonstrate semantic search
 	fmt.Println("\n🔍 Step 6: Demonstrating semantic search...")
-	
+
 	searchQueries := []string{
 		"What is artificial intelligence?",
 		"How do neural networks work?",
@@ -174,7 +174,7 @@ func runEmbeddingsDemoLogic() error {
 
 	for i, query := range searchQueries {
 		fmt.Printf("\n   Query %d: \"%s\"\n", i+1, query)
-		
+
 		searchRequest := &embeddings.SearchRequest{
 			Query:    query,
 			Dataset:  "demo-docs",
@@ -194,19 +194,19 @@ func runEmbeddingsDemoLogic() error {
 		}
 
 		fmt.Printf("   Found %d results in %.2fms:\n", len(searchResponse.Results), searchResponse.QueryTime)
-		
+
 		for j, result := range searchResponse.Results {
 			contentPreview := result.DocumentVector.Content
 			if len(contentPreview) > 100 {
 				contentPreview = contentPreview[:100] + "..."
 			}
-			
+
 			docType := "unknown"
 			if t, ok := result.DocumentVector.Metadata["type"].(string); ok {
 				docType = t
 			}
-			
-			fmt.Printf("      %d. Document: %s (Score: %.3f, Type: %s)\n", 
+
+			fmt.Printf("      %d. Document: %s (Score: %.3f, Type: %s)\n",
 				j+1, result.DocumentVector.DocumentID, result.Score, docType)
 			fmt.Printf("         Preview: %s\n", contentPreview)
 		}
@@ -214,7 +214,7 @@ func runEmbeddingsDemoLogic() error {
 
 	// Step 7: Get service statistics
 	fmt.Println("\n📊 Step 7: Service statistics...")
-	
+
 	stats, err := service.GetStats(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get stats: %v", err)
@@ -229,7 +229,7 @@ func runEmbeddingsDemoLogic() error {
 
 	// Step 8: Demonstrate document retrieval and deletion
 	fmt.Println("\n🗑️  Step 8: Document management...")
-	
+
 	// Get vectors for a specific document
 	docID := "doc-ai-intro"
 	vectors, err := service.GetDocumentVectors(ctx, docID)
@@ -265,7 +265,7 @@ func demonstrateAdvancedFeatures(service embeddings.EmbeddingService) error {
 
 	// Batch processing demo
 	fmt.Println("\n📦 Batch Processing Demo:")
-	
+
 	chunks := []*embeddings.ChunkInput{
 		{
 			ID:          "chunk-1",
@@ -291,9 +291,9 @@ func demonstrateAdvancedFeatures(service embeddings.EmbeddingService) error {
 	}
 
 	batchRequest := &embeddings.ProcessChunksRequest{
-		Chunks:   chunks,
-		Dataset:  "demo-docs",
-		TenantID: tenantID,
+		Chunks:    chunks,
+		Dataset:   "demo-docs",
+		TenantID:  tenantID,
 		BatchSize: 2,
 	}
 
@@ -307,7 +307,7 @@ func demonstrateAdvancedFeatures(service embeddings.EmbeddingService) error {
 
 	// Advanced search with filters
 	fmt.Println("\n🔍 Advanced Search with Filters:")
-	
+
 	searchRequest := &embeddings.SearchRequest{
 		Query:    "artificial intelligence and machine learning",
 		Dataset:  "demo-docs",
@@ -331,7 +331,7 @@ func demonstrateAdvancedFeatures(service embeddings.EmbeddingService) error {
 		return fmt.Errorf("advanced search failed: %v", err)
 	}
 
-	fmt.Printf("   Found %d unique documents in %.2fms\n", 
+	fmt.Printf("   Found %d unique documents in %.2fms\n",
 		len(searchResponse.Results), searchResponse.QueryTime)
 
 	if searchResponse.SearchStats != nil {

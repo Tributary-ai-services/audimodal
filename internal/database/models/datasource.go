@@ -14,28 +14,28 @@ type DataSource struct {
 	Name        string    `gorm:"not null;index" json:"name"`
 	DisplayName string    `gorm:"not null" json:"display_name"`
 	Type        string    `gorm:"not null;index" json:"type"` // s3, gcs, azure, gdrive, etc.
-	
+
 	// Configuration (stored as JSON for flexibility)
 	Config DataSourceConfig `gorm:"type:jsonb" json:"config"`
-	
+
 	// Credentials reference
 	CredentialsRef DataSourceCredentials `gorm:"type:jsonb" json:"credentials_ref"`
-	
+
 	// Sync settings
 	SyncSettings DataSourceSyncSettings `gorm:"type:jsonb" json:"sync_settings"`
-	
+
 	// Processing settings
 	ProcessingSettings DataSourceProcessingSettings `gorm:"type:jsonb" json:"processing_settings"`
-	
+
 	// Status and metadata
-	Status          string    `gorm:"not null;default:'active'" json:"status"`
-	LastSyncAt      *time.Time `json:"last_sync_at,omitempty"`
-	LastSyncStatus  string    `gorm:"default:'pending'" json:"last_sync_status"`
-	LastSyncError   *string   `json:"last_sync_error,omitempty"`
-	CreatedAt       time.Time `gorm:"not null" json:"created_at"`
-	UpdatedAt       time.Time `gorm:"not null" json:"updated_at"`
-	DeletedAt       *time.Time `gorm:"index" json:"deleted_at,omitempty"`
-	
+	Status         string     `gorm:"not null;default:'active'" json:"status"`
+	LastSyncAt     *time.Time `json:"last_sync_at,omitempty"`
+	LastSyncStatus string     `gorm:"default:'pending'" json:"last_sync_status"`
+	LastSyncError  *string    `json:"last_sync_error,omitempty"`
+	CreatedAt      time.Time  `gorm:"not null" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"not null" json:"updated_at"`
+	DeletedAt      *time.Time `gorm:"index" json:"deleted_at,omitempty"`
+
 	// Relationships
 	Tenant *Tenant `gorm:"foreignKey:TenantID" json:"tenant,omitempty"`
 	Files  []File  `gorm:"foreignKey:DataSourceID" json:"files,omitempty"`
@@ -46,26 +46,26 @@ type DataSourceConfig struct {
 	// Common fields
 	Region   string `json:"region,omitempty"`
 	Endpoint string `json:"endpoint,omitempty"`
-	
+
 	// S3/GCS/Azure specific
 	Bucket    string `json:"bucket,omitempty"`
 	Container string `json:"container,omitempty"`
 	Path      string `json:"path,omitempty"`
-	
+
 	// Google Drive specific
 	DriveID string `json:"drive_id,omitempty"`
-	
+
 	// SharePoint specific
 	SiteURL string `json:"site_url,omitempty"`
-	
+
 	// Database specific
 	Host     string `json:"host,omitempty"`
 	Port     int    `json:"port,omitempty"`
 	Database string `json:"database,omitempty"`
-	
+
 	// File system specific
 	RootPath string `json:"root_path,omitempty"`
-	
+
 	// Additional custom configuration
 	CustomConfig map[string]interface{} `json:"custom_config,omitempty"`
 }
@@ -81,13 +81,13 @@ type DataSourceCredentials struct {
 // DataSourceSyncSettings represents sync settings for a data source
 type DataSourceSyncSettings struct {
 	Enabled         bool   `json:"enabled"`
-	Schedule        string `json:"schedule"`         // Cron expression
+	Schedule        string `json:"schedule"` // Cron expression
 	IncrementalSync bool   `json:"incremental_sync"`
 	BatchSize       int    `json:"batch_size"`
-	MaxDepth        int    `json:"max_depth"`        // Directory traversal depth
-	FilePattern     string `json:"file_pattern"`     // Regex pattern for file matching
-	ExcludePattern  string `json:"exclude_pattern"`  // Regex pattern for file exclusion
-	SizeLimit       int64  `json:"size_limit"`       // Maximum file size in bytes
+	MaxDepth        int    `json:"max_depth"`       // Directory traversal depth
+	FilePattern     string `json:"file_pattern"`    // Regex pattern for file matching
+	ExcludePattern  string `json:"exclude_pattern"` // Regex pattern for file exclusion
+	SizeLimit       int64  `json:"size_limit"`      // Maximum file size in bytes
 }
 
 // DataSourceProcessingSettings represents processing settings for a data source
@@ -187,9 +187,9 @@ func (d *DataSource) ShouldProcessFile(filename string, size int64) bool {
 	if d.SyncSettings.SizeLimit > 0 && size > d.SyncSettings.SizeLimit {
 		return false
 	}
-	
+
 	// TODO: Add regex pattern matching for file inclusion/exclusion
 	// This would require importing regexp package
-	
+
 	return true
 }

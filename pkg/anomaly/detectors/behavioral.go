@@ -9,95 +9,95 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/TAS/audimodal/pkg/anomaly"
+	"github.com/jscharber/eAIIngest/pkg/anomaly"
 )
 
 // BehavioralDetector implements behavioral anomaly detection
 type BehavioralDetector struct {
-	name           string
-	version        string
-	enabled        bool
-	config         *BehavioralConfig
-	baselines      map[string]*anomaly.BaselineData
-	userProfiles   map[uuid.UUID]*UserProfile
-	sessionData    map[string]*SessionTracker
+	name         string
+	version      string
+	enabled      bool
+	config       *BehavioralConfig
+	baselines    map[string]*anomaly.BaselineData
+	userProfiles map[uuid.UUID]*UserProfile
+	sessionData  map[string]*SessionTracker
 }
 
 // BehavioralConfig contains configuration for behavioral detection
 type BehavioralConfig struct {
-	AccessPatternThreshold    float64       `json:"access_pattern_threshold"`
-	VelocityThreshold        float64       `json:"velocity_threshold"`
-	SessionTimeoutThreshold  time.Duration `json:"session_timeout_threshold"`
-	BurstDetectionWindow     time.Duration `json:"burst_detection_window"`
-	BurstThreshold           int           `json:"burst_threshold"`
-	LocationChangeThreshold  int           `json:"location_change_threshold"`
-	OffHoursThreshold        float64       `json:"off_hours_threshold"`
-	UserProfileMinSamples    int           `json:"user_profile_min_samples"`
-	AnomalousSequenceLength  int           `json:"anomalous_sequence_length"`
-	DeviceFingerprinting     bool          `json:"device_fingerprinting"`
-	EnableUserProfiling      bool          `json:"enable_user_profiling"`
-	EnableGeolocationCheck   bool          `json:"enable_geolocation_check"`
-	EnableTimeBasedCheck     bool          `json:"enable_time_based_check"`
-	SuspiciousFileTypes      []string      `json:"suspicious_file_types"`
-	LargeFileThresholdMB     int64         `json:"large_file_threshold_mb"`
+	AccessPatternThreshold  float64       `json:"access_pattern_threshold"`
+	VelocityThreshold       float64       `json:"velocity_threshold"`
+	SessionTimeoutThreshold time.Duration `json:"session_timeout_threshold"`
+	BurstDetectionWindow    time.Duration `json:"burst_detection_window"`
+	BurstThreshold          int           `json:"burst_threshold"`
+	LocationChangeThreshold int           `json:"location_change_threshold"`
+	OffHoursThreshold       float64       `json:"off_hours_threshold"`
+	UserProfileMinSamples   int           `json:"user_profile_min_samples"`
+	AnomalousSequenceLength int           `json:"anomalous_sequence_length"`
+	DeviceFingerprinting    bool          `json:"device_fingerprinting"`
+	EnableUserProfiling     bool          `json:"enable_user_profiling"`
+	EnableGeolocationCheck  bool          `json:"enable_geolocation_check"`
+	EnableTimeBasedCheck    bool          `json:"enable_time_based_check"`
+	SuspiciousFileTypes     []string      `json:"suspicious_file_types"`
+	LargeFileThresholdMB    int64         `json:"large_file_threshold_mb"`
 }
 
 // UserProfile contains behavioral profile information for a user
 type UserProfile struct {
-	UserID              uuid.UUID                `json:"user_id"`
-	TypicalAccessHours  []int                    `json:"typical_access_hours"`
-	TypicalLocations    []string                 `json:"typical_locations"`
-	TypicalDevices      []string                 `json:"typical_devices"`
-	AvgSessionDuration  time.Duration            `json:"avg_session_duration"`
-	TypicalFileTypes    map[string]int           `json:"typical_file_types"`
-	AvgFilesPerSession  float64                  `json:"avg_files_per_session"`
-	AccessVelocity      *VelocityProfile         `json:"access_velocity"`
-	LastSeen            time.Time                `json:"last_seen"`
-	TotalSessions       int64                    `json:"total_sessions"`
-	CreatedAt           time.Time                `json:"created_at"`
-	UpdatedAt           time.Time                `json:"updated_at"`
-	BehaviorSignatures  map[string]float64       `json:"behavior_signatures"`
+	UserID             uuid.UUID          `json:"user_id"`
+	TypicalAccessHours []int              `json:"typical_access_hours"`
+	TypicalLocations   []string           `json:"typical_locations"`
+	TypicalDevices     []string           `json:"typical_devices"`
+	AvgSessionDuration time.Duration      `json:"avg_session_duration"`
+	TypicalFileTypes   map[string]int     `json:"typical_file_types"`
+	AvgFilesPerSession float64            `json:"avg_files_per_session"`
+	AccessVelocity     *VelocityProfile   `json:"access_velocity"`
+	LastSeen           time.Time          `json:"last_seen"`
+	TotalSessions      int64              `json:"total_sessions"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+	BehaviorSignatures map[string]float64 `json:"behavior_signatures"`
 }
 
 // VelocityProfile tracks user access velocity patterns
 type VelocityProfile struct {
-	AvgRequestsPerMinute float64   `json:"avg_requests_per_minute"`
-	MaxRequestsPerMinute float64   `json:"max_requests_per_minute"`
-	TypicalBurstSize     int       `json:"typical_burst_size"`
+	AvgRequestsPerMinute float64       `json:"avg_requests_per_minute"`
+	MaxRequestsPerMinute float64       `json:"max_requests_per_minute"`
+	TypicalBurstSize     int           `json:"typical_burst_size"`
 	TypicalPauseTime     time.Duration `json:"typical_pause_time"`
 }
 
 // SessionTracker tracks current session behavior
 type SessionTracker struct {
-	SessionID        string                   `json:"session_id"`
-	UserID           uuid.UUID                `json:"user_id"`
-	StartTime        time.Time                `json:"start_time"`
-	LastActivity     time.Time                `json:"last_activity"`
-	RequestCount     int                      `json:"request_count"`
-	FileAccessCount  int                      `json:"file_access_count"`
-	Locations        []string                 `json:"locations"`
-	DeviceFingerprint string                  `json:"device_fingerprint"`
-	AccessedFiles    []FileAccess             `json:"accessed_files"`
-	SuspiciousActions []SuspiciousAction      `json:"suspicious_actions"`
+	SessionID         string             `json:"session_id"`
+	UserID            uuid.UUID          `json:"user_id"`
+	StartTime         time.Time          `json:"start_time"`
+	LastActivity      time.Time          `json:"last_activity"`
+	RequestCount      int                `json:"request_count"`
+	FileAccessCount   int                `json:"file_access_count"`
+	Locations         []string           `json:"locations"`
+	DeviceFingerprint string             `json:"device_fingerprint"`
+	AccessedFiles     []FileAccess       `json:"accessed_files"`
+	SuspiciousActions []SuspiciousAction `json:"suspicious_actions"`
 }
 
 // FileAccess represents a file access event
 type FileAccess struct {
-	DocumentID   uuid.UUID `json:"document_id"`
-	AccessTime   time.Time `json:"access_time"`
-	AccessType   string    `json:"access_type"` // view, download, share, etc.
-	FileSize     int64     `json:"file_size"`
-	FileType     string    `json:"file_type"`
-	Location     string    `json:"location"`
-	Success      bool      `json:"success"`
+	DocumentID uuid.UUID `json:"document_id"`
+	AccessTime time.Time `json:"access_time"`
+	AccessType string    `json:"access_type"` // view, download, share, etc.
+	FileSize   int64     `json:"file_size"`
+	FileType   string    `json:"file_type"`
+	Location   string    `json:"location"`
+	Success    bool      `json:"success"`
 }
 
 // SuspiciousAction represents a suspicious action during a session
 type SuspiciousAction struct {
-	Action      string                 `json:"action"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Severity    anomaly.AnomalySeverity `json:"severity"`
-	Details     map[string]interface{} `json:"details"`
+	Action    string                  `json:"action"`
+	Timestamp time.Time               `json:"timestamp"`
+	Severity  anomaly.AnomalySeverity `json:"severity"`
+	Details   map[string]interface{}  `json:"details"`
 }
 
 // NewBehavioralDetector creates a new behavioral anomaly detector
@@ -107,7 +107,7 @@ func NewBehavioralDetector() *BehavioralDetector {
 		version: "1.0.0",
 		enabled: true,
 		config: &BehavioralConfig{
-			AccessPatternThreshold:   0.3,
+			AccessPatternThreshold:  0.3,
 			VelocityThreshold:       2.0,
 			SessionTimeoutThreshold: 30 * time.Minute,
 			BurstDetectionWindow:    5 * time.Minute,
@@ -232,9 +232,9 @@ func (d *BehavioralDetector) detectAccessPatternAnomalies(ctx context.Context, i
 		if sessionTracker != nil {
 			currentRate := float64(sessionTracker.FileAccessCount)
 			expectedRate := profile.AvgFilesPerSession
-			
+
 			deviation := math.Abs(currentRate-expectedRate) / expectedRate
-			
+
 			if deviation > d.config.AccessPatternThreshold {
 				severity := anomaly.SeverityLow
 				if deviation > 0.5 {
@@ -245,22 +245,22 @@ func (d *BehavioralDetector) detectAccessPatternAnomalies(ctx context.Context, i
 				}
 
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeAccessPattern,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "Unusual File Access Rate",
-					Description:    fmt.Sprintf("User accessing files at unusual rate: current=%.1f, expected=%.1f (deviation: %.1f%%)", currentRate, expectedRate, deviation*100),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					UserID:         input.UserID,
-					Score:          math.Min(deviation, 1.0),
-					Confidence:     0.75,
-					Threshold:      d.config.AccessPatternThreshold,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeAccessPattern,
+					Severity:        severity,
+					Status:          anomaly.StatusDetected,
+					Title:           "Unusual File Access Rate",
+					Description:     fmt.Sprintf("User accessing files at unusual rate: current=%.1f, expected=%.1f (deviation: %.1f%%)", currentRate, expectedRate, deviation*100),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					UserID:          input.UserID,
+					Score:           math.Min(deviation, 1.0),
+					Confidence:      0.75,
+					Threshold:       d.config.AccessPatternThreshold,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Baseline: map[string]interface{}{
 						"expected_access_rate": expectedRate,
@@ -284,26 +284,26 @@ func (d *BehavioralDetector) detectAccessPatternAnomalies(ctx context.Context, i
 	if totalAccess > 0 {
 		downloadRatio := float64(pattern.DownloadCount) / float64(totalAccess)
 		shareRatio := float64(pattern.ShareCount) / float64(totalAccess)
-		
+
 		// High download ratio might indicate data exfiltration
 		if downloadRatio > 0.8 && totalAccess > 5 {
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeAccessPattern,
-				Severity:       anomaly.SeverityMedium,
-				Status:         anomaly.StatusDetected,
-				Title:          "High Download Activity",
-				Description:    fmt.Sprintf("Unusually high download ratio: %.1f%% of accesses are downloads", downloadRatio*100),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				UserID:         input.UserID,
-				Score:          downloadRatio,
-				Confidence:     0.8,
-				Threshold:      0.8,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeAccessPattern,
+				Severity:        anomaly.SeverityMedium,
+				Status:          anomaly.StatusDetected,
+				Title:           "High Download Activity",
+				Description:     fmt.Sprintf("Unusually high download ratio: %.1f%% of accesses are downloads", downloadRatio*100),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				UserID:          input.UserID,
+				Score:           downloadRatio,
+				Confidence:      0.8,
+				Threshold:       0.8,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"download_ratio": downloadRatio,
@@ -320,26 +320,26 @@ func (d *BehavioralDetector) detectAccessPatternAnomalies(ctx context.Context, i
 		// Unusual sharing activity
 		if shareRatio > 0.5 && totalAccess > 3 {
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeAccessPattern,
-				Severity:       anomaly.SeverityMedium,
-				Status:         anomaly.StatusDetected,
-				Title:          "High Sharing Activity",
-				Description:    fmt.Sprintf("Unusually high sharing ratio: %.1f%% of accesses involve sharing", shareRatio*100),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				DataSourceID:   input.DataSourceID,
-				DocumentID:     input.DocumentID,
-				UserID:         input.UserID,
-				Score:          shareRatio,
-				Confidence:     0.75,
-				Threshold:      0.5,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeAccessPattern,
+				Severity:        anomaly.SeverityMedium,
+				Status:          anomaly.StatusDetected,
+				Title:           "High Sharing Activity",
+				Description:     fmt.Sprintf("Unusually high sharing ratio: %.1f%% of accesses involve sharing", shareRatio*100),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				DataSourceID:    input.DataSourceID,
+				DocumentID:      input.DocumentID,
+				UserID:          input.UserID,
+				Score:           shareRatio,
+				Confidence:      0.75,
+				Threshold:       0.5,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
-					"share_ratio": shareRatio,
-					"share_count": pattern.ShareCount,
+					"share_ratio":  shareRatio,
+					"share_count":  pattern.ShareCount,
 					"total_access": totalAccess,
 				},
 				Metadata: map[string]interface{}{
@@ -372,10 +372,10 @@ func (d *BehavioralDetector) detectVelocityAnomalies(ctx context.Context, input 
 	// Compare with user profile
 	if profile != nil && profile.AccessVelocity != nil {
 		expectedVelocity := profile.AccessVelocity.AvgRequestsPerMinute
-		
+
 		if expectedVelocity > 0 {
 			velocityRatio := requestsPerMinute / expectedVelocity
-			
+
 			if velocityRatio > d.config.VelocityThreshold {
 				severity := anomaly.SeverityMedium
 				if velocityRatio > 3.0 {
@@ -386,20 +386,20 @@ func (d *BehavioralDetector) detectVelocityAnomalies(ctx context.Context, input 
 				}
 
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeUsagePattern,
-					Severity:       severity,
-					Status:         anomaly.StatusDetected,
-					Title:          "Unusual Access Velocity",
-					Description:    fmt.Sprintf("User access velocity (%.1f req/min) is %.1fx higher than typical (%.1f req/min)", requestsPerMinute, velocityRatio, expectedVelocity),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					UserID:         input.UserID,
-					Score:          math.Min(velocityRatio/5.0, 1.0),
-					Confidence:     0.85,
-					Threshold:      d.config.VelocityThreshold,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeUsagePattern,
+					Severity:        severity,
+					Status:          anomaly.StatusDetected,
+					Title:           "Unusual Access Velocity",
+					Description:     fmt.Sprintf("User access velocity (%.1f req/min) is %.1fx higher than typical (%.1f req/min)", requestsPerMinute, velocityRatio, expectedVelocity),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					UserID:          input.UserID,
+					Score:           math.Min(velocityRatio/5.0, 1.0),
+					Confidence:      0.85,
+					Threshold:       d.config.VelocityThreshold,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Baseline: map[string]interface{}{
 						"expected_velocity": expectedVelocity,
@@ -432,7 +432,7 @@ func (d *BehavioralDetector) detectBurstActivity(ctx context.Context, input *ano
 	// Count recent requests within burst detection window
 	now := time.Now()
 	recentRequests := 0
-	
+
 	for _, access := range sessionTracker.AccessedFiles {
 		if now.Sub(access.AccessTime) <= d.config.BurstDetectionWindow {
 			recentRequests++
@@ -446,25 +446,25 @@ func (d *BehavioralDetector) detectBurstActivity(ctx context.Context, input *ano
 		}
 
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeFrequency,
-			Severity:       severity,
-			Status:         anomaly.StatusDetected,
-			Title:          "Burst Activity Detected",
-			Description:    fmt.Sprintf("User made %d requests in the last %s (threshold: %d)", recentRequests, d.config.BurstDetectionWindow.String(), d.config.BurstThreshold),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			UserID:         input.UserID,
-			Score:          float64(recentRequests) / float64(d.config.BurstThreshold*2),
-			Confidence:     0.9,
-			Threshold:      float64(d.config.BurstThreshold),
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeFrequency,
+			Severity:        severity,
+			Status:          anomaly.StatusDetected,
+			Title:           "Burst Activity Detected",
+			Description:     fmt.Sprintf("User made %d requests in the last %s (threshold: %d)", recentRequests, d.config.BurstDetectionWindow.String(), d.config.BurstThreshold),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			UserID:          input.UserID,
+			Score:           float64(recentRequests) / float64(d.config.BurstThreshold*2),
+			Confidence:      0.9,
+			Threshold:       float64(d.config.BurstThreshold),
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
-				"recent_requests":      recentRequests,
-				"detection_window":     d.config.BurstDetectionWindow.String(),
-				"burst_threshold":      d.config.BurstThreshold,
+				"recent_requests":  recentRequests,
+				"detection_window": d.config.BurstDetectionWindow.String(),
+				"burst_threshold":  d.config.BurstThreshold,
 			},
 			Metadata: map[string]interface{}{
 				"detection_method": "burst_detection",
@@ -481,7 +481,7 @@ func (d *BehavioralDetector) detectTimeBasedAnomalies(ctx context.Context, input
 	var anomalies []*anomaly.Anomaly
 
 	currentHour := input.Timestamp.Hour()
-	
+
 	// Check if user is accessing during unusual hours
 	if profile != nil && len(profile.TypicalAccessHours) > 0 {
 		isTypicalHour := false
@@ -514,25 +514,25 @@ func (d *BehavioralDetector) detectTimeBasedAnomalies(ctx context.Context, input
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeUsagePattern,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Off-Hours Access",
-				Description:    fmt.Sprintf("User accessing system at unusual hour (%d:00), %d hours from typical access times", currentHour, minDistance),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				UserID:         input.UserID,
-				Score:          float64(minDistance) / 12.0,
-				Confidence:     0.7,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeUsagePattern,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Off-Hours Access",
+				Description:     fmt.Sprintf("User accessing system at unusual hour (%d:00), %d hours from typical access times", currentHour, minDistance),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				UserID:          input.UserID,
+				Score:           float64(minDistance) / 12.0,
+				Confidence:      0.7,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Baseline: map[string]interface{}{
 					"typical_access_hours": profile.TypicalAccessHours,
 				},
 				Detected: map[string]interface{}{
-					"current_hour":     currentHour,
+					"current_hour":       currentHour,
 					"hours_from_typical": minDistance,
 				},
 				Metadata: map[string]interface{}{
@@ -548,19 +548,19 @@ func (d *BehavioralDetector) detectTimeBasedAnomalies(ctx context.Context, input
 		if profile != nil && profile.TotalSessions > 20 {
 			// This is a simplified check - in production, you'd track weekend vs weekday patterns
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeUsagePattern,
-				Severity:       anomaly.SeverityLow,
-				Status:         anomaly.StatusDetected,
-				Title:          "Weekend Access",
-				Description:    fmt.Sprintf("User accessing system on %s", input.Timestamp.Weekday().String()),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				UserID:         input.UserID,
-				Score:          0.3,
-				Confidence:     0.6,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeUsagePattern,
+				Severity:        anomaly.SeverityLow,
+				Status:          anomaly.StatusDetected,
+				Title:           "Weekend Access",
+				Description:     fmt.Sprintf("User accessing system on %s", input.Timestamp.Weekday().String()),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				UserID:          input.UserID,
+				Score:           0.3,
+				Confidence:      0.6,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"day_of_week": input.Timestamp.Weekday().String(),
@@ -601,19 +601,19 @@ func (d *BehavioralDetector) detectLocationAnomalies(ctx context.Context, input 
 			}
 
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeUnauthorizedAccess,
-				Severity:       severity,
-				Status:         anomaly.StatusDetected,
-				Title:          "Access from New Location",
-				Description:    fmt.Sprintf("User accessing from unusual location: %s", currentLocation),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				UserID:         input.UserID,
-				Score:          0.8,
-				Confidence:     0.75,
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeUnauthorizedAccess,
+				Severity:        severity,
+				Status:          anomaly.StatusDetected,
+				Title:           "Access from New Location",
+				Description:     fmt.Sprintf("User accessing from unusual location: %s", currentLocation),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				UserID:          input.UserID,
+				Score:           0.8,
+				Confidence:      0.75,
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Baseline: map[string]interface{}{
 					"typical_locations": profile.TypicalLocations,
@@ -639,20 +639,20 @@ func (d *BehavioralDetector) detectLocationAnomalies(ctx context.Context, input 
 
 		if len(uniqueLocations) > d.config.LocationChangeThreshold {
 			anomaly := &anomaly.Anomaly{
-				ID:             uuid.New(),
-				Type:           anomaly.AnomalyTypeUnauthorizedAccess,
-				Severity:       anomaly.SeverityHigh,
-				Status:         anomaly.StatusDetected,
-				Title:          "Multiple Location Access",
-				Description:    fmt.Sprintf("User accessed from %d different locations in single session", len(uniqueLocations)),
-				DetectedAt:     time.Now(),
-				UpdatedAt:      time.Now(),
-				TenantID:       input.TenantID,
-				UserID:         input.UserID,
-				Score:          float64(len(uniqueLocations)) / 10.0,
-				Confidence:     0.9,
-				Threshold:      float64(d.config.LocationChangeThreshold),
-				DetectorName:   d.name,
+				ID:              uuid.New(),
+				Type:            anomaly.AnomalyTypeUnauthorizedAccess,
+				Severity:        anomaly.SeverityHigh,
+				Status:          anomaly.StatusDetected,
+				Title:           "Multiple Location Access",
+				Description:     fmt.Sprintf("User accessed from %d different locations in single session", len(uniqueLocations)),
+				DetectedAt:      time.Now(),
+				UpdatedAt:       time.Now(),
+				TenantID:        input.TenantID,
+				UserID:          input.UserID,
+				Score:           float64(len(uniqueLocations)) / 10.0,
+				Confidence:      0.9,
+				Threshold:       float64(d.config.LocationChangeThreshold),
+				DetectorName:    d.name,
 				DetectorVersion: d.version,
 				Detected: map[string]interface{}{
 					"unique_locations": len(uniqueLocations),
@@ -687,19 +687,19 @@ func (d *BehavioralDetector) detectSessionAnomalies(ctx context.Context, input *
 		}
 
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeUsagePattern,
-			Severity:       severity,
-			Status:         anomaly.StatusDetected,
-			Title:          "Extended Session Duration",
-			Description:    fmt.Sprintf("Session duration (%s) exceeds normal patterns", sessionDuration.String()),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			UserID:         input.UserID,
-			Score:          math.Min(sessionDuration.Hours()/24.0, 1.0),
-			Confidence:     0.7,
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeUsagePattern,
+			Severity:        severity,
+			Status:          anomaly.StatusDetected,
+			Title:           "Extended Session Duration",
+			Description:     fmt.Sprintf("Session duration (%s) exceeds normal patterns", sessionDuration.String()),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			UserID:          input.UserID,
+			Score:           math.Min(sessionDuration.Hours()/24.0, 1.0),
+			Confidence:      0.7,
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"session_duration": sessionDuration.String(),
@@ -723,25 +723,25 @@ func (d *BehavioralDetector) detectFileAccessAnomalies(ctx context.Context, inpu
 		for _, suspiciousType := range d.config.SuspiciousFileTypes {
 			if strings.HasSuffix(strings.ToLower(input.FileName), suspiciousType) {
 				anomaly := &anomaly.Anomaly{
-					ID:             uuid.New(),
-					Type:           anomaly.AnomalyTypeSuspiciousContent,
-					Severity:       anomaly.SeverityHigh,
-					Status:         anomaly.StatusDetected,
-					Title:          "Suspicious File Type Access",
-					Description:    fmt.Sprintf("User accessed file with suspicious extension: %s", suspiciousType),
-					DetectedAt:     time.Now(),
-					UpdatedAt:      time.Now(),
-					TenantID:       input.TenantID,
-					DataSourceID:   input.DataSourceID,
-					DocumentID:     input.DocumentID,
-					UserID:         input.UserID,
-					Score:          0.9,
-					Confidence:     0.85,
-					DetectorName:   d.name,
+					ID:              uuid.New(),
+					Type:            anomaly.AnomalyTypeSuspiciousContent,
+					Severity:        anomaly.SeverityHigh,
+					Status:          anomaly.StatusDetected,
+					Title:           "Suspicious File Type Access",
+					Description:     fmt.Sprintf("User accessed file with suspicious extension: %s", suspiciousType),
+					DetectedAt:      time.Now(),
+					UpdatedAt:       time.Now(),
+					TenantID:        input.TenantID,
+					DataSourceID:    input.DataSourceID,
+					DocumentID:      input.DocumentID,
+					UserID:          input.UserID,
+					Score:           0.9,
+					Confidence:      0.85,
+					DetectorName:    d.name,
 					DetectorVersion: d.version,
 					Detected: map[string]interface{}{
-						"file_name":     input.FileName,
-						"file_type":     suspiciousType,
+						"file_name": input.FileName,
+						"file_type": suspiciousType,
 					},
 					Metadata: map[string]interface{}{
 						"detection_method": "suspicious_file_type",
@@ -756,22 +756,22 @@ func (d *BehavioralDetector) detectFileAccessAnomalies(ctx context.Context, inpu
 	// Check for large file access
 	if input.FileSize > d.config.LargeFileThresholdMB*1024*1024 {
 		anomaly := &anomaly.Anomaly{
-			ID:             uuid.New(),
-			Type:           anomaly.AnomalyTypeAccessPattern,
-			Severity:       anomaly.SeverityMedium,
-			Status:         anomaly.StatusDetected,
-			Title:          "Large File Access",
-			Description:    fmt.Sprintf("User accessed unusually large file: %.2f MB", float64(input.FileSize)/(1024*1024)),
-			DetectedAt:     time.Now(),
-			UpdatedAt:      time.Now(),
-			TenantID:       input.TenantID,
-			DataSourceID:   input.DataSourceID,
-			DocumentID:     input.DocumentID,
-			UserID:         input.UserID,
-			Score:          math.Min(float64(input.FileSize)/(d.config.LargeFileThresholdMB*1024*1024*10), 1.0),
-			Confidence:     0.6,
-			Threshold:      float64(d.config.LargeFileThresholdMB),
-			DetectorName:   d.name,
+			ID:              uuid.New(),
+			Type:            anomaly.AnomalyTypeAccessPattern,
+			Severity:        anomaly.SeverityMedium,
+			Status:          anomaly.StatusDetected,
+			Title:           "Large File Access",
+			Description:     fmt.Sprintf("User accessed unusually large file: %.2f MB", float64(input.FileSize)/(1024*1024)),
+			DetectedAt:      time.Now(),
+			UpdatedAt:       time.Now(),
+			TenantID:        input.TenantID,
+			DataSourceID:    input.DataSourceID,
+			DocumentID:      input.DocumentID,
+			UserID:          input.UserID,
+			Score:           math.Min(float64(input.FileSize)/(float64(d.config.LargeFileThresholdMB)*1024*1024*10), 1.0),
+			Confidence:      0.6,
+			Threshold:       float64(d.config.LargeFileThresholdMB),
+			DetectorName:    d.name,
 			DetectorVersion: d.version,
 			Detected: map[string]interface{}{
 				"file_size_mb": float64(input.FileSize) / (1024 * 1024),
@@ -825,13 +825,13 @@ func (d *BehavioralDetector) updateSessionTracker(sessionID string, input *anoma
 	tracker, exists := d.sessionData[sessionID]
 	if !exists {
 		tracker = &SessionTracker{
-			SessionID:    sessionID,
-			StartTime:    input.Timestamp,
-			LastActivity: input.Timestamp,
-			RequestCount: 0,
+			SessionID:       sessionID,
+			StartTime:       input.Timestamp,
+			LastActivity:    input.Timestamp,
+			RequestCount:    0,
 			FileAccessCount: 0,
-			Locations:    []string{},
-			AccessedFiles: []FileAccess{},
+			Locations:       []string{},
+			AccessedFiles:   []FileAccess{},
 		}
 		if input.UserID != nil {
 			tracker.UserID = *input.UserID
@@ -873,12 +873,12 @@ func (d *BehavioralDetector) updateUserProfile(userID uuid.UUID, input *anomaly.
 	profile, exists := d.userProfiles[userID]
 	if !exists {
 		profile = &UserProfile{
-			UserID:            userID,
+			UserID:             userID,
 			TypicalAccessHours: []int{},
-			TypicalLocations:  []string{},
-			TypicalDevices:    []string{},
-			TypicalFileTypes:  make(map[string]int),
-			CreatedAt:         time.Now(),
+			TypicalLocations:   []string{},
+			TypicalDevices:     []string{},
+			TypicalFileTypes:   make(map[string]int),
+			CreatedAt:          time.Now(),
 			BehaviorSignatures: make(map[string]float64),
 		}
 		d.userProfiles[userID] = profile

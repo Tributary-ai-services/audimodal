@@ -27,32 +27,32 @@ func NewFileReaderHandler() *FileReaderHandler {
 func (h *FileReaderHandler) ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error {
 	ctx, span := h.tracer.Start(ctx, "file_reader_step")
 	defer span.End()
-	
+
 	// Extract file URL from context
 	fileURL, ok := execution.Context["file_url"].(string)
 	if !ok {
 		return fmt.Errorf("file_url not found in execution context")
 	}
-	
+
 	span.SetAttributes(
 		attribute.String("file.url", fileURL),
 		attribute.String("step.name", step.Name),
 	)
-	
+
 	// Simulate file reading (in real implementation, this would call the file reader service)
 	time.Sleep(100 * time.Millisecond) // Simulate processing time
-	
+
 	// Store results
 	stepExecution.Results["file_content"] = "file content would be here"
 	stepExecution.Results["file_size"] = 1024
 	stepExecution.Results["content_type"] = "text/plain"
 	stepExecution.Results["processing_time"] = "100ms"
-	
+
 	// Add to execution context for next steps
 	execution.Context["file_content"] = stepExecution.Results["file_content"]
 	execution.Context["file_size"] = stepExecution.Results["file_size"]
 	execution.Context["content_type"] = stepExecution.Results["content_type"]
-	
+
 	return nil
 }
 
@@ -82,13 +82,13 @@ func NewChunkingHandler() *ChunkingHandler {
 func (h *ChunkingHandler) ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error {
 	ctx, span := h.tracer.Start(ctx, "chunking_step")
 	defer span.End()
-	
+
 	// Extract file content from context
 	fileContent, ok := execution.Context["file_content"].(string)
 	if !ok {
 		return fmt.Errorf("file_content not found in execution context")
 	}
-	
+
 	// Get chunking strategy from step config or use default
 	strategy := "fixed_size"
 	if strategyConfig, exists := step.Config["strategy"]; exists {
@@ -96,15 +96,15 @@ func (h *ChunkingHandler) ExecuteStep(ctx context.Context, execution *WorkflowEx
 			strategy = s
 		}
 	}
-	
+
 	span.SetAttributes(
 		attribute.String("chunking.strategy", strategy),
 		attribute.Int("content.length", len(fileContent)),
 	)
-	
+
 	// Simulate chunking (in real implementation, this would call the chunking service)
 	time.Sleep(200 * time.Millisecond) // Simulate processing time
-	
+
 	// Generate chunk metadata
 	chunks := []map[string]interface{}{
 		{
@@ -126,18 +126,18 @@ func (h *ChunkingHandler) ExecuteStep(ctx context.Context, execution *WorkflowEx
 			"quality":      0.92,
 		},
 	}
-	
+
 	// Store results
 	stepExecution.Results["chunk_count"] = len(chunks)
 	stepExecution.Results["chunks"] = chunks
 	stepExecution.Results["strategy"] = strategy
 	stepExecution.Results["total_size"] = len(fileContent)
 	stepExecution.Results["processing_time"] = "200ms"
-	
+
 	// Add to execution context
 	execution.Context["chunks"] = chunks
 	execution.Context["chunk_count"] = len(chunks)
-	
+
 	return nil
 }
 
@@ -167,26 +167,26 @@ func NewDLPScanHandler() *DLPScanHandler {
 func (h *DLPScanHandler) ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error {
 	ctx, span := h.tracer.Start(ctx, "dlp_scan_step")
 	defer span.End()
-	
+
 	// Extract chunks from context
 	chunksInterface, ok := execution.Context["chunks"]
 	if !ok {
 		return fmt.Errorf("chunks not found in execution context")
 	}
-	
+
 	chunks, ok := chunksInterface.([]map[string]interface{})
 	if !ok {
 		return fmt.Errorf("invalid chunks format in execution context")
 	}
-	
+
 	span.SetAttributes(
 		attribute.Int("chunks.count", len(chunks)),
 		attribute.String("step.name", step.Name),
 	)
-	
+
 	// Simulate DLP scanning (in real implementation, this would call the DLP service)
 	time.Sleep(300 * time.Millisecond) // Simulate processing time
-	
+
 	// Simulate finding some violations
 	violations := []map[string]interface{}{
 		{
@@ -199,28 +199,28 @@ func (h *DLPScanHandler) ExecuteStep(ctx context.Context, execution *WorkflowExe
 			"context":        "Social Security Number: 123-45-6789",
 		},
 	}
-	
+
 	// Store results
 	stepExecution.Results["violations_found"] = len(violations)
 	stepExecution.Results["violations"] = violations
 	stepExecution.Results["scanned_chunks"] = len(chunks)
 	stepExecution.Results["processing_time"] = "300ms"
-	
+
 	// Determine data classification based on violations
 	dataClass := "public"
 	if len(violations) > 0 {
 		dataClass = "confidential"
 	}
-	
+
 	stepExecution.Results["data_class"] = dataClass
 	execution.Context["data_class"] = dataClass
 	execution.Context["dlp_violations"] = violations
-	
+
 	span.SetAttributes(
 		attribute.Int("violations.count", len(violations)),
 		attribute.String("data.class", dataClass),
 	)
-	
+
 	return nil
 }
 
@@ -250,19 +250,19 @@ func NewClassificationHandler() *ClassificationHandler {
 func (h *ClassificationHandler) ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error {
 	ctx, span := h.tracer.Start(ctx, "classification_step")
 	defer span.End()
-	
+
 	// Extract file content and DLP results from context
 	contentType, _ := execution.Context["content_type"].(string)
 	dataClass, _ := execution.Context["data_class"].(string)
-	
+
 	span.SetAttributes(
 		attribute.String("content.type", contentType),
 		attribute.String("data.class", dataClass),
 	)
-	
+
 	// Simulate content classification (in real implementation, this would call the classification service)
 	time.Sleep(150 * time.Millisecond) // Simulate processing time
-	
+
 	// Generate classification results
 	classification := map[string]interface{}{
 		"content_category": "document",
@@ -273,15 +273,15 @@ func (h *ClassificationHandler) ExecuteStep(ctx context.Context, execution *Work
 		"entities":         []string{"person", "organization"},
 		"topics":           []string{"business", "technology"},
 	}
-	
+
 	// Store results
 	stepExecution.Results["classification"] = classification
 	stepExecution.Results["confidence"] = classification["confidence"]
 	stepExecution.Results["processing_time"] = "150ms"
-	
+
 	// Add to execution context
 	execution.Context["classification"] = classification
-	
+
 	return nil
 }
 
@@ -311,18 +311,18 @@ func NewEmbeddingHandler() *EmbeddingHandler {
 func (h *EmbeddingHandler) ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error {
 	ctx, span := h.tracer.Start(ctx, "embedding_step")
 	defer span.End()
-	
+
 	// Extract chunks from context
 	chunksInterface, ok := execution.Context["chunks"]
 	if !ok {
 		return fmt.Errorf("chunks not found in execution context")
 	}
-	
+
 	chunks, ok := chunksInterface.([]map[string]interface{})
 	if !ok {
 		return fmt.Errorf("invalid chunks format in execution context")
 	}
-	
+
 	// Get embedding model from step config or use default
 	model := "text-embedding-ada-002"
 	if modelConfig, exists := step.Config["model"]; exists {
@@ -330,40 +330,40 @@ func (h *EmbeddingHandler) ExecuteStep(ctx context.Context, execution *WorkflowE
 			model = m
 		}
 	}
-	
+
 	span.SetAttributes(
 		attribute.Int("chunks.count", len(chunks)),
 		attribute.String("embedding.model", model),
 	)
-	
+
 	// Simulate embedding generation (in real implementation, this would call the embedding service)
 	time.Sleep(500 * time.Millisecond) // Simulate processing time
-	
+
 	// Generate embedding metadata
 	embeddings := make([]map[string]interface{}, len(chunks))
 	for i, chunk := range chunks {
 		embeddings[i] = map[string]interface{}{
-			"chunk_id":     chunk["chunk_id"],
-			"vector_id":    uuid.New().String(),
-			"model":        model,
-			"dimension":    1536,
-			"vector_store": "pinecone",
-			"token_count":  128,
+			"chunk_id":        chunk["chunk_id"],
+			"vector_id":       uuid.New().String(),
+			"model":           model,
+			"dimension":       1536,
+			"vector_store":    "pinecone",
+			"token_count":     128,
 			"processing_time": "100ms",
 		}
 	}
-	
+
 	// Store results
 	stepExecution.Results["embeddings_created"] = len(embeddings)
 	stepExecution.Results["embeddings"] = embeddings
 	stepExecution.Results["model"] = model
 	stepExecution.Results["total_tokens"] = len(embeddings) * 128
 	stepExecution.Results["processing_time"] = "500ms"
-	
+
 	// Add to execution context
 	execution.Context["embeddings"] = embeddings
 	execution.Context["embeddings_created"] = len(embeddings)
-	
+
 	return nil
 }
 
@@ -393,22 +393,22 @@ func NewStorageHandler() *StorageHandler {
 func (h *StorageHandler) ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error {
 	ctx, span := h.tracer.Start(ctx, "storage_step")
 	defer span.End()
-	
+
 	// Extract processing results from context
 	chunks, _ := execution.Context["chunks"].([]map[string]interface{})
 	embeddings, _ := execution.Context["embeddings"].([]map[string]interface{})
 	classification, _ := execution.Context["classification"].(map[string]interface{})
 	dlpViolations, _ := execution.Context["dlp_violations"].([]map[string]interface{})
-	
+
 	span.SetAttributes(
 		attribute.Int("chunks.count", len(chunks)),
 		attribute.Int("embeddings.count", len(embeddings)),
 		attribute.Int("violations.count", len(dlpViolations)),
 	)
-	
+
 	// Simulate storage operations (in real implementation, this would call the storage service)
 	time.Sleep(200 * time.Millisecond) // Simulate processing time
-	
+
 	// Generate storage results
 	storageResults := map[string]interface{}{
 		"chunks_stored":     len(chunks),
@@ -419,13 +419,13 @@ func (h *StorageHandler) ExecuteStep(ctx context.Context, execution *WorkflowExe
 		"storage_location":  "s3://my-bucket/processed-files/",
 		"created_at":        time.Now().Format(time.RFC3339),
 	}
-	
+
 	// Store results
 	stepExecution.Results["storage"] = storageResults
 	stepExecution.Results["chunks_stored"] = len(chunks)
 	stepExecution.Results["embeddings_stored"] = len(embeddings)
 	stepExecution.Results["processing_time"] = "200ms"
-	
+
 	// Add final results to execution
 	execution.Results["chunks_created"] = len(chunks)
 	execution.Results["embeddings_created"] = len(embeddings)
@@ -433,7 +433,7 @@ func (h *StorageHandler) ExecuteStep(ctx context.Context, execution *WorkflowExe
 	execution.Results["classification"] = classification
 	execution.Results["storage_location"] = storageResults["storage_location"]
 	execution.Results["processing_complete"] = true
-	
+
 	return nil
 }
 
@@ -463,39 +463,39 @@ func NewNotificationHandler() *NotificationHandler {
 func (h *NotificationHandler) ExecuteStep(ctx context.Context, execution *WorkflowExecution, step *WorkflowStep, stepExecution *StepExecution) error {
 	ctx, span := h.tracer.Start(ctx, "notification_step")
 	defer span.End()
-	
+
 	// Extract notification data from context
 	dlpViolations, _ := execution.Context["dlp_violations"].([]map[string]interface{})
 	dataClass, _ := execution.Context["data_class"].(string)
 	fileURL, _ := execution.Context["file_url"].(string)
-	
+
 	// Determine notification type and recipients
 	notificationType := "info"
 	if len(dlpViolations) > 0 {
 		notificationType = "alert"
 	}
-	
+
 	span.SetAttributes(
 		attribute.String("notification.type", notificationType),
 		attribute.String("data.class", dataClass),
 		attribute.Int("violations.count", len(dlpViolations)),
 	)
-	
+
 	// Simulate sending notifications (in real implementation, this would call the notification service)
 	time.Sleep(50 * time.Millisecond) // Simulate processing time
-	
+
 	// Generate notification results
 	notifications := []map[string]interface{}{
 		{
-			"type":       notificationType,
-			"recipient":  "admin@company.com",
-			"subject":    fmt.Sprintf("File processing completed: %s", fileURL),
-			"message":    fmt.Sprintf("File classified as %s with %d DLP violations", dataClass, len(dlpViolations)),
-			"sent_at":    time.Now().Format(time.RFC3339),
-			"channel":    "email",
+			"type":      notificationType,
+			"recipient": "admin@company.com",
+			"subject":   fmt.Sprintf("File processing completed: %s", fileURL),
+			"message":   fmt.Sprintf("File classified as %s with %d DLP violations", dataClass, len(dlpViolations)),
+			"sent_at":   time.Now().Format(time.RFC3339),
+			"channel":   "email",
 		},
 	}
-	
+
 	// If there are violations, send additional alert notifications
 	if len(dlpViolations) > 0 {
 		notifications = append(notifications, map[string]interface{}{
@@ -508,16 +508,16 @@ func (h *NotificationHandler) ExecuteStep(ctx context.Context, execution *Workfl
 			"priority":  "high",
 		})
 	}
-	
+
 	// Store results
 	stepExecution.Results["notifications_sent"] = len(notifications)
 	stepExecution.Results["notifications"] = notifications
 	stepExecution.Results["notification_type"] = notificationType
 	stepExecution.Results["processing_time"] = "50ms"
-	
+
 	// Add to execution results
 	execution.Results["notifications_sent"] = len(notifications)
-	
+
 	return nil
 }
 

@@ -276,8 +276,8 @@ func (r *DOCReader) CreateIterator(ctx context.Context, sourcePath string, strat
 
 	iterator := &DOCIterator{
 		sourcePath:       sourcePath,
-		config:          strategyConfig,
-		document:        document,
+		config:           strategyConfig,
+		document:         document,
 		currentParagraph: 0,
 	}
 
@@ -324,10 +324,10 @@ type DOCDocument struct {
 
 // DOCParagraph represents a document paragraph
 type DOCParagraph struct {
-	Text      string
-	Number    int
-	Section   string
-	Style     string
+	Text       string
+	Number     int
+	Section    string
+	Style      string
 	Properties map[string]any
 }
 
@@ -403,10 +403,10 @@ func (r *DOCReader) extractDOCMetadata(sourcePath string) (DOCMetadata, error) {
 
 	// Look for common Word document indicators and extract basic info
 	content := string(buffer[:n])
-	
+
 	// Estimate document size based on file size
 	sizeCategory := stat.Size() / (1024) // Size in KB
-	
+
 	switch {
 	case sizeCategory < 50: // < 50KB
 		metadata.WordCount = 200
@@ -477,10 +477,10 @@ func (r *DOCReader) parseDocument(sourcePath string, config map[string]any) (*DO
 			Section: "body",
 			Style:   "Normal",
 			Properties: map[string]any{
-				"font_name":  "Times New Roman",
-				"font_size":  12,
-				"is_bold":    false,
-				"is_italic":  false,
+				"font_name": "Times New Roman",
+				"font_size": 12,
+				"is_bold":   false,
+				"is_italic": false,
 			},
 		}
 	}

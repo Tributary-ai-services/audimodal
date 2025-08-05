@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/robfig/cron/v3"
+	cron "github.com/robfig/cron/v3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -17,34 +17,34 @@ import (
 
 // BackupManager manages backup and disaster recovery operations
 type BackupManager struct {
-	config              *BackupConfig
-	storageManager      storage.StorageManager
-	backupStore         BackupStore
-	restoreService      RestoreService
-	replicationService  ReplicationService
-	tracer              trace.Tracer
+	config             *BackupConfig
+	storageManager     storage.StorageManager
+	backupStore        BackupStore
+	restoreService     RestoreService
+	replicationService ReplicationService
+	tracer             trace.Tracer
 
 	// Scheduling
-	scheduler           *cron.Cron
-	scheduledBackups    map[uuid.UUID]*ScheduledBackup
+	scheduler        *cron.Cron
+	scheduledBackups map[uuid.UUID]*ScheduledBackup
 
 	// Execution
-	backupExecutor      *BackupExecutor
-	restoreExecutor     *RestoreExecutor
+	backupExecutor  *BackupExecutor
+	restoreExecutor *RestoreExecutor
 
 	// State management
-	activeBackups       map[uuid.UUID]*BackupJob
-	activeRestores      map[uuid.UUID]*RestoreJob
-	backupPolicies      map[uuid.UUID]*BackupPolicy
+	activeBackups  map[uuid.UUID]*BackupJob
+	activeRestores map[uuid.UUID]*RestoreJob
+	backupPolicies map[uuid.UUID]*BackupPolicy
 
 	// Synchronization
-	mu                  sync.RWMutex
-	isRunning           bool
-	stopCh              chan struct{}
-	wg                  sync.WaitGroup
+	mu        sync.RWMutex
+	isRunning bool
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
 
 	// Metrics
-	metrics             *BackupMetrics
+	metrics *BackupMetrics
 }
 
 // BackupStore interface for persistent backup metadata storage
@@ -78,32 +78,32 @@ type ReplicationService interface {
 
 // ScheduledBackup represents a scheduled backup operation
 type ScheduledBackup struct {
-	ID              uuid.UUID       `json:"id"`
-	PolicyID        uuid.UUID       `json:"policy_id"`
-	Name            string          `json:"name"`
-	Schedule        string          `json:"schedule"`          // Cron expression
-	NextRun         time.Time       `json:"next_run"`
-	LastRun         *time.Time      `json:"last_run,omitempty"`
-	LastBackupID    *uuid.UUID      `json:"last_backup_id,omitempty"`
-	IsRunning       bool            `json:"is_running"`
-	Enabled         bool            `json:"enabled"`
+	ID           uuid.UUID  `json:"id"`
+	PolicyID     uuid.UUID  `json:"policy_id"`
+	Name         string     `json:"name"`
+	Schedule     string     `json:"schedule"` // Cron expression
+	NextRun      time.Time  `json:"next_run"`
+	LastRun      *time.Time `json:"last_run,omitempty"`
+	LastBackupID *uuid.UUID `json:"last_backup_id,omitempty"`
+	IsRunning    bool       `json:"is_running"`
+	Enabled      bool       `json:"enabled"`
 }
 
 // BackupMetrics tracks backup system performance
 type BackupMetrics struct {
-	TotalBackups        int64         `json:"total_backups"`
-	SuccessfulBackups   int64         `json:"successful_backups"`
-	FailedBackups       int64         `json:"failed_backups"`
-	ActiveBackups       int64         `json:"active_backups"`
-	TotalRestores       int64         `json:"total_restores"`
-	SuccessfulRestores  int64         `json:"successful_restores"`
-	FailedRestores      int64         `json:"failed_restores"`
-	ActiveRestores      int64         `json:"active_restores"`
-	AverageBackupTime   time.Duration `json:"average_backup_time"`
-	AverageRestoreTime  time.Duration `json:"average_restore_time"`
-	TotalBackupSize     int64         `json:"total_backup_size"`
-	LastBackupTime      time.Time     `json:"last_backup_time"`
-	LastRestoreTime     time.Time     `json:"last_restore_time"`
+	TotalBackups       int64         `json:"total_backups"`
+	SuccessfulBackups  int64         `json:"successful_backups"`
+	FailedBackups      int64         `json:"failed_backups"`
+	ActiveBackups      int64         `json:"active_backups"`
+	TotalRestores      int64         `json:"total_restores"`
+	SuccessfulRestores int64         `json:"successful_restores"`
+	FailedRestores     int64         `json:"failed_restores"`
+	ActiveRestores     int64         `json:"active_restores"`
+	AverageBackupTime  time.Duration `json:"average_backup_time"`
+	AverageRestoreTime time.Duration `json:"average_restore_time"`
+	TotalBackupSize    int64         `json:"total_backup_size"`
+	LastBackupTime     time.Time     `json:"last_backup_time"`
+	LastRestoreTime    time.Time     `json:"last_restore_time"`
 }
 
 // NewBackupManager creates a new backup manager
@@ -135,8 +135,8 @@ func NewBackupManager(
 	}
 
 	// Initialize executors
-	bm.backupExecutor = NewBackupExecutor(config, storageManager, bm)
-	bm.restoreExecutor = NewRestoreExecutor(config, storageManager, restoreService, bm)
+	bm.backupExecutor = NewBackupExecutor(config, &storageManager, bm)
+	bm.restoreExecutor = NewRestoreExecutor(config, &storageManager, restoreService, bm)
 
 	return bm
 }
@@ -426,9 +426,9 @@ func (bm *BackupManager) ValidateBackupIntegrity(ctx context.Context, backupID u
 	}
 
 	validation := &BackupValidation{
-		BackupID:   backupID,
-		StartedAt:  time.Now(),
-		Status:     "validating",
+		BackupID:  backupID,
+		StartedAt: time.Now(),
+		Status:    "validating",
 	}
 
 	// Validate backup metadata
@@ -526,12 +526,12 @@ func (bm *BackupManager) scheduleBackupPolicy(policy *BackupPolicy) error {
 			Type:     BackupTypeFull, // Default to full backup
 			Config:   policy.BackupConfig,
 		}
-		
+
 		_, err := bm.ExecuteBackup(ctx, request)
 		if err != nil {
 			// Log error - would use proper logging in production
 		}
-		
+
 		// Update last run time
 		now := time.Now()
 		scheduledBackup.LastRun = &now

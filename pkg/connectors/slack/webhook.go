@@ -38,13 +38,13 @@ func NewWebhookHandler(connector *SlackConnector, secret string, tracer trace.Tr
 		secret:    secret,
 		handlers:  make(map[string]EventHandler),
 	}
-	
+
 	// Register default event handlers
 	handler.RegisterHandler(&MessageHandler{connector: connector})
 	handler.RegisterHandler(&FileHandler{connector: connector})
 	handler.RegisterHandler(&ChannelHandler{connector: connector})
 	handler.RegisterHandler(&UserHandler{connector: connector})
-	
+
 	return handler
 }
 
@@ -58,13 +58,13 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 	_, span := wh.tracer.Start(ctx, "slack_webhook_handler")
 	defer span.End()
-	
+
 	// Verify request method
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	
+
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -72,7 +72,7 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	defer r.Body.Close()
-	
+
 	// Verify webhook signature
 	if wh.secret != "" {
 		if !wh.verifyWebhookSignature(r, body) {
@@ -80,14 +80,14 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
-	
+
 	// Parse webhook event
 	var event SlackEvent
 	if err := json.Unmarshal(body, &event); err != nil {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
-	
+
 	// Handle URL verification challenge
 	if event.Type == "url_verification" {
 		w.Header().Set("Content-Type", "text/plain")
@@ -95,7 +95,7 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 		w.Write([]byte(event.Challenge))
 		return
 	}
-	
+
 	// Handle event callbacks
 	if event.Type == "event_callback" {
 		if err := wh.handleEventCallback(ctx, &event); err != nil {
@@ -104,7 +104,7 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	}
-	
+
 	// Acknowledge receipt
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
@@ -114,27 +114,27 @@ func (wh *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) 
 func (wh *WebhookHandler) verifyWebhookSignature(r *http.Request, body []byte) bool {
 	timestamp := r.Header.Get("X-Slack-Request-Timestamp")
 	signature := r.Header.Get("X-Slack-Signature")
-	
+
 	if timestamp == "" || signature == "" {
 		return false
 	}
-	
+
 	// Check timestamp to prevent replay attacks
 	ts, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
 		return false
 	}
-	
+
 	if time.Since(time.Unix(ts, 0)) > 5*time.Minute {
 		return false // Request is too old
 	}
-	
+
 	// Generate expected signature
 	baseString := fmt.Sprintf("v0:%s:%s", timestamp, string(body))
 	mac := hmac.New(sha256.New, []byte(wh.secret))
 	mac.Write([]byte(baseString))
 	expectedSignature := "v0=" + hex.EncodeToString(mac.Sum(nil))
-	
+
 	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }
 
@@ -145,24 +145,24 @@ func (wh *WebhookHandler) handleEventCallback(ctx context.Context, event *SlackE
 	if !ok {
 		return fmt.Errorf("missing event type")
 	}
-	
+
 	// Create webhook event structure
 	webhookEvent := &SlackWebhookEvent{
 		Type: eventData,
 	}
-	
+
 	// Parse event-specific data
 	if err := wh.parseEventData(event.Event, webhookEvent); err != nil {
 		return fmt.Errorf("failed to parse event data: %w", err)
 	}
-	
+
 	// Find and execute appropriate handler
 	handler, exists := wh.handlers[eventData]
 	if !exists {
 		// Log unknown event type but don't fail
 		return nil
 	}
-	
+
 	return handler.HandleEvent(ctx, webhookEvent)
 }
 
@@ -173,7 +173,7 @@ func (wh *WebhookHandler) parseEventData(eventData map[string]interface{}, webho
 	if err != nil {
 		return err
 	}
-	
+
 	return json.Unmarshal(jsonData, webhookEvent)
 }
 
@@ -205,7 +205,7 @@ func (h *MessageHandler) handleNewMessage(ctx context.Context, event *SlackWebho
 	h.connector.cache.mu.Lock()
 	delete(h.connector.cache.messages, event.Channel)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -214,7 +214,7 @@ func (h *MessageHandler) handleMessageDeleted(ctx context.Context, event *SlackW
 	h.connector.cache.mu.Lock()
 	delete(h.connector.cache.messages, event.Channel)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -223,7 +223,7 @@ func (h *MessageHandler) handleMessageChanged(ctx context.Context, event *SlackW
 	h.connector.cache.mu.Lock()
 	delete(h.connector.cache.messages, event.Channel)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -233,7 +233,7 @@ func (h *MessageHandler) handleFileShare(ctx context.Context, event *SlackWebhoo
 		// Process the shared file
 		// Could trigger file download or indexing
 	}
-	
+
 	return nil
 }
 
@@ -254,7 +254,7 @@ func (h *FileHandler) HandleEvent(ctx context.Context, event *SlackWebhookEvent)
 			// Could trigger immediate file sync
 		}
 	}
-	
+
 	return nil
 }
 
@@ -272,7 +272,7 @@ func (h *ChannelHandler) HandleEvent(ctx context.Context, event *SlackWebhookEve
 	h.connector.cache.mu.Lock()
 	h.connector.cache.channels = make(map[string]*SlackChannel)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -290,7 +290,7 @@ func (h *UserHandler) HandleEvent(ctx context.Context, event *SlackWebhookEvent)
 	h.connector.cache.mu.Lock()
 	h.connector.cache.users = make(map[string]*SlackUser)
 	h.connector.cache.mu.Unlock()
-	
+
 	return nil
 }
 
@@ -311,13 +311,13 @@ func NewSocketModeHandler(connector *SlackConnector, appToken string, tracer tra
 		appToken:  appToken,
 		handlers:  make(map[string]EventHandler),
 	}
-	
+
 	// Register default event handlers (same as webhook)
 	handler.RegisterHandler(&MessageHandler{connector: connector})
 	handler.RegisterHandler(&FileHandler{connector: connector})
 	handler.RegisterHandler(&ChannelHandler{connector: connector})
 	handler.RegisterHandler(&UserHandler{connector: connector})
-	
+
 	return handler
 }
 
@@ -332,43 +332,43 @@ func (sm *SocketModeHandler) Connect(ctx context.Context) error {
 	params := map[string]string{
 		"token": sm.appToken,
 	}
-	
+
 	var requestBody bytes.Buffer
 	json.NewEncoder(&requestBody).Encode(params)
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://slack.com/api/apps.connections.open", &requestBody)
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", sm.appToken))
-	
+
 	resp, err := sm.connector.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	
+
 	var connectionResp struct {
-		OK  bool   `json:"ok"`
-		URL string `json:"url"`
+		OK    bool   `json:"ok"`
+		URL   string `json:"url"`
 		Error string `json:"error,omitempty"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&connectionResp); err != nil {
 		return err
 	}
-	
+
 	if !connectionResp.OK {
 		return fmt.Errorf("failed to get Socket Mode URL: %s", connectionResp.Error)
 	}
-	
+
 	sm.socketURL = connectionResp.URL
-	
+
 	// In a real implementation, you would establish a WebSocket connection
 	// to the returned URL and handle real-time events
-	
+
 	return nil
 }
 
@@ -377,13 +377,13 @@ func (sm *SocketModeHandler) StartListening(ctx context.Context) error {
 	if sm.socketURL == "" {
 		return fmt.Errorf("Socket Mode connection not established")
 	}
-	
+
 	// In a real implementation, this would:
 	// 1. Establish WebSocket connection to sm.socketURL
 	// 2. Handle incoming events in real-time
 	// 3. Send acknowledgments back to Slack
 	// 4. Route events to appropriate handlers
-	
+
 	return nil
 }
 
@@ -410,7 +410,7 @@ func (r *SlackEventRouter) RouteEvent(ctx context.Context, event *SlackWebhookEv
 	if !exists {
 		return nil // No handlers for this event type
 	}
-	
+
 	var lastError error
 	for _, handler := range handlers {
 		if err := handler.HandleEvent(ctx, event); err != nil {
@@ -418,15 +418,15 @@ func (r *SlackEventRouter) RouteEvent(ctx context.Context, event *SlackWebhookEv
 			// Continue processing other handlers even if one fails
 		}
 	}
-	
+
 	return lastError
 }
 
 // BatchEventProcessor processes events in batches for efficiency
 type BatchEventProcessor struct {
-	events   chan *SlackWebhookEvent
-	router   *SlackEventRouter
-	batchSize int
+	events        chan *SlackWebhookEvent
+	router        *SlackEventRouter
+	batchSize     int
 	flushInterval time.Duration
 }
 
@@ -444,9 +444,9 @@ func NewBatchEventProcessor(router *SlackEventRouter, batchSize int, flushInterv
 func (bp *BatchEventProcessor) Start(ctx context.Context) {
 	ticker := time.NewTicker(bp.flushInterval)
 	defer ticker.Stop()
-	
+
 	var batch []*SlackWebhookEvent
-	
+
 	for {
 		select {
 		case event := <-bp.events:
@@ -455,13 +455,13 @@ func (bp *BatchEventProcessor) Start(ctx context.Context) {
 				bp.processBatch(ctx, batch)
 				batch = nil
 			}
-			
+
 		case <-ticker.C:
 			if len(batch) > 0 {
 				bp.processBatch(ctx, batch)
 				batch = nil
 			}
-			
+
 		case <-ctx.Done():
 			// Process remaining events before shutting down
 			if len(batch) > 0 {

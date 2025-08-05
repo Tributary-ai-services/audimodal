@@ -15,25 +15,25 @@ import (
 
 // Service implements the ClassificationService interface
 type Service struct {
-	classifiers        map[string]Classifier
-	languageDetector   LanguageDetector
-	sentimentAnalyzer  SentimentAnalyzer
-	entityExtractor    EntityExtractor
-	keywordExtractor   KeywordExtractor
-	topicModeler       TopicModeler
+	classifiers         map[string]Classifier
+	languageDetector    LanguageDetector
+	sentimentAnalyzer   SentimentAnalyzer
+	entityExtractor     EntityExtractor
+	keywordExtractor    KeywordExtractor
+	topicModeler        TopicModeler
 	contentTypeDetector *ContentTypeDetector
-	structureAnalyzer  *DocumentStructureAnalyzer
-	
+	structureAnalyzer   *DocumentStructureAnalyzer
+
 	// Configuration
-	config             *ServiceConfig
-	
+	config *ServiceConfig
+
 	// Metrics and monitoring
-	metrics            *ClassificationMetrics
-	tracer             trace.Tracer
-	
+	metrics *ClassificationMetrics
+	tracer  trace.Tracer
+
 	// Concurrency control
-	mu                 sync.RWMutex
-	semaphore          chan struct{}
+	mu        sync.RWMutex
+	semaphore chan struct{}
 }
 
 // ServiceConfig contains configuration for the classification service
@@ -65,29 +65,29 @@ func NewService(config *ServiceConfig) *Service {
 	if config == nil {
 		config = DefaultServiceConfig()
 	}
-	
+
 	service := &Service{
-		classifiers:   make(map[string]Classifier),
-		config:        config,
-		metrics:       &ClassificationMetrics{
+		classifiers: make(map[string]Classifier),
+		config:      config,
+		metrics: &ClassificationMetrics{
 			ClassificationsByType:     make(map[ContentType]int64),
 			ClassificationsByLanguage: make(map[Language]int64),
 		},
-		tracer:        otel.Tracer("classification-service"),
-		semaphore:     make(chan struct{}, config.MaxConcurrentClassifications),
+		tracer:    otel.Tracer("classification-service"),
+		semaphore: make(chan struct{}, config.MaxConcurrentClassifications),
 	}
-	
+
 	// Register default components
 	service.RegisterLanguageDetector(NewBasicLanguageDetector())
 	service.RegisterSentimentAnalyzer(NewBasicSentimentAnalyzer())
 	service.RegisterEntityExtractor(NewBasicEntityExtractor())
 	service.RegisterKeywordExtractor(NewBasicKeywordExtractor())
 	service.RegisterTopicModeler(NewBasicTopicModeler())
-	
+
 	// Initialize content type detector and structure analyzer
 	service.contentTypeDetector = NewContentTypeDetector()
 	service.structureAnalyzer = NewDocumentStructureAnalyzer()
-	
+
 	return service
 }
 
@@ -130,12 +130,12 @@ func (s *Service) RegisterTopicModeler(modeler TopicModeler) {
 func (s *Service) RegisterClassifier(classifier Classifier) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	name := classifier.GetName()
 	if name == "" {
 		return fmt.Errorf("classifier name cannot be empty")
 	}
-	
+
 	s.classifiers[name] = classifier
 	return nil
 }
@@ -144,12 +144,12 @@ func (s *Service) RegisterClassifier(classifier Classifier) error {
 func (s *Service) GetClassifiers() []Classifier {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	classifiers := make([]Classifier, 0, len(s.classifiers))
 	for _, classifier := range s.classifiers {
 		classifiers = append(classifiers, classifier)
 	}
-	
+
 	return classifiers
 }
 
@@ -162,26 +162,26 @@ func (s *Service) Classify(ctx context.Context, input *ClassificationInput) (*Cl
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-	
+
 	startTime := time.Now()
-	
+
 	// Add tracing
 	ctx, span := s.tracer.Start(ctx, "classify_content")
 	defer span.End()
-	
+
 	span.SetAttributes(
 		attribute.String("tenant.id", input.TenantID.String()),
 		attribute.String("content.type", string(s.detectContentType(input))),
 		attribute.Int("content.length", len(input.Content)),
 	)
-	
+
 	// Validate input
 	if err := s.validateInput(input); err != nil {
 		span.RecordError(err)
 		s.updateMetrics(false, time.Since(startTime))
 		return nil, fmt.Errorf("invalid input: %w", err)
 	}
-	
+
 	// Apply timeout
 	if input.Options == nil || input.Options.ConfidenceThreshold == 0 {
 		if input.Options == nil {
@@ -190,38 +190,38 @@ func (s *Service) Classify(ctx context.Context, input *ClassificationInput) (*Cl
 			input.Options.ConfidenceThreshold = s.config.DefaultConfidenceThreshold
 		}
 	}
-	
+
 	ctx, cancel := context.WithTimeout(ctx, s.config.DefaultTimeout)
 	defer cancel()
-	
+
 	// Create result
 	result := NewClassificationResult(input.TenantID)
 	result.FileID = input.FileID
 	result.ChunkID = input.ChunkID
-	
+
 	// Perform classification
 	if err := s.performClassification(ctx, input, result); err != nil {
 		span.RecordError(err)
 		s.updateMetrics(false, time.Since(startTime))
 		return nil, fmt.Errorf("classification failed: %w", err)
 	}
-	
+
 	// Calculate processing time
 	processingTime := time.Since(startTime)
 	result.ProcessingTime = processingTime
 	result.ProcessedBy = "classification-service"
-	
+
 	// Update metrics
 	s.updateMetrics(true, processingTime)
 	s.updateClassificationCounters(result)
-	
+
 	span.SetAttributes(
 		attribute.Float64("classification.confidence", result.Confidence),
 		attribute.String("classification.language", string(result.Language)),
 		attribute.String("classification.sensitivity", string(result.SensitivityLevel)),
 		attribute.Int64("processing.time_ms", processingTime.Milliseconds()),
 	)
-	
+
 	return result, nil
 }
 
@@ -230,19 +230,19 @@ func (s *Service) ClassifyBatch(ctx context.Context, inputs []*ClassificationInp
 	if len(inputs) == 0 {
 		return []*ClassificationResult{}, nil
 	}
-	
+
 	if len(inputs) > s.config.MaxBatchSize {
 		return nil, fmt.Errorf("batch size %d exceeds maximum %d", len(inputs), s.config.MaxBatchSize)
 	}
-	
+
 	ctx, span := s.tracer.Start(ctx, "classify_batch")
 	defer span.End()
-	
+
 	span.SetAttributes(attribute.Int("batch.size", len(inputs)))
-	
+
 	results := make([]*ClassificationResult, len(inputs))
 	errors := make([]error, len(inputs))
-	
+
 	// Process in parallel with goroutines
 	var wg sync.WaitGroup
 	for i, input := range inputs {
@@ -254,9 +254,9 @@ func (s *Service) ClassifyBatch(ctx context.Context, inputs []*ClassificationInp
 			errors[index] = err
 		}(i, input)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Check for errors
 	var firstError error
 	successCount := 0
@@ -268,16 +268,16 @@ func (s *Service) ClassifyBatch(ctx context.Context, inputs []*ClassificationInp
 			successCount++
 		}
 	}
-	
+
 	span.SetAttributes(
 		attribute.Int("batch.successful", successCount),
 		attribute.Int("batch.failed", len(inputs)-successCount),
 	)
-	
+
 	if firstError != nil && successCount == 0 {
 		return nil, fmt.Errorf("batch classification failed: %w", firstError)
 	}
-	
+
 	return results, nil
 }
 
@@ -289,7 +289,7 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 			result.ContentType = contentResult.ContentType
 			result.DocumentType = contentResult.DocumentType
 			result.MimeType = contentResult.MimeType
-			
+
 			// Add content detection metadata
 			result.Metadata["content_detection_confidence"] = contentResult.Confidence
 			result.Metadata["content_detection_method"] = contentResult.DetectionMethod
@@ -307,7 +307,7 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 		result.DocumentType = s.detectDocumentType(input)
 		result.MimeType = input.MimeType
 	}
-	
+
 	// Perform language detection
 	if input.Options.EnableLanguageDetection && s.languageDetector != nil {
 		if langResult, err := s.languageDetector.DetectLanguage(ctx, input.Content); err == nil {
@@ -317,7 +317,7 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Language detection failed: %v", err))
 		}
 	}
-	
+
 	// Perform sentiment analysis
 	if input.Options.EnableSentimentAnalysis && s.sentimentAnalyzer != nil {
 		if sentiment, err := s.sentimentAnalyzer.AnalyzeSentiment(ctx, input.Content); err == nil {
@@ -326,7 +326,7 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Sentiment analysis failed: %v", err))
 		}
 	}
-	
+
 	// Extract entities
 	if input.Options.EnableEntityExtraction && s.entityExtractor != nil {
 		if entities, err := s.entityExtractor.ExtractEntities(ctx, input.Content); err == nil {
@@ -338,7 +338,7 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Entity extraction failed: %v", err))
 		}
 	}
-	
+
 	// Extract keywords
 	if input.Options.EnableKeywordExtraction && s.keywordExtractor != nil {
 		if keywords, err := s.keywordExtractor.ExtractKeywords(ctx, input.Content, input.Options.MaxKeywords); err == nil {
@@ -347,7 +347,7 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Keyword extraction failed: %v", err))
 		}
 	}
-	
+
 	// Extract topics
 	if input.Options.EnableTopicModeling && s.topicModeler != nil {
 		if topics, err := s.topicModeler.ExtractTopics(ctx, input.Content, input.Options.MaxTopics); err == nil {
@@ -356,16 +356,16 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Topic modeling failed: %v", err))
 		}
 	}
-	
+
 	// Classify sensitivity
 	s.classifySensitivity(input, result)
-	
+
 	// Analyze compliance
 	s.analyzeCompliance(input, result)
-	
+
 	// Run custom classifiers
 	s.runCustomClassifiers(ctx, input, result)
-	
+
 	// Perform document structure analysis
 	if input.Options.EnableStructureAnalysis && s.structureAnalyzer != nil {
 		if structureResult, err := s.structureAnalyzer.AnalyzeStructure(ctx, input.Content, result.ContentType); err == nil {
@@ -376,10 +376,10 @@ func (s *Service) performClassification(ctx context.Context, input *Classificati
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Document structure analysis failed: %v", err))
 		}
 	}
-	
+
 	// Calculate overall confidence
 	result.Confidence = s.calculateOverallConfidence(result)
-	
+
 	return nil
 }
 
@@ -390,12 +390,12 @@ func (s *Service) detectContentType(input *ClassificationInput) ContentType {
 		switch {
 		case strings.HasPrefix(input.MimeType, "text/"):
 			return ContentTypeDocument
-		case strings.Contains(input.MimeType, "spreadsheet") || 
-			 strings.Contains(input.MimeType, "excel") ||
-			 input.MimeType == "text/csv":
+		case strings.Contains(input.MimeType, "spreadsheet") ||
+			strings.Contains(input.MimeType, "excel") ||
+			input.MimeType == "text/csv":
 			return ContentTypeSpreadsheet
 		case strings.Contains(input.MimeType, "presentation") ||
-			 strings.Contains(input.MimeType, "powerpoint"):
+			strings.Contains(input.MimeType, "powerpoint"):
 			return ContentTypePresentation
 		case strings.HasPrefix(input.MimeType, "image/"):
 			return ContentTypeImage
@@ -407,7 +407,7 @@ func (s *Service) detectContentType(input *ClassificationInput) ContentType {
 			return ContentTypeDocument
 		}
 	}
-	
+
 	// Check filename extension
 	if input.Filename != "" {
 		ext := strings.ToLower(input.Filename[strings.LastIndex(input.Filename, ".")+1:])
@@ -434,40 +434,40 @@ func (s *Service) detectContentType(input *ClassificationInput) ContentType {
 			return ContentTypeDatabase
 		}
 	}
-	
+
 	// Analyze content patterns
 	content := strings.ToLower(input.Content)
 	if len(content) > 0 {
 		// Check for code patterns
-		if strings.Contains(content, "function") || 
-		   strings.Contains(content, "class ") ||
-		   strings.Contains(content, "import ") ||
-		   strings.Contains(content, "#include") {
+		if strings.Contains(content, "function") ||
+			strings.Contains(content, "class ") ||
+			strings.Contains(content, "import ") ||
+			strings.Contains(content, "#include") {
 			return ContentTypeCode
 		}
-		
+
 		// Check for email patterns
-		if strings.Contains(content, "from:") && 
-		   strings.Contains(content, "to:") &&
-		   strings.Contains(content, "subject:") {
+		if strings.Contains(content, "from:") &&
+			strings.Contains(content, "to:") &&
+			strings.Contains(content, "subject:") {
 			return ContentTypeEmail
 		}
-		
+
 		// Check for log patterns
 		if strings.Contains(content, "[info]") ||
-		   strings.Contains(content, "[error]") ||
-		   strings.Contains(content, "timestamp") {
+			strings.Contains(content, "[error]") ||
+			strings.Contains(content, "timestamp") {
 			return ContentTypeLog
 		}
-		
+
 		// Check for HTML/web content
 		if strings.Contains(content, "<html") ||
-		   strings.Contains(content, "<body") ||
-		   strings.Contains(content, "<!doctype") {
+			strings.Contains(content, "<body") ||
+			strings.Contains(content, "<!doctype") {
 			return ContentTypeWeb
 		}
 	}
-	
+
 	return ContentTypeDocument // Default
 }
 
@@ -497,7 +497,7 @@ func (s *Service) detectDocumentType(input *ClassificationInput) DocumentType {
 			return DocumentTypePowerPoint
 		}
 	}
-	
+
 	if input.Filename != "" {
 		ext := strings.ToLower(input.Filename[strings.LastIndex(input.Filename, ".")+1:])
 		switch ext {
@@ -525,7 +525,7 @@ func (s *Service) detectDocumentType(input *ClassificationInput) DocumentType {
 			return DocumentTypeRTF
 		}
 	}
-	
+
 	return DocumentTypeText // Default
 }
 
@@ -533,9 +533,9 @@ func (s *Service) detectDocumentType(input *ClassificationInput) DocumentType {
 func (s *Service) classifySensitivity(input *ClassificationInput, result *ClassificationResult) {
 	sensitivityScore := 0.0
 	reasons := []string{}
-	
+
 	content := strings.ToLower(input.Content)
-	
+
 	// Check for high-sensitivity patterns
 	highSensitivityPatterns := []string{
 		"confidential", "classified", "secret", "restricted",
@@ -543,14 +543,14 @@ func (s *Service) classifySensitivity(input *ClassificationInput, result *Classi
 		"medical record", "patient", "health information",
 		"financial", "bank account", "routing number",
 	}
-	
+
 	for _, pattern := range highSensitivityPatterns {
 		if strings.Contains(content, pattern) {
 			sensitivityScore += 0.3
 			reasons = append(reasons, fmt.Sprintf("Contains sensitive pattern: %s", pattern))
 		}
 	}
-	
+
 	// Check for PII entities
 	for _, entity := range result.Entities {
 		switch entity.Type {
@@ -562,7 +562,7 @@ func (s *Service) classifySensitivity(input *ClassificationInput, result *Classi
 			reasons = append(reasons, fmt.Sprintf("Contains personal information: %s", entity.Type))
 		}
 	}
-	
+
 	// Classify based on score
 	if sensitivityScore >= 0.8 {
 		result.SensitivityLevel = SensitivityRestricted
@@ -573,7 +573,7 @@ func (s *Service) classifySensitivity(input *ClassificationInput, result *Classi
 	} else {
 		result.SensitivityLevel = SensitivityPublic
 	}
-	
+
 	result.SensitivityScore = sensitivityScore
 	result.SensitivityReasons = reasons
 }
@@ -582,7 +582,7 @@ func (s *Service) classifySensitivity(input *ClassificationInput, result *Classi
 func (s *Service) analyzeCompliance(input *ClassificationInput, result *ClassificationResult) {
 	flags := []ComplianceFramework{}
 	risks := []ComplianceRisk{}
-	
+
 	// Check for GDPR requirements
 	if s.hasPersonalData(result) {
 		flags = append(flags, ComplianceGDPR)
@@ -593,7 +593,7 @@ func (s *Service) analyzeCompliance(input *ClassificationInput, result *Classifi
 			Mitigation:  []string{"Implement data protection measures", "Obtain consent", "Enable data portability"},
 		})
 	}
-	
+
 	// Check for HIPAA requirements
 	if s.hasHealthInformation(input.Content) {
 		flags = append(flags, ComplianceHIPAA)
@@ -604,7 +604,7 @@ func (s *Service) analyzeCompliance(input *ClassificationInput, result *Classifi
 			Mitigation:  []string{"Implement HIPAA safeguards", "Encrypt data", "Audit access"},
 		})
 	}
-	
+
 	// Check for PCI requirements
 	if s.hasPaymentData(result) {
 		flags = append(flags, CompliancePCI)
@@ -615,7 +615,7 @@ func (s *Service) analyzeCompliance(input *ClassificationInput, result *Classifi
 			Mitigation:  []string{"Implement PCI DSS controls", "Tokenize card data", "Secure transmission"},
 		})
 	}
-	
+
 	result.ComplianceFlags = flags
 	result.ComplianceRisks = risks
 }
@@ -636,7 +636,7 @@ func (s *Service) hasHealthInformation(content string) bool {
 		"patient", "medical", "diagnosis", "treatment", "medication",
 		"health record", "medical record", "hospital", "clinic", "doctor",
 	}
-	
+
 	lowerContent := strings.ToLower(content)
 	for _, term := range healthTerms {
 		if strings.Contains(lowerContent, term) {
@@ -664,7 +664,7 @@ func (s *Service) runCustomClassifiers(ctx context.Context, input *Classificatio
 		classifiers = append(classifiers, classifier)
 	}
 	s.mu.RUnlock()
-	
+
 	for _, classifier := range classifiers {
 		// Check if classifier supports this content type
 		supportedTypes := classifier.GetSupportedTypes()
@@ -675,17 +675,17 @@ func (s *Service) runCustomClassifiers(ctx context.Context, input *Classificatio
 				break
 			}
 		}
-		
+
 		if !supported {
 			continue
 		}
-		
+
 		// Run classifier
 		if classifierResult, err := classifier.Classify(ctx, input); err == nil {
 			// Merge results
 			s.mergeClassificationResults(result, classifierResult)
 		} else {
-			result.Warnings = append(result.Warnings, 
+			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("Custom classifier %s failed: %v", classifier.GetName(), err))
 		}
 	}
@@ -695,13 +695,13 @@ func (s *Service) runCustomClassifiers(ctx context.Context, input *Classificatio
 func (s *Service) mergeClassificationResults(main *ClassificationResult, custom *ClassificationResult) {
 	// Merge categories
 	main.Categories = append(main.Categories, custom.Categories...)
-	
+
 	// Merge keywords (avoid duplicates)
 	keywordMap := make(map[string]*Keyword)
 	for i := range main.Keywords {
 		keywordMap[main.Keywords[i].Text] = &main.Keywords[i]
 	}
-	
+
 	for _, keyword := range custom.Keywords {
 		if existing, exists := keywordMap[keyword.Text]; exists {
 			// Update relevance if higher
@@ -712,7 +712,7 @@ func (s *Service) mergeClassificationResults(main *ClassificationResult, custom 
 			main.Keywords = append(main.Keywords, keyword)
 		}
 	}
-	
+
 	// Merge metadata
 	for key, value := range custom.Metadata {
 		main.Metadata[key] = value
@@ -723,19 +723,19 @@ func (s *Service) mergeClassificationResults(main *ClassificationResult, custom 
 func (s *Service) calculateOverallConfidence(result *ClassificationResult) float64 {
 	confidenceSum := 0.0
 	componentCount := 0
-	
+
 	// Language confidence
 	if result.LanguageConfidence > 0 {
 		confidenceSum += result.LanguageConfidence
 		componentCount++
 	}
-	
+
 	// Sentiment confidence
 	if result.Sentiment != nil && result.Sentiment.Confidence > 0 {
 		confidenceSum += result.Sentiment.Confidence
 		componentCount++
 	}
-	
+
 	// Entity confidence (average)
 	if len(result.Entities) > 0 {
 		entityConfidenceSum := 0.0
@@ -745,7 +745,7 @@ func (s *Service) calculateOverallConfidence(result *ClassificationResult) float
 		confidenceSum += entityConfidenceSum / float64(len(result.Entities))
 		componentCount++
 	}
-	
+
 	// Keyword relevance (average of top keywords)
 	if len(result.Keywords) > 0 {
 		keywordSum := 0.0
@@ -759,11 +759,11 @@ func (s *Service) calculateOverallConfidence(result *ClassificationResult) float
 		confidenceSum += keywordSum / float64(maxKeywords)
 		componentCount++
 	}
-	
+
 	if componentCount == 0 {
 		return 0.0
 	}
-	
+
 	return confidenceSum / float64(componentCount)
 }
 
@@ -772,33 +772,33 @@ func (s *Service) validateInput(input *ClassificationInput) error {
 	if input == nil {
 		return fmt.Errorf("input cannot be nil")
 	}
-	
+
 	if input.TenantID == uuid.Nil {
 		return fmt.Errorf("tenant ID is required")
 	}
-	
+
 	if input.Content == "" {
 		return fmt.Errorf("content cannot be empty")
 	}
-	
+
 	if len(input.Content) > s.config.MaxTextLength {
 		return fmt.Errorf("content length %d exceeds maximum %d", len(input.Content), s.config.MaxTextLength)
 	}
-	
+
 	if input.Options != nil {
 		if input.Options.ConfidenceThreshold < 0 || input.Options.ConfidenceThreshold > 1 {
 			return fmt.Errorf("confidence threshold must be between 0 and 1")
 		}
-		
+
 		if input.Options.MaxKeywords < 0 || input.Options.MaxKeywords > 1000 {
 			return fmt.Errorf("max keywords must be between 0 and 1000")
 		}
-		
+
 		if input.Options.MaxEntities < 0 || input.Options.MaxEntities > 1000 {
 			return fmt.Errorf("max entities must be between 0 and 1000")
 		}
 	}
-	
+
 	return nil
 }
 
@@ -806,22 +806,22 @@ func (s *Service) validateInput(input *ClassificationInput) error {
 func (s *Service) updateMetrics(success bool, processingTime time.Duration) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.metrics.TotalClassifications++
-	
+
 	if success {
 		s.metrics.SuccessfulClassifications++
 	} else {
 		s.metrics.FailedClassifications++
 	}
-	
+
 	// Update average processing time
 	totalTime := s.metrics.AverageProcessingTime * time.Duration(s.metrics.TotalClassifications-1)
 	s.metrics.AverageProcessingTime = (totalTime + processingTime) / time.Duration(s.metrics.TotalClassifications)
-	
+
 	// Update error rate
 	s.metrics.ErrorRate = float64(s.metrics.FailedClassifications) / float64(s.metrics.TotalClassifications)
-	
+
 	// Update last classification time
 	now := time.Now()
 	s.metrics.LastClassificationAt = &now
@@ -831,7 +831,7 @@ func (s *Service) updateMetrics(success bool, processingTime time.Duration) {
 func (s *Service) updateClassificationCounters(result *ClassificationResult) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.metrics.ClassificationsByType[result.ContentType]++
 	s.metrics.ClassificationsByLanguage[result.Language]++
 }
@@ -840,7 +840,7 @@ func (s *Service) updateClassificationCounters(result *ClassificationResult) {
 func (s *Service) GetMetrics() *ClassificationMetrics {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	// Create a copy to avoid race conditions
 	metrics := &ClassificationMetrics{
 		TotalClassifications:      s.metrics.TotalClassifications,
@@ -853,15 +853,15 @@ func (s *Service) GetMetrics() *ClassificationMetrics {
 		ClassificationsByType:     make(map[ContentType]int64),
 		ClassificationsByLanguage: make(map[Language]int64),
 	}
-	
+
 	for k, v := range s.metrics.ClassificationsByType {
 		metrics.ClassificationsByType[k] = v
 	}
-	
+
 	for k, v := range s.metrics.ClassificationsByLanguage {
 		metrics.ClassificationsByLanguage[k] = v
 	}
-	
+
 	return metrics
 }
 
@@ -871,22 +871,22 @@ func (s *Service) HealthCheck(ctx context.Context) error {
 	s.mu.RLock()
 	hasClassifiers := len(s.classifiers) > 0
 	s.mu.RUnlock()
-	
+
 	if !hasClassifiers {
 		return fmt.Errorf("no classifiers registered")
 	}
-	
+
 	// Test with a simple classification
 	testInput := &ClassificationInput{
 		Content:  "This is a test document for health check.",
 		TenantID: uuid.New(),
 		Options:  DefaultClassificationOptions(),
 	}
-	
+
 	_, err := s.Classify(ctx, testInput)
 	if err != nil {
 		return fmt.Errorf("health check classification failed: %w", err)
 	}
-	
+
 	return nil
 }

@@ -33,55 +33,55 @@ func NewEncodingDetector() *EncodingDetector {
 			"utf-16be": unicode.UTF16(unicode.BigEndian, unicode.IgnoreBOM),
 			"utf-16le": unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM),
 			"utf-32":   unicode.UTF16(unicode.BigEndian, unicode.UseBOM), // UTF32 not available, using UTF16
-			
+
 			// Western European
 			"iso-8859-1":   charmap.ISO8859_1,
 			"iso-8859-15":  charmap.ISO8859_15,
 			"windows-1252": charmap.Windows1252,
 			"cp1252":       charmap.Windows1252,
-			
+
 			// Eastern European
 			"iso-8859-2":   charmap.ISO8859_2,
 			"windows-1250": charmap.Windows1250,
 			"cp1250":       charmap.Windows1250,
-			
+
 			// Cyrillic
 			"iso-8859-5":   charmap.ISO8859_5,
 			"windows-1251": charmap.Windows1251,
 			"cp1251":       charmap.Windows1251,
 			"koi8-r":       charmap.KOI8R,
-			
+
 			// Greek
 			"iso-8859-7":   charmap.ISO8859_7,
 			"windows-1253": charmap.Windows1253,
-			
+
 			// Turkish
 			"iso-8859-9":   charmap.ISO8859_9,
 			"windows-1254": charmap.Windows1254,
-			
+
 			// Hebrew
 			"iso-8859-8":   charmap.ISO8859_8,
 			"windows-1255": charmap.Windows1255,
-			
+
 			// Arabic
 			"iso-8859-6":   charmap.ISO8859_6,
 			"windows-1256": charmap.Windows1256,
-			
+
 			// Japanese
-			"shift_jis":  japanese.ShiftJIS,
-			"sjis":       japanese.ShiftJIS,
-			"euc-jp":     japanese.EUCJP,
+			"shift_jis":   japanese.ShiftJIS,
+			"sjis":        japanese.ShiftJIS,
+			"euc-jp":      japanese.EUCJP,
 			"iso-2022-jp": japanese.ISO2022JP,
-			
+
 			// Korean
-			"euc-kr":     korean.EUCKR,
-			"cp949":      korean.EUCKR,
-			
+			"euc-kr": korean.EUCKR,
+			"cp949":  korean.EUCKR,
+
 			// Chinese
-			"gb2312":     simplifiedchinese.HZGB2312,
-			"gbk":        simplifiedchinese.GBK,
-			"gb18030":    simplifiedchinese.GB18030,
-			"big5":       traditionalchinese.Big5,
+			"gb2312":  simplifiedchinese.HZGB2312,
+			"gbk":     simplifiedchinese.GBK,
+			"gb18030": simplifiedchinese.GB18030,
+			"big5":    traditionalchinese.Big5,
 		},
 	}
 }
@@ -183,7 +183,7 @@ func (ed *EncodingDetector) detectCommonPatterns(data []byte) (string, float64) 
 // extractHTMLCharset extracts charset from HTML meta tags
 func (ed *EncodingDetector) extractHTMLCharset(data []byte) string {
 	dataStr := strings.ToLower(string(data))
-	
+
 	// Look for <meta charset="...">
 	if start := strings.Index(dataStr, "<meta charset="); start != -1 {
 		start += 14
@@ -197,7 +197,7 @@ func (ed *EncodingDetector) extractHTMLCharset(data []byte) string {
 			}
 		}
 	}
-	
+
 	// Look for <meta http-equiv="Content-Type" content="...charset=...">
 	if start := strings.Index(dataStr, "charset="); start != -1 {
 		start += 8
@@ -209,14 +209,14 @@ func (ed *EncodingDetector) extractHTMLCharset(data []byte) string {
 			return dataStr[start:end]
 		}
 	}
-	
+
 	return ""
 }
 
 // extractXMLEncoding extracts encoding from XML declaration
 func (ed *EncodingDetector) extractXMLEncoding(data []byte) string {
 	dataStr := strings.ToLower(string(data))
-	
+
 	// Look for <?xml ... encoding="...">
 	if start := strings.Index(dataStr, "<?xml"); start != -1 {
 		xmlDecl := dataStr[start:]
@@ -236,7 +236,7 @@ func (ed *EncodingDetector) extractXMLEncoding(data []byte) string {
 			}
 		}
 	}
-	
+
 	return ""
 }
 
@@ -257,36 +257,36 @@ func (ed *EncodingDetector) statisticalDetection(data []byte) (string, float64) 
 	for _, b := range data {
 		freq[b]++
 	}
-	
+
 	// Check for Windows-1252 patterns (common high-byte characters)
 	windows1252Score := 0
 	commonWin1252 := []byte{0x80, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8E, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0x9B, 0x9C, 0x9E, 0x9F}
 	for _, b := range commonWin1252 {
 		windows1252Score += freq[b]
 	}
-	
+
 	// Check for ISO-8859-1 patterns
 	iso88591Score := 0
 	for i := 160; i <= 255; i++ {
 		iso88591Score += freq[i]
 	}
-	
+
 	// Determine best guess based on scores
 	totalBytes := len(data)
 	if totalBytes == 0 {
 		return "utf-8", 0.5
 	}
-	
+
 	windows1252Ratio := float64(windows1252Score) / float64(totalBytes)
 	iso88591Ratio := float64(iso88591Score) / float64(totalBytes)
-	
+
 	if windows1252Ratio > 0.01 {
 		return "windows-1252", 0.6
 	}
 	if iso88591Ratio > 0.02 {
 		return "iso-8859-1", 0.6
 	}
-	
+
 	// Default to UTF-8 for unknown encodings
 	return "utf-8", 0.5
 }
@@ -297,26 +297,26 @@ func (ed *EncodingDetector) ConvertToUTF8(filePath string, sourceEncoding string
 	if sourceEncoding == "utf-8" {
 		return filePath, nil
 	}
-	
+
 	encoder, exists := ed.supportedEncodings[strings.ToLower(sourceEncoding)]
 	if !exists {
 		return "", fmt.Errorf("unsupported encoding: %s", sourceEncoding)
 	}
-	
+
 	// Read original file
 	sourceFile, err := os.Open(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open source file: %w", err)
 	}
 	defer sourceFile.Close()
-	
+
 	// Create temporary UTF-8 file
 	tempFile, err := os.CreateTemp(os.TempDir(), "utf8_converted_*.tmp")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
 	defer tempFile.Close()
-	
+
 	// Convert encoding
 	if encoder == encoding.Nop {
 		// No conversion needed (already UTF-8)
@@ -327,12 +327,12 @@ func (ed *EncodingDetector) ConvertToUTF8(filePath string, sourceEncoding string
 		reader := transform.NewReader(sourceFile, decoder)
 		_, err = io.Copy(tempFile, reader)
 	}
-	
+
 	if err != nil {
 		os.Remove(tempFile.Name())
 		return "", fmt.Errorf("failed to convert encoding: %w", err)
 	}
-	
+
 	return tempFile.Name(), nil
 }
 
@@ -341,16 +341,16 @@ func (ed *EncodingDetector) ConvertBytesToUTF8(data []byte, sourceEncoding strin
 	if sourceEncoding == "utf-8" {
 		return data, nil
 	}
-	
+
 	encoder, exists := ed.supportedEncodings[strings.ToLower(sourceEncoding)]
 	if !exists {
 		return nil, fmt.Errorf("unsupported encoding: %s", sourceEncoding)
 	}
-	
+
 	if encoder == encoding.Nop {
 		return data, nil
 	}
-	
+
 	decoder := encoder.NewDecoder()
 	reader := transform.NewReader(bytes.NewReader(data), decoder)
 	return io.ReadAll(reader)
@@ -377,12 +377,12 @@ func (ed *EncodingDetector) AutoDetectAndConvert(filePath string) (string, *Enco
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to detect encoding: %w", err)
 	}
-	
+
 	// Convert to UTF-8
 	convertedPath, err := ed.ConvertToUTF8(filePath, encodingInfo.Name)
 	if err != nil {
 		return "", encodingInfo, fmt.Errorf("failed to convert to UTF-8: %w", err)
 	}
-	
+
 	return convertedPath, encodingInfo, nil
 }

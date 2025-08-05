@@ -18,23 +18,23 @@ import (
 func main() {
 	// Parse command line flags
 	var (
-		configFile       = flag.String("config", "", "Path to configuration file")
-		generateConfig   = flag.String("generate-config", "", "Generate example configuration file at specified path")
-		validateConfig   = flag.Bool("validate-config", false, "Validate configuration and exit")
-		host            = flag.String("host", "0.0.0.0", "Server host")
-		port            = flag.Int("port", 8080, "Server port")
-		tlsEnabled      = flag.Bool("tls", false, "Enable TLS/HTTPS")
-		tlsCertFile     = flag.String("tls-cert", "", "TLS certificate file")
-		tlsKeyFile      = flag.String("tls-key", "", "TLS private key file")
-		dbHost          = flag.String("db-host", "localhost", "Database host")
-		dbPort          = flag.Int("db-port", 5432, "Database port")
-		dbUsername      = flag.String("db-username", "postgres", "Database username")
-		dbPassword      = flag.String("db-password", "", "Database password")
-		dbName          = flag.String("db-name", "audimodal", "Database name")
-		dbSSLMode       = flag.String("db-ssl-mode", "disable", "Database SSL mode")
-		jwtSecret       = flag.String("jwt-secret", "", "JWT secret for authentication")
-		logLevel        = flag.String("log-level", "info", "Log level")
-		version         = flag.Bool("version", false, "Show version information")
+		configFile     = flag.String("config", "", "Path to configuration file")
+		generateConfig = flag.String("generate-config", "", "Generate example configuration file at specified path")
+		validateConfig = flag.Bool("validate-config", false, "Validate configuration and exit")
+		host           = flag.String("host", "0.0.0.0", "Server host")
+		port           = flag.Int("port", 8080, "Server port")
+		tlsEnabled     = flag.Bool("tls", false, "Enable TLS/HTTPS")
+		tlsCertFile    = flag.String("tls-cert", "", "TLS certificate file")
+		tlsKeyFile     = flag.String("tls-key", "", "TLS private key file")
+		dbHost         = flag.String("db-host", "localhost", "Database host")
+		dbPort         = flag.Int("db-port", 5432, "Database port")
+		dbUsername     = flag.String("db-username", "postgres", "Database username")
+		dbPassword     = flag.String("db-password", "", "Database password")
+		dbName         = flag.String("db-name", "audimodal", "Database name")
+		dbSSLMode      = flag.String("db-ssl-mode", "disable", "Database SSL mode")
+		jwtSecret      = flag.String("jwt-secret", "", "JWT secret for authentication")
+		logLevel       = flag.String("log-level", "info", "Log level")
+		version        = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
 
@@ -244,8 +244,8 @@ func main() {
 
 	// Initialize server
 	appLogger.WithFields(map[string]interface{}{
-		"host": serverConfig.Host,
-		"port": serverConfig.Port,
+		"host":        serverConfig.Host,
+		"port":        serverConfig.Port,
 		"tls_enabled": serverConfig.TLSEnabled,
 	}).Info("Initializing server")
 	srv, err := server.New(serverConfig, db)

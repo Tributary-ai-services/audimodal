@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/drive/v3"
+	drive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 
 	"github.com/jscharber/eAIIngest/pkg/storage"
@@ -26,65 +26,65 @@ type GoogleDriveConnector struct {
 	oauthConfig  *oauth2.Config
 	driveService *drive.Service
 	tracer       trace.Tracer
-	
+
 	// Connection state
-	isConnected  bool
-	lastSync     time.Time
-	
+	isConnected bool
+	lastSync    time.Time
+
 	// Rate limiting and throttling
-	rateLimiter  *RateLimiter
-	
+	rateLimiter *RateLimiter
+
 	// Caching
-	folderCache  map[string]*drive.File
-	fileCache    map[string]*drive.File
-	cacheMu      sync.RWMutex
-	
+	folderCache map[string]*drive.File
+	fileCache   map[string]*drive.File
+	cacheMu     sync.RWMutex
+
 	// Sync state
-	syncState    *SyncState
-	syncMu       sync.RWMutex
-	
+	syncState *SyncState
+	syncMu    sync.RWMutex
+
 	// Metrics
-	metrics      *ConnectorMetrics
-	
+	metrics *ConnectorMetrics
+
 	// Error handling
-	retryPolicy  *RetryPolicy
+	retryPolicy *RetryPolicy
 }
 
 // GoogleDriveConfig contains configuration for Google Drive connector
 type GoogleDriveConfig struct {
 	// OAuth2 configuration
-	ClientID           string   `yaml:"client_id"`
-	ClientSecret       string   `yaml:"client_secret"`
-	Scopes            []string `yaml:"scopes"`
-	RedirectURL       string   `yaml:"redirect_url"`
-	
+	ClientID     string   `yaml:"client_id"`
+	ClientSecret string   `yaml:"client_secret"`
+	Scopes       []string `yaml:"scopes"`
+	RedirectURL  string   `yaml:"redirect_url"`
+
 	// Sync configuration
-	SyncInterval       time.Duration `yaml:"sync_interval"`
-	FullSyncInterval   time.Duration `yaml:"full_sync_interval"`
-	BatchSize          int           `yaml:"batch_size"`
-	MaxConcurrentReqs  int           `yaml:"max_concurrent_requests"`
-	
+	SyncInterval      time.Duration `yaml:"sync_interval"`
+	FullSyncInterval  time.Duration `yaml:"full_sync_interval"`
+	BatchSize         int           `yaml:"batch_size"`
+	MaxConcurrentReqs int           `yaml:"max_concurrent_requests"`
+
 	// Filter configuration
-	IncludeFolders     []string      `yaml:"include_folders"`
-	ExcludeFolders     []string      `yaml:"exclude_folders"`
-	FileExtensions     []string      `yaml:"file_extensions"`
-	MaxFileSize        int64         `yaml:"max_file_size"`
-	SyncSharedFiles    bool          `yaml:"sync_shared_files"`
-	SyncTrashedFiles   bool          `yaml:"sync_trashed_files"`
-	
+	IncludeFolders   []string `yaml:"include_folders"`
+	ExcludeFolders   []string `yaml:"exclude_folders"`
+	FileExtensions   []string `yaml:"file_extensions"`
+	MaxFileSize      int64    `yaml:"max_file_size"`
+	SyncSharedFiles  bool     `yaml:"sync_shared_files"`
+	SyncTrashedFiles bool     `yaml:"sync_trashed_files"`
+
 	// Rate limiting
-	RequestsPerSecond  float64       `yaml:"requests_per_second"`
-	BurstLimit         int           `yaml:"burst_limit"`
-	
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	BurstLimit        int     `yaml:"burst_limit"`
+
 	// Retry configuration
 	MaxRetries         int           `yaml:"max_retries"`
 	RetryDelay         time.Duration `yaml:"retry_delay"`
 	ExponentialBackoff bool          `yaml:"exponential_backoff"`
-	
+
 	// Cache configuration
-	CacheEnabled       bool          `yaml:"cache_enabled"`
-	CacheTTL           time.Duration `yaml:"cache_ttl"`
-	CacheSize          int           `yaml:"cache_size"`
+	CacheEnabled bool          `yaml:"cache_enabled"`
+	CacheTTL     time.Duration `yaml:"cache_ttl"`
+	CacheSize    int           `yaml:"cache_size"`
 }
 
 // DefaultGoogleDriveConfig returns default configuration
@@ -203,7 +203,7 @@ func (c *GoogleDriveConnector) Disconnect(ctx context.Context) error {
 
 	c.isConnected = false
 	c.driveService = nil
-	
+
 	// Clear caches
 	c.cacheMu.Lock()
 	c.folderCache = make(map[string]*drive.File)
@@ -235,7 +235,7 @@ func (c *GoogleDriveConnector) ListFiles(ctx context.Context, path string, optio
 
 	var files []*storage.ConnectorFileInfo
 	var pageToken string
-	
+
 	for {
 		// Wait for rate limit
 		if err := c.rateLimiter.Wait(ctx); err != nil {
@@ -245,34 +245,34 @@ func (c *GoogleDriveConnector) ListFiles(ctx context.Context, path string, optio
 
 		// Build query
 		query := c.buildFileQuery(path, options)
-		
+
 		// Execute API call with retry
 		fileList, err := c.executeWithRetry(ctx, func() (interface{}, error) {
 			call := c.driveService.Files.List().
 				Q(query).
 				Fields("nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, parents, shared, trashed, webViewLink, webContentLink)").
 				PageSize(int64(c.config.BatchSize))
-			
+
 			if pageToken != "" {
 				call = call.PageToken(pageToken)
 			}
-			
+
 			return call.Do()
 		})
-		
+
 		if err != nil {
 			span.RecordError(err)
 			return nil, fmt.Errorf("failed to list files: %w", err)
 		}
 
 		list := fileList.(*drive.FileList)
-		
+
 		// Convert Drive files to FileInfo
 		for _, file := range list.Files {
 			if c.shouldIncludeFile(file) {
 				fileInfo := c.convertToFileInfo(file)
 				files = append(files, fileInfo)
-				
+
 				// Cache file
 				if c.config.CacheEnabled {
 					c.cacheFile(file)
@@ -338,7 +338,7 @@ func (c *GoogleDriveConnector) GetFile(ctx context.Context, fileID string) (*sto
 	}
 
 	file := fileData.(*drive.File)
-	
+
 	// Cache file
 	if c.config.CacheEnabled {
 		c.cacheFile(file)
@@ -458,11 +458,11 @@ func (c *GoogleDriveConnector) SyncFiles(ctx context.Context, options *storage.S
 				Q(query).
 				Fields("nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, parents, shared, trashed, webViewLink, webContentLink)").
 				PageSize(int64(c.config.BatchSize))
-			
+
 			if pageToken != "" {
 				call = call.PageToken(pageToken)
 			}
-			
+
 			return call.Do()
 		})
 
@@ -477,13 +477,13 @@ func (c *GoogleDriveConnector) SyncFiles(ctx context.Context, options *storage.S
 		// Process files
 		for _, file := range list.Files {
 			result.FilesFound++
-			
+
 			if c.shouldIncludeFile(file) {
 				// Check if file is new or changed
 				cachedFile := c.getCachedFile(file.Id)
 				if cachedFile == nil || c.isFileChanged(cachedFile, file) {
 					result.FilesChanged++
-					
+
 					// Cache updated file
 					if c.config.CacheEnabled {
 						c.cacheFile(file)
@@ -540,18 +540,18 @@ func (c *GoogleDriveConnector) GetSyncState(ctx context.Context) (*storage.SyncS
 // GetMetrics returns connector metrics
 func (c *GoogleDriveConnector) GetMetrics(ctx context.Context) (*storage.ConnectorMetrics, error) {
 	return &storage.ConnectorMetrics{
-		ConnectorType:     "googledrive",
-		IsConnected:       c.isConnected,
+		ConnectorType:      "googledrive",
+		IsConnected:        c.isConnected,
 		LastConnectionTime: c.metrics.LastConnectionTime,
-		FilesListed:       c.metrics.FilesListed,
-		FilesRetrieved:    c.metrics.FilesRetrieved,
-		FilesDownloaded:   c.metrics.FilesDownloaded,
-		BytesDownloaded:   c.metrics.BytesDownloaded,
-		SyncCount:         c.metrics.SyncCount,
-		LastSyncTime:      c.metrics.LastSyncTime,
-		LastSyncDuration:  c.metrics.LastSyncDuration,
-		ErrorCount:        c.metrics.ErrorCount,
-		LastError:         c.metrics.LastError,
+		FilesListed:        c.metrics.FilesListed,
+		FilesRetrieved:     c.metrics.FilesRetrieved,
+		FilesDownloaded:    c.metrics.FilesDownloaded,
+		BytesDownloaded:    c.metrics.BytesDownloaded,
+		SyncCount:          c.metrics.SyncCount,
+		LastSyncTime:       c.metrics.LastSyncTime,
+		LastSyncDuration:   c.metrics.LastSyncDuration,
+		ErrorCount:         c.metrics.ErrorCount,
+		LastError:          c.metrics.LastError,
 	}, nil
 }
 
@@ -563,7 +563,7 @@ func (c *GoogleDriveConnector) testConnection(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
-	
+
 	c.metrics.LastConnectionTime = time.Now()
 	return nil
 }
@@ -728,10 +728,10 @@ func (c *GoogleDriveConnector) convertToFileInfo(file *drive.File) *storage.Conn
 			CanDelete: false,
 		},
 		Metadata: map[string]interface{}{
-			"drive_id":     file.Id,
-			"shared":       file.Shared,
-			"trashed":      file.Trashed,
-			"mime_type":    file.MimeType,
+			"drive_id":      file.Id,
+			"shared":        file.Shared,
+			"trashed":       file.Trashed,
+			"mime_type":     file.MimeType,
 			"web_view_link": file.WebViewLink,
 		},
 		Tags: map[string]string{
@@ -752,7 +752,7 @@ func (c *GoogleDriveConnector) cacheFile(file *drive.File) {
 	defer c.cacheMu.Unlock()
 
 	c.fileCache[file.Id] = file
-	
+
 	// Simple cache size management
 	if len(c.fileCache) > c.config.CacheSize {
 		// Remove oldest entries (simple FIFO, could be improved with LRU)
@@ -786,7 +786,7 @@ func (c *GoogleDriveConnector) isFileChanged(cached, current *drive.File) bool {
 
 func (c *GoogleDriveConnector) executeWithRetry(ctx context.Context, operation func() (interface{}, error)) (interface{}, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -794,7 +794,7 @@ func (c *GoogleDriveConnector) executeWithRetry(ctx context.Context, operation f
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -808,7 +808,7 @@ func (c *GoogleDriveConnector) executeWithRetry(ctx context.Context, operation f
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -817,7 +817,7 @@ func (c *GoogleDriveConnector) executeWithRetry(ctx context.Context, operation f
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 

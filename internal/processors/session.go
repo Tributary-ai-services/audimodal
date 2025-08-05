@@ -14,27 +14,27 @@ import (
 
 // SessionManager manages processing sessions and coordinates file processing
 type SessionManager struct {
-	db                *database.Database
-	pipeline          *Pipeline
-	activeSessions    map[uuid.UUID]*SessionContext
-	sessionMutex      sync.RWMutex
-	defaultTimeout    time.Duration
+	db                 *database.Database
+	pipeline           *Pipeline
+	activeSessions     map[uuid.UUID]*SessionContext
+	sessionMutex       sync.RWMutex
+	defaultTimeout     time.Duration
 	maxFilesPerSession int
 }
 
 // SessionContext tracks the state of an active processing session
 type SessionContext struct {
-	SessionID      uuid.UUID              `json:"session_id"`
-	TenantID       uuid.UUID              `json:"tenant_id"`
-	Status         string                 `json:"status"`
-	StartedAt      time.Time              `json:"started_at"`
-	CompletedAt    *time.Time             `json:"completed_at,omitempty"`
-	TotalFiles     int                    `json:"total_files"`
-	ProcessedFiles int                    `json:"processed_files"`
-	FailedFiles    int                    `json:"failed_files"`
-	TotalChunks    int                    `json:"total_chunks"`
+	SessionID      uuid.UUID                 `json:"session_id"`
+	TenantID       uuid.UUID                 `json:"tenant_id"`
+	Status         string                    `json:"status"`
+	StartedAt      time.Time                 `json:"started_at"`
+	CompletedAt    *time.Time                `json:"completed_at,omitempty"`
+	TotalFiles     int                       `json:"total_files"`
+	ProcessedFiles int                       `json:"processed_files"`
+	FailedFiles    int                       `json:"failed_files"`
+	TotalChunks    int                       `json:"total_chunks"`
 	ProcessingJobs map[uuid.UUID]*JobContext `json:"-"`
-	Config         *SessionConfig         `json:"config"`
+	Config         *SessionConfig            `json:"config"`
 	mutex          sync.RWMutex
 }
 
@@ -62,17 +62,17 @@ type SessionConfig struct {
 
 // SessionProgress represents the overall progress of a session
 type SessionProgress struct {
-	SessionID        uuid.UUID     `json:"session_id"`
-	Status           string        `json:"status"`
-	Progress         float64       `json:"progress"`
-	FilesTotal       int           `json:"files_total"`
-	FilesProcessed   int           `json:"files_processed"`
-	FilesFailed      int           `json:"files_failed"`
-	ChunksCreated    int           `json:"chunks_created"`
-	BytesProcessed   int64         `json:"bytes_processed"`
-	ElapsedTime      time.Duration `json:"elapsed_time"`
+	SessionID         uuid.UUID     `json:"session_id"`
+	Status            string        `json:"status"`
+	Progress          float64       `json:"progress"`
+	FilesTotal        int           `json:"files_total"`
+	FilesProcessed    int           `json:"files_processed"`
+	FilesFailed       int           `json:"files_failed"`
+	ChunksCreated     int           `json:"chunks_created"`
+	BytesProcessed    int64         `json:"bytes_processed"`
+	ElapsedTime       time.Duration `json:"elapsed_time"`
 	EstimatedTimeLeft time.Duration `json:"estimated_time_left"`
-	CurrentFile      string        `json:"current_file,omitempty"`
+	CurrentFile       string        `json:"current_file,omitempty"`
 }
 
 // NewSessionManager creates a new session manager
@@ -89,7 +89,7 @@ func NewSessionManager(db *database.Database, pipeline *Pipeline) *SessionManage
 // CreateSession creates a new processing session
 func (sm *SessionManager) CreateSession(ctx context.Context, tenantID uuid.UUID, config *SessionConfig) (*SessionContext, error) {
 	sessionID := uuid.New()
-	
+
 	if config == nil {
 		config = &SessionConfig{
 			Priority:           "normal",
@@ -102,10 +102,10 @@ func (sm *SessionManager) CreateSession(ctx context.Context, tenantID uuid.UUID,
 
 	// Create session in database
 	dbSession := &models.ProcessingSession{
-		ID:                sessionID,
-		TenantID:          tenantID,
-		Status:            models.SessionStatusPending,
-		MaxRetries:        config.RetryAttempts,
+		ID:         sessionID,
+		TenantID:   tenantID,
+		Status:     models.SessionStatusPending,
+		MaxRetries: config.RetryAttempts,
 		// Map config to ProcessingOptions structure
 		Options: models.ProcessingOptions{
 			DLPScanEnabled:     config.DLPScanEnabled,
@@ -113,10 +113,10 @@ func (sm *SessionManager) CreateSession(ctx context.Context, tenantID uuid.UUID,
 			ParallelProcessing: true,         // Default to parallel
 			BatchSize:          100,          // Default batch size
 		},
-		Progress:          0.0,
-		TotalFiles:        0,
-		ProcessedFiles:    0,
-		FailedFiles:       0,
+		Progress:       0.0,
+		TotalFiles:     0,
+		ProcessedFiles: 0,
+		FailedFiles:    0,
 	}
 
 	tenantService := sm.db.NewTenantService()
@@ -170,8 +170,8 @@ func (sm *SessionManager) AddFilesToSession(ctx context.Context, sessionID uuid.
 	// Create job contexts for each file
 	for _, fileID := range fileIDs {
 		jobCtx := &JobContext{
-			FileID:  fileID,
-			Status:  "pending",
+			FileID:   fileID,
+			Status:   "pending",
 			Progress: 0.0,
 		}
 		sessionCtx.ProcessingJobs[fileID] = jobCtx
@@ -312,7 +312,7 @@ func (sm *SessionManager) processFile(ctx context.Context, sessionCtx *SessionCo
 
 	// Process file through pipeline
 	result, err := sm.pipeline.ProcessFile(ctx, request)
-	
+
 	// Update job context
 	now := time.Now()
 	jobCtx.CompletedAt = &now
@@ -342,7 +342,7 @@ func (sm *SessionManager) updateSessionProgress(sessionCtx *SessionContext) {
 	sessionCtx.mutex.RLock()
 	totalFiles := sessionCtx.TotalFiles
 	completedJobs := 0
-	
+
 	for _, job := range sessionCtx.ProcessingJobs {
 		if job.Status == "completed" || job.Status == "failed" {
 			completedJobs++
@@ -512,9 +512,22 @@ func (sm *SessionManager) ListActiveSessions() []*SessionContext {
 
 	sessions := make([]*SessionContext, 0, len(sm.activeSessions))
 	for _, session := range sm.activeSessions {
-		// Create a copy to avoid race conditions
-		sessionCopy := *session
-		sessions = append(sessions, &sessionCopy)
+		// Create a copy to avoid race conditions (without copying the mutex)
+		sessionCopy := &SessionContext{
+			SessionID:      session.SessionID,
+			TenantID:       session.TenantID,
+			Status:         session.Status,
+			StartedAt:      session.StartedAt,
+			CompletedAt:    session.CompletedAt,
+			TotalFiles:     session.TotalFiles,
+			ProcessedFiles: session.ProcessedFiles,
+			FailedFiles:    session.FailedFiles,
+			TotalChunks:    session.TotalChunks,
+			ProcessingJobs: session.ProcessingJobs,
+			Config:         session.Config,
+			// Don't copy mutex - it's a synchronization primitive
+		}
+		sessions = append(sessions, sessionCopy)
 	}
 
 	return sessions

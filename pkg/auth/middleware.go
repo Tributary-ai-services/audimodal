@@ -18,27 +18,27 @@ type AuthMiddleware struct {
 
 // MiddlewareConfig contains middleware configuration
 type MiddlewareConfig struct {
-	RequireAuth       bool     `yaml:"require_auth"`
-	AllowedPaths      []string `yaml:"allowed_paths"`
-	RequiredScopes    []string `yaml:"required_scopes,omitempty"`
+	RequireAuth         bool         `yaml:"require_auth"`
+	AllowedPaths        []string     `yaml:"allowed_paths"`
+	RequiredScopes      []string     `yaml:"required_scopes,omitempty"`
 	RequiredPermissions []Permission `yaml:"required_permissions,omitempty"`
-	TokenHeader       string   `yaml:"token_header"`
-	TokenPrefix       string   `yaml:"token_prefix"`
-	APIKeyHeader      string   `yaml:"api_key_header"`
-	CookieName        string   `yaml:"cookie_name"`
-	SkipPaths         []string `yaml:"skip_paths"`
+	TokenHeader         string       `yaml:"token_header"`
+	TokenPrefix         string       `yaml:"token_prefix"`
+	APIKeyHeader        string       `yaml:"api_key_header"`
+	CookieName          string       `yaml:"cookie_name"`
+	SkipPaths           []string     `yaml:"skip_paths"`
 }
 
 // DefaultMiddlewareConfig returns default middleware configuration
 func DefaultMiddlewareConfig() *MiddlewareConfig {
 	return &MiddlewareConfig{
-		RequireAuth:    true,
-		AllowedPaths:   []string{"/health", "/metrics", "/auth/login", "/auth/register"},
-		TokenHeader:    "Authorization",
-		TokenPrefix:    "Bearer ",
-		APIKeyHeader:   "X-API-Key",
-		CookieName:     "auth_token",
-		SkipPaths:      []string{"/health", "/metrics", "/swagger"},
+		RequireAuth:  true,
+		AllowedPaths: []string{"/health", "/metrics", "/auth/login", "/auth/register"},
+		TokenHeader:  "Authorization",
+		TokenPrefix:  "Bearer ",
+		APIKeyHeader: "X-API-Key",
+		CookieName:   "auth_token",
+		SkipPaths:    []string{"/health", "/metrics", "/swagger"},
 	}
 }
 
@@ -47,7 +47,7 @@ func NewAuthMiddleware(authService AuthService, config *MiddlewareConfig) *AuthM
 	if config == nil {
 		config = DefaultMiddlewareConfig()
 	}
-	
+
 	return &AuthMiddleware{
 		authService: authService,
 		config:      config,
@@ -62,7 +62,7 @@ func (m *AuthMiddleware) AuthenticateGin() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		
+
 		// Extract token
 		token, authType := m.extractToken(c.Request)
 		if token == "" {
@@ -77,12 +77,12 @@ func (m *AuthMiddleware) AuthenticateGin() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		
+
 		// Authenticate
 		authReq := &AuthRequest{
 			Type: authType,
 		}
-		
+
 		switch authType {
 		case AuthTypeAPIKey:
 			authReq.APIKey = token
@@ -91,18 +91,18 @@ func (m *AuthMiddleware) AuthenticateGin() gin.HandlerFunc {
 		default:
 			authReq.Token = token
 		}
-		
+
 		authResp, err := m.authService.Authenticate(c.Request.Context(), authReq)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "authentication failed",
-				"code":  "AUTH_FAILED",
+				"error":   "authentication failed",
+				"code":    "AUTH_FAILED",
 				"details": err.Error(),
 			})
 			c.Abort()
 			return
 		}
-		
+
 		// Check scopes if required
 		if len(m.config.RequiredScopes) > 0 {
 			if !m.hasRequiredScopes(authResp.Scopes, m.config.RequiredScopes) {
@@ -114,7 +114,7 @@ func (m *AuthMiddleware) AuthenticateGin() gin.HandlerFunc {
 				return
 			}
 		}
-		
+
 		// Check permissions if required
 		if len(m.config.RequiredPermissions) > 0 {
 			claims, err := m.authService.ValidateToken(c.Request.Context(), token)
@@ -127,10 +127,10 @@ func (m *AuthMiddleware) AuthenticateGin() gin.HandlerFunc {
 				return
 			}
 		}
-		
+
 		// Set user context
 		m.setUserContext(c, authResp)
-		
+
 		c.Next()
 	}
 }
@@ -147,7 +147,7 @@ func (m *AuthMiddleware) RequirePermission(permissions ...Permission) gin.Handle
 			c.Abort()
 			return
 		}
-		
+
 		// Get claims from context
 		claims := GetClaimsFromContext(c)
 		if claims == nil {
@@ -158,18 +158,18 @@ func (m *AuthMiddleware) RequirePermission(permissions ...Permission) gin.Handle
 			c.Abort()
 			return
 		}
-		
+
 		// Check permissions
 		if !m.hasRequiredPermissions(claims.Permissions, permissions) {
 			c.JSON(http.StatusForbidden, gin.H{
-				"error": "insufficient permissions",
-				"code":  "INSUFFICIENT_PERMISSIONS",
+				"error":    "insufficient permissions",
+				"code":     "INSUFFICIENT_PERMISSIONS",
 				"required": permissions,
 			})
 			c.Abort()
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -186,7 +186,7 @@ func (m *AuthMiddleware) RequireRole(roles ...Role) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		
+
 		// Check if user has any of the required roles
 		hasRole := false
 		for _, requiredRole := range roles {
@@ -200,17 +200,17 @@ func (m *AuthMiddleware) RequireRole(roles ...Role) gin.HandlerFunc {
 				break
 			}
 		}
-		
+
 		if !hasRole {
 			c.JSON(http.StatusForbidden, gin.H{
-				"error": "insufficient role",
-				"code":  "INSUFFICIENT_ROLE",
+				"error":    "insufficient role",
+				"code":     "INSUFFICIENT_ROLE",
 				"required": roles,
 			})
 			c.Abort()
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -227,7 +227,7 @@ func (m *AuthMiddleware) RequireTenantRole(tenantRoles ...TenantRole) gin.Handle
 			c.Abort()
 			return
 		}
-		
+
 		// Check if user has any of the required tenant roles
 		hasRole := false
 		for _, requiredRole := range tenantRoles {
@@ -236,17 +236,17 @@ func (m *AuthMiddleware) RequireTenantRole(tenantRoles ...TenantRole) gin.Handle
 				break
 			}
 		}
-		
+
 		if !hasRole {
 			c.JSON(http.StatusForbidden, gin.H{
-				"error": "insufficient tenant role",
-				"code":  "INSUFFICIENT_TENANT_ROLE",
+				"error":    "insufficient tenant role",
+				"code":     "INSUFFICIENT_TENANT_ROLE",
 				"required": tenantRoles,
 			})
 			c.Abort()
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -259,7 +259,7 @@ func (m *AuthMiddleware) AuthenticateHTTP(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
 		// Extract token
 		token, authType := m.extractToken(r)
 		if token == "" {
@@ -270,12 +270,12 @@ func (m *AuthMiddleware) AuthenticateHTTP(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		
+
 		// Authenticate
 		authReq := &AuthRequest{
 			Type: authType,
 		}
-		
+
 		switch authType {
 		case AuthTypeAPIKey:
 			authReq.APIKey = token
@@ -284,13 +284,13 @@ func (m *AuthMiddleware) AuthenticateHTTP(next http.Handler) http.Handler {
 		default:
 			authReq.Token = token
 		}
-		
+
 		authResp, err := m.authService.Authenticate(r.Context(), authReq)
 		if err != nil {
 			http.Error(w, "authentication failed: "+err.Error(), http.StatusUnauthorized)
 			return
 		}
-		
+
 		// Check permissions if required
 		if len(m.config.RequiredPermissions) > 0 {
 			claims, err := m.authService.ValidateToken(r.Context(), token)
@@ -299,11 +299,11 @@ func (m *AuthMiddleware) AuthenticateHTTP(next http.Handler) http.Handler {
 				return
 			}
 		}
-		
+
 		// Set user context
 		ctx := m.setHTTPUserContext(r.Context(), authResp)
 		r = r.WithContext(ctx)
-		
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -320,13 +320,13 @@ func (m *AuthMiddleware) extractToken(r *http.Request) (string, AuthType) {
 		// If no prefix, assume it's a raw token
 		return strings.TrimSpace(authHeader), AuthTypeToken
 	}
-	
+
 	// Try API key header
 	apiKey := r.Header.Get(m.config.APIKeyHeader)
 	if apiKey != "" {
 		return strings.TrimSpace(apiKey), AuthTypeAPIKey
 	}
-	
+
 	// Try cookie
 	if m.config.CookieName != "" {
 		cookie, err := r.Cookie(m.config.CookieName)
@@ -334,18 +334,18 @@ func (m *AuthMiddleware) extractToken(r *http.Request) (string, AuthType) {
 			return cookie.Value, AuthTypeToken
 		}
 	}
-	
+
 	// Try query parameter (less secure, but sometimes needed)
 	token := r.URL.Query().Get("token")
 	if token != "" {
 		return token, AuthTypeToken
 	}
-	
+
 	apiKey = r.URL.Query().Get("api_key")
 	if apiKey != "" {
 		return apiKey, AuthTypeAPIKey
 	}
-	
+
 	return "", AuthTypeToken
 }
 
@@ -356,13 +356,13 @@ func (m *AuthMiddleware) shouldSkipAuth(path string) bool {
 			return true
 		}
 	}
-	
+
 	for _, allowedPath := range m.config.AllowedPaths {
 		if path == allowedPath || strings.HasPrefix(path, allowedPath) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -371,18 +371,18 @@ func (m *AuthMiddleware) hasRequiredScopes(userScopes, requiredScopes []string) 
 	if len(requiredScopes) == 0 {
 		return true
 	}
-	
+
 	scopeMap := make(map[string]bool)
 	for _, scope := range userScopes {
 		scopeMap[scope] = true
 	}
-	
+
 	for _, required := range requiredScopes {
 		if !scopeMap[required] {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -391,18 +391,18 @@ func (m *AuthMiddleware) hasRequiredPermissions(userPermissions, requiredPermiss
 	if len(requiredPermissions) == 0 {
 		return true
 	}
-	
+
 	permissionMap := make(map[Permission]bool)
 	for _, permission := range userPermissions {
 		permissionMap[permission] = true
 	}
-	
+
 	for _, required := range requiredPermissions {
 		if !permissionMap[required] {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -411,7 +411,7 @@ func (m *AuthMiddleware) setUserContext(c *gin.Context, authResp *AuthResponse) 
 	c.Set("user", authResp.User)
 	c.Set("tenant", authResp.Tenant)
 	c.Set("scopes", authResp.Scopes)
-	
+
 	// Extract and set claims if possible
 	if claims, err := m.authService.ValidateToken(c.Request.Context(), authResp.AccessToken); err == nil {
 		c.Set("claims", claims)
@@ -428,7 +428,7 @@ func (m *AuthMiddleware) setHTTPUserContext(ctx context.Context, authResp *AuthR
 	ctx = context.WithValue(ctx, "user", authResp.User)
 	ctx = context.WithValue(ctx, "tenant", authResp.Tenant)
 	ctx = context.WithValue(ctx, "scopes", authResp.Scopes)
-	
+
 	// Extract and set claims if possible
 	if claims, err := m.authService.ValidateToken(ctx, authResp.AccessToken); err == nil {
 		ctx = context.WithValue(ctx, "claims", claims)
@@ -438,7 +438,7 @@ func (m *AuthMiddleware) setHTTPUserContext(ctx context.Context, authResp *AuthR
 		ctx = context.WithValue(ctx, "tenant_role", claims.TenantRole)
 		ctx = context.WithValue(ctx, "permissions", claims.Permissions)
 	}
-	
+
 	return ctx
 }
 
@@ -573,12 +573,12 @@ func (m *AuthMiddleware) CORSMiddleware() gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With, X-API-Key")
 		c.Header("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -588,11 +588,11 @@ func (m *AuthMiddleware) RateLimitMiddleware(requestsPerMinute int) gin.HandlerF
 	// This is a simplified rate limiter
 	// In production, you'd use Redis or a proper rate limiting library
 	clients := make(map[string][]int64)
-	
+
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
 		now := time.Now().Unix()
-		
+
 		// Clean old entries
 		if requests, exists := clients[clientIP]; exists {
 			var validRequests []int64
@@ -603,7 +603,7 @@ func (m *AuthMiddleware) RateLimitMiddleware(requestsPerMinute int) gin.HandlerF
 			}
 			clients[clientIP] = validRequests
 		}
-		
+
 		// Check rate limit
 		if len(clients[clientIP]) >= requestsPerMinute {
 			c.JSON(http.StatusTooManyRequests, gin.H{
@@ -613,10 +613,10 @@ func (m *AuthMiddleware) RateLimitMiddleware(requestsPerMinute int) gin.HandlerF
 			c.Abort()
 			return
 		}
-		
+
 		// Add current request
 		clients[clientIP] = append(clients[clientIP], now)
-		
+
 		c.Next()
 	}
 }

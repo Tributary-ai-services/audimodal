@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
@@ -20,13 +21,25 @@ const (
 
 // StorageURL represents a parsed cloud storage URL
 type StorageURL struct {
-	Provider   CloudProvider `json:"provider"`
-	Bucket     string        `json:"bucket"`
-	Key        string        `json:"key"`
-	Region     string        `json:"region,omitempty"`
-	Project    string        `json:"project,omitempty"`
-	RawURL     string        `json:"raw_url"`
-	Metadata   URLMetadata   `json:"metadata,omitempty"`
+	Provider CloudProvider `json:"provider"`
+	Bucket   string        `json:"bucket"`
+	Key      string        `json:"key"`
+	Path     string        `json:"path"`
+	Region   string        `json:"region,omitempty"`
+	Project  string        `json:"project,omitempty"`
+	RawURL   string        `json:"raw_url"`
+	Metadata URLMetadata   `json:"metadata,omitempty"`
+}
+
+// String returns the string representation of the StorageURL
+func (u *StorageURL) String() string {
+	if u.RawURL != "" {
+		return u.RawURL
+	}
+	if u.Path != "" {
+		return u.Path
+	}
+	return fmt.Sprintf("%s://%s/%s", u.Provider, u.Bucket, u.Key)
 }
 
 // URLMetadata contains additional metadata about the storage URL
@@ -40,10 +53,14 @@ type URLMetadata struct {
 
 // FileInfo represents metadata about a file in cloud storage
 type FileInfo struct {
+	Name         string            `json:"name"`
 	URL          string            `json:"url"`
 	Size         int64             `json:"size"`
 	ContentType  string            `json:"content_type"`
+	MimeType     string            `json:"mime_type"`
+	Extension    string            `json:"extension"`
 	LastModified time.Time         `json:"last_modified"`
+	ModifiedAt   time.Time         `json:"modified_at"`
 	ETag         string            `json:"etag"`
 	Checksum     string            `json:"checksum"`
 	ChecksumType string            `json:"checksum_type"`
@@ -56,11 +73,11 @@ type FileInfo struct {
 
 // DownloadOptions configures how files are downloaded
 type DownloadOptions struct {
-	Range       *ByteRange `json:"range,omitempty"`
-	BufferSize  int        `json:"buffer_size,omitempty"`
-	Timeout     time.Duration `json:"timeout,omitempty"`
-	RetryCount  int        `json:"retry_count,omitempty"`
-	ChecksumValidation bool `json:"checksum_validation,omitempty"`
+	Range              *ByteRange    `json:"range,omitempty"`
+	BufferSize         int           `json:"buffer_size,omitempty"`
+	Timeout            time.Duration `json:"timeout,omitempty"`
+	RetryCount         int           `json:"retry_count,omitempty"`
+	ChecksumValidation bool          `json:"checksum_validation,omitempty"`
 }
 
 // ByteRange represents a byte range for partial downloads
@@ -71,12 +88,12 @@ type ByteRange struct {
 
 // ListOptions configures how directory listings are performed
 type ListOptions struct {
-	Prefix       string `json:"prefix,omitempty"`
-	Delimiter    string `json:"delimiter,omitempty"`
-	MaxKeys      int    `json:"max_keys,omitempty"`
+	Prefix            string `json:"prefix,omitempty"`
+	Delimiter         string `json:"delimiter,omitempty"`
+	MaxKeys           int    `json:"max_keys,omitempty"`
 	ContinuationToken string `json:"continuation_token,omitempty"`
-	Recursive    bool   `json:"recursive,omitempty"`
-	IncludeMetadata bool `json:"include_metadata,omitempty"`
+	Recursive         bool   `json:"recursive,omitempty"`
+	IncludeMetadata   bool   `json:"include_metadata,omitempty"`
 }
 
 // ListResult contains the results of a directory listing
@@ -90,27 +107,27 @@ type ListResult struct {
 
 // PresignedURLOptions configures presigned URL generation
 type PresignedURLOptions struct {
-	Method     string        `json:"method"`
-	Expiration time.Duration `json:"expiration"`
+	Method     string            `json:"method"`
+	Expiration time.Duration     `json:"expiration"`
 	Headers    map[string]string `json:"headers,omitempty"`
 }
 
 // PresignedURL contains a presigned URL and its metadata
 type PresignedURL struct {
-	URL        string            `json:"url"`
-	Method     string            `json:"method"`
-	Headers    map[string]string `json:"headers,omitempty"`
-	ExpiresAt  time.Time         `json:"expires_at"`
+	URL       string            `json:"url"`
+	Method    string            `json:"method"`
+	Headers   map[string]string `json:"headers,omitempty"`
+	ExpiresAt time.Time         `json:"expires_at"`
 }
 
 // CredentialProvider represents different ways to authenticate with cloud storage
 type CredentialProvider interface {
 	// GetCredentials returns the credentials for the specified tenant and provider
 	GetCredentials(ctx context.Context, tenantID uuid.UUID, provider CloudProvider) (*Credentials, error)
-	
+
 	// ValidateCredentials checks if credentials are valid
 	ValidateCredentials(ctx context.Context, credentials *Credentials) error
-	
+
 	// RefreshCredentials refreshes temporary credentials if needed
 	RefreshCredentials(ctx context.Context, credentials *Credentials) (*Credentials, error)
 }
@@ -133,22 +150,22 @@ type Credentials struct {
 type StorageResolver interface {
 	// ParseURL parses a cloud storage URL into its components
 	ParseURL(url string) (*StorageURL, error)
-	
+
 	// GetFileInfo retrieves metadata about a file
 	GetFileInfo(ctx context.Context, storageURL *StorageURL, credentials *Credentials) (*FileInfo, error)
-	
+
 	// DownloadFile downloads a file from cloud storage
 	DownloadFile(ctx context.Context, storageURL *StorageURL, credentials *Credentials, options *DownloadOptions) (io.ReadCloser, error)
-	
+
 	// ListFiles lists files in a directory/prefix
 	ListFiles(ctx context.Context, storageURL *StorageURL, credentials *Credentials, options *ListOptions) (*ListResult, error)
-	
+
 	// GeneratePresignedURL generates a presigned URL for file access
 	GeneratePresignedURL(ctx context.Context, storageURL *StorageURL, credentials *Credentials, options *PresignedURLOptions) (*PresignedURL, error)
-	
+
 	// ValidateAccess checks if the credentials can access the storage location
 	ValidateAccess(ctx context.Context, storageURL *StorageURL, credentials *Credentials) error
-	
+
 	// GetSupportedProviders returns the cloud providers this resolver supports
 	GetSupportedProviders() []CloudProvider
 }
@@ -157,24 +174,24 @@ type StorageResolver interface {
 type ResolverRegistry interface {
 	// RegisterResolver registers a resolver for specific providers
 	RegisterResolver(providers []CloudProvider, resolver StorageResolver) error
-	
+
 	// GetResolver returns the appropriate resolver for a provider
 	GetResolver(provider CloudProvider) (StorageResolver, error)
-	
+
 	// ParseURL parses any supported storage URL
 	ParseURL(url string) (*StorageURL, error)
-	
+
 	// GetSupportedProviders returns all supported providers
 	GetSupportedProviders() []CloudProvider
 }
 
 // StorageError represents errors that occur during storage operations
 type StorageError struct {
-	Code     string `json:"code"`
-	Message  string `json:"message"`
+	Code     string        `json:"code"`
+	Message  string        `json:"message"`
 	Provider CloudProvider `json:"provider"`
-	URL      string `json:"url,omitempty"`
-	Cause    error  `json:"-"`
+	URL      string        `json:"url,omitempty"`
+	Cause    error         `json:"-"`
 }
 
 func (e *StorageError) Error() string {
@@ -190,16 +207,16 @@ func (e *StorageError) Unwrap() error {
 
 // Common error codes
 const (
-	ErrorCodeInvalidURL        = "INVALID_URL"
-	ErrorCodeUnsupportedProvider = "UNSUPPORTED_PROVIDER"
+	ErrorCodeInvalidURL           = "INVALID_URL"
+	ErrorCodeUnsupportedProvider  = "UNSUPPORTED_PROVIDER"
 	ErrorCodeAuthenticationFailed = "AUTHENTICATION_FAILED"
-	ErrorCodeAccessDenied      = "ACCESS_DENIED"
-	ErrorCodeFileNotFound      = "FILE_NOT_FOUND"
-	ErrorCodeNetworkError      = "NETWORK_ERROR"
-	ErrorCodeInternalError     = "INTERNAL_ERROR"
-	ErrorCodeQuotaExceeded     = "QUOTA_EXCEEDED"
-	ErrorCodeInvalidCredentials = "INVALID_CREDENTIALS"
-	ErrorCodeServiceUnavailable = "SERVICE_UNAVAILABLE"
+	ErrorCodeAccessDenied         = "ACCESS_DENIED"
+	ErrorCodeFileNotFound         = "FILE_NOT_FOUND"
+	ErrorCodeNetworkError         = "NETWORK_ERROR"
+	ErrorCodeInternalError        = "INTERNAL_ERROR"
+	ErrorCodeQuotaExceeded        = "QUOTA_EXCEEDED"
+	ErrorCodeInvalidCredentials   = "INVALID_CREDENTIALS"
+	ErrorCodeServiceUnavailable   = "SERVICE_UNAVAILABLE"
 )
 
 // NewStorageError creates a new storage error
@@ -274,25 +291,32 @@ type ConnectorListOptions struct {
 
 // SyncOptions for synchronization
 type SyncOptions struct {
-	FullSync     bool      `json:"full_sync"`
-	Since        time.Time `json:"since"`
-	Paths        []string  `json:"paths,omitempty"`
-	DryRun       bool      `json:"dry_run"`
-	MaxFiles     int64     `json:"max_files,omitempty"`
-	MaxSize      int64     `json:"max_size,omitempty"`
+	FullSync bool      `json:"full_sync"`
+	Since    time.Time `json:"since"`
+	Paths    []string  `json:"paths,omitempty"`
+	DryRun   bool      `json:"dry_run"`
+	MaxFiles int64     `json:"max_files,omitempty"`
+	MaxSize  int64     `json:"max_size,omitempty"`
 }
 
 // SyncResult contains synchronization results
 type SyncResult struct {
-	StartTime     time.Time                    `json:"start_time"`
-	EndTime       time.Time                    `json:"end_time"`
-	Duration      time.Duration                `json:"duration"`
-	SyncType      string                       `json:"sync_type"` // full, incremental
-	TotalFiles    int                          `json:"total_files"`
-	SyncedFiles   int                          `json:"synced_files"`
-	FailedFiles   int                          `json:"failed_files"`
-	Files         map[string]*SyncFileResult   `json:"files"`
-	Error         string                       `json:"error,omitempty"`
+	StartTime   time.Time                  `json:"start_time"`
+	EndTime     time.Time                  `json:"end_time"`
+	Duration    time.Duration              `json:"duration"`
+	SyncType    string                     `json:"sync_type"` // full, incremental
+	TotalFiles  int                        `json:"total_files"`
+	SyncedFiles int                        `json:"synced_files"`
+	FailedFiles int                        `json:"failed_files"`
+	Files       map[string]*SyncFileResult `json:"files"`
+	Error       string                     `json:"error,omitempty"`
+
+	// Additional fields for connector compatibility
+	FilesFound   int64    `json:"files_found"`
+	FilesChanged int64    `json:"files_changed"`
+	FilesDeleted int64    `json:"files_deleted"`
+	Errors       []string `json:"errors,omitempty"`
+	HasMore      bool     `json:"has_more,omitempty"`
 }
 
 // SyncFileResult contains results for a single file sync
@@ -338,28 +362,28 @@ type ConnectorMetrics struct {
 type StorageConnector interface {
 	// Connect establishes connection to the storage system
 	Connect(ctx context.Context, credentials map[string]interface{}) error
-	
+
 	// Disconnect closes the connection
 	Disconnect(ctx context.Context) error
-	
+
 	// IsConnected returns connection status
 	IsConnected() bool
-	
+
 	// ListFiles lists files in the storage system
 	ListFiles(ctx context.Context, path string, options *ConnectorListOptions) ([]*ConnectorFileInfo, error)
-	
+
 	// GetFile retrieves file metadata
 	GetFile(ctx context.Context, fileID string) (*ConnectorFileInfo, error)
-	
+
 	// DownloadFile downloads file content
 	DownloadFile(ctx context.Context, fileID string) (io.ReadCloser, error)
-	
+
 	// SyncFiles performs synchronization
 	SyncFiles(ctx context.Context, options *SyncOptions) (*SyncResult, error)
-	
+
 	// GetSyncState returns current sync state
 	GetSyncState(ctx context.Context) (*SyncState, error)
-	
+
 	// GetMetrics returns connector metrics
 	GetMetrics(ctx context.Context) (*ConnectorMetrics, error)
 }
@@ -368,19 +392,19 @@ type StorageConnector interface {
 type LocalStore interface {
 	// SaveFile saves file content to local storage
 	SaveFile(ctx context.Context, path string, reader io.Reader) error
-	
+
 	// LoadFile loads file content from local storage
 	LoadFile(ctx context.Context, path string) (io.ReadCloser, error)
-	
+
 	// DeleteFile deletes a file from local storage
 	DeleteFile(ctx context.Context, path string) error
-	
+
 	// MoveFile moves a file to a new location
 	MoveFile(ctx context.Context, oldPath, newPath string) error
-	
+
 	// GetFileInfo gets file metadata
 	GetFileInfo(ctx context.Context, path string) (*ConnectorFileInfo, error)
-	
+
 	// ListFiles lists files in a directory
 	ListFiles(ctx context.Context, path string, options *ConnectorListOptions) ([]*ConnectorFileInfo, error)
 }
@@ -389,10 +413,10 @@ type LocalStore interface {
 type ConnectorStorageManager interface {
 	// GetLocalStore returns the local storage interface
 	GetLocalStore() LocalStore
-	
+
 	// GetConnector returns a connector for the specified type
 	GetConnector(connectorType string) (StorageConnector, error)
-	
+
 	// RegisterConnector registers a new connector
 	RegisterConnector(connectorType string, connector StorageConnector) error
 }

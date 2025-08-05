@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // Loader handles loading configuration from various sources
@@ -226,7 +226,7 @@ func (l *Loader) Load(configPath string, config interface{}) error {
 // WriteExample writes an example configuration file
 func (l *Loader) WriteExample(configPath string, config interface{}) error {
 	ext := strings.ToLower(filepath.Ext(configPath))
-	
+
 	var data []byte
 	var err error
 

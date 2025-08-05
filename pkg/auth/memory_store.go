@@ -26,7 +26,7 @@ func NewMemoryUserStore() *MemoryUserStore {
 func (s *MemoryUserStore) CreateUser(ctx context.Context, user *User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Check if user already exists
 	for _, existingUser := range s.users {
 		if existingUser.Email == user.Email {
@@ -36,11 +36,11 @@ func (s *MemoryUserStore) CreateUser(ctx context.Context, user *User) error {
 			return ErrUserAlreadyExists
 		}
 	}
-	
+
 	// Create copy to avoid mutations
 	userCopy := *user
 	s.users[user.ID] = &userCopy
-	
+
 	return nil
 }
 
@@ -48,12 +48,12 @@ func (s *MemoryUserStore) CreateUser(ctx context.Context, user *User) error {
 func (s *MemoryUserStore) GetUser(ctx context.Context, userID uuid.UUID) (*User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	user, exists := s.users[userID]
 	if !exists {
 		return nil, ErrUserNotFound
 	}
-	
+
 	// Return copy to avoid mutations
 	userCopy := *user
 	return &userCopy, nil
@@ -63,7 +63,7 @@ func (s *MemoryUserStore) GetUser(ctx context.Context, userID uuid.UUID) (*User,
 func (s *MemoryUserStore) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	for _, user := range s.users {
 		if user.Email == email {
 			// Return copy to avoid mutations
@@ -71,7 +71,7 @@ func (s *MemoryUserStore) GetUserByEmail(ctx context.Context, email string) (*Us
 			return &userCopy, nil
 		}
 	}
-	
+
 	return nil, ErrUserNotFound
 }
 
@@ -79,7 +79,7 @@ func (s *MemoryUserStore) GetUserByEmail(ctx context.Context, email string) (*Us
 func (s *MemoryUserStore) GetUserByUsername(ctx context.Context, username string) (*User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	for _, user := range s.users {
 		if user.Username == username {
 			// Return copy to avoid mutations
@@ -87,7 +87,7 @@ func (s *MemoryUserStore) GetUserByUsername(ctx context.Context, username string
 			return &userCopy, nil
 		}
 	}
-	
+
 	return nil, ErrUserNotFound
 }
 
@@ -95,16 +95,16 @@ func (s *MemoryUserStore) GetUserByUsername(ctx context.Context, username string
 func (s *MemoryUserStore) UpdateUser(ctx context.Context, user *User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if _, exists := s.users[user.ID]; !exists {
 		return ErrUserNotFound
 	}
-	
+
 	// Create copy to avoid mutations
 	userCopy := *user
 	userCopy.UpdatedAt = time.Now()
 	s.users[user.ID] = &userCopy
-	
+
 	return nil
 }
 
@@ -112,11 +112,11 @@ func (s *MemoryUserStore) UpdateUser(ctx context.Context, user *User) error {
 func (s *MemoryUserStore) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if _, exists := s.users[userID]; !exists {
 		return ErrUserNotFound
 	}
-	
+
 	delete(s.users, userID)
 	return nil
 }
@@ -125,16 +125,16 @@ func (s *MemoryUserStore) DeleteUser(ctx context.Context, userID uuid.UUID) erro
 func (s *MemoryUserStore) ListUsers(ctx context.Context, filter *UserFilter) ([]*User, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	var users []*User
-	
+
 	for _, user := range s.users {
 		// Apply filters
 		if filter != nil {
 			if filter.Status != nil && user.Status != *filter.Status {
 				continue
 			}
-			
+
 			if filter.Role != nil {
 				hasRole := false
 				for _, role := range user.Roles {
@@ -147,7 +147,7 @@ func (s *MemoryUserStore) ListUsers(ctx context.Context, filter *UserFilter) ([]
 					continue
 				}
 			}
-			
+
 			if filter.Search != "" {
 				search := strings.ToLower(filter.Search)
 				if !strings.Contains(strings.ToLower(user.Username), search) &&
@@ -158,31 +158,31 @@ func (s *MemoryUserStore) ListUsers(ctx context.Context, filter *UserFilter) ([]
 				}
 			}
 		}
-		
+
 		// Create copy to avoid mutations
 		userCopy := *user
 		users = append(users, &userCopy)
 	}
-	
+
 	// Apply pagination
 	if filter != nil {
 		start := filter.Offset
 		if start > len(users) {
 			start = len(users)
 		}
-		
+
 		end := start + filter.Limit
 		if filter.Limit == 0 || end > len(users) {
 			end = len(users)
 		}
-		
+
 		if start < end {
 			users = users[start:end]
 		} else {
 			users = []*User{}
 		}
 	}
-	
+
 	return users, nil
 }
 
@@ -207,7 +207,7 @@ func NewMemoryTenantStore() *MemoryTenantStore {
 func (s *MemoryTenantStore) CreateTenant(ctx context.Context, tenant *Tenant) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Check if tenant already exists by name or domain
 	for _, existingTenant := range s.tenants {
 		if existingTenant.Name == tenant.Name {
@@ -217,11 +217,11 @@ func (s *MemoryTenantStore) CreateTenant(ctx context.Context, tenant *Tenant) er
 			return ErrTenantAlreadyExists
 		}
 	}
-	
+
 	// Create copy to avoid mutations
 	tenantCopy := *tenant
 	s.tenants[tenant.ID] = &tenantCopy
-	
+
 	return nil
 }
 
@@ -229,12 +229,12 @@ func (s *MemoryTenantStore) CreateTenant(ctx context.Context, tenant *Tenant) er
 func (s *MemoryTenantStore) GetTenant(ctx context.Context, tenantID uuid.UUID) (*Tenant, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	tenant, exists := s.tenants[tenantID]
 	if !exists {
 		return nil, ErrTenantNotFound
 	}
-	
+
 	// Return copy to avoid mutations
 	tenantCopy := *tenant
 	return &tenantCopy, nil
@@ -244,16 +244,16 @@ func (s *MemoryTenantStore) GetTenant(ctx context.Context, tenantID uuid.UUID) (
 func (s *MemoryTenantStore) UpdateTenant(ctx context.Context, tenant *Tenant) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if _, exists := s.tenants[tenant.ID]; !exists {
 		return ErrTenantNotFound
 	}
-	
+
 	// Create copy to avoid mutations
 	tenantCopy := *tenant
 	tenantCopy.UpdatedAt = time.Now()
 	s.tenants[tenant.ID] = &tenantCopy
-	
+
 	return nil
 }
 
@@ -261,13 +261,13 @@ func (s *MemoryTenantStore) UpdateTenant(ctx context.Context, tenant *Tenant) er
 func (s *MemoryTenantStore) DeleteTenant(ctx context.Context, tenantID uuid.UUID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if _, exists := s.tenants[tenantID]; !exists {
 		return ErrTenantNotFound
 	}
-	
+
 	delete(s.tenants, tenantID)
-	
+
 	// Clean up user-tenant relationships
 	delete(s.tenantUsers, tenantID)
 	for userID, userTenants := range s.userTenants {
@@ -279,7 +279,7 @@ func (s *MemoryTenantStore) DeleteTenant(ctx context.Context, tenantID uuid.UUID
 		}
 		s.userTenants[userID] = filteredTenants
 	}
-	
+
 	return nil
 }
 
@@ -287,20 +287,20 @@ func (s *MemoryTenantStore) DeleteTenant(ctx context.Context, tenantID uuid.UUID
 func (s *MemoryTenantStore) ListTenants(ctx context.Context, filter *TenantFilter) ([]*Tenant, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	var tenants []*Tenant
-	
+
 	for _, tenant := range s.tenants {
 		// Apply filters
 		if filter != nil {
 			if filter.Status != nil && tenant.Status != *filter.Status {
 				continue
 			}
-			
+
 			if filter.Domain != "" && tenant.Domain != filter.Domain {
 				continue
 			}
-			
+
 			if filter.Search != "" {
 				search := strings.ToLower(filter.Search)
 				if !strings.Contains(strings.ToLower(tenant.Name), search) &&
@@ -310,31 +310,31 @@ func (s *MemoryTenantStore) ListTenants(ctx context.Context, filter *TenantFilte
 				}
 			}
 		}
-		
+
 		// Create copy to avoid mutations
 		tenantCopy := *tenant
 		tenants = append(tenants, &tenantCopy)
 	}
-	
+
 	// Apply pagination
 	if filter != nil {
 		start := filter.Offset
 		if start > len(tenants) {
 			start = len(tenants)
 		}
-		
+
 		end := start + filter.Limit
 		if filter.Limit == 0 || end > len(tenants) {
 			end = len(tenants)
 		}
-		
+
 		if start < end {
 			tenants = tenants[start:end]
 		} else {
 			tenants = []*Tenant{}
 		}
 	}
-	
+
 	return tenants, nil
 }
 
@@ -342,12 +342,12 @@ func (s *MemoryTenantStore) ListTenants(ctx context.Context, filter *TenantFilte
 func (s *MemoryTenantStore) AddUserToTenant(ctx context.Context, userID, tenantID uuid.UUID, role TenantRole) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Check if tenant exists
 	if _, exists := s.tenants[tenantID]; !exists {
 		return ErrTenantNotFound
 	}
-	
+
 	// Check if relationship already exists
 	userTenants := s.userTenants[userID]
 	for _, ut := range userTenants {
@@ -359,7 +359,7 @@ func (s *MemoryTenantStore) AddUserToTenant(ctx context.Context, userID, tenantI
 			return nil
 		}
 	}
-	
+
 	// Create new relationship
 	now := time.Now()
 	userTenant := &UserTenant{
@@ -370,9 +370,9 @@ func (s *MemoryTenantStore) AddUserToTenant(ctx context.Context, userID, tenantI
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	
+
 	s.userTenants[userID] = append(s.userTenants[userID], userTenant)
-	
+
 	// Add to tenant users (would need user info for TenantUser)
 	// This is simplified - in a real implementation, you'd fetch user details
 	tenantUser := &TenantUser{
@@ -381,9 +381,9 @@ func (s *MemoryTenantStore) AddUserToTenant(ctx context.Context, userID, tenantI
 		Status:    UserTenantStatusActive,
 		CreatedAt: now,
 	}
-	
+
 	s.tenantUsers[tenantID] = append(s.tenantUsers[tenantID], tenantUser)
-	
+
 	return nil
 }
 
@@ -391,7 +391,7 @@ func (s *MemoryTenantStore) AddUserToTenant(ctx context.Context, userID, tenantI
 func (s *MemoryTenantStore) RemoveUserFromTenant(ctx context.Context, userID, tenantID uuid.UUID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Remove from user tenants
 	userTenants := s.userTenants[userID]
 	var filteredUserTenants []*UserTenant
@@ -401,7 +401,7 @@ func (s *MemoryTenantStore) RemoveUserFromTenant(ctx context.Context, userID, te
 		}
 	}
 	s.userTenants[userID] = filteredUserTenants
-	
+
 	// Remove from tenant users
 	tenantUsers := s.tenantUsers[tenantID]
 	var filteredTenantUsers []*TenantUser
@@ -411,7 +411,7 @@ func (s *MemoryTenantStore) RemoveUserFromTenant(ctx context.Context, userID, te
 		}
 	}
 	s.tenantUsers[tenantID] = filteredTenantUsers
-	
+
 	return nil
 }
 
@@ -419,19 +419,19 @@ func (s *MemoryTenantStore) RemoveUserFromTenant(ctx context.Context, userID, te
 func (s *MemoryTenantStore) GetUserTenants(ctx context.Context, userID uuid.UUID) ([]*UserTenant, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	userTenants := s.userTenants[userID]
 	if userTenants == nil {
 		return []*UserTenant{}, nil
 	}
-	
+
 	// Return copies to avoid mutations
 	var result []*UserTenant
 	for _, ut := range userTenants {
 		utCopy := *ut
 		result = append(result, &utCopy)
 	}
-	
+
 	return result, nil
 }
 
@@ -439,12 +439,12 @@ func (s *MemoryTenantStore) GetUserTenants(ctx context.Context, userID uuid.UUID
 func (s *MemoryTenantStore) GetTenantUsers(ctx context.Context, tenantID uuid.UUID) ([]*TenantUser, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	tenantUsers := s.tenantUsers[tenantID]
 	if tenantUsers == nil {
 		return []*TenantUser{}, nil
 	}
-	
+
 	// Return copies to avoid mutations
 	var result []*TenantUser
 	for _, tu := range tenantUsers {
@@ -455,7 +455,7 @@ func (s *MemoryTenantStore) GetTenantUsers(ctx context.Context, tenantID uuid.UU
 		}
 		result = append(result, &tuCopy)
 	}
-	
+
 	return result, nil
 }
 
@@ -482,9 +482,9 @@ func (s *MemoryUserStore) SeedData() error {
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
-	
+
 	s.users[adminUser.ID] = adminUser
-	
+
 	// Create a test user
 	testUser := &User{
 		ID:           uuid.New(),
@@ -500,9 +500,9 @@ func (s *MemoryUserStore) SeedData() error {
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
-	
+
 	s.users[testUser.ID] = testUser
-	
+
 	return nil
 }
 
@@ -520,9 +520,9 @@ func (s *MemoryTenantStore) SeedData() error {
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	
+
 	s.tenants[defaultTenant.ID] = defaultTenant
-	
+
 	return nil
 }
 
@@ -530,14 +530,14 @@ func (s *MemoryTenantStore) SeedData() error {
 func (s *MemoryTenantStore) GetDefaultTenant() *Tenant {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	for _, tenant := range s.tenants {
 		if tenant.Name == "default" {
 			tenantCopy := *tenant
 			return &tenantCopy
 		}
 	}
-	
+
 	return nil
 }
 
@@ -545,13 +545,13 @@ func (s *MemoryTenantStore) GetDefaultTenant() *Tenant {
 func (s *MemoryUserStore) GetAdminUser() *User {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	for _, user := range s.users {
 		if user.Username == "admin" {
 			userCopy := *user
 			return &userCopy
 		}
 	}
-	
+
 	return nil
 }

@@ -18,15 +18,15 @@ type EventHandler struct {
 
 // ProcessingEventData represents data for processing events
 type ProcessingEventData struct {
-	TenantID    uuid.UUID `json:"tenant_id"`
-	SessionID   uuid.UUID `json:"session_id,omitempty"`
-	FileID      uuid.UUID `json:"file_id,omitempty"`
-	Status      string    `json:"status"`
-	Progress    float64   `json:"progress,omitempty"`
-	Message     string    `json:"message,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	Timestamp   time.Time `json:"timestamp"`
+	TenantID  uuid.UUID      `json:"tenant_id"`
+	SessionID uuid.UUID      `json:"session_id,omitempty"`
+	FileID    uuid.UUID      `json:"file_id,omitempty"`
+	Status    string         `json:"status"`
+	Progress  float64        `json:"progress,omitempty"`
+	Message   string         `json:"message,omitempty"`
+	Error     string         `json:"error,omitempty"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	Timestamp time.Time      `json:"timestamp"`
 }
 
 // NewEventHandler creates a new event handler
@@ -66,7 +66,7 @@ func (eh *EventHandler) HandleFileDiscovered(ctx context.Context, event *events.
 	if autoProcess {
 		// Start processing automatically
 		options := map[string]any{
-			"priority": "normal",
+			"priority":         "normal",
 			"dlp_scan_enabled": true,
 		}
 
@@ -101,17 +101,17 @@ func (eh *EventHandler) HandleProcessingRequested(ctx context.Context, event *ev
 		}
 
 		options := eh.extractProcessingOptions(eventData)
-		
+
 		go func() {
 			result, err := eh.coordinator.ProcessSingleFile(context.Background(), tenantID, fileID, options)
 			if err != nil {
 				eh.emitProcessingEvent("file.processing.failed", tenantID, fileID, uuid.Nil, "failed", 0, err.Error(), nil)
 			} else {
 				metadata := map[string]any{
-					"chunks_created":   result.ChunksCreated,
-					"bytes_processed":  result.BytesProcessed,
-					"processing_time":  result.ProcessingTime,
-					"quality_score":    result.QualityScore,
+					"chunks_created":  result.ChunksCreated,
+					"bytes_processed": result.BytesProcessed,
+					"processing_time": result.ProcessingTime,
+					"quality_score":   result.QualityScore,
 				}
 				eh.emitProcessingEvent("file.processing.completed", tenantID, fileID, uuid.Nil, "completed", 1.0, "", metadata)
 			}
@@ -129,14 +129,14 @@ func (eh *EventHandler) HandleProcessingRequested(ctx context.Context, event *ev
 
 		if len(fileIDs) > 0 {
 			options := eh.extractProcessingOptions(eventData)
-			
+
 			go func() {
 				job, err := eh.coordinator.ProcessMultipleFiles(context.Background(), tenantID, fileIDs, options)
 				if err != nil {
 					eh.emitProcessingEvent("batch.processing.failed", tenantID, uuid.Nil, uuid.Nil, "failed", 0, err.Error(), nil)
 				} else {
 					metadata := map[string]any{
-						"job_id":    job.ID,
+						"job_id":     job.ID,
 						"session_id": job.SessionID,
 						"file_count": len(fileIDs),
 					}
@@ -172,7 +172,7 @@ func (eh *EventHandler) HandleDataSourceSync(ctx context.Context, event *events.
 	autoProcess, _ := eventData["auto_process"].(bool)
 	if autoProcess {
 		options := eh.extractProcessingOptions(eventData)
-		
+
 		go func() {
 			job, err := eh.coordinator.ProcessDataSource(context.Background(), tenantID, dataSourceID, options)
 			if err != nil {
@@ -213,13 +213,13 @@ func (eh *EventHandler) HandleSessionStatusUpdate(ctx context.Context, event *ev
 
 	// Emit progress event
 	metadata := map[string]any{
-		"files_total":      progress.FilesTotal,
-		"files_processed":  progress.FilesProcessed,
-		"files_failed":     progress.FilesFailed,
-		"chunks_created":   progress.ChunksCreated,
-		"bytes_processed":  progress.BytesProcessed,
-		"elapsed_time":     progress.ElapsedTime,
-		"estimated_left":   progress.EstimatedTimeLeft,
+		"files_total":     progress.FilesTotal,
+		"files_processed": progress.FilesProcessed,
+		"files_failed":    progress.FilesFailed,
+		"chunks_created":  progress.ChunksCreated,
+		"bytes_processed": progress.BytesProcessed,
+		"elapsed_time":    progress.ElapsedTime,
+		"estimated_left":  progress.EstimatedTimeLeft,
 	}
 
 	eventType := "session.progress.updated"
@@ -302,10 +302,10 @@ func (eh *EventHandler) emitProcessingEvent(eventType string, tenantID, fileID, 
 	}
 
 	event := &events.Event{
-		ID:        uuid.New(),
-		Type:      eventType,
-		TenantID:  eventData.TenantID,
-		Payload:   map[string]interface{}{
+		ID:       uuid.New(),
+		Type:     eventType,
+		TenantID: eventData.TenantID,
+		Payload: map[string]interface{}{
 			"session_id": eventData.SessionID,
 			"file_id":    eventData.FileID,
 			"status":     eventData.Status,
@@ -325,11 +325,11 @@ func (eh *EventHandler) RegisterEventHandlers(bus events.EventBusInterface) erro
 	// Subscribe this handler to relevant event types
 	eventTypes := []string{
 		"file.discovered",
-		"processing.requested", 
+		"processing.requested",
 		"datasource.synced",
 		"session.status.update",
 	}
-	
+
 	return bus.Subscribe(eh, eventTypes...)
 }
 
@@ -341,7 +341,7 @@ func (eh *EventHandler) HandleEvent(ctx context.Context, event interface{}) erro
 	if !ok {
 		return fmt.Errorf("expected *events.Event, got %T", event)
 	}
-	
+
 	switch ev.Type {
 	case "file.discovered":
 		return eh.HandleFileDiscovered(ctx, ev)
@@ -361,7 +361,7 @@ func (eh *EventHandler) GetEventTypes() []string {
 	return []string{
 		"file.discovered",
 		"processing.requested",
-		"datasource.synced", 
+		"datasource.synced",
 		"session.status.update",
 	}
 }
@@ -391,12 +391,12 @@ func (pee *ProcessingEventEmitter) EmitFileProcessingStarted(ctx context.Context
 // EmitFileProcessingCompleted emits an event when file processing completes
 func (pee *ProcessingEventEmitter) EmitFileProcessingCompleted(ctx context.Context, tenantID, fileID uuid.UUID, result *ProcessingResult) error {
 	metadata := map[string]any{
-		"chunks_created":   result.ChunksCreated,
-		"bytes_processed":  result.BytesProcessed,
-		"processing_time":  result.ProcessingTime,
-		"quality_score":    result.QualityScore,
-		"reader_used":      result.ReaderUsed,
-		"strategy_used":    result.StrategyUsed,
+		"chunks_created":  result.ChunksCreated,
+		"bytes_processed": result.BytesProcessed,
+		"processing_time": result.ProcessingTime,
+		"quality_score":   result.QualityScore,
+		"reader_used":     result.ReaderUsed,
+		"strategy_used":   result.StrategyUsed,
 	}
 	return pee.emitEvent(ctx, "file.processing.completed", tenantID, fileID, uuid.Nil, "completed", 1.0, "", metadata)
 }
@@ -422,11 +422,11 @@ func (pee *ProcessingEventEmitter) EmitSessionStarted(ctx context.Context, tenan
 // EmitSessionProgress emits an event with session progress updates
 func (pee *ProcessingEventEmitter) EmitSessionProgress(ctx context.Context, tenantID, sessionID uuid.UUID, progress *SessionProgress) error {
 	metadata := map[string]any{
-		"files_total":      progress.FilesTotal,
-		"files_processed":  progress.FilesProcessed,
-		"files_failed":     progress.FilesFailed,
-		"chunks_created":   progress.ChunksCreated,
-		"bytes_processed":  progress.BytesProcessed,
+		"files_total":     progress.FilesTotal,
+		"files_processed": progress.FilesProcessed,
+		"files_failed":    progress.FilesFailed,
+		"chunks_created":  progress.ChunksCreated,
+		"bytes_processed": progress.BytesProcessed,
 	}
 	return pee.emitEvent(ctx, "session.progress", tenantID, uuid.Nil, sessionID, progress.Status, progress.Progress, "", metadata)
 }
@@ -434,12 +434,12 @@ func (pee *ProcessingEventEmitter) EmitSessionProgress(ctx context.Context, tena
 // EmitSessionCompleted emits an event when a processing session completes
 func (pee *ProcessingEventEmitter) EmitSessionCompleted(ctx context.Context, tenantID, sessionID uuid.UUID, progress *SessionProgress) error {
 	metadata := map[string]any{
-		"files_total":      progress.FilesTotal,
-		"files_processed":  progress.FilesProcessed,
-		"files_failed":     progress.FilesFailed,
-		"chunks_created":   progress.ChunksCreated,
-		"bytes_processed":  progress.BytesProcessed,
-		"total_time":       progress.ElapsedTime,
+		"files_total":     progress.FilesTotal,
+		"files_processed": progress.FilesProcessed,
+		"files_failed":    progress.FilesFailed,
+		"chunks_created":  progress.ChunksCreated,
+		"bytes_processed": progress.BytesProcessed,
+		"total_time":      progress.ElapsedTime,
 	}
 	return pee.emitEvent(ctx, "session.completed", tenantID, uuid.Nil, sessionID, "completed", 1.0, "", metadata)
 }
@@ -472,12 +472,11 @@ func (pee *ProcessingEventEmitter) emitEvent(ctx context.Context, eventType stri
 		eventData.Metadata = metadata
 	}
 
-
 	event := &events.Event{
-		ID:        uuid.New(),
-		Type:      eventType,
-		TenantID:  tenantID,
-		Payload:   map[string]interface{}{
+		ID:       uuid.New(),
+		Type:     eventType,
+		TenantID: tenantID,
+		Payload: map[string]interface{}{
 			"session_id": sessionID,
 			"file_id":    fileID,
 			"status":     status,

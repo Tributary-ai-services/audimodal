@@ -133,7 +133,7 @@ func (d *FileDecompressor) decompressZip(filePath string) ([]DecompressedFile, e
 
 	var files []DecompressedFile
 	extractDir := filepath.Join(d.tempDir, "zip_"+filepath.Base(filePath)+"_extract")
-	
+
 	err = os.MkdirAll(extractDir, 0755)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create extract directory: %w", err)
@@ -141,14 +141,14 @@ func (d *FileDecompressor) decompressZip(filePath string) ([]DecompressedFile, e
 
 	for _, file := range reader.File {
 		extractPath := filepath.Join(extractDir, file.Name)
-		
+
 		// Ensure directory exists
 		if file.FileInfo().IsDir() {
 			err = os.MkdirAll(extractPath, file.FileInfo().Mode())
 			if err != nil {
 				return nil, fmt.Errorf("failed to create directory %s: %w", extractPath, err)
 			}
-			
+
 			files = append(files, DecompressedFile{
 				Name:        file.Name,
 				Path:        extractPath,
@@ -180,7 +180,7 @@ func (d *FileDecompressor) decompressZip(filePath string) ([]DecompressedFile, e
 		_, err = io.Copy(outFile, rc)
 		outFile.Close()
 		rc.Close()
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract file %s: %w", file.Name, err)
 		}
@@ -222,7 +222,7 @@ func (d *FileDecompressor) decompressGzip(filePath string) ([]DecompressedFile, 
 	}
 
 	extractPath := filepath.Join(d.tempDir, "gzip_"+baseName)
-	
+
 	outFile, err := os.Create(extractPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create output file: %w", err)
@@ -277,7 +277,7 @@ func (d *FileDecompressor) decompressTarGz(filePath string) ([]DecompressedFile,
 func (d *FileDecompressor) extractTar(reader io.Reader, sourcePath string) ([]DecompressedFile, error) {
 	tarReader := tar.NewReader(reader)
 	var files []DecompressedFile
-	
+
 	extractDir := filepath.Join(d.tempDir, "tar_"+filepath.Base(sourcePath)+"_extract")
 	err := os.MkdirAll(extractDir, 0755)
 	if err != nil {
@@ -301,7 +301,7 @@ func (d *FileDecompressor) extractTar(reader io.Reader, sourcePath string) ([]De
 			if err != nil {
 				return nil, fmt.Errorf("failed to create directory %s: %w", extractPath, err)
 			}
-			
+
 			files = append(files, DecompressedFile{
 				Name:        header.Name,
 				Path:        extractPath,
@@ -324,7 +324,7 @@ func (d *FileDecompressor) extractTar(reader io.Reader, sourcePath string) ([]De
 
 			_, err = io.Copy(outFile, tarReader)
 			outFile.Close()
-			
+
 			if err != nil {
 				return nil, fmt.Errorf("failed to extract file %s: %w", header.Name, err)
 			}
@@ -359,7 +359,7 @@ func (d *FileDecompressor) GetSupportedFormats() []string {
 // Cleanup removes temporary extracted files
 func (d *FileDecompressor) Cleanup(files []DecompressedFile) error {
 	dirs := make(map[string]bool)
-	
+
 	// Collect unique directories to remove
 	for _, file := range files {
 		if !file.IsDirectory && file.SourcePath != file.Path {
@@ -367,13 +367,13 @@ func (d *FileDecompressor) Cleanup(files []DecompressedFile) error {
 			dirs[dir] = true
 		}
 	}
-	
+
 	// Remove directories
 	for dir := range dirs {
 		if strings.Contains(dir, "_extract") { // Safety check
 			os.RemoveAll(dir)
 		}
 	}
-	
+
 	return nil
 }

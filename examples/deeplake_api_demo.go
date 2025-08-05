@@ -41,7 +41,7 @@ func main() {
 	} else {
 		fmt.Printf("Found %d datasets:\n", len(datasets))
 		for i, dataset := range datasets {
-			fmt.Printf("  %d. %s (%d dimensions, %d vectors)\n", 
+			fmt.Printf("  %d. %s (%d dimensions, %d vectors)\n",
 				i+1, dataset.Name, dataset.Dimensions, dataset.VectorCount)
 		}
 	}
@@ -103,7 +103,7 @@ func main() {
 		},
 		{
 			ID:         "vec_2",
-			DocumentID: "doc_2", 
+			DocumentID: "doc_2",
 			ChunkID:    "chunk_1",
 			Content:    "This document discusses artificial intelligence concepts.",
 			Vector:     generateTestVector(1536),
@@ -118,7 +118,7 @@ func main() {
 		{
 			ID:         "vec_3",
 			DocumentID: "doc_3",
-			ChunkID:    "chunk_1", 
+			ChunkID:    "chunk_1",
 			Content:    "Natural language processing is a subfield of AI.",
 			Vector:     generateTestVector(1536),
 			Metadata: map[string]interface{}{
@@ -153,10 +153,10 @@ func main() {
 	if err != nil {
 		log.Printf("Error performing similarity search: %v", err)
 	} else {
-		fmt.Printf("Search Results (%d found, query time: %.2fms):\n", 
+		fmt.Printf("Search Results (%d found, query time: %.2fms):\n",
 			searchResult.TotalFound, searchResult.QueryTime)
 		for i, result := range searchResult.Results {
-			fmt.Printf("  %d. ID: %s, Score: %.4f, Distance: %.4f\n", 
+			fmt.Printf("  %d. ID: %s, Score: %.4f, Distance: %.4f\n",
 				i+1, result.DocumentVector.ID, result.Score, result.Distance)
 			fmt.Printf("     Content: %s\n", result.DocumentVector.Content)
 			if category, ok := result.DocumentVector.Metadata["category"]; ok {
@@ -171,10 +171,10 @@ func main() {
 	if err != nil {
 		log.Printf("Text search not available or error: %v", err)
 	} else {
-		fmt.Printf("Text Search Results (%d found, query time: %.2fms):\n", 
+		fmt.Printf("Text Search Results (%d found, query time: %.2fms):\n",
 			textSearchResult.TotalFound, textSearchResult.QueryTime)
 		for i, result := range textSearchResult.Results {
-			fmt.Printf("  %d. ID: %s, Score: %.4f\n", 
+			fmt.Printf("  %d. ID: %s, Score: %.4f\n",
 				i+1, result.DocumentVector.ID, result.Score)
 			fmt.Printf("     Content: %s\n", result.DocumentVector.Content)
 		}
@@ -237,14 +237,14 @@ func main() {
 // generateTestVector creates a random test vector of the specified dimensions
 func generateTestVector(dimensions int) []float32 {
 	vector := make([]float32, dimensions)
-	
+
 	// Generate a simple pattern to create consistent but varied test vectors
 	for i := 0; i < dimensions; i++ {
 		// Create a simple sine wave pattern with some noise
 		base := float32(i) / float32(dimensions) * 6.28 // 2π
 		vector[i] = float32(0.5 + 0.3*sin(float64(base)) + 0.2*sin(float64(base*3)))
 	}
-	
+
 	return vector
 }
 
@@ -252,7 +252,7 @@ func generateTestVector(dimensions int) []float32 {
 func sin(x float64) float64 {
 	// Taylor series approximation for sin(x)
 	// sin(x) ≈ x - x³/3! + x⁵/5! - x⁷/7! + ...
-	
+
 	// Normalize x to [-π, π] range
 	for x > 3.14159 {
 		x -= 6.28318
@@ -260,20 +260,20 @@ func sin(x float64) float64 {
 	for x < -3.14159 {
 		x += 6.28318
 	}
-	
+
 	x2 := x * x
 	result := x
 	term := x
-	
+
 	// Calculate first few terms of Taylor series
 	for i := 1; i < 10; i++ {
-		term *= -x2 / float64((2*i) * (2*i + 1))
+		term *= -x2 / float64((2*i)*(2*i+1))
 		result += term
 		if abs(term) < 1e-10 {
 			break
 		}
 	}
-	
+
 	return result
 }
 

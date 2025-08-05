@@ -47,9 +47,9 @@ type DataSourceConfig struct {
 	Credentials DataSourceCredentials `json:"credentials,omitempty"`
 
 	// File filtering options
-	Includes           []string `json:"includes,omitempty"`
-	Excludes           []string `json:"excludes,omitempty"`
-	MaxFileSize        string   `json:"maxFileSize,omitempty"`
+	Includes            []string `json:"includes,omitempty"`
+	Excludes            []string `json:"excludes,omitempty"`
+	MaxFileSize         string   `json:"maxFileSize,omitempty"`
 	SupportedExtensions []string `json:"supportedExtensions,omitempty"`
 
 	// Cloud storage specific
@@ -63,11 +63,11 @@ type DataSourceConfig struct {
 
 	// Database specific
 	ConnectionString string   `json:"connectionString,omitempty"`
-	Tables          []string `json:"tables,omitempty"`
+	Tables           []string `json:"tables,omitempty"`
 
 	// API specific
-	Endpoint  string            `json:"endpoint,omitempty"`
-	Headers   map[string]string `json:"headers,omitempty"`
+	Endpoint  string              `json:"endpoint,omitempty"`
+	Headers   map[string]string   `json:"headers,omitempty"`
 	RateLimit DataSourceRateLimit `json:"rateLimit,omitempty"`
 }
 
@@ -364,6 +364,10 @@ type DataSourceHealth struct {
 //+kubebuilder:printcolumn:name="Last Sync",type="string",JSONPath=".status.lastSync.status",description="Last sync status"
 //+kubebuilder:printcolumn:name="Files",type="integer",JSONPath=".status.statistics.totalFiles",description="Total files"
 //+kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+
+// DataSource is the Schema for the datasources API
+//+kubebuilder:object:root=true
+//+kubebuilder:resource:scope=Namespaced
 
 // DataSource is the Schema for the datasources API
 type DataSource struct {

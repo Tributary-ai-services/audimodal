@@ -1,6 +1,6 @@
 // Package v1 contains API Schema definitions for the audimodal v1 API group
-//+kubebuilder:object:generate=true
-//+groupName=audimodal.ai
+// +kubebuilder:object:generate=true
+// +groupName=audimodal.ai
 package v1
 
 import (

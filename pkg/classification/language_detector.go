@@ -17,26 +17,26 @@ type BasicLanguageDetector struct {
 
 // LanguagePatterns contains patterns for detecting a specific language
 type LanguagePatterns struct {
-	CommonWords     []string           // Most common words in the language
-	StopWords       []string           // Stop words
-	CharFrequency   map[rune]float64   // Character frequency patterns
-	BigramPatterns  []string           // Common bigram patterns
-	TrigramPatterns []string           // Common trigram patterns
-	Regex           []*regexp.Regexp   // Language-specific regex patterns
+	CommonWords     []string         // Most common words in the language
+	StopWords       []string         // Stop words
+	CharFrequency   map[rune]float64 // Character frequency patterns
+	BigramPatterns  []string         // Common bigram patterns
+	TrigramPatterns []string         // Common trigram patterns
+	Regex           []*regexp.Regexp // Language-specific regex patterns
 }
 
 // NewBasicLanguageDetector creates a new basic language detector
 func NewBasicLanguageDetector() *BasicLanguageDetector {
 	detector := &BasicLanguageDetector{
-		name:               "basic-language-detector",
-		version:            "1.0.0",
+		name:    "basic-language-detector",
+		version: "1.0.0",
 		supportedLanguages: []Language{
 			LanguageEnglish, LanguageSpanish, LanguageFrench, LanguageGerman,
 			LanguageItalian, LanguagePortuguese, LanguageDutch, LanguageRussian,
 		},
 		patterns: make(map[Language]*LanguagePatterns),
 	}
-	
+
 	detector.initializePatterns()
 	return detector
 }
@@ -49,7 +49,7 @@ func (d *BasicLanguageDetector) DetectLanguage(ctx context.Context, text string)
 			Confidence: 0.0,
 		}, nil
 	}
-	
+
 	// Preprocess text
 	cleanText := d.preprocessText(text)
 	if len(cleanText) < 10 {
@@ -58,15 +58,15 @@ func (d *BasicLanguageDetector) DetectLanguage(ctx context.Context, text string)
 			Confidence: 0.0,
 		}, nil
 	}
-	
+
 	// Calculate scores for each language
 	scores := make(map[Language]float64)
 	candidates := make([]LanguageCandidate, 0)
-	
+
 	for _, lang := range d.supportedLanguages {
 		score := d.calculateLanguageScore(cleanText, lang)
 		scores[lang] = score
-		
+
 		if score > 0.1 { // Only include candidates with reasonable scores
 			candidates = append(candidates, LanguageCandidate{
 				Language:   lang,
@@ -74,24 +74,24 @@ func (d *BasicLanguageDetector) DetectLanguage(ctx context.Context, text string)
 			})
 		}
 	}
-	
+
 	// Find the best match
 	bestLang := LanguageUnknown
 	bestScore := 0.0
-	
+
 	for lang, score := range scores {
 		if score > bestScore {
 			bestScore = score
 			bestLang = lang
 		}
 	}
-	
+
 	// If confidence is too low, return unknown
 	if bestScore < 0.3 {
 		bestLang = LanguageUnknown
 		bestScore = 0.0
 	}
-	
+
 	// Sort candidates by confidence
 	for i := range candidates {
 		for j := i + 1; j < len(candidates); j++ {
@@ -100,7 +100,7 @@ func (d *BasicLanguageDetector) DetectLanguage(ctx context.Context, text string)
 			}
 		}
 	}
-	
+
 	return &LanguageResult{
 		Language:   bestLang,
 		Confidence: bestScore,
@@ -117,7 +117,7 @@ func (d *BasicLanguageDetector) GetSupportedLanguages() []Language {
 func (d *BasicLanguageDetector) preprocessText(text string) string {
 	// Convert to lowercase
 	text = strings.ToLower(text)
-	
+
 	// Remove non-letter characters except spaces
 	var result strings.Builder
 	for _, r := range text {
@@ -127,11 +127,11 @@ func (d *BasicLanguageDetector) preprocessText(text string) string {
 			result.WriteRune(' ')
 		}
 	}
-	
+
 	// Normalize whitespace
 	text = regexp.MustCompile(`\s+`).ReplaceAllString(result.String(), " ")
 	text = strings.TrimSpace(text)
-	
+
 	return text
 }
 
@@ -141,31 +141,31 @@ func (d *BasicLanguageDetector) calculateLanguageScore(text string, lang Languag
 	if !exists {
 		return 0.0
 	}
-	
+
 	score := 0.0
 	weights := map[string]float64{
-		"common_words":    0.4,
-		"stop_words":      0.3,
-		"char_frequency":  0.2,
-		"bigrams":         0.1,
+		"common_words":   0.4,
+		"stop_words":     0.3,
+		"char_frequency": 0.2,
+		"bigrams":        0.1,
 	}
-	
+
 	// Check common words
 	commonWordScore := d.checkCommonWords(text, patterns.CommonWords)
 	score += commonWordScore * weights["common_words"]
-	
+
 	// Check stop words
 	stopWordScore := d.checkStopWords(text, patterns.StopWords)
 	score += stopWordScore * weights["stop_words"]
-	
+
 	// Check character frequency patterns
 	charFreqScore := d.checkCharacterFrequency(text, patterns.CharFrequency)
 	score += charFreqScore * weights["char_frequency"]
-	
+
 	// Check bigram patterns
 	bigramScore := d.checkBigramPatterns(text, patterns.BigramPatterns)
 	score += bigramScore * weights["bigrams"]
-	
+
 	return score
 }
 
@@ -174,12 +174,12 @@ func (d *BasicLanguageDetector) checkCommonWords(text string, commonWords []stri
 	if len(commonWords) == 0 {
 		return 0.0
 	}
-	
+
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return 0.0
 	}
-	
+
 	matches := 0
 	for _, word := range words {
 		for _, commonWord := range commonWords {
@@ -189,7 +189,7 @@ func (d *BasicLanguageDetector) checkCommonWords(text string, commonWords []stri
 			}
 		}
 	}
-	
+
 	return float64(matches) / float64(len(words))
 }
 
@@ -198,12 +198,12 @@ func (d *BasicLanguageDetector) checkStopWords(text string, stopWords []string) 
 	if len(stopWords) == 0 {
 		return 0.0
 	}
-	
+
 	words := strings.Fields(text)
 	if len(words) == 0 {
 		return 0.0
 	}
-	
+
 	matches := 0
 	for _, word := range words {
 		for _, stopWord := range stopWords {
@@ -213,7 +213,7 @@ func (d *BasicLanguageDetector) checkStopWords(text string, stopWords []string) 
 			}
 		}
 	}
-	
+
 	return float64(matches) / float64(len(words))
 }
 
@@ -222,49 +222,49 @@ func (d *BasicLanguageDetector) checkCharacterFrequency(text string, expectedFre
 	if len(expectedFreq) == 0 {
 		return 0.0
 	}
-	
+
 	// Calculate actual character frequencies
 	charCount := make(map[rune]int)
 	totalChars := 0
-	
+
 	for _, r := range text {
 		if unicode.IsLetter(r) {
 			charCount[r]++
 			totalChars++
 		}
 	}
-	
+
 	if totalChars == 0 {
 		return 0.0
 	}
-	
+
 	// Calculate similarity to expected frequencies
 	similarity := 0.0
 	checkedChars := 0
-	
+
 	for char, expectedFreq := range expectedFreq {
 		actualCount := charCount[char]
 		actualFreq := float64(actualCount) / float64(totalChars)
-		
+
 		// Calculate similarity (1 - absolute difference)
 		diff := actualFreq - expectedFreq
 		if diff < 0 {
 			diff = -diff
 		}
-		
+
 		charSimilarity := 1.0 - diff
 		if charSimilarity < 0 {
 			charSimilarity = 0
 		}
-		
+
 		similarity += charSimilarity
 		checkedChars++
 	}
-	
+
 	if checkedChars == 0 {
 		return 0.0
 	}
-	
+
 	return similarity / float64(checkedChars)
 }
 
@@ -273,26 +273,26 @@ func (d *BasicLanguageDetector) checkBigramPatterns(text string, patterns []stri
 	if len(patterns) == 0 {
 		return 0.0
 	}
-	
+
 	// Generate bigrams from text
 	words := strings.Fields(text)
 	if len(words) < 2 {
 		return 0.0
 	}
-	
+
 	textBigrams := make(map[string]int)
 	totalBigrams := 0
-	
+
 	for i := 0; i < len(words)-1; i++ {
 		bigram := words[i] + " " + words[i+1]
 		textBigrams[bigram]++
 		totalBigrams++
 	}
-	
+
 	if totalBigrams == 0 {
 		return 0.0
 	}
-	
+
 	// Count pattern matches
 	matches := 0
 	for _, pattern := range patterns {
@@ -300,7 +300,7 @@ func (d *BasicLanguageDetector) checkBigramPatterns(text string, patterns []stri
 			matches += count
 		}
 	}
-	
+
 	return float64(matches) / float64(totalBigrams)
 }
 
@@ -326,7 +326,7 @@ func (d *BasicLanguageDetector) initializePatterns() {
 			"and the", "to be", "in a", "that the", "with the",
 		},
 	}
-	
+
 	// Spanish patterns
 	d.patterns[LanguageSpanish] = &LanguagePatterns{
 		CommonWords: []string{
@@ -347,7 +347,7 @@ func (d *BasicLanguageDetector) initializePatterns() {
 			"por la", "con la", "de un", "en un", "que la",
 		},
 	}
-	
+
 	// French patterns
 	d.patterns[LanguageFrench] = &LanguagePatterns{
 		CommonWords: []string{
@@ -368,7 +368,7 @@ func (d *BasicLanguageDetector) initializePatterns() {
 			"sur le", "avec le", "que le", "par la", "de ce",
 		},
 	}
-	
+
 	// German patterns
 	d.patterns[LanguageGerman] = &LanguagePatterns{
 		CommonWords: []string{
@@ -389,7 +389,7 @@ func (d *BasicLanguageDetector) initializePatterns() {
 			"auf der", "für die", "in den", "von den", "zu den",
 		},
 	}
-	
+
 	// Add patterns for other languages...
 	// Italian
 	d.patterns[LanguageItalian] = &LanguagePatterns{
@@ -407,7 +407,7 @@ func (d *BasicLanguageDetector) initializePatterns() {
 			't': 0.063, 'r': 0.064, 'l': 0.065, 's': 0.050, 'c': 0.045,
 		},
 	}
-	
+
 	// Portuguese
 	d.patterns[LanguagePortuguese] = &LanguagePatterns{
 		CommonWords: []string{

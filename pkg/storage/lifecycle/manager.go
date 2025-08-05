@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/robfig/cron/v3"
+	cron "github.com/robfig/cron/v3"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -27,15 +27,15 @@ type LifecycleManager struct {
 	tracer         trace.Tracer
 	metrics        *LifecycleMetrics
 	mu             sync.RWMutex
-	
+
 	// Runtime state
 	activePolicies map[uuid.UUID]*LifecyclePolicy
 	activeJobs     map[uuid.UUID]*LifecycleJob
-	
+
 	// Channels for coordination
-	jobQueue       chan *LifecycleJob
-	stopCh         chan struct{}
-	wg             sync.WaitGroup
+	jobQueue chan *LifecycleJob
+	stopCh   chan struct{}
+	wg       sync.WaitGroup
 }
 
 // PolicyStore interface for persistent policy storage
@@ -65,26 +65,26 @@ type EventStore interface {
 
 // JobFilters for filtering job queries
 type JobFilters struct {
-	TenantID   *uuid.UUID        `json:"tenant_id,omitempty"`
-	PolicyID   *uuid.UUID        `json:"policy_id,omitempty"`
-	Status     *LifecycleStatus  `json:"status,omitempty"`
-	Type       *string           `json:"type,omitempty"`
-	StartTime  *time.Time        `json:"start_time,omitempty"`
-	EndTime    *time.Time        `json:"end_time,omitempty"`
-	Limit      int               `json:"limit,omitempty"`
-	Offset     int               `json:"offset,omitempty"`
+	TenantID  *uuid.UUID       `json:"tenant_id,omitempty"`
+	PolicyID  *uuid.UUID       `json:"policy_id,omitempty"`
+	Status    *LifecycleStatus `json:"status,omitempty"`
+	Type      *string          `json:"type,omitempty"`
+	StartTime *time.Time       `json:"start_time,omitempty"`
+	EndTime   *time.Time       `json:"end_time,omitempty"`
+	Limit     int              `json:"limit,omitempty"`
+	Offset    int              `json:"offset,omitempty"`
 }
 
 // EventFilters for filtering event queries
 type EventFilters struct {
-	TenantID   *uuid.UUID  `json:"tenant_id,omitempty"`
-	JobID      *uuid.UUID  `json:"job_id,omitempty"`
-	PolicyID   *uuid.UUID  `json:"policy_id,omitempty"`
-	EventType  *string     `json:"event_type,omitempty"`
-	StartTime  *time.Time  `json:"start_time,omitempty"`
-	EndTime    *time.Time  `json:"end_time,omitempty"`
-	Limit      int         `json:"limit,omitempty"`
-	Offset     int         `json:"offset,omitempty"`
+	TenantID  *uuid.UUID `json:"tenant_id,omitempty"`
+	JobID     *uuid.UUID `json:"job_id,omitempty"`
+	PolicyID  *uuid.UUID `json:"policy_id,omitempty"`
+	EventType *string    `json:"event_type,omitempty"`
+	StartTime *time.Time `json:"start_time,omitempty"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
+	Limit     int        `json:"limit,omitempty"`
+	Offset    int        `json:"offset,omitempty"`
 }
 
 // NewLifecycleManager creates a new lifecycle manager
@@ -610,9 +610,9 @@ func (lm *LifecycleManager) updateJobStatuses(ctx context.Context) {
 		lm.mu.Unlock()
 
 		// Remove completed jobs from active list
-		if updatedJob.Status == StatusCompleted || 
-		   updatedJob.Status == StatusFailed || 
-		   updatedJob.Status == StatusCancelled {
+		if updatedJob.Status == StatusCompleted ||
+			updatedJob.Status == StatusFailed ||
+			updatedJob.Status == StatusCancelled {
 			lm.mu.Lock()
 			delete(lm.activeJobs, job.ID)
 			lm.mu.Unlock()

@@ -13,11 +13,11 @@ func TestFileDecompressor_DetectCompressionType(t *testing.T) {
 	decompressor := NewFileDecompressor(tempDir)
 
 	tests := []struct {
-		name           string
-		filename       string
-		content        []byte
-		expectedType   string
-		expectError    bool
+		name         string
+		filename     string
+		content      []byte
+		expectedType string
+		expectError  bool
 	}{
 		{
 			name:         "ZIP file",
@@ -55,7 +55,7 @@ func TestFileDecompressor_DetectCompressionType(t *testing.T) {
 			}
 
 			compressionType, err := decompressor.DetectCompressionType(testPath)
-			
+
 			if tt.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
@@ -86,13 +86,13 @@ func TestFileDecompressor_DecompressZip(t *testing.T) {
 	}
 
 	zipWriter := zip.NewWriter(zipFile)
-	
+
 	// Add a test file to the ZIP
 	fileWriter, err := zipWriter.Create("test.txt")
 	if err != nil {
 		t.Fatalf("Failed to create file in ZIP: %v", err)
 	}
-	
+
 	_, err = fileWriter.Write([]byte("Hello World"))
 	if err != nil {
 		t.Fatalf("Failed to write to ZIP file: %v", err)
@@ -102,7 +102,7 @@ func TestFileDecompressor_DecompressZip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to close ZIP writer: %v", err)
 	}
-	
+
 	err = zipFile.Close()
 	if err != nil {
 		t.Fatalf("Failed to close ZIP file: %v", err)
@@ -158,7 +158,7 @@ func TestFileDecompressor_DecompressGzip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to close GZIP writer: %v", err)
 	}
-	
+
 	err = gzipFile.Close()
 	if err != nil {
 		t.Fatalf("Failed to close GZIP file: %v", err)
@@ -229,7 +229,7 @@ func TestFileDecompressor_GetSupportedFormats(t *testing.T) {
 	formats := decompressor.GetSupportedFormats()
 
 	expectedFormats := []string{"zip", "gzip", "gz", "tar", "tgz", "tar.gz"}
-	
+
 	if len(formats) != len(expectedFormats) {
 		t.Errorf("Expected %d formats, got %d", len(expectedFormats), len(formats))
 	}

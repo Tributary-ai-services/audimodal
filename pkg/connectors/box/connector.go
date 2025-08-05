@@ -20,98 +20,98 @@ import (
 
 // BoxConnector implements storage.StorageConnector for Box
 type BoxConnector struct {
-	config       *BoxConfig
-	oauthConfig  *oauth2.Config
-	httpClient   *http.Client
-	tracer       trace.Tracer
-	
+	config      *BoxConfig
+	oauthConfig *oauth2.Config
+	httpClient  *http.Client
+	tracer      trace.Tracer
+
 	// Connection state
-	isConnected  bool
-	lastSync     time.Time
-	accessToken  string
-	
+	isConnected bool
+	lastSync    time.Time
+	accessToken string
+
 	// Rate limiting and throttling
-	rateLimiter  *RateLimiter
-	
+	rateLimiter *RateLimiter
+
 	// Caching
-	folderCache  map[string]*BoxFolder
-	fileCache    map[string]*BoxFile
-	cacheMu      sync.RWMutex
-	
+	folderCache map[string]*BoxFolder
+	fileCache   map[string]*BoxFile
+	cacheMu     sync.RWMutex
+
 	// Sync state
-	syncState    *SyncState
-	syncMu       sync.RWMutex
-	
+	syncState *SyncState
+	syncMu    sync.RWMutex
+
 	// Metrics
-	metrics      *ConnectorMetrics
-	
+	metrics *ConnectorMetrics
+
 	// Error handling
-	retryPolicy  *RetryPolicy
+	retryPolicy *RetryPolicy
 }
 
 // BoxConfig contains configuration for Box connector
 type BoxConfig struct {
 	// OAuth2 configuration
-	ClientID           string   `yaml:"client_id"`
-	ClientSecret       string   `yaml:"client_secret"`
-	RedirectURL        string   `yaml:"redirect_url"`
-	
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURL  string `yaml:"redirect_url"`
+
 	// Sync configuration
-	SyncInterval       time.Duration `yaml:"sync_interval"`
-	FullSyncInterval   time.Duration `yaml:"full_sync_interval"`
-	BatchSize          int           `yaml:"batch_size"`
-	MaxConcurrentReqs  int           `yaml:"max_concurrent_requests"`
-	
+	SyncInterval      time.Duration `yaml:"sync_interval"`
+	FullSyncInterval  time.Duration `yaml:"full_sync_interval"`
+	BatchSize         int           `yaml:"batch_size"`
+	MaxConcurrentReqs int           `yaml:"max_concurrent_requests"`
+
 	// Filter configuration
-	IncludeFolders     []string      `yaml:"include_folders"`
-	ExcludeFolders     []string      `yaml:"exclude_folders"`
-	FileExtensions     []string      `yaml:"file_extensions"`
-	MaxFileSize        int64         `yaml:"max_file_size"`
-	SyncSharedFiles    bool          `yaml:"sync_shared_files"`
-	SyncTrashedFiles   bool          `yaml:"sync_trashed_files"`
-	
+	IncludeFolders   []string `yaml:"include_folders"`
+	ExcludeFolders   []string `yaml:"exclude_folders"`
+	FileExtensions   []string `yaml:"file_extensions"`
+	MaxFileSize      int64    `yaml:"max_file_size"`
+	SyncSharedFiles  bool     `yaml:"sync_shared_files"`
+	SyncTrashedFiles bool     `yaml:"sync_trashed_files"`
+
 	// Rate limiting
-	RequestsPerSecond  float64       `yaml:"requests_per_second"`
-	BurstLimit         int           `yaml:"burst_limit"`
-	
+	RequestsPerSecond float64 `yaml:"requests_per_second"`
+	BurstLimit        int     `yaml:"burst_limit"`
+
 	// Retry configuration
 	MaxRetries         int           `yaml:"max_retries"`
 	RetryDelay         time.Duration `yaml:"retry_delay"`
 	ExponentialBackoff bool          `yaml:"exponential_backoff"`
-	
+
 	// Cache configuration
-	CacheEnabled       bool          `yaml:"cache_enabled"`
-	CacheTTL           time.Duration `yaml:"cache_ttl"`
-	CacheSize          int           `yaml:"cache_size"`
-	
+	CacheEnabled bool          `yaml:"cache_enabled"`
+	CacheTTL     time.Duration `yaml:"cache_ttl"`
+	CacheSize    int           `yaml:"cache_size"`
+
 	// Enterprise features
-	EnterpriseEventsEnabled bool   `yaml:"enterprise_events_enabled"`
-	ContentInsightsEnabled  bool   `yaml:"content_insights_enabled"`
-	DLPEnabled             bool   `yaml:"dlp_enabled"`
+	EnterpriseEventsEnabled bool `yaml:"enterprise_events_enabled"`
+	ContentInsightsEnabled  bool `yaml:"content_insights_enabled"`
+	DLPEnabled              bool `yaml:"dlp_enabled"`
 }
 
 // DefaultBoxConfig returns default configuration
 func DefaultBoxConfig() *BoxConfig {
 	return &BoxConfig{
-		SyncInterval:       15 * time.Minute,
-		FullSyncInterval:   24 * time.Hour,
-		BatchSize:          100,
-		MaxConcurrentReqs:  10,
-		FileExtensions:     []string{".pdf", ".doc", ".docx", ".txt", ".xlsx", ".pptx"},
-		MaxFileSize:        100 * 1024 * 1024, // 100MB
-		SyncSharedFiles:    true,
-		SyncTrashedFiles:   false,
-		RequestsPerSecond:  10.0,
-		BurstLimit:         50,
-		MaxRetries:         3,
-		RetryDelay:         5 * time.Second,
-		ExponentialBackoff: true,
-		CacheEnabled:       true,
-		CacheTTL:           1 * time.Hour,
-		CacheSize:          10000,
+		SyncInterval:            15 * time.Minute,
+		FullSyncInterval:        24 * time.Hour,
+		BatchSize:               100,
+		MaxConcurrentReqs:       10,
+		FileExtensions:          []string{".pdf", ".doc", ".docx", ".txt", ".xlsx", ".pptx"},
+		MaxFileSize:             100 * 1024 * 1024, // 100MB
+		SyncSharedFiles:         true,
+		SyncTrashedFiles:        false,
+		RequestsPerSecond:       10.0,
+		BurstLimit:              50,
+		MaxRetries:              3,
+		RetryDelay:              5 * time.Second,
+		ExponentialBackoff:      true,
+		CacheEnabled:            true,
+		CacheTTL:                1 * time.Hour,
+		CacheSize:               10000,
 		EnterpriseEventsEnabled: true,
 		ContentInsightsEnabled:  false,
-		DLPEnabled:             false,
+		DLPEnabled:              false,
 	}
 }
 
@@ -199,7 +199,7 @@ func (c *BoxConnector) Disconnect(ctx context.Context) error {
 
 	c.isConnected = false
 	c.accessToken = ""
-	
+
 	// Clear caches
 	c.cacheMu.Lock()
 	c.folderCache = make(map[string]*BoxFolder)
@@ -232,7 +232,7 @@ func (c *BoxConnector) ListFiles(ctx context.Context, path string, options *stor
 	var files []*storage.ConnectorFileInfo
 	var offset int64 = 0
 	limit := int64(c.config.BatchSize)
-	
+
 	for {
 		// Wait for rate limit
 		if err := c.rateLimiter.Wait(ctx); err != nil {
@@ -243,27 +243,27 @@ func (c *BoxConnector) ListFiles(ctx context.Context, path string, options *stor
 		// Build API URL for folder listing
 		folderID := c.pathToFolderID(path)
 		apiURL := fmt.Sprintf("https://api.box.com/2.0/folders/%s/items", folderID)
-		
+
 		// Execute API call with retry
 		response, err := c.executeWithRetry(ctx, func() (interface{}, error) {
 			req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 			if err != nil {
 				return nil, err
 			}
-			
+
 			// Add query parameters
 			q := req.URL.Query()
 			q.Set("limit", fmt.Sprintf("%d", limit))
 			q.Set("offset", fmt.Sprintf("%d", offset))
 			q.Set("fields", "id,name,type,size,created_at,modified_at,path_collection,shared_link,trashed_at,content_created_at,content_modified_at")
 			req.URL.RawQuery = q.Encode()
-			
+
 			// Add authorization header
 			req.Header.Set("Authorization", "Bearer "+c.accessToken)
-			
+
 			return c.httpClient.Do(req)
 		})
-		
+
 		if err != nil {
 			span.RecordError(err)
 			return nil, fmt.Errorf("failed to list files: %w", err)
@@ -271,7 +271,7 @@ func (c *BoxConnector) ListFiles(ctx context.Context, path string, options *stor
 
 		resp := response.(*http.Response)
 		defer resp.Body.Close()
-		
+
 		if resp.StatusCode != http.StatusOK {
 			err := fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 			span.RecordError(err)
@@ -283,13 +283,13 @@ func (c *BoxConnector) ListFiles(ctx context.Context, path string, options *stor
 			span.RecordError(err)
 			return nil, fmt.Errorf("failed to parse API response: %w", err)
 		}
-		
+
 		// Convert Box items to FileInfo
 		for _, item := range listResponse.Entries {
 			if c.shouldIncludeItem(&item) {
 				fileInfo := c.convertToFileInfo(&item)
 				files = append(files, fileInfo)
-				
+
 				// Cache item
 				if c.config.CacheEnabled {
 					c.cacheItem(&item)
@@ -350,15 +350,15 @@ func (c *BoxConnector) GetFile(ctx context.Context, fileID string) (*storage.Con
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add query parameters for fields
 		q := req.URL.Query()
 		q.Set("fields", "id,name,type,size,created_at,modified_at,path_collection,shared_link,trashed_at,content_created_at,content_modified_at,sha1")
 		req.URL.RawQuery = q.Encode()
-		
+
 		// Add authorization header
 		req.Header.Set("Authorization", "Bearer "+c.accessToken)
-		
+
 		return c.httpClient.Do(req)
 	})
 
@@ -369,7 +369,7 @@ func (c *BoxConnector) GetFile(ctx context.Context, fileID string) (*storage.Con
 
 	resp := response.(*http.Response)
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		err := fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 		span.RecordError(err)
@@ -381,7 +381,7 @@ func (c *BoxConnector) GetFile(ctx context.Context, fileID string) (*storage.Con
 		span.RecordError(err)
 		return nil, fmt.Errorf("failed to parse API response: %w", err)
 	}
-	
+
 	// Cache file
 	if c.config.CacheEnabled {
 		c.cacheFile(&boxFile)
@@ -421,10 +421,10 @@ func (c *BoxConnector) DownloadFile(ctx context.Context, fileID string) (io.Read
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Add authorization header
 		req.Header.Set("Authorization", "Bearer "+c.accessToken)
-		
+
 		return c.httpClient.Do(req)
 	})
 
@@ -566,19 +566,19 @@ func (c *BoxConnector) testConnection(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Authorization", "Bearer "+c.accessToken)
-	
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("connection test failed with status: %d", resp.StatusCode)
 	}
-	
+
 	c.metrics.LastConnectionTime = time.Now()
 	return nil
 }
@@ -589,7 +589,7 @@ func (c *BoxConnector) pathToFolderID(path string) string {
 	if path == "" || path == "/" {
 		return "0"
 	}
-	
+
 	// For now, treat the path as a folder ID
 	// In a full implementation, this would traverse the folder hierarchy
 	return strings.TrimPrefix(path, "/")
@@ -768,8 +768,8 @@ func (c *BoxConnector) convertFileToFileInfo(file *BoxFile) *storage.ConnectorFi
 			"source": "box",
 			"type":   "file",
 		},
-		Source:   "box",
-		Checksum: file.SHA1,
+		Source:       "box",
+		Checksum:     file.SHA1,
 		ChecksumType: "sha1",
 	}
 }
@@ -785,27 +785,27 @@ func (c *BoxConnector) cacheItem(item *BoxItem) {
 	if item.Type == "file" {
 		// Convert to BoxFile for caching
 		boxFile := &BoxFile{
-			ID:         item.ID,
-			Name:       item.Name,
-			Size:       item.Size,
-			CreatedAt:  item.CreatedAt,
-			ModifiedAt: item.ModifiedAt,
-			SequenceID: item.SequenceID,
+			ID:             item.ID,
+			Name:           item.Name,
+			Size:           item.Size,
+			CreatedAt:      item.CreatedAt,
+			ModifiedAt:     item.ModifiedAt,
+			SequenceID:     item.SequenceID,
 			PathCollection: item.PathCollection,
 		}
 		c.fileCache[item.ID] = boxFile
 	} else if item.Type == "folder" {
 		boxFolder := &BoxFolder{
-			ID:         item.ID,
-			Name:       item.Name,
-			CreatedAt:  item.CreatedAt,
-			ModifiedAt: item.ModifiedAt,
-			SequenceID: item.SequenceID,
+			ID:             item.ID,
+			Name:           item.Name,
+			CreatedAt:      item.CreatedAt,
+			ModifiedAt:     item.ModifiedAt,
+			SequenceID:     item.SequenceID,
 			PathCollection: item.PathCollection,
 		}
 		c.folderCache[item.ID] = boxFolder
 	}
-	
+
 	// Simple cache size management
 	if len(c.fileCache) > c.config.CacheSize {
 		// Remove oldest entries (simple FIFO)
@@ -845,7 +845,7 @@ func (c *BoxConnector) getCachedFile(fileID string) *BoxFile {
 func (c *BoxConnector) executeSyncOperation(ctx context.Context, options *storage.SyncOptions, result *storage.SyncResult, isFullSync bool) error {
 	// For Box, we can use the Events API to get incremental changes
 	// or traverse folders for full sync
-	
+
 	if isFullSync {
 		return c.executeFullSync(ctx, options, result)
 	} else {
@@ -861,7 +861,7 @@ func (c *BoxConnector) executeFullSync(ctx context.Context, options *storage.Syn
 func (c *BoxConnector) executeIncrementalSync(ctx context.Context, options *storage.SyncOptions, result *storage.SyncResult) error {
 	// Use Box Events API to get changes since last sync
 	// This is a simplified implementation
-	
+
 	// For now, fall back to full sync
 	return c.executeFullSync(ctx, options, result)
 }
@@ -872,16 +872,16 @@ func (c *BoxConnector) traverseFolder(ctx context.Context, folderID string, resu
 	if err != nil {
 		return err
 	}
-	
+
 	result.FilesFound += int64(len(files))
 	result.FilesChanged += int64(len(files)) // For full sync, consider all files as changed
-	
+
 	return nil
 }
 
 func (c *BoxConnector) executeWithRetry(ctx context.Context, operation func() (interface{}, error)) (interface{}, error) {
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= c.retryPolicy.MaxRetries; attempt++ {
 		if attempt > 0 {
 			// Calculate delay
@@ -889,7 +889,7 @@ func (c *BoxConnector) executeWithRetry(ctx context.Context, operation func() (i
 			if c.retryPolicy.ExponentialBackoff {
 				delay = delay * time.Duration(1<<uint(attempt-1))
 			}
-			
+
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -903,7 +903,7 @@ func (c *BoxConnector) executeWithRetry(ctx context.Context, operation func() (i
 		}
 
 		lastErr = err
-		
+
 		// Check if error is retryable
 		if !c.isRetryableError(err) {
 			break
@@ -912,7 +912,7 @@ func (c *BoxConnector) executeWithRetry(ctx context.Context, operation func() (i
 
 	c.metrics.ErrorCount++
 	c.metrics.LastError = lastErr.Error()
-	
+
 	return nil, lastErr
 }
 
@@ -920,7 +920,7 @@ func (c *BoxConnector) isRetryableError(err error) bool {
 	errStr := strings.ToLower(err.Error())
 	retryableErrors := []string{
 		"rate limit",
-		"quota exceeded", 
+		"quota exceeded",
 		"internal error",
 		"service unavailable",
 		"timeout",

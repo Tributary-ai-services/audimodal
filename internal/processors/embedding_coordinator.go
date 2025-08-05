@@ -18,27 +18,27 @@ type EmbeddingCoordinator struct {
 	coordinator      *Coordinator
 	tierProcessor    *TierProcessor
 	embeddingService embeddings.EmbeddingService
-	config          *EmbeddingCoordinatorConfig
+	config           *EmbeddingCoordinatorConfig
 }
 
 // EmbeddingCoordinatorConfig contains configuration for the embedding coordinator
 type EmbeddingCoordinatorConfig struct {
 	// DeepLake configuration
 	DeepLakeConfig *client.DeepLakeAPIConfig `json:"deeplake_config"`
-	
+
 	// OpenAI configuration
 	OpenAIConfig *providers.OpenAIConfig `json:"openai_config"`
-	
+
 	// Processing configuration
-	DefaultDataset      string `json:"default_dataset"`
-	AutoCreateDatasets  bool   `json:"auto_create_datasets"`
-	EmbeddingBatchSize  int    `json:"embedding_batch_size"`
-	
+	DefaultDataset     string `json:"default_dataset"`
+	AutoCreateDatasets bool   `json:"auto_create_datasets"`
+	EmbeddingBatchSize int    `json:"embedding_batch_size"`
+
 	// Quality and filtering
 	MinQualityThreshold float64 `json:"min_quality_threshold"`
 	MaxChunkSize        int     `json:"max_chunk_size"`
 	ChunkOverlap        int     `json:"chunk_overlap"`
-	
+
 	// Performance tuning
 	MaxConcurrentEmbeddings int           `json:"max_concurrent_embeddings"`
 	EmbeddingTimeout        time.Duration `json:"embedding_timeout"`
@@ -48,11 +48,11 @@ type EmbeddingCoordinatorConfig struct {
 // ProcessingJobWithEmbeddings extends ProcessingJob with embedding information
 type ProcessingJobWithEmbeddings struct {
 	*ProcessingJob
-	EmbeddingDataset    string    `json:"embedding_dataset"`
-	EmbeddingsCreated   int       `json:"embeddings_created"`
+	EmbeddingDataset    string        `json:"embedding_dataset"`
+	EmbeddingsCreated   int           `json:"embeddings_created"`
 	EmbeddingTime       time.Duration `json:"embedding_time"`
-	VectorSearchEnabled bool      `json:"vector_search_enabled"`
-	EmbeddingErrors     []string  `json:"embedding_errors,omitempty"`
+	VectorSearchEnabled bool          `json:"vector_search_enabled"`
+	EmbeddingErrors     []string      `json:"embedding_errors,omitempty"`
 }
 
 // NewEmbeddingCoordinator creates a new embedding coordinator
@@ -128,17 +128,17 @@ func createEmbeddingService(config *EmbeddingCoordinatorConfig) (embeddings.Embe
 
 	// Create service configuration
 	serviceConfig := &embeddings.ServiceConfig{
-		DefaultDataset:  config.DefaultDataset,
-		ChunkSize:       config.MaxChunkSize,
-		ChunkOverlap:    config.ChunkOverlap,
-		BatchSize:       config.EmbeddingBatchSize,
-		MaxConcurrency:  config.MaxConcurrentEmbeddings,
-		CacheEnabled:    true,
-		CacheTTL:        24 * time.Hour,
-		MetricsEnabled:  true,
-		DefaultTopK:     10,
+		DefaultDataset:   config.DefaultDataset,
+		ChunkSize:        config.MaxChunkSize,
+		ChunkOverlap:     config.ChunkOverlap,
+		BatchSize:        config.EmbeddingBatchSize,
+		MaxConcurrency:   config.MaxConcurrentEmbeddings,
+		CacheEnabled:     true,
+		CacheTTL:         24 * time.Hour,
+		MetricsEnabled:   true,
+		DefaultTopK:      10,
 		DefaultThreshold: 0.7,
-		DefaultMetric:   "cosine",
+		DefaultMetric:    "cosine",
 	}
 
 	return embeddings.NewEmbeddingService(openaiProvider, deeplakeClient, serviceConfig), nil
@@ -269,11 +269,11 @@ func (ec *EmbeddingCoordinator) GetEmbeddingStats(ctx context.Context, tenantID 
 	tierMetrics := ec.tierProcessor.GetTierMetrics()
 
 	return &EmbeddingStats{
-		TenantID:           tenantID,
-		ServiceStats:       serviceStats,
-		ProcessingMetrics:  processingMetrics,
-		TierMetrics:        tierMetrics,
-		LastUpdated:        time.Now(),
+		TenantID:          tenantID,
+		ServiceStats:      serviceStats,
+		ProcessingMetrics: processingMetrics,
+		TierMetrics:       tierMetrics,
+		LastUpdated:       time.Now(),
 	}, nil
 }
 
@@ -298,15 +298,15 @@ func (ec *EmbeddingCoordinator) GetJobStatusWithEmbeddings(jobID uuid.UUID) (*Pr
 func (ec *EmbeddingCoordinator) ValidateEmbeddingConfiguration(ctx context.Context) error {
 	// Test embedding service with a simple document processing
 	testRequest := &embeddings.ProcessDocumentRequest{
-		DocumentID:  "test-validation",
-		TenantID:    uuid.New(),
-		Content:     "This is a test for embedding validation.",
-		ContentType: "text/plain",
-		Dataset:     ec.config.DefaultDataset,
-		ChunkSize:   100,
+		DocumentID:   "test-validation",
+		TenantID:     uuid.New(),
+		Content:      "This is a test for embedding validation.",
+		ContentType:  "text/plain",
+		Dataset:      ec.config.DefaultDataset,
+		ChunkSize:    100,
 		SkipExisting: true,
 	}
-	
+
 	_, err := ec.embeddingService.ProcessDocument(ctx, testRequest)
 	if err != nil {
 		return fmt.Errorf("embedding service validation failed: %w", err)
@@ -329,11 +329,11 @@ func (ec *EmbeddingCoordinator) ValidateEmbeddingConfiguration(ctx context.Conte
 
 // EmbeddingStats contains comprehensive embedding statistics
 type EmbeddingStats struct {
-	TenantID          uuid.UUID                         `json:"tenant_id"`
-	ServiceStats      *embeddings.ServiceStats          `json:"service_stats"`
-	ProcessingMetrics *PipelineMetrics                  `json:"processing_metrics"`
-	TierMetrics       map[ProcessingTier]*TierMetrics   `json:"tier_metrics"`
-	LastUpdated       time.Time                         `json:"last_updated"`
+	TenantID          uuid.UUID                       `json:"tenant_id"`
+	ServiceStats      *embeddings.ServiceStats        `json:"service_stats"`
+	ProcessingMetrics *PipelineMetrics                `json:"processing_metrics"`
+	TierMetrics       map[ProcessingTier]*TierMetrics `json:"tier_metrics"`
+	LastUpdated       time.Time                       `json:"last_updated"`
 }
 
 // RecommendEmbeddingOptions recommends embedding configuration for a file
@@ -359,7 +359,7 @@ func (ec *EmbeddingCoordinator) RecommendEmbeddingOptions(ctx context.Context, t
 		if file.Size > 100*1024*1024 { // > 100MB
 			baseOptions["embedding_batch_size"] = ec.config.EmbeddingBatchSize / 2 // Smaller batches for large files
 		}
-		
+
 		if file.ContentType == "application/pdf" {
 			baseOptions["min_quality_threshold"] = 0.4 // Lower threshold for PDFs
 		}

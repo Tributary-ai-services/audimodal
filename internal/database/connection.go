@@ -21,17 +21,17 @@ type Config struct {
 	Password string `yaml:"password" env:"DB_PASSWORD" default:""`
 	Database string `yaml:"database" env:"DB_DATABASE" default:"audimodal"`
 	SSLMode  string `yaml:"ssl_mode" env:"DB_SSL_MODE" default:"disable"`
-	
+
 	// Connection pool settings
 	MaxOpenConns    int           `yaml:"max_open_conns" env:"DB_MAX_OPEN_CONNS" default:"25"`
 	MaxIdleConns    int           `yaml:"max_idle_conns" env:"DB_MAX_IDLE_CONNS" default:"5"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime" env:"DB_CONN_MAX_LIFETIME" default:"1h"`
 	ConnMaxIdleTime time.Duration `yaml:"conn_max_idle_time" env:"DB_CONN_MAX_IDLE_TIME" default:"30m"`
-	
+
 	// Performance settings
-	LogLevel    string        `yaml:"log_level" env:"DB_LOG_LEVEL" default:"warn"`
+	LogLevel      string        `yaml:"log_level" env:"DB_LOG_LEVEL" default:"warn"`
 	SlowThreshold time.Duration `yaml:"slow_threshold" env:"DB_SLOW_THRESHOLD" default:"200ms"`
-	
+
 	// Migration settings
 	AutoMigrate bool `yaml:"auto_migrate" env:"DB_AUTO_MIGRATE" default:"false"`
 }
@@ -45,7 +45,7 @@ type Connection struct {
 // NewConnection creates a new database connection
 func NewConnection(config *Config) (*Connection, error) {
 	dsn := buildDSN(config)
-	
+
 	// Configure GORM
 	gormConfig := &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
@@ -53,37 +53,37 @@ func NewConnection(config *Config) (*Connection, error) {
 		},
 		Logger: getLogger(config.LogLevel, config.SlowThreshold),
 	}
-	
+
 	// Open database connection
 	db, err := gorm.Open(postgres.Open(dsn), gormConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
-	
+
 	// Get underlying SQL DB for connection pool configuration
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
 	}
-	
+
 	// Configure connection pool
 	sqlDB.SetMaxOpenConns(config.MaxOpenConns)
 	sqlDB.SetMaxIdleConns(config.MaxIdleConns)
 	sqlDB.SetConnMaxLifetime(config.ConnMaxLifetime)
 	sqlDB.SetConnMaxIdleTime(config.ConnMaxIdleTime)
-	
+
 	conn := &Connection{
 		db:     db,
 		config: config,
 	}
-	
+
 	// Auto-migrate if enabled
 	if config.AutoMigrate {
 		if err := conn.AutoMigrate(); err != nil {
 			return nil, fmt.Errorf("auto-migration failed: %w", err)
 		}
 	}
-	
+
 	return conn, nil
 }
 
@@ -146,19 +146,19 @@ func (c *Connection) GetStats() (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
 	}
-	
+
 	stats := sqlDB.Stats()
-	
+
 	return map[string]interface{}{
-		"max_open_connections":     stats.MaxOpenConnections,
-		"open_connections":         stats.OpenConnections,
-		"in_use":                  stats.InUse,
-		"idle":                    stats.Idle,
-		"wait_count":              stats.WaitCount,
-		"wait_duration":           stats.WaitDuration,
-		"max_idle_closed":         stats.MaxIdleClosed,
-		"max_idle_time_closed":    stats.MaxIdleTimeClosed,
-		"max_lifetime_closed":     stats.MaxLifetimeClosed,
+		"max_open_connections": stats.MaxOpenConnections,
+		"open_connections":     stats.OpenConnections,
+		"in_use":               stats.InUse,
+		"idle":                 stats.Idle,
+		"wait_count":           stats.WaitCount,
+		"wait_duration":        stats.WaitDuration,
+		"max_idle_closed":      stats.MaxIdleClosed,
+		"max_idle_time_closed": stats.MaxIdleTimeClosed,
+		"max_lifetime_closed":  stats.MaxLifetimeClosed,
 	}, nil
 }
 
@@ -178,7 +178,7 @@ func buildDSN(config *Config) string {
 // getLogger configures the GORM logger based on level and slow threshold
 func getLogger(level string, slowThreshold time.Duration) logger.Interface {
 	var logLevel logger.LogLevel
-	
+
 	switch level {
 	case "silent":
 		logLevel = logger.Silent
@@ -191,7 +191,7 @@ func getLogger(level string, slowThreshold time.Duration) logger.Interface {
 	default:
 		logLevel = logger.Warn
 	}
-	
+
 	return logger.New(
 		nil, // Use default writer (stdout)
 		logger.Config{
@@ -209,24 +209,24 @@ func (c *Connection) HealthCheck(ctx context.Context) error {
 	if err := c.Ping(ctx); err != nil {
 		return fmt.Errorf("ping failed: %w", err)
 	}
-	
+
 	// Test a simple query
 	var count int64
 	if err := c.db.WithContext(ctx).Raw("SELECT COUNT(*) FROM tenants").Scan(&count).Error; err != nil {
 		return fmt.Errorf("query test failed: %w", err)
 	}
-	
+
 	// Check connection pool health
 	sqlDB, err := c.db.DB()
 	if err != nil {
 		return fmt.Errorf("failed to get sql.DB: %w", err)
 	}
-	
+
 	stats := sqlDB.Stats()
 	if stats.OpenConnections == 0 {
 		return fmt.Errorf("no open database connections")
 	}
-	
+
 	return nil
 }
 
@@ -271,17 +271,17 @@ func (tr *TenantRepository) ValidateTenantAccess(record interface{}) error {
 func (c *Connection) Cleanup(ctx context.Context) error {
 	// Run VACUUM ANALYZE on large tables periodically
 	tables := []string{"files", "chunks", "dlp_violations"}
-	
+
 	for _, table := range tables {
 		if err := c.db.WithContext(ctx).Exec(fmt.Sprintf("VACUUM ANALYZE %s", table)).Error; err != nil {
 			return fmt.Errorf("failed to vacuum table %s: %w", table, err)
 		}
 	}
-	
+
 	// Refresh materialized views
 	if err := c.db.WithContext(ctx).Exec("SELECT refresh_tenant_usage_stats()").Error; err != nil {
 		return fmt.Errorf("failed to refresh materialized views: %w", err)
 	}
-	
+
 	return nil
 }

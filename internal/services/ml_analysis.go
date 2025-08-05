@@ -24,65 +24,65 @@ type MLAnalysisService struct {
 
 // MLAnalysisServiceConfig configures the ML analysis service
 type MLAnalysisServiceConfig struct {
-	EnableAsync        bool          `json:"enable_async"`
-	BatchSize          int           `json:"batch_size"`
-	ProcessingTimeout  time.Duration `json:"processing_timeout"`
-	RetryAttempts      int           `json:"retry_attempts"`
-	RetryDelay         time.Duration `json:"retry_delay"`
-	PersistResults     bool          `json:"persist_results"`
-	CacheEnabled       bool          `json:"cache_enabled"`
-	CacheTTL           time.Duration `json:"cache_ttl"`
-	MinTextLength      int           `json:"min_text_length"`
-	MaxTextLength      int           `json:"max_text_length"`
-	EnabledAnalysis    []string      `json:"enabled_analysis"`
+	EnableAsync       bool          `json:"enable_async"`
+	BatchSize         int           `json:"batch_size"`
+	ProcessingTimeout time.Duration `json:"processing_timeout"`
+	RetryAttempts     int           `json:"retry_attempts"`
+	RetryDelay        time.Duration `json:"retry_delay"`
+	PersistResults    bool          `json:"persist_results"`
+	CacheEnabled      bool          `json:"cache_enabled"`
+	CacheTTL          time.Duration `json:"cache_ttl"`
+	MinTextLength     int           `json:"min_text_length"`
+	MaxTextLength     int           `json:"max_text_length"`
+	EnabledAnalysis   []string      `json:"enabled_analysis"`
 }
 
 // MLAnalysisRequest represents a request for ML analysis
 type MLAnalysisRequest struct {
-	DocumentID   uuid.UUID `json:"document_id"`
-	ChunkID      *uuid.UUID `json:"chunk_id,omitempty"`
-	Content      string    `json:"content"`
-	ContentType  string    `json:"content_type"`
-	Language     string    `json:"language,omitempty"`
-	TenantID     uuid.UUID `json:"tenant_id"`
-	Priority     int       `json:"priority"`
-	RequestedBy  string    `json:"requested_by"`
-	Options      map[string]interface{} `json:"options,omitempty"`
+	DocumentID  uuid.UUID              `json:"document_id"`
+	ChunkID     *uuid.UUID             `json:"chunk_id,omitempty"`
+	Content     string                 `json:"content"`
+	ContentType string                 `json:"content_type"`
+	Language    string                 `json:"language,omitempty"`
+	TenantID    uuid.UUID              `json:"tenant_id"`
+	Priority    int                    `json:"priority"`
+	RequestedBy string                 `json:"requested_by"`
+	Options     map[string]interface{} `json:"options,omitempty"`
 }
 
 // MLAnalysisResponse represents the response from ML analysis
 type MLAnalysisResponse struct {
-	RequestID      uuid.UUID                `json:"request_id"`
-	DocumentID     uuid.UUID                `json:"document_id"`
-	ChunkID        *uuid.UUID               `json:"chunk_id,omitempty"`
-	TenantID       uuid.UUID                `json:"tenant_id"`
-	Status         string                   `json:"status"`
+	RequestID      uuid.UUID                  `json:"request_id"`
+	DocumentID     uuid.UUID                  `json:"document_id"`
+	ChunkID        *uuid.UUID                 `json:"chunk_id,omitempty"`
+	TenantID       uuid.UUID                  `json:"tenant_id"`
+	Status         string                     `json:"status"`
 	Result         *analysis.MLAnalysisResult `json:"result,omitempty"`
-	Error          string                   `json:"error,omitempty"`
-	ProcessingTime int64                    `json:"processing_time_ms"`
-	Timestamp      time.Time                `json:"timestamp"`
-	RetryCount     int                      `json:"retry_count"`
+	Error          string                     `json:"error,omitempty"`
+	ProcessingTime int64                      `json:"processing_time_ms"`
+	Timestamp      time.Time                  `json:"timestamp"`
+	RetryCount     int                        `json:"retry_count"`
 }
 
 // BatchAnalysisRequest represents a batch analysis request
 type BatchAnalysisRequest struct {
-	BatchID   uuid.UUID            `json:"batch_id"`
-	TenantID  uuid.UUID            `json:"tenant_id"`
-	Requests  []MLAnalysisRequest  `json:"requests"`
-	Options   map[string]interface{} `json:"options,omitempty"`
+	BatchID  uuid.UUID              `json:"batch_id"`
+	TenantID uuid.UUID              `json:"tenant_id"`
+	Requests []MLAnalysisRequest    `json:"requests"`
+	Options  map[string]interface{} `json:"options,omitempty"`
 }
 
 // BatchAnalysisResponse represents a batch analysis response
 type BatchAnalysisResponse struct {
-	BatchID        uuid.UUID             `json:"batch_id"`
-	TenantID       uuid.UUID             `json:"tenant_id"`
-	TotalRequests  int                   `json:"total_requests"`
-	Completed      int                   `json:"completed"`
-	Failed         int                   `json:"failed"`
-	Responses      []MLAnalysisResponse  `json:"responses"`
-	ProcessingTime int64                 `json:"processing_time_ms"`
-	Status         string                `json:"status"`
-	Timestamp      time.Time             `json:"timestamp"`
+	BatchID        uuid.UUID            `json:"batch_id"`
+	TenantID       uuid.UUID            `json:"tenant_id"`
+	TotalRequests  int                  `json:"total_requests"`
+	Completed      int                  `json:"completed"`
+	Failed         int                  `json:"failed"`
+	Responses      []MLAnalysisResponse `json:"responses"`
+	ProcessingTime int64                `json:"processing_time_ms"`
+	Status         string               `json:"status"`
+	Timestamp      time.Time            `json:"timestamp"`
 }
 
 // NewMLAnalysisService creates a new ML analysis service
@@ -192,19 +192,19 @@ func (s *MLAnalysisService) AnalyzeContent(ctx context.Context, request *MLAnaly
 
 		// Create analysis context with timeout
 		analysisCtx, cancel := context.WithTimeout(ctx, s.config.ProcessingTimeout)
-		
+
 		chunkID := ""
 		if request.ChunkID != nil {
 			chunkID = request.ChunkID.String()
 		}
 
 		result, err = s.analyzer.AnalyzeContent(
-			analysisCtx, 
-			request.DocumentID.String(), 
+			analysisCtx,
+			request.DocumentID.String(),
 			chunkID,
 			request.Content,
 		)
-		
+
 		cancel()
 
 		if err == nil {
@@ -375,7 +375,7 @@ func (s *MLAnalysisService) GetAnalysisResult(ctx context.Context, tenantID, doc
 
 	var analysisRecord models.MLAnalysisResult
 	query := tenantRepo.DB().Where("document_id = ?", documentID)
-	
+
 	if chunkID != nil {
 		query = query.Where("chunk_id = ?", *chunkID)
 	}

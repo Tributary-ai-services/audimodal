@@ -2,7 +2,6 @@ package compression
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -17,42 +16,42 @@ import (
 
 // CompressionPolicy defines compression rules for different scenarios
 type CompressionPolicy struct {
-	ID          uuid.UUID                   `json:"id"`
-	Name        string                      `json:"name"`
-	Description string                      `json:"description"`
-	TenantID    uuid.UUID                   `json:"tenant_id"`
-	
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	TenantID    uuid.UUID `json:"tenant_id"`
+
 	// Policy rules
-	Rules       []CompressionRule           `json:"rules"`
-	DefaultRule *CompressionRule            `json:"default_rule"`
-	
+	Rules       []CompressionRule `json:"rules"`
+	DefaultRule *CompressionRule  `json:"default_rule"`
+
 	// Policy metadata
-	CreatedAt   time.Time                   `json:"created_at"`
-	UpdatedAt   time.Time                   `json:"updated_at"`
-	CreatedBy   string                      `json:"created_by"`
-	Enabled     bool                        `json:"enabled"`
-	Priority    int                         `json:"priority"`
-	
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	CreatedBy string    `json:"created_by"`
+	Enabled   bool      `json:"enabled"`
+	Priority  int       `json:"priority"`
+
 	// Policy settings
-	Settings    CompressionPolicySettings   `json:"settings"`
+	Settings CompressionPolicySettings `json:"settings"`
 }
 
 // CompressionRule defines when and how to apply compression
 type CompressionRule struct {
-	ID          uuid.UUID                   `json:"id"`
-	Name        string                      `json:"name"`
-	Conditions  []CompressionCondition      `json:"conditions"`
-	Action      CompressionAction           `json:"action"`
-	Priority    int                         `json:"priority"`
-	Enabled     bool                        `json:"enabled"`
+	ID         uuid.UUID              `json:"id"`
+	Name       string                 `json:"name"`
+	Conditions []CompressionCondition `json:"conditions"`
+	Action     CompressionAction      `json:"action"`
+	Priority   int                    `json:"priority"`
+	Enabled    bool                   `json:"enabled"`
 }
 
 // CompressionCondition defines conditions for applying compression
 type CompressionCondition struct {
-	Type     ConditionType    `json:"type"`
+	Type     ConditionType     `json:"type"`
 	Operator ConditionOperator `json:"operator"`
-	Value    interface{}      `json:"value"`
-	Field    string           `json:"field,omitempty"`
+	Value    interface{}       `json:"value"`
+	Field    string            `json:"field,omitempty"`
 }
 
 // ConditionType defines the type of condition
@@ -95,7 +94,7 @@ type CompressionAction struct {
 	CacheResult      bool                        `json:"cache_result"`
 	CacheTTL         time.Duration               `json:"cache_ttl"`
 	AsyncCompression bool                        `json:"async_compression"`
-	
+
 	// Advanced options
 	BatchSize        int           `json:"batch_size"`
 	RetryAttempts    int           `json:"retry_attempts"`
@@ -105,20 +104,20 @@ type CompressionAction struct {
 
 // CompressionPolicySettings contains policy-wide settings
 type CompressionPolicySettings struct {
-	EnableMetrics     bool          `json:"enable_metrics"`
-	EnableAuditLog    bool          `json:"enable_audit_log"`
-	MaxConcurrency    int           `json:"max_concurrency"`
-	DefaultCacheTTL   time.Duration `json:"default_cache_ttl"`
-	ErrorHandling     string        `json:"error_handling"` // "fail", "skip", "retry"
-	
+	EnableMetrics   bool          `json:"enable_metrics"`
+	EnableAuditLog  bool          `json:"enable_audit_log"`
+	MaxConcurrency  int           `json:"max_concurrency"`
+	DefaultCacheTTL time.Duration `json:"default_cache_ttl"`
+	ErrorHandling   string        `json:"error_handling"` // "fail", "skip", "retry"
+
 	// Performance settings
-	BufferSize        int `json:"buffer_size"`
-	BatchTimeout      time.Duration `json:"batch_timeout"`
-	
+	BufferSize   int           `json:"buffer_size"`
+	BatchTimeout time.Duration `json:"batch_timeout"`
+
 	// Storage settings
-	PreferCompressed  bool `json:"prefer_compressed"`
-	CleanupOriginals  bool `json:"cleanup_originals"`
-	CleanupDelay      time.Duration `json:"cleanup_delay"`
+	PreferCompressed bool          `json:"prefer_compressed"`
+	CleanupOriginals bool          `json:"cleanup_originals"`
+	CleanupDelay     time.Duration `json:"cleanup_delay"`
 }
 
 // PolicyManager manages compression policies
@@ -232,7 +231,7 @@ func (pm *PolicyManager) GetPolicy(ctx context.Context, policyID uuid.UUID) (*Co
 // ListPolicies lists all policies for a tenant
 func (pm *PolicyManager) ListPolicies(ctx context.Context, tenantID uuid.UUID) ([]*CompressionPolicy, error) {
 	var policies []*CompressionPolicy
-	
+
 	for _, policy := range pm.policies {
 		if policy.TenantID == tenantID {
 			policies = append(policies, policy)
@@ -256,7 +255,7 @@ func (pm *PolicyManager) EvaluateFile(ctx context.Context, fileInfo *storage.Fil
 
 	// Get policies for tenant, sorted by priority
 	policies := pm.getPoliciesForTenant(tenantID)
-	
+
 	for _, policy := range policies {
 		if !policy.Enabled {
 			continue
@@ -333,7 +332,7 @@ func (pm *PolicyManager) ApplyCompression(ctx context.Context, data []byte, file
 // getPoliciesForTenant gets policies for a tenant sorted by priority
 func (pm *PolicyManager) getPoliciesForTenant(tenantID uuid.UUID) []*CompressionPolicy {
 	var policies []*CompressionPolicy
-	
+
 	for _, policy := range pm.policies {
 		if policy.TenantID == tenantID && policy.Enabled {
 			policies = append(policies, policy)
@@ -368,35 +367,33 @@ func (pm *PolicyManager) evaluateCondition(condition CompressionCondition, fileI
 	switch condition.Type {
 	case ConditionFileSize:
 		return pm.evaluateNumericCondition(float64(fileInfo.Size), condition)
-		
+
 	case ConditionFileExtension:
 		ext := strings.ToLower(fileInfo.Extension)
 		return pm.evaluateStringCondition(ext, condition)
-		
+
 	case ConditionMimeType:
 		return pm.evaluateStringCondition(fileInfo.MimeType, condition)
-		
+
 	case ConditionAge:
 		age := time.Since(fileInfo.ModifiedAt)
 		return pm.evaluateDurationCondition(age, condition)
-		
+
 	case ConditionPath:
 		return pm.evaluateStringCondition(fileInfo.URL, condition)
-		
+
 	case ConditionTenant:
 		return pm.evaluateStringCondition(tenantID.String(), condition)
-		
+
 	case ConditionMetadata:
 		if condition.Field == "" {
 			return false
 		}
 		if value, exists := fileInfo.Metadata[condition.Field]; exists {
-			if strValue, ok := value.(string); ok {
-				return pm.evaluateStringCondition(strValue, condition)
-			}
+			return pm.evaluateStringCondition(value, condition)
 		}
 		return false
-		
+
 	default:
 		return false
 	}
@@ -526,7 +523,7 @@ func (pm *PolicyManager) validateCondition(condition CompressionCondition) error
 		ConditionFileSize, ConditionFileExtension, ConditionMimeType,
 		ConditionAge, ConditionPath, ConditionMetadata, ConditionTenant,
 	}
-	
+
 	validType := false
 	for _, vt := range validTypes {
 		if condition.Type == vt {
@@ -534,7 +531,7 @@ func (pm *PolicyManager) validateCondition(condition CompressionCondition) error
 			break
 		}
 	}
-	
+
 	if !validType {
 		return fmt.Errorf("invalid condition type: %s", condition.Type)
 	}
@@ -545,7 +542,7 @@ func (pm *PolicyManager) validateCondition(condition CompressionCondition) error
 		OperatorGreaterEqual, OperatorLessEqual, OperatorContains,
 		OperatorStartsWith, OperatorEndsWith, OperatorMatches, OperatorIn, OperatorNotIn,
 	}
-	
+
 	validOperator := false
 	for _, vo := range validOperators {
 		if condition.Operator == vo {
@@ -553,7 +550,7 @@ func (pm *PolicyManager) validateCondition(condition CompressionCondition) error
 			break
 		}
 	}
-	
+
 	if !validOperator {
 		return fmt.Errorf("invalid condition operator: %s", condition.Operator)
 	}
@@ -568,7 +565,7 @@ func (pm *PolicyManager) validateAction(action CompressionAction) error {
 		StrategyNone, StrategyAdaptive, StrategyAggressive,
 		StrategyText, StrategyBinary, StrategyArchive,
 	}
-	
+
 	validStrategy := false
 	for _, vs := range validStrategies {
 		if action.Strategy == vs {
@@ -576,7 +573,7 @@ func (pm *PolicyManager) validateAction(action CompressionAction) error {
 			break
 		}
 	}
-	
+
 	if !validStrategy {
 		return fmt.Errorf("invalid compression strategy: %s", action.Strategy)
 	}

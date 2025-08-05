@@ -24,12 +24,12 @@ type TransitionEngine struct {
 	metrics        *TransitionMetrics
 
 	// Worker pool for concurrent transitions
-	workers        []TransitionWorker
-	workerPool     chan TransitionWorker
-	
+	workers    []TransitionWorker
+	workerPool chan TransitionWorker
+
 	// Rate limiting
-	rateLimiter    *RateLimiter
-	
+	rateLimiter *RateLimiter
+
 	// Concurrent transition tracking
 	activeTransitions map[string]*TransitionContext
 	mu                sync.RWMutex
@@ -54,41 +54,41 @@ type TransitionContext struct {
 
 // TransitionProgress tracks progress of a transition
 type TransitionProgress struct {
-	TotalFiles      int64     `json:"total_files"`
-	ProcessedFiles  int64     `json:"processed_files"`
-	SuccessfulFiles int64     `json:"successful_files"`
-	FailedFiles     int64     `json:"failed_files"`
-	TotalBytes      int64     `json:"total_bytes"`
-	ProcessedBytes  int64     `json:"processed_bytes"`
-	LastUpdate      time.Time `json:"last_update"`
+	TotalFiles      int64      `json:"total_files"`
+	ProcessedFiles  int64      `json:"processed_files"`
+	SuccessfulFiles int64      `json:"successful_files"`
+	FailedFiles     int64      `json:"failed_files"`
+	TotalBytes      int64      `json:"total_bytes"`
+	ProcessedBytes  int64      `json:"processed_bytes"`
+	LastUpdate      time.Time  `json:"last_update"`
 	EstimatedETA    *time.Time `json:"estimated_eta,omitempty"`
 }
 
 // TransitionMetrics tracks transition engine performance
 type TransitionMetrics struct {
-	ActiveTransitions    int64     `json:"active_transitions"`
-	CompletedTransitions int64     `json:"completed_transitions"`
-	FailedTransitions    int64     `json:"failed_transitions"`
+	ActiveTransitions     int64         `json:"active_transitions"`
+	CompletedTransitions  int64         `json:"completed_transitions"`
+	FailedTransitions     int64         `json:"failed_transitions"`
 	AverageTransitionTime time.Duration `json:"average_transition_time"`
-	ThroughputMBps       float64   `json:"throughput_mbps"`
-	ErrorRate            float64   `json:"error_rate"`
-	LastReset            time.Time `json:"last_reset"`
+	ThroughputMBps        float64       `json:"throughput_mbps"`
+	ErrorRate             float64       `json:"error_rate"`
+	LastReset             time.Time     `json:"last_reset"`
 }
 
 // TierTransition represents a single tier transition operation
 type TierTransition struct {
-	ID               string                `json:"id"`
-	JobID            uuid.UUID             `json:"job_id"`
-	FilePath         string                `json:"file_path"`
-	FileSize         int64                 `json:"file_size"`
-	FromTier         StorageTier           `json:"from_tier"`
-	ToTier           StorageTier           `json:"to_tier"`
-	Priority         int                   `json:"priority"`
-	EstimatedCost    float64               `json:"estimated_cost"`
-	MaxRetries       int                   `json:"max_retries"`
-	RetryCount       int                   `json:"retry_count"`
-	CreatedAt        time.Time             `json:"created_at"`
-	Metadata         map[string]string     `json:"metadata,omitempty"`
+	ID            string            `json:"id"`
+	JobID         uuid.UUID         `json:"job_id"`
+	FilePath      string            `json:"file_path"`
+	FileSize      int64             `json:"file_size"`
+	FromTier      StorageTier       `json:"from_tier"`
+	ToTier        StorageTier       `json:"to_tier"`
+	Priority      int               `json:"priority"`
+	EstimatedCost float64           `json:"estimated_cost"`
+	MaxRetries    int               `json:"max_retries"`
+	RetryCount    int               `json:"retry_count"`
+	CreatedAt     time.Time         `json:"created_at"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
 // RateLimiter controls the rate of transitions
@@ -157,13 +157,14 @@ func (te *TransitionEngine) ExecuteTransitions(ctx context.Context, transitions 
 			if err != nil {
 				span.RecordError(err)
 				result = &TierTransitionResult{
-					FilePath:     t.FilePath,
-					FromTier:     t.FromTier,
-					ToTier:       t.ToTier,
-					FileSize:     t.FileSize,
-					Success:      false,
-					ErrorMessage: err.Error(),
-					CompletedAt:  time.Now(),
+					FilePath:    t.FilePath,
+					FromTier:    t.FromTier,
+					ToTier:      t.ToTier,
+					FileSize:    t.FileSize,
+					CompletedAt: time.Now(),
+					Metadata: map[string]string{
+						"error": err.Error(),
+					},
 				}
 			}
 
@@ -211,9 +212,9 @@ func (te *TransitionEngine) executeTransition(ctx context.Context, transition *T
 		Files:        []string{transition.FilePath},
 		Worker:       worker,
 		Progress: &TransitionProgress{
-			TotalFiles:   1,
-			TotalBytes:   transition.FileSize,
-			LastUpdate:   time.Now(),
+			TotalFiles: 1,
+			TotalBytes: transition.FileSize,
+			LastUpdate: time.Now(),
 		},
 	}
 
@@ -244,7 +245,7 @@ func (te *TransitionEngine) executeTransition(ctx context.Context, transition *T
 		}
 
 		transition.RetryCount = attempt + 1
-		
+
 		// Check if error is retryable
 		if !te.isRetryableError(err) {
 			break
@@ -424,15 +425,15 @@ func (te *TransitionEngine) isRetryableError(err error) bool {
 func (te *TransitionEngine) getTransitionCostPerGB(from, to StorageTier) float64 {
 	// Default transition costs (would be configurable per provider)
 	transitionCosts := map[string]float64{
-		string(TierHot) + "->" + string(TierWarm):    0.0,
-		string(TierHot) + "->" + string(TierCold):    0.01,
-		string(TierWarm) + "->" + string(TierHot):    0.01,
-		string(TierWarm) + "->" + string(TierCold):   0.0,
-		string(TierWarm) + "->" + string(TierArchive): 0.05,
-		string(TierCold) + "->" + string(TierWarm):   0.02,
-		string(TierCold) + "->" + string(TierArchive): 0.02,
-		string(TierCold) + "->" + string(TierGlacier): 0.05,
-		string(TierArchive) + "->" + string(TierCold): 0.03,
+		string(TierHot) + "->" + string(TierWarm):        0.0,
+		string(TierHot) + "->" + string(TierCold):        0.01,
+		string(TierWarm) + "->" + string(TierHot):        0.01,
+		string(TierWarm) + "->" + string(TierCold):       0.0,
+		string(TierWarm) + "->" + string(TierArchive):    0.05,
+		string(TierCold) + "->" + string(TierWarm):       0.02,
+		string(TierCold) + "->" + string(TierArchive):    0.02,
+		string(TierCold) + "->" + string(TierGlacier):    0.05,
+		string(TierArchive) + "->" + string(TierCold):    0.03,
 		string(TierArchive) + "->" + string(TierGlacier): 0.03,
 		string(TierGlacier) + "->" + string(TierArchive): 0.05,
 	}
@@ -498,7 +499,7 @@ func (te *TransitionEngine) updateMetrics(results []*TierTransitionResult) {
 
 	if len(results) > 0 {
 		te.metrics.AverageTransitionTime = totalDuration / time.Duration(len(results))
-		
+
 		if totalDuration > 0 {
 			mbps := float64(totalBytes) / (1024 * 1024) / totalDuration.Seconds()
 			te.metrics.ThroughputMBps = mbps
@@ -535,7 +536,7 @@ func (rl *RateLimiter) Allow() bool {
 
 	now := time.Now()
 	elapsed := now.Sub(rl.lastUpdate).Seconds()
-	
+
 	// Add tokens based on elapsed time
 	rl.tokens = math.Min(rl.limit, rl.tokens+elapsed*rl.limit)
 	rl.lastUpdate = now
@@ -606,18 +607,18 @@ func (w *DefaultTransitionWorker) Execute(ctx context.Context, transition *TierT
 	time.Sleep(simulatedDuration)
 
 	result := &TierTransitionResult{
-		FilePath:         transition.FilePath,
-		FromTier:         transition.FromTier,
-		ToTier:           transition.ToTier,
-		FileSize:         transition.FileSize,
-		Success:          true,
-		TransitionCost:   transition.EstimatedCost,
-		StartedAt:        startTime,
-		CompletedAt:      time.Now(),
+		FilePath:       transition.FilePath,
+		FromTier:       transition.FromTier,
+		ToTier:         transition.ToTier,
+		FileSize:       transition.FileSize,
+		Success:        true,
+		TransitionCost: transition.EstimatedCost,
+		StartedAt:      startTime,
+		CompletedAt:    time.Now(),
 		Metadata: map[string]string{
-			"worker_id":        w.id,
-			"transition_id":    transition.ID,
-			"retry_count":      fmt.Sprintf("%d", transition.RetryCount),
+			"worker_id":     w.id,
+			"transition_id": transition.ID,
+			"retry_count":   fmt.Sprintf("%d", transition.RetryCount),
 		},
 	}
 

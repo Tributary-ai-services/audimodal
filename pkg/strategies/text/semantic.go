@@ -164,7 +164,7 @@ func (s *SemanticStrategy) ConfigureReader(readerConfig map[string]any) (map[str
 	for k, v := range readerConfig {
 		configured[k] = v
 	}
-	
+
 	// Preserve all text structure for semantic analysis
 	configured["skip_empty_lines"] = false
 	return configured, nil
@@ -194,7 +194,7 @@ func (s *SemanticStrategy) GetOptimalChunkSize(sourceSchema core.SchemaInfo) int
 	if sourceSchema.Format == "unstructured" {
 		return 1500
 	}
-	
+
 	return 1000
 }
 
@@ -254,18 +254,18 @@ func (s *SemanticStrategy) updateConfigFromContext(config *semanticConfig, conte
 
 func (s *SemanticStrategy) chunkTextSemantically(text string, config *semanticConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	// Analyze text structure
 	structure := s.analyzeTextStructure(text, config)
-	
+
 	// Create chunks based on semantic units
 	chunks = s.createSemanticChunks(structure, config, metadata)
-	
+
 	// Add overlap if requested
 	if config.OverlapSentences > 0 {
 		chunks = s.addSentenceOverlap(chunks, config.OverlapSentences)
 	}
-	
+
 	return chunks
 }
 
@@ -277,11 +277,11 @@ type textStructure struct {
 }
 
 type textSection struct {
-	Title     string
-	Level     int
-	Start     int
-	End       int
-	Content   string
+	Title   string
+	Level   int
+	Start   int
+	End     int
+	Content string
 }
 
 type textParagraph struct {
@@ -307,75 +307,75 @@ type textList struct {
 
 func (s *SemanticStrategy) analyzeTextStructure(text string, config *semanticConfig) *textStructure {
 	structure := &textStructure{}
-	
+
 	// Split into paragraphs
 	structure.Paragraphs = s.identifyParagraphs(text)
-	
+
 	// Identify sections/headers
 	if config.RespectSections {
 		structure.Sections = s.identifySections(text)
 	}
-	
+
 	// Split into sentences
 	structure.Sentences = s.identifySentences(text)
-	
+
 	// Detect lists
 	if config.DetectLists {
 		structure.Lists = s.identifyLists(text)
 	}
-	
+
 	return structure
 }
 
 func (s *SemanticStrategy) identifyParagraphs(text string) []textParagraph {
 	var paragraphs []textParagraph
-	
+
 	// Split on double newlines
 	parts := strings.Split(text, "\n\n")
 	currentPos := 0
-	
+
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			currentPos += 2 // Account for the double newline
 			continue
 		}
-		
+
 		paragraphType := "normal"
-		
+
 		// Check if it's a header (simple heuristic)
 		if s.looksLikeHeader(part) {
 			paragraphType = "header"
 		} else if s.looksLikeList(part) {
 			paragraphType = "list"
 		}
-		
+
 		paragraph := textParagraph{
 			Start:   currentPos,
 			End:     currentPos + len(part),
 			Content: part,
 			Type:    paragraphType,
 		}
-		
+
 		paragraphs = append(paragraphs, paragraph)
 		currentPos += len(part) + 2
 	}
-	
+
 	return paragraphs
 }
 
 func (s *SemanticStrategy) identifySections(text string) []textSection {
 	var sections []textSection
-	
+
 	// Simple markdown-style header detection
 	headerRegex := regexp.MustCompile(`(?m)^(#{1,6})\s+(.+)$`)
 	matches := headerRegex.FindAllStringSubmatch(text, -1)
-	
+
 	for _, match := range matches {
 		if len(match) >= 3 {
 			level := len(match[1]) // Number of # characters
 			title := strings.TrimSpace(match[2])
-			
+
 			// Find position in text
 			start := strings.Index(text, match[0])
 			if start >= 0 {
@@ -389,54 +389,54 @@ func (s *SemanticStrategy) identifySections(text string) []textSection {
 			}
 		}
 	}
-	
+
 	return sections
 }
 
 func (s *SemanticStrategy) identifySentences(text string) []textSentence {
 	var sentences []textSentence
-	
+
 	// Simple sentence splitting
 	sentenceRegex := regexp.MustCompile(`[.!?]+\s+`)
 	parts := sentenceRegex.Split(text, -1)
-	
+
 	currentPos := 0
 	for i, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
-		
+
 		// Add back the punctuation except for the last part
 		if i < len(parts)-1 {
 			part += "."
 		}
-		
+
 		sentence := textSentence{
 			Start:   currentPos,
 			End:     currentPos + len(part),
 			Content: part,
 		}
-		
+
 		sentences = append(sentences, sentence)
 		currentPos += len(part) + 1
 	}
-	
+
 	return sentences
 }
 
 func (s *SemanticStrategy) identifyLists(text string) []textList {
 	var lists []textList
-	
+
 	// Find bullet lists and numbered lists
 	listItemRegex := regexp.MustCompile(`(?m)^[\s]*[-\*\+][\s]+(.+)$|^[\s]*\d+\.[\s]+(.+)$`)
 	matches := listItemRegex.FindAllStringSubmatch(text, -1)
-	
+
 	if len(matches) > 0 {
 		var items []string
 		start := strings.Index(text, matches[0][0])
 		end := start
-		
+
 		for _, match := range matches {
 			item := match[1]
 			if item == "" {
@@ -445,12 +445,12 @@ func (s *SemanticStrategy) identifyLists(text string) []textList {
 			items = append(items, strings.TrimSpace(item))
 			end = strings.Index(text, match[0]) + len(match[0])
 		}
-		
+
 		listType := "unordered"
 		if strings.Contains(matches[0][0], ".") {
 			listType = "ordered"
 		}
-		
+
 		list := textList{
 			Start: start,
 			End:   end,
@@ -459,18 +459,18 @@ func (s *SemanticStrategy) identifyLists(text string) []textList {
 		}
 		lists = append(lists, list)
 	}
-	
+
 	return lists
 }
 
 func (s *SemanticStrategy) createSemanticChunks(structure *textStructure, config *semanticConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
 	// Start with paragraphs as base units
 	currentChunk := ""
 	chunkStart := 0
 	chunkNumber := 1
-	
+
 	for _, paragraph := range structure.Paragraphs {
 		// Check if adding this paragraph would exceed max size
 		proposedChunk := currentChunk
@@ -478,12 +478,12 @@ func (s *SemanticStrategy) createSemanticChunks(structure *textStructure, config
 			proposedChunk += "\n\n"
 		}
 		proposedChunk += paragraph.Content
-		
+
 		if len(proposedChunk) > config.MaxChunkSize && len(currentChunk) >= config.MinChunkSize {
 			// Create chunk with current content
 			chunk := s.createChunk(currentChunk, chunkStart, chunkNumber, metadata)
 			chunks = append(chunks, chunk)
-			
+
 			// Start new chunk
 			currentChunk = paragraph.Content
 			chunkStart = paragraph.Start
@@ -499,18 +499,18 @@ func (s *SemanticStrategy) createSemanticChunks(structure *textStructure, config
 			}
 		}
 	}
-	
+
 	// Add final chunk if it has content
 	if len(currentChunk) >= config.MinChunkSize {
 		chunk := s.createChunk(currentChunk, chunkStart, chunkNumber, metadata)
 		chunks = append(chunks, chunk)
 	}
-	
+
 	// Update total chunks in context
 	for i := range chunks {
 		chunks[i].Metadata.Context["total_chunks"] = fmt.Sprintf("%d", len(chunks))
 	}
-	
+
 	return chunks
 }
 
@@ -540,11 +540,11 @@ func (s *SemanticStrategy) addSentenceOverlap(chunks []core.Chunk, overlapSenten
 	if len(chunks) <= 1 || overlapSentences <= 0 {
 		return chunks
 	}
-	
+
 	for i := 1; i < len(chunks); i++ {
 		prevContent := chunks[i-1].Data.(string)
 		currContent := chunks[i].Data.(string)
-		
+
 		// Get last sentences from previous chunk
 		prevSentences := s.getLastSentences(prevContent, overlapSentences)
 		if prevSentences != "" {
@@ -553,7 +553,7 @@ func (s *SemanticStrategy) addSentenceOverlap(chunks []core.Chunk, overlapSenten
 			chunks[i].Metadata.SizeBytes = int64(len(chunks[i].Data.(string)))
 		}
 	}
-	
+
 	return chunks
 }
 
@@ -561,11 +561,11 @@ func (s *SemanticStrategy) getLastSentences(text string, count int) string {
 	sentences := strings.FieldsFunc(text, func(r rune) bool {
 		return r == '.' || r == '!' || r == '?'
 	})
-	
+
 	if len(sentences) <= count {
 		return text
 	}
-	
+
 	// Get last 'count' sentences
 	lastSentences := sentences[len(sentences)-count:]
 	return strings.Join(lastSentences, ". ") + "."
@@ -578,13 +578,13 @@ func (s *SemanticStrategy) calculateSemanticQuality(text string) *core.QualityMe
 		return r == '.' || r == '!' || r == '?'
 	})
 	paragraphs := strings.Split(text, "\n\n")
-	
+
 	// Completeness: based on paragraph and sentence structure
 	completeness := 1.0
 	if !s.endsWithPunctuation(text) {
 		completeness = 0.7
 	}
-	
+
 	// Coherence: based on semantic structure
 	coherence := 0.5
 	if len(paragraphs) > 1 {
@@ -593,7 +593,7 @@ func (s *SemanticStrategy) calculateSemanticQuality(text string) *core.QualityMe
 	if s.hasGoodSentenceFlow(sentences) {
 		coherence += 0.1
 	}
-	
+
 	// Readability
 	readability := 0.5
 	if len(words) > 0 && len(sentences) > 0 {
@@ -602,7 +602,7 @@ func (s *SemanticStrategy) calculateSemanticQuality(text string) *core.QualityMe
 			readability = 0.8
 		}
 	}
-	
+
 	// Uniqueness: simple approximation
 	uniqueness := 0.7
 	uniqueWords := make(map[string]bool)
@@ -612,7 +612,7 @@ func (s *SemanticStrategy) calculateSemanticQuality(text string) *core.QualityMe
 	if len(words) > 0 {
 		uniqueness = float64(len(uniqueWords)) / float64(len(words))
 	}
-	
+
 	return &core.QualityMetrics{
 		Completeness: completeness,
 		Coherence:    coherence,
@@ -628,22 +628,22 @@ func (s *SemanticStrategy) calculateSemanticQuality(text string) *core.QualityMe
 func (s *SemanticStrategy) looksLikeHeader(text string) bool {
 	// Simple heuristics for header detection
 	text = strings.TrimSpace(text)
-	
+
 	// Markdown headers
 	if strings.HasPrefix(text, "#") {
 		return true
 	}
-	
+
 	// Short lines that don't end with punctuation
 	if len(text) < 100 && !s.endsWithPunctuation(text) {
 		return true
 	}
-	
+
 	// All caps (likely a header)
 	if text == strings.ToUpper(text) && len(text) < 100 {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -655,7 +655,7 @@ func (s *SemanticStrategy) looksLikeList(text string) bool {
 			return true
 		}
 	}
-	
+
 	// Check for numbered lists
 	numberedList := regexp.MustCompile(`\d+\.\s`)
 	return numberedList.MatchString(text)
@@ -666,7 +666,7 @@ func (s *SemanticStrategy) endsWithPunctuation(text string) bool {
 	if len(text) == 0 {
 		return false
 	}
-	
+
 	lastChar := rune(text[len(text)-1])
 	return lastChar == '.' || lastChar == '!' || lastChar == '?' || lastChar == ':'
 }
@@ -675,13 +675,13 @@ func (s *SemanticStrategy) hasGoodSentenceFlow(sentences []string) bool {
 	if len(sentences) < 2 {
 		return true
 	}
-	
+
 	// Simple check: sentences should vary in length
 	lengths := make([]int, len(sentences))
 	for i, sentence := range sentences {
 		lengths[i] = len(strings.Fields(sentence))
 	}
-	
+
 	// Calculate variance
 	if len(lengths) > 1 {
 		sum := 0
@@ -689,16 +689,16 @@ func (s *SemanticStrategy) hasGoodSentenceFlow(sentences []string) bool {
 			sum += length
 		}
 		avg := float64(sum) / float64(len(lengths))
-		
+
 		variance := 0.0
 		for _, length := range lengths {
 			variance += (float64(length) - avg) * (float64(length) - avg)
 		}
 		variance /= float64(len(lengths))
-		
+
 		// If variance is reasonable, it suggests good flow
 		return variance > 4.0 && variance < 100.0
 	}
-	
+
 	return true
 }

@@ -276,18 +276,18 @@ func (r *MarkdownReader) DiscoverSchema(ctx context.Context, sourcePath string) 
 			},
 		},
 		Metadata: map[string]any{
-			"detected_encoding":  encodingInfo.Name,
+			"detected_encoding":   encodingInfo.Name,
 			"encoding_confidence": encodingInfo.Confidence,
-			"frontmatter":        mdInfo.Frontmatter,
-			"heading_count":      mdInfo.HeadingCount,
-			"code_block_count":   mdInfo.CodeBlockCount,
-			"table_count":        mdInfo.TableCount,
-			"link_count":         mdInfo.LinkCount,
-			"image_count":        mdInfo.ImageCount,
-			"word_count":         mdInfo.WordCount,
-			"max_heading_level":  mdInfo.MaxHeadingLevel,
-			"has_toc":            mdInfo.HasTOC,
-			"languages_found":    mdInfo.LanguagesFound,
+			"frontmatter":         mdInfo.Frontmatter,
+			"heading_count":       mdInfo.HeadingCount,
+			"code_block_count":    mdInfo.CodeBlockCount,
+			"table_count":         mdInfo.TableCount,
+			"link_count":          mdInfo.LinkCount,
+			"image_count":         mdInfo.ImageCount,
+			"word_count":          mdInfo.WordCount,
+			"max_heading_level":   mdInfo.MaxHeadingLevel,
+			"has_toc":             mdInfo.HasTOC,
+			"languages_found":     mdInfo.LanguagesFound,
 		},
 	}
 
@@ -365,7 +365,7 @@ func (r *MarkdownReader) CreateIterator(ctx context.Context, sourcePath string, 
 	// Detect and handle encoding
 	var filePath string
 	var cleanupPath string
-	
+
 	if encoding, ok := strategyConfig["encoding"].(string); ok && encoding != "auto" {
 		// Use specified encoding
 		if encoding != "utf-8" {
@@ -384,7 +384,7 @@ func (r *MarkdownReader) CreateIterator(ctx context.Context, sourcePath string, 
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect encoding: %w", err)
 		}
-		
+
 		if encodingInfo.Name != "utf-8" {
 			convertedPath, err := r.encodingDetector.ConvertToUTF8(sourcePath, encodingInfo.Name)
 			if err != nil {
@@ -406,7 +406,7 @@ func (r *MarkdownReader) CreateIterator(ctx context.Context, sourcePath string, 
 	}
 
 	chunks := r.parseMarkdownChunks(string(content), strategyConfig)
-	
+
 	iterator := &MarkdownIterator{
 		sourcePath:   sourcePath,
 		cleanupPath:  cleanupPath,
@@ -430,17 +430,17 @@ func (r *MarkdownReader) GetSupportedFormats() []string {
 
 // MarkdownInfo contains analyzed markdown structure information
 type MarkdownInfo struct {
-	Frontmatter      map[string]any
-	HeadingCount     int
-	CodeBlockCount   int
-	TableCount       int
-	LinkCount        int
-	ImageCount       int
-	WordCount        int
-	MaxHeadingLevel  int
-	HasTOC           bool
-	LanguagesFound   []string
-	SampleChunks     []MarkdownChunk
+	Frontmatter     map[string]any
+	HeadingCount    int
+	CodeBlockCount  int
+	TableCount      int
+	LinkCount       int
+	ImageCount      int
+	WordCount       int
+	MaxHeadingLevel int
+	HasTOC          bool
+	LanguagesFound  []string
+	SampleChunks    []MarkdownChunk
 }
 
 // MarkdownChunk represents a parsed markdown chunk
@@ -495,7 +495,7 @@ func (r *MarkdownReader) analyzeMarkdownStructure(content string) MarkdownInfo {
 				if level > info.MaxHeadingLevel {
 					info.MaxHeadingLevel = level
 				}
-				
+
 				// Add as sample chunk
 				if sampleCount < 5 {
 					info.SampleChunks = append(info.SampleChunks, MarkdownChunk{
@@ -550,9 +550,9 @@ func (r *MarkdownReader) analyzeMarkdownStructure(content string) MarkdownInfo {
 
 	// Check for TOC indicators
 	toc := strings.ToLower(content)
-	info.HasTOC = strings.Contains(toc, "table of contents") || 
-		         strings.Contains(toc, "toc") ||
-		         strings.Contains(toc, "- [") // Common TOC pattern
+	info.HasTOC = strings.Contains(toc, "table of contents") ||
+		strings.Contains(toc, "toc") ||
+		strings.Contains(toc, "- [") // Common TOC pattern
 
 	return info
 }
@@ -560,7 +560,7 @@ func (r *MarkdownReader) analyzeMarkdownStructure(content string) MarkdownInfo {
 // parseFrontmatter parses YAML frontmatter (simplified)
 func (r *MarkdownReader) parseFrontmatter(content string) map[string]any {
 	frontmatter := make(map[string]any)
-	
+
 	// Simple key-value parsing for YAML-like frontmatter
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
@@ -568,45 +568,45 @@ func (r *MarkdownReader) parseFrontmatter(content string) map[string]any {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		if strings.Contains(line, ":") {
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) == 2 {
 				key := strings.TrimSpace(parts[0])
 				value := strings.TrimSpace(parts[1])
-				
+
 				// Remove quotes if present
 				if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
-				   (strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
+					(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
 					value = value[1 : len(value)-1]
 				}
-				
+
 				frontmatter[key] = value
 			}
 		}
 	}
-	
+
 	return frontmatter
 }
 
 // parseMarkdownChunks parses markdown into chunks based on configuration
 func (r *MarkdownReader) parseMarkdownChunks(content string, config map[string]any) []MarkdownChunk {
 	var chunks []MarkdownChunk
-	
+
 	chunkBy := "section"
 	if cb, ok := config["chunk_by"].(string); ok {
 		chunkBy = cb
 	}
-	
+
 	lines := strings.Split(content, "\n")
 	var frontmatterEnd int
-	
+
 	// Skip frontmatter
 	if len(lines) > 0 && strings.HasPrefix(lines[0], "---") {
 		for i := 1; i < len(lines); i++ {
 			if strings.HasPrefix(lines[i], "---") {
 				frontmatterEnd = i + 1
-				
+
 				// Add frontmatter as chunk if requested
 				if extractFM, ok := config["extract_frontmatter"].(bool); !ok || extractFM {
 					fmContent := strings.Join(lines[1:i], "\n")
@@ -622,9 +622,9 @@ func (r *MarkdownReader) parseMarkdownChunks(content string, config map[string]a
 			}
 		}
 	}
-	
+
 	contentLines := lines[frontmatterEnd:]
-	
+
 	switch chunkBy {
 	case "heading":
 		chunks = append(chunks, r.chunkByHeading(contentLines, config, frontmatterEnd)...)
@@ -635,7 +635,7 @@ func (r *MarkdownReader) parseMarkdownChunks(content string, config map[string]a
 	default: // section
 		chunks = append(chunks, r.chunkBySection(contentLines, config, frontmatterEnd)...)
 	}
-	
+
 	return chunks
 }
 
@@ -646,7 +646,7 @@ func (r *MarkdownReader) chunkBySection(lines []string, config map[string]any, o
 	var currentHeading string
 	var currentHeadingLevel int
 	var sectionStart int
-	
+
 	for i, line := range lines {
 		if strings.HasPrefix(line, "#") {
 			// Save previous section
@@ -662,14 +662,14 @@ func (r *MarkdownReader) chunkBySection(lines []string, config map[string]any, o
 					})
 				}
 			}
-			
+
 			// Start new section
 			level := r.getHeadingLevel(line)
 			currentHeading = strings.TrimSpace(line[level:])
 			currentHeadingLevel = level
 			currentSection = []string{}
 			sectionStart = i
-			
+
 			// Add heading as separate chunk if configured
 			if preserveFormatting, ok := config["preserve_formatting"].(bool); ok && preserveFormatting {
 				chunks = append(chunks, MarkdownChunk{
@@ -692,7 +692,7 @@ func (r *MarkdownReader) chunkBySection(lines []string, config map[string]any, o
 			currentSection = append(currentSection, line)
 		}
 	}
-	
+
 	// Add final section
 	if len(currentSection) > 0 {
 		content := strings.TrimSpace(strings.Join(currentSection, "\n"))
@@ -706,19 +706,19 @@ func (r *MarkdownReader) chunkBySection(lines []string, config map[string]any, o
 			})
 		}
 	}
-	
+
 	return chunks
 }
 
 // chunkByHeading creates one chunk per heading
 func (r *MarkdownReader) chunkByHeading(lines []string, config map[string]any, offset int) []MarkdownChunk {
 	var chunks []MarkdownChunk
-	
+
 	for i, line := range lines {
 		if strings.HasPrefix(line, "#") {
 			level := r.getHeadingLevel(line)
 			heading := strings.TrimSpace(line[level:])
-			
+
 			chunks = append(chunks, MarkdownChunk{
 				Content:      heading,
 				Type:         "heading",
@@ -728,7 +728,7 @@ func (r *MarkdownReader) chunkByHeading(lines []string, config map[string]any, o
 			})
 		}
 	}
-	
+
 	return chunks
 }
 
@@ -737,7 +737,7 @@ func (r *MarkdownReader) chunkByParagraph(lines []string, config map[string]any,
 	var chunks []MarkdownChunk
 	var currentParagraph []string
 	var paragraphStart int
-	
+
 	for i, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			// End of paragraph
@@ -748,7 +748,7 @@ func (r *MarkdownReader) chunkByParagraph(lines []string, config map[string]any,
 					if strings.HasPrefix(currentParagraph[0], "#") {
 						chunkType = "heading"
 					}
-					
+
 					chunks = append(chunks, MarkdownChunk{
 						Content:    content,
 						Type:       chunkType,
@@ -764,7 +764,7 @@ func (r *MarkdownReader) chunkByParagraph(lines []string, config map[string]any,
 			currentParagraph = append(currentParagraph, line)
 		}
 	}
-	
+
 	// Add final paragraph
 	if len(currentParagraph) > 0 {
 		content := strings.TrimSpace(strings.Join(currentParagraph, "\n"))
@@ -773,7 +773,7 @@ func (r *MarkdownReader) chunkByParagraph(lines []string, config map[string]any,
 			if strings.HasPrefix(currentParagraph[0], "#") {
 				chunkType = "heading"
 			}
-			
+
 			chunks = append(chunks, MarkdownChunk{
 				Content:    content,
 				Type:       chunkType,
@@ -781,7 +781,7 @@ func (r *MarkdownReader) chunkByParagraph(lines []string, config map[string]any,
 			})
 		}
 	}
-	
+
 	return chunks
 }
 
@@ -792,7 +792,7 @@ func (r *MarkdownReader) chunkByBlock(lines []string, config map[string]any, off
 	var currentBlock []string
 	var blockStart int
 	var language string
-	
+
 	for i, line := range lines {
 		if strings.HasPrefix(line, "```") {
 			if inCodeBlock {
@@ -837,7 +837,7 @@ func (r *MarkdownReader) chunkByBlock(lines []string, config map[string]any, off
 			}
 		}
 	}
-	
+
 	// Handle unclosed code block
 	if inCodeBlock && len(currentBlock) > 0 {
 		content := strings.Join(currentBlock, "\n")
@@ -848,7 +848,7 @@ func (r *MarkdownReader) chunkByBlock(lines []string, config map[string]any, off
 			LineNumber: blockStart + offset + 1,
 		})
 	}
-	
+
 	return chunks
 }
 
@@ -903,10 +903,10 @@ func (it *MarkdownIterator) Next(ctx context.Context) (core.Chunk, error) {
 			ProcessedAt: time.Now(),
 			ProcessedBy: "markdown_reader",
 			Context: map[string]string{
-				"chunk_number":   strconv.Itoa(it.currentChunk),
-				"total_chunks":   strconv.Itoa(len(it.chunks)),
-				"chunk_type":     chunk.Type,
-				"line_number":    strconv.Itoa(chunk.LineNumber),
+				"chunk_number": strconv.Itoa(it.currentChunk),
+				"total_chunks": strconv.Itoa(len(it.chunks)),
+				"chunk_type":   chunk.Type,
+				"line_number":  strconv.Itoa(chunk.LineNumber),
 			},
 		},
 	}

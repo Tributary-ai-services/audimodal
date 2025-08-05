@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/TAS/audimodal/pkg/anomaly"
+	"github.com/jscharber/eAIIngest/pkg/anomaly"
 )
 
 // AnomalyController handles anomaly detection API endpoints
@@ -38,27 +37,27 @@ func (c *AnomalyController) RegisterRoutes(router *gin.RouterGroup) {
 		anomalyGroup.POST("/detect", c.DetectAnomalies)
 		anomalyGroup.POST("/detect/async", c.DetectAnomaliesAsync)
 		anomalyGroup.GET("/detect/result/:request_id", c.GetDetectionResult)
-		
+
 		// Anomaly management endpoints
 		anomalyGroup.GET("", c.ListAnomalies)
 		anomalyGroup.GET("/:id", c.GetAnomaly)
 		anomalyGroup.PUT("/:id/status", c.UpdateAnomalyStatus)
 		anomalyGroup.DELETE("/:id", c.DeleteAnomaly)
-		
+
 		// Statistics and reporting endpoints
 		anomalyGroup.GET("/statistics", c.GetAnomalyStatistics)
 		anomalyGroup.GET("/trends", c.GetAnomalyTrends)
 		anomalyGroup.GET("/summary", c.GetAnomalySummary)
-		
+
 		// Detector management endpoints
 		anomalyGroup.GET("/detectors", c.GetDetectorInfo)
 		anomalyGroup.PUT("/detectors/:name/config", c.ConfigureDetector)
 		anomalyGroup.POST("/detectors/:name/baseline", c.UpdateDetectorBaseline)
-		
+
 		// Notification endpoints
 		anomalyGroup.POST("/notify/:id", c.SendNotification)
 		anomalyGroup.GET("/notifications/:id", c.GetNotificationHistory)
-		
+
 		// Bulk operations
 		anomalyGroup.POST("/bulk/status", c.BulkUpdateStatus)
 		anomalyGroup.POST("/bulk/detect", c.BulkDetectAnomalies)
@@ -95,7 +94,7 @@ func (c *AnomalyController) DetectAnomalies(ctx *gin.Context) {
 
 	// Convert to response format
 	response := c.convertToDetectionResponse(result)
-	
+
 	span.SetAttributes(
 		attribute.Int("anomalies_detected", len(result.Anomalies)),
 		attribute.Int64("processing_time_ms", result.ProcessingTime.Milliseconds()),
@@ -133,9 +132,9 @@ func (c *AnomalyController) DetectAnomaliesAsync(ctx *gin.Context) {
 	}
 
 	response := AsyncDetectionResponse{
-		RequestID:   detectionRequest.ID,
-		Status:      "submitted",
-		SubmittedAt: detectionRequest.Timestamp,
+		RequestID:           detectionRequest.ID,
+		Status:              "submitted",
+		SubmittedAt:         detectionRequest.Timestamp,
 		EstimatedCompletion: detectionRequest.Timestamp.Add(30 * time.Second),
 	}
 
@@ -145,7 +144,7 @@ func (c *AnomalyController) DetectAnomaliesAsync(ctx *gin.Context) {
 // GetDetectionResult retrieves the result of an async detection
 func (c *AnomalyController) GetDetectionResult(ctx *gin.Context) {
 	requestIDStr := ctx.Param("request_id")
-	requestID, err := uuid.Parse(requestIDStr)
+	_, err := uuid.Parse(requestIDStr)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request ID"})
 		return
@@ -232,7 +231,7 @@ func (c *AnomalyController) UpdateAnomalyStatus(ctx *gin.Context) {
 		anomaly.StatusResolved,
 		anomaly.StatusSuppressed,
 	}
-	
+
 	valid := false
 	for _, validStatus := range validStatuses {
 		if request.Status == validStatus {
@@ -240,7 +239,7 @@ func (c *AnomalyController) UpdateAnomalyStatus(ctx *gin.Context) {
 			break
 		}
 	}
-	
+
 	if !valid {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status"})
 		return
@@ -337,11 +336,11 @@ func (c *AnomalyController) GetAnomalySummary(ctx *gin.Context) {
 			"pending":         38,
 			"false_positives": 12,
 			"by_type": map[string]int{
-				"content_size":        23,
-				"suspicious_content":  18,
-				"access_pattern":      15,
-				"data_leak":           12,
-				"malicious_pattern":   8,
+				"content_size":       23,
+				"suspicious_content": 18,
+				"access_pattern":     15,
+				"data_leak":          12,
+				"malicious_pattern":  8,
 			},
 			"top_sources": []string{
 				"googledrive",
@@ -361,7 +360,7 @@ func (c *AnomalyController) GetDetectorInfo(ctx *gin.Context) {
 // ConfigureDetector updates detector configuration
 func (c *AnomalyController) ConfigureDetector(ctx *gin.Context) {
 	detectorName := ctx.Param("name")
-	
+
 	var config map[string]interface{}
 	if err := ctx.ShouldBindJSON(&config); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid configuration format", "details": err.Error()})
@@ -380,7 +379,7 @@ func (c *AnomalyController) ConfigureDetector(ctx *gin.Context) {
 // UpdateDetectorBaseline updates detector baseline
 func (c *AnomalyController) UpdateDetectorBaseline(ctx *gin.Context) {
 	detectorName := ctx.Param("name")
-	
+
 	var baseline anomaly.BaselineData
 	if err := ctx.ShouldBindJSON(&baseline); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid baseline format", "details": err.Error()})
@@ -481,7 +480,7 @@ func (c *AnomalyController) BulkDetectAnomalies(ctx *gin.Context) {
 	for i, detectionRequest := range request.Requests {
 		input := c.convertToDetectionInput(&detectionRequest)
 		result, err := c.service.DetectAnomalies(ctx.Request.Context(), input)
-		
+
 		bulkResult := BulkDetectionResult{
 			Index:     i,
 			Success:   err == nil,
@@ -527,13 +526,13 @@ func (c *AnomalyController) validateAsyncDetectionRequest(request *DetectAnomali
 
 func (c *AnomalyController) convertToDetectionInput(request *DetectAnomaliesRequest) *anomaly.DetectionInput {
 	input := &anomaly.DetectionInput{
-		Content:      request.Content,
-		ContentType:  request.ContentType,
-		FileSize:     request.FileSize,
-		FileName:     request.FileName,
-		TenantID:     request.TenantID,
-		Timestamp:    time.Now(),
-		Metadata:     request.Metadata,
+		Content:     request.Content,
+		ContentType: request.ContentType,
+		FileSize:    request.FileSize,
+		FileName:    request.FileName,
+		TenantID:    request.TenantID,
+		Timestamp:   time.Now(),
+		Metadata:    request.Metadata,
 	}
 
 	if request.DataSourceID != nil {
@@ -556,15 +555,15 @@ func (c *AnomalyController) convertToDetectionResponse(result *anomaly.Detection
 	anomalies := make([]AnomalyResponse, len(result.Anomalies))
 	for i, a := range result.Anomalies {
 		anomalies[i] = AnomalyResponse{
-			ID:          a.ID,
-			Type:        a.Type,
-			Severity:    a.Severity,
-			Status:      a.Status,
-			Title:       a.Title,
-			Description: a.Description,
-			DetectedAt:  a.DetectedAt,
-			Score:       a.Score,
-			Confidence:  a.Confidence,
+			ID:           a.ID,
+			Type:         a.Type,
+			Severity:     a.Severity,
+			Status:       a.Status,
+			Title:        a.Title,
+			Description:  a.Description,
+			DetectedAt:   a.DetectedAt,
+			Score:        a.Score,
+			Confidence:   a.Confidence,
 			DetectorName: a.DetectorName,
 		}
 	}
@@ -582,14 +581,14 @@ func (c *AnomalyController) convertAnomaliesForList(anomalies []*anomaly.Anomaly
 	items := make([]AnomalyListItem, len(anomalies))
 	for i, a := range anomalies {
 		items[i] = AnomalyListItem{
-			ID:          a.ID,
-			Type:        a.Type,
-			Severity:    a.Severity,
-			Status:      a.Status,
-			Title:       a.Title,
-			DetectedAt:  a.DetectedAt,
-			Score:       a.Score,
-			Confidence:  a.Confidence,
+			ID:           a.ID,
+			Type:         a.Type,
+			Severity:     a.Severity,
+			Status:       a.Status,
+			Title:        a.Title,
+			DetectedAt:   a.DetectedAt,
+			Score:        a.Score,
+			Confidence:   a.Confidence,
 			DetectorName: a.DetectorName,
 		}
 	}
@@ -598,31 +597,31 @@ func (c *AnomalyController) convertAnomaliesForList(anomalies []*anomaly.Anomaly
 
 func (c *AnomalyController) convertAnomalyForDetail(a *anomaly.Anomaly) AnomalyDetailResponse {
 	return AnomalyDetailResponse{
-		ID:             a.ID,
-		Type:           a.Type,
-		Severity:       a.Severity,
-		Status:         a.Status,
-		Title:          a.Title,
-		Description:    a.Description,
-		DetectedAt:     a.DetectedAt,
-		UpdatedAt:      a.UpdatedAt,
-		ResolvedAt:     a.ResolvedAt,
-		TenantID:       a.TenantID,
-		DataSourceID:   a.DataSourceID,
-		DocumentID:     a.DocumentID,
-		ChunkID:        a.ChunkID,
-		UserID:         a.UserID,
-		Score:          a.Score,
-		Confidence:     a.Confidence,
-		Threshold:      a.Threshold,
-		Baseline:       a.Baseline,
-		Detected:       a.Detected,
-		Metadata:       a.Metadata,
-		DetectorName:   a.DetectorName,
-		DetectorVersion: a.DetectorVersion,
-		RuleName:       a.RuleName,
-		ResolutionNotes: a.ResolutionNotes,
-		Actions:        a.Actions,
+		ID:                a.ID,
+		Type:              a.Type,
+		Severity:          a.Severity,
+		Status:            a.Status,
+		Title:             a.Title,
+		Description:       a.Description,
+		DetectedAt:        a.DetectedAt,
+		UpdatedAt:         a.UpdatedAt,
+		ResolvedAt:        a.ResolvedAt,
+		TenantID:          a.TenantID,
+		DataSourceID:      a.DataSourceID,
+		DocumentID:        a.DocumentID,
+		ChunkID:           a.ChunkID,
+		UserID:            a.UserID,
+		Score:             a.Score,
+		Confidence:        a.Confidence,
+		Threshold:         a.Threshold,
+		Baseline:          a.Baseline,
+		Detected:          a.Detected,
+		Metadata:          a.Metadata,
+		DetectorName:      a.DetectorName,
+		DetectorVersion:   a.DetectorVersion,
+		RuleName:          a.RuleName,
+		ResolutionNotes:   a.ResolutionNotes,
+		Actions:           a.Actions,
 		NotificationsSent: a.NotificationsSent,
 	}
 }

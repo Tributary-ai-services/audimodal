@@ -157,7 +157,7 @@ func (r *PDFReader) TestConnection(ctx context.Context, config map[string]any) c
 
 	// Test if required dependencies are available
 	dependencies := r.checkDependencies()
-	
+
 	return core.ConnectionTestResult{
 		Success: len(dependencies) == 0,
 		Message: func() string {
@@ -169,9 +169,9 @@ func (r *PDFReader) TestConnection(ctx context.Context, config map[string]any) c
 		Latency: time.Since(start),
 		Errors:  dependencies,
 		Details: map[string]any{
-			"extract_mode":   config["extract_mode"],
-			"ocr_language":   config["ocr_language"],
-			"dependencies":   len(dependencies) == 0,
+			"extract_mode": config["extract_mode"],
+			"ocr_language": config["ocr_language"],
+			"dependencies": len(dependencies) == 0,
 		},
 	}
 }
@@ -179,22 +179,22 @@ func (r *PDFReader) TestConnection(ctx context.Context, config map[string]any) c
 // checkDependencies verifies required tools are available
 func (r *PDFReader) checkDependencies() []string {
 	var missing []string
-	
+
 	// Check for pdftotext (poppler-utils)
 	if !r.commandExists("pdftotext") {
 		missing = append(missing, "pdftotext (install poppler-utils)")
 	}
-	
+
 	// Check for tesseract (OCR)
 	if !r.commandExists("tesseract") {
 		missing = append(missing, "tesseract (install tesseract-ocr)")
 	}
-	
+
 	// Check for pdftoppm (for image conversion)
 	if !r.commandExists("pdftoppm") {
 		missing = append(missing, "pdftoppm (install poppler-utils)")
 	}
-	
+
 	return missing
 }
 
@@ -270,17 +270,17 @@ func (r *PDFReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 			},
 		},
 		Metadata: map[string]any{
-			"file_size":    stat.Size(),
-			"page_count":   metadata.PageCount,
-			"title":        metadata.Title,
-			"author":       metadata.Author,
-			"subject":      metadata.Subject,
-			"creator":      metadata.Creator,
-			"producer":     metadata.Producer,
+			"file_size":     stat.Size(),
+			"page_count":    metadata.PageCount,
+			"title":         metadata.Title,
+			"author":        metadata.Author,
+			"subject":       metadata.Subject,
+			"creator":       metadata.Creator,
+			"producer":      metadata.Producer,
 			"creation_date": metadata.CreationDate,
 			"modified_date": metadata.ModificationDate,
-			"encrypted":    metadata.Encrypted,
-			"pdf_version":  metadata.PDFVersion,
+			"encrypted":     metadata.Encrypted,
+			"pdf_version":   metadata.PDFVersion,
 		},
 	}
 
@@ -292,9 +292,9 @@ func (r *PDFReader) DiscoverSchema(ctx context.Context, sourcePath string) (core
 				{
 					"content":           sampleText[:min(500, len(sampleText))], // First 500 chars
 					"page_number":       1,
-					"page_text":        sampleText,
+					"page_text":         sampleText,
 					"extraction_method": method,
-					"confidence":       confidence,
+					"confidence":        confidence,
 				},
 			}
 		}
@@ -319,7 +319,7 @@ func (r *PDFReader) EstimateSize(ctx context.Context, sourcePath string) (core.S
 	avgCharsPerPage := int64(2000) // Conservative estimate
 	if metadata.PageCount > 0 {
 		estimatedTextSize := int64(metadata.PageCount) * avgCharsPerPage
-		
+
 		// Estimate chunks based on typical chunk size (1000 characters)
 		chunkSize := int64(1000)
 		estimatedChunks := int((estimatedTextSize + chunkSize - 1) / chunkSize)
@@ -368,11 +368,11 @@ func (r *PDFReader) CreateIterator(ctx context.Context, sourcePath string, strat
 	}
 
 	iterator := &PDFIterator{
-		sourcePath:     sourcePath,
-		config:         strategyConfig,
-		metadata:       metadata,
-		currentPage:    0,
-		totalPages:     metadata.PageCount,
+		sourcePath:  sourcePath,
+		config:      strategyConfig,
+		metadata:    metadata,
+		currentPage: 0,
+		totalPages:  metadata.PageCount,
 	}
 
 	return iterator, nil
@@ -408,7 +408,7 @@ func (r *PDFReader) extractPDFMetadata(sourcePath string) (PDFMetadata, error) {
 	// - github.com/ledongthuc/pdf for pure Go
 	// - github.com/unidoc/unipdf for commercial use
 	// - Or call pdfinfo command from poppler-utils
-	
+
 	// For now, return mock metadata
 	return PDFMetadata{
 		PageCount:        10, // Would be extracted from actual PDF
@@ -438,7 +438,7 @@ func (r *PDFReader) extractPageText(sourcePath string, pageNum int, config map[s
 	// 1. Try pdftotext first for text extraction
 	// 2. Fall back to OCR if text extraction fails or mode is "ocr"
 	// 3. Use tesseract for OCR processing
-	
+
 	// Mock implementation
 	extractedText := fmt.Sprintf("This is sample text from page %d of the PDF document.\nIt would contain the actual extracted content.", pageNum)
 	extractionMethod := "text"

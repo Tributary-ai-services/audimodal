@@ -29,59 +29,59 @@ type Pipeline struct {
 
 // PipelineConfig contains configuration for the processing pipeline
 type PipelineConfig struct {
-	MaxConcurrentFiles    int           `json:"max_concurrent_files"`
-	MaxConcurrentChunks   int           `json:"max_concurrent_chunks"`
-	ChunkBatchSize        int           `json:"chunk_batch_size"`
-	ProcessingTimeout     time.Duration `json:"processing_timeout"`
-	RetryAttempts         int           `json:"retry_attempts"`
-	RetryDelay            time.Duration `json:"retry_delay"`
-	AutoSelectReader      bool          `json:"auto_select_reader"`
-	AutoSelectStrategy    bool          `json:"auto_select_strategy"`
-	EnableQualityFilter   bool          `json:"enable_quality_filter"`
-	MinQualityThreshold   float64       `json:"min_quality_threshold"`
-	TempStoragePath       string        `json:"temp_storage_path"`
-	EnableMetrics         bool          `json:"enable_metrics"`
+	MaxConcurrentFiles  int           `json:"max_concurrent_files"`
+	MaxConcurrentChunks int           `json:"max_concurrent_chunks"`
+	ChunkBatchSize      int           `json:"chunk_batch_size"`
+	ProcessingTimeout   time.Duration `json:"processing_timeout"`
+	RetryAttempts       int           `json:"retry_attempts"`
+	RetryDelay          time.Duration `json:"retry_delay"`
+	AutoSelectReader    bool          `json:"auto_select_reader"`
+	AutoSelectStrategy  bool          `json:"auto_select_strategy"`
+	EnableQualityFilter bool          `json:"enable_quality_filter"`
+	MinQualityThreshold float64       `json:"min_quality_threshold"`
+	TempStoragePath     string        `json:"temp_storage_path"`
+	EnableMetrics       bool          `json:"enable_metrics"`
 }
 
 // PipelineMetrics tracks processing statistics
 type PipelineMetrics struct {
-	FilesProcessed    int64     `json:"files_processed"`
-	ChunksCreated     int64     `json:"chunks_created"`
-	BytesProcessed    int64     `json:"bytes_processed"`
-	ErrorCount        int64     `json:"error_count"`
-	AverageFileTime   float64   `json:"average_file_time_ms"`
-	AverageChunkTime  float64   `json:"average_chunk_time_ms"`
-	LastProcessedAt   time.Time `json:"last_processed_at"`
-	mu                sync.RWMutex
+	FilesProcessed   int64     `json:"files_processed"`
+	ChunksCreated    int64     `json:"chunks_created"`
+	BytesProcessed   int64     `json:"bytes_processed"`
+	ErrorCount       int64     `json:"error_count"`
+	AverageFileTime  float64   `json:"average_file_time_ms"`
+	AverageChunkTime float64   `json:"average_chunk_time_ms"`
+	LastProcessedAt  time.Time `json:"last_processed_at"`
+	mu               sync.RWMutex
 }
 
 // ProcessingRequest represents a file processing request
 type ProcessingRequest struct {
-	TenantID         uuid.UUID `json:"tenant_id"`
-	SessionID        uuid.UUID `json:"session_id"`
-	FileID           uuid.UUID `json:"file_id"`
-	FilePath         string    `json:"file_path"`
-	ReaderType       string    `json:"reader_type,omitempty"`
-	StrategyType     string    `json:"strategy_type,omitempty"`
-	ReaderConfig     map[string]any `json:"reader_config,omitempty"`
-	StrategyConfig   map[string]any `json:"strategy_config,omitempty"`
-	Priority         string    `json:"priority"`
-	DLPScanEnabled   bool      `json:"dlp_scan_enabled"`
-	ComplianceRules  []string  `json:"compliance_rules,omitempty"`
+	TenantID        uuid.UUID      `json:"tenant_id"`
+	SessionID       uuid.UUID      `json:"session_id"`
+	FileID          uuid.UUID      `json:"file_id"`
+	FilePath        string         `json:"file_path"`
+	ReaderType      string         `json:"reader_type,omitempty"`
+	StrategyType    string         `json:"strategy_type,omitempty"`
+	ReaderConfig    map[string]any `json:"reader_config,omitempty"`
+	StrategyConfig  map[string]any `json:"strategy_config,omitempty"`
+	Priority        string         `json:"priority"`
+	DLPScanEnabled  bool           `json:"dlp_scan_enabled"`
+	ComplianceRules []string       `json:"compliance_rules,omitempty"`
 }
 
 // ProcessingResult contains the results of file processing
 type ProcessingResult struct {
-	FileID          uuid.UUID     `json:"file_id"`
-	Status          string        `json:"status"`
-	ChunksCreated   int           `json:"chunks_created"`
-	BytesProcessed  int64         `json:"bytes_processed"`
-	ProcessingTime  time.Duration `json:"processing_time"`
-	ReaderUsed      string        `json:"reader_used"`
-	StrategyUsed    string        `json:"strategy_used"`
-	QualityScore    float64       `json:"quality_score"`
-	ErrorMessage    string        `json:"error_message,omitempty"`
-	Metadata        map[string]any `json:"metadata,omitempty"`
+	FileID         uuid.UUID      `json:"file_id"`
+	Status         string         `json:"status"`
+	ChunksCreated  int            `json:"chunks_created"`
+	BytesProcessed int64          `json:"bytes_processed"`
+	ProcessingTime time.Duration  `json:"processing_time"`
+	ReaderUsed     string         `json:"reader_used"`
+	StrategyUsed   string         `json:"strategy_used"`
+	QualityScore   float64        `json:"quality_score"`
+	ErrorMessage   string         `json:"error_message,omitempty"`
+	Metadata       map[string]any `json:"metadata,omitempty"`
 }
 
 // NewPipeline creates a new processing pipeline
@@ -101,25 +101,25 @@ func NewPipeline(db *database.Database, config *PipelineConfig) *Pipeline {
 // GetDefaultPipelineConfig returns default pipeline configuration
 func GetDefaultPipelineConfig() *PipelineConfig {
 	return &PipelineConfig{
-		MaxConcurrentFiles:    5,
-		MaxConcurrentChunks:   20,
-		ChunkBatchSize:        100,
-		ProcessingTimeout:     30 * time.Minute,
-		RetryAttempts:         3,
-		RetryDelay:            5 * time.Second,
-		AutoSelectReader:      true,
-		AutoSelectStrategy:    true,
-		EnableQualityFilter:   true,
-		MinQualityThreshold:   0.3,
-		TempStoragePath:       "/tmp/audimodal",
-		EnableMetrics:         true,
+		MaxConcurrentFiles:  5,
+		MaxConcurrentChunks: 20,
+		ChunkBatchSize:      100,
+		ProcessingTimeout:   30 * time.Minute,
+		RetryAttempts:       3,
+		RetryDelay:          5 * time.Second,
+		AutoSelectReader:    true,
+		AutoSelectStrategy:  true,
+		EnableQualityFilter: true,
+		MinQualityThreshold: 0.3,
+		TempStoragePath:     "/tmp/audimodal",
+		EnableMetrics:       true,
 	}
 }
 
 // ProcessFile processes a single file through the complete pipeline
 func (p *Pipeline) ProcessFile(ctx context.Context, request *ProcessingRequest) (*ProcessingResult, error) {
 	startTime := time.Now()
-	
+
 	result := &ProcessingResult{
 		FileID: request.FileID,
 		Status: "processing",
@@ -136,7 +136,7 @@ func (p *Pipeline) ProcessFile(ctx context.Context, request *ProcessingRequest) 
 
 	// Execute processing pipeline
 	err := p.executeProcessingPipeline(processCtx, request, result)
-	
+
 	// Calculate processing time
 	result.ProcessingTime = time.Since(startTime)
 
@@ -178,7 +178,7 @@ func (p *Pipeline) ProcessFiles(ctx context.Context, requests []*ProcessingReque
 		wg.Add(1)
 		go func(idx int, req *ProcessingRequest) {
 			defer wg.Done()
-			
+
 			// Acquire semaphore
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -254,7 +254,7 @@ func (p *Pipeline) executeProcessingPipeline(ctx context.Context, request *Proce
 	if readerConfig == nil {
 		readerConfig = make(map[string]any)
 	}
-	
+
 	configuredReaderConfig, err := strategy.ConfigureReader(readerConfig)
 	if err != nil {
 		return fmt.Errorf("failed to configure reader: %w", err)
@@ -320,14 +320,14 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 		// Convert to database models and apply quality filter
 		for _, processedChunk := range processedChunks {
 			dbChunk := p.convertToDBChunk(processedChunk, request)
-			
+
 			// Apply quality filter if enabled
 			if p.config.EnableQualityFilter && dbChunk.Quality.Completeness < p.config.MinQualityThreshold {
 				continue // Skip low-quality chunks
 			}
 
 			chunkBatch = append(chunkBatch, dbChunk)
-			
+
 			// Update quality tracking
 			if dbChunk.Quality.Completeness > 0 {
 				totalQuality += dbChunk.Quality.Completeness
@@ -378,26 +378,26 @@ func (p *Pipeline) saveBatch(ctx context.Context, tenantRepo *database.TenantRep
 // convertToDBChunk converts a core.Chunk to a database models.Chunk
 func (p *Pipeline) convertToDBChunk(chunk core.Chunk, request *ProcessingRequest) *models.Chunk {
 	dbChunk := &models.Chunk{
-		TenantID:         request.TenantID,
-		FileID:           request.FileID,
-		ChunkID:          chunk.Metadata.ChunkID,
-		ChunkType:        chunk.Metadata.ChunkType,
-		ChunkNumber:      p.extractChunkNumber(chunk.Metadata.ChunkID),
-		Content:          fmt.Sprintf("%v", chunk.Data),
-		ContentHash:      p.calculateContentHash(chunk.Data),
-		SizeBytes:        chunk.Metadata.SizeBytes,
-		StartPosition:    chunk.Metadata.StartPosition,
-		EndPosition:      chunk.Metadata.EndPosition,
-		PageNumber:       nil, // Could be extracted from context if needed
-		LineNumber:       nil, // Could be extracted from context if needed
-		Relationships:    chunk.Metadata.Relationships,
-		ProcessedAt:      chunk.Metadata.ProcessedAt,
-		ProcessedBy:      chunk.Metadata.ProcessedBy,
-		ProcessingTime:   0, // Could be calculated if needed
-		Context:          chunk.Metadata.Context,
-		SchemaInfo:       chunk.Metadata.SchemaInfo,
-		EmbeddingStatus:  models.EmbeddingStatusPending,
-		DLPScanStatus:    models.DLPScanStatusPending,
+		TenantID:        request.TenantID,
+		FileID:          request.FileID,
+		ChunkID:         chunk.Metadata.ChunkID,
+		ChunkType:       chunk.Metadata.ChunkType,
+		ChunkNumber:     p.extractChunkNumber(chunk.Metadata.ChunkID),
+		Content:         fmt.Sprintf("%v", chunk.Data),
+		ContentHash:     p.calculateContentHash(chunk.Data),
+		SizeBytes:       chunk.Metadata.SizeBytes,
+		StartPosition:   chunk.Metadata.StartPosition,
+		EndPosition:     chunk.Metadata.EndPosition,
+		PageNumber:      nil, // Could be extracted from context if needed
+		LineNumber:      nil, // Could be extracted from context if needed
+		Relationships:   chunk.Metadata.Relationships,
+		ProcessedAt:     chunk.Metadata.ProcessedAt,
+		ProcessedBy:     chunk.Metadata.ProcessedBy,
+		ProcessingTime:  0, // Could be calculated if needed
+		Context:         chunk.Metadata.Context,
+		SchemaInfo:      chunk.Metadata.SchemaInfo,
+		EmbeddingStatus: models.EmbeddingStatusPending,
+		DLPScanStatus:   models.DLPScanStatusPending,
 	}
 
 	// Set quality metrics if available
@@ -422,11 +422,11 @@ func (p *Pipeline) buildChunkContext(request *ProcessingRequest) map[string]stri
 	context["session_id"] = request.SessionID.String()
 	context["file_id"] = request.FileID.String()
 	context["priority"] = request.Priority
-	
+
 	if request.DLPScanEnabled {
 		context["dlp_scan_enabled"] = "true"
 	}
-	
+
 	// Add strategy config to context
 	for key, value := range request.StrategyConfig {
 		context[key] = fmt.Sprintf("%v", value)
@@ -438,7 +438,7 @@ func (p *Pipeline) buildChunkContext(request *ProcessingRequest) map[string]stri
 // updateFileStatus updates the processing status of a file
 func (p *Pipeline) updateFileStatus(ctx context.Context, fileID uuid.UUID, status string, errorMsg string) error {
 	tenantService := p.db.NewTenantService()
-	
+
 	// We need to find the tenant for this file first
 	var file models.File
 	if err := p.db.DB().Where("id = ?", fileID).First(&file).Error; err != nil {
@@ -454,12 +454,12 @@ func (p *Pipeline) updateFileStatus(ctx context.Context, fileID uuid.UUID, statu
 	updates := map[string]interface{}{
 		"status": status,
 	}
-	
+
 	if status == models.FileStatusProcessed {
 		now := time.Now()
 		updates["processed_at"] = &now
 	}
-	
+
 	if errorMsg != "" {
 		updates["processing_error"] = &errorMsg
 	}
@@ -470,7 +470,7 @@ func (p *Pipeline) updateFileStatus(ctx context.Context, fileID uuid.UUID, statu
 // updateFileChunkCount updates the chunk count for a file
 func (p *Pipeline) updateFileChunkCount(ctx context.Context, fileID uuid.UUID, chunkCount int) error {
 	tenantService := p.db.NewTenantService()
-	
+
 	var file models.File
 	if err := p.db.DB().Where("id = ?", fileID).First(&file).Error; err != nil {
 		return fmt.Errorf("failed to find file: %w", err)
@@ -492,7 +492,7 @@ func (p *Pipeline) updateMetrics(result *ProcessingResult) {
 	p.metrics.FilesProcessed++
 	p.metrics.ChunksCreated += int64(result.ChunksCreated)
 	p.metrics.BytesProcessed += result.BytesProcessed
-	
+
 	if result.Status == "failed" {
 		p.metrics.ErrorCount++
 	}

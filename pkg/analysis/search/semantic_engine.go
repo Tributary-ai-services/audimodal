@@ -19,156 +19,156 @@ import (
 
 // SemanticSearchEngine provides enhanced semantic search capabilities
 type SemanticSearchEngine struct {
-	config           *SemanticSearchConfig
-	embeddingEngine  *EmbeddingEngine
-	indexEngine      *IndexEngine
-	queryProcessor   *QueryProcessor
-	rankingEngine    *RankingEngine
-	documentIndex    map[uuid.UUID]*SearchableDocument
-	embeddings       map[uuid.UUID][]float64
-	cache            map[string]*CachedSearchResult
-	tracer           trace.Tracer
-	mutex            sync.RWMutex
+	config          *SemanticSearchConfig
+	embeddingEngine *EmbeddingEngine
+	indexEngine     *IndexEngine
+	queryProcessor  *QueryProcessor
+	rankingEngine   *RankingEngine
+	documentIndex   map[uuid.UUID]*SearchableDocument
+	embeddings      map[uuid.UUID][]float64
+	cache           map[string]*CachedSearchResult
+	tracer          trace.Tracer
+	mutex           sync.RWMutex
 }
 
 // SemanticSearchConfig contains configuration for semantic search
 type SemanticSearchConfig struct {
-	Enabled                     bool          `json:"enabled"`
-	EmbeddingModel              string        `json:"embedding_model"`
-	VectorDimensions            int           `json:"vector_dimensions"`
-	SimilarityThreshold         float64       `json:"similarity_threshold"`
-	MaxResults                  int           `json:"max_results"`
-	EnableHybridSearch          bool          `json:"enable_hybrid_search"`
-	EnableQueryExpansion        bool          `json:"enable_query_expansion"`
-	EnableReranking             bool          `json:"enable_reranking"`
-	EnablePersonalization       bool          `json:"enable_personalization"`
-	EnableFacetedSearch         bool          `json:"enable_faceted_search"`
-	IndexUpdateInterval         time.Duration `json:"index_update_interval"`
-	CacheSize                   int           `json:"cache_size"`
-	CacheTTL                    time.Duration `json:"cache_ttl"`
-	BatchSize                   int           `json:"batch_size"`
-	MaxQueryLength              int           `json:"max_query_length"`
-	EnableSemanticHighlighting  bool          `json:"enable_semantic_highlighting"`
-	EnableAutoComplete          bool          `json:"enable_auto_complete"`
-	EnableSpellCorrection       bool          `json:"enable_spell_correction"`
-	EnableSynonymExpansion      bool          `json:"enable_synonym_expansion"`
-	EnableConceptualSearch      bool          `json:"enable_conceptual_search"`
+	Enabled                    bool          `json:"enabled"`
+	EmbeddingModel             string        `json:"embedding_model"`
+	VectorDimensions           int           `json:"vector_dimensions"`
+	SimilarityThreshold        float64       `json:"similarity_threshold"`
+	MaxResults                 int           `json:"max_results"`
+	EnableHybridSearch         bool          `json:"enable_hybrid_search"`
+	EnableQueryExpansion       bool          `json:"enable_query_expansion"`
+	EnableReranking            bool          `json:"enable_reranking"`
+	EnablePersonalization      bool          `json:"enable_personalization"`
+	EnableFacetedSearch        bool          `json:"enable_faceted_search"`
+	IndexUpdateInterval        time.Duration `json:"index_update_interval"`
+	CacheSize                  int           `json:"cache_size"`
+	CacheTTL                   time.Duration `json:"cache_ttl"`
+	BatchSize                  int           `json:"batch_size"`
+	MaxQueryLength             int           `json:"max_query_length"`
+	EnableSemanticHighlighting bool          `json:"enable_semantic_highlighting"`
+	EnableAutoComplete         bool          `json:"enable_auto_complete"`
+	EnableSpellCorrection      bool          `json:"enable_spell_correction"`
+	EnableSynonymExpansion     bool          `json:"enable_synonym_expansion"`
+	EnableConceptualSearch     bool          `json:"enable_conceptual_search"`
 }
 
 // SearchableDocument represents a document that can be searched
 type SearchableDocument struct {
-	ID              uuid.UUID                 `json:"id"`
-	TenantID        uuid.UUID                 `json:"tenant_id"`
-	Title           string                    `json:"title"`
-	Content         string                    `json:"content"`
-	Summary         string                    `json:"summary,omitempty"`
-	DocumentType    string                    `json:"document_type"`
-	Language        string                    `json:"language"`
-	Author          string                    `json:"author,omitempty"`
-	CreatedAt       time.Time                 `json:"created_at"`
-	ModifiedAt      time.Time                 `json:"modified_at"`
-	
+	ID           uuid.UUID `json:"id"`
+	TenantID     uuid.UUID `json:"tenant_id"`
+	Title        string    `json:"title"`
+	Content      string    `json:"content"`
+	Summary      string    `json:"summary,omitempty"`
+	DocumentType string    `json:"document_type"`
+	Language     string    `json:"language"`
+	Author       string    `json:"author,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	ModifiedAt   time.Time `json:"modified_at"`
+
 	// Metadata
-	Tags            []string                  `json:"tags,omitempty"`
-	Categories      []string                  `json:"categories,omitempty"`
-	Topics          []string                  `json:"topics,omitempty"`
-	Keywords        []string                  `json:"keywords,omitempty"`
-	
+	Tags       []string `json:"tags,omitempty"`
+	Categories []string `json:"categories,omitempty"`
+	Topics     []string `json:"topics,omitempty"`
+	Keywords   []string `json:"keywords,omitempty"`
+
 	// Embeddings
-	TitleEmbedding  []float64                 `json:"title_embedding,omitempty"`
-	ContentEmbedding []float64                `json:"content_embedding,omitempty"`
-	SummaryEmbedding []float64                `json:"summary_embedding,omitempty"`
-	
+	TitleEmbedding   []float64 `json:"title_embedding,omitempty"`
+	ContentEmbedding []float64 `json:"content_embedding,omitempty"`
+	SummaryEmbedding []float64 `json:"summary_embedding,omitempty"`
+
 	// Search metadata
-	SearchableText  string                    `json:"searchable_text,omitempty"`
-	BoostFactor     float64                   `json:"boost_factor"`
-	AccessLevel     string                    `json:"access_level"`
-	
+	SearchableText string  `json:"searchable_text,omitempty"`
+	BoostFactor    float64 `json:"boost_factor"`
+	AccessLevel    string  `json:"access_level"`
+
 	// Analytics
-	ViewCount       int64                     `json:"view_count"`
-	SearchCount     int64                     `json:"search_count"`
-	LastAccessed    *time.Time                `json:"last_accessed,omitempty"`
-	PopularityScore float64                   `json:"popularity_score"`
-	
+	ViewCount       int64      `json:"view_count"`
+	SearchCount     int64      `json:"search_count"`
+	LastAccessed    *time.Time `json:"last_accessed,omitempty"`
+	PopularityScore float64    `json:"popularity_score"`
+
 	// Custom metadata
-	Metadata        map[string]interface{}    `json:"metadata,omitempty"`
+	Metadata map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // SearchQuery represents a search query
 type SearchQuery struct {
-	ID              uuid.UUID                 `json:"id"`
-	UserID          uuid.UUID                 `json:"user_id"`
-	TenantID        uuid.UUID                 `json:"tenant_id"`
-	QueryText       string                    `json:"query_text"`
-	QueryType       QueryType                 `json:"query_type"`
-	SearchMode      SearchMode                `json:"search_mode"`
-	
+	ID         uuid.UUID  `json:"id"`
+	UserID     uuid.UUID  `json:"user_id"`
+	TenantID   uuid.UUID  `json:"tenant_id"`
+	QueryText  string     `json:"query_text"`
+	QueryType  QueryType  `json:"query_type"`
+	SearchMode SearchMode `json:"search_mode"`
+
 	// Query parameters
-	Filters         []SearchFilter            `json:"filters,omitempty"`
-	Facets          []SearchFacet             `json:"facets,omitempty"`
-	SortBy          []SortCriteria            `json:"sort_by,omitempty"`
-	Limit           int                       `json:"limit"`
-	Offset          int                       `json:"offset"`
-	
+	Filters []SearchFilter `json:"filters,omitempty"`
+	Facets  []SearchFacet  `json:"facets,omitempty"`
+	SortBy  []SortCriteria `json:"sort_by,omitempty"`
+	Limit   int            `json:"limit"`
+	Offset  int            `json:"offset"`
+
 	// Advanced options
-	BoostQueries    []BoostQuery              `json:"boost_queries,omitempty"`
-	MinScore        float64                   `json:"min_score,omitempty"`
-	IncludeHighlights bool                    `json:"include_highlights"`
-	IncludeFacets   bool                      `json:"include_facets"`
-	
+	BoostQueries      []BoostQuery `json:"boost_queries,omitempty"`
+	MinScore          float64      `json:"min_score,omitempty"`
+	IncludeHighlights bool         `json:"include_highlights"`
+	IncludeFacets     bool         `json:"include_facets"`
+
 	// Personalization
-	UserContext     *UserContext              `json:"user_context,omitempty"`
-	HistoricalQueries []string                `json:"historical_queries,omitempty"`
-	
+	UserContext       *UserContext `json:"user_context,omitempty"`
+	HistoricalQueries []string     `json:"historical_queries,omitempty"`
+
 	// Metadata
-	CreatedAt       time.Time                 `json:"created_at"`
-	ExecutedAt      *time.Time                `json:"executed_at,omitempty"`
-	ExecutionTime   time.Duration             `json:"execution_time"`
-	
+	CreatedAt     time.Time     `json:"created_at"`
+	ExecutedAt    *time.Time    `json:"executed_at,omitempty"`
+	ExecutionTime time.Duration `json:"execution_time"`
+
 	// Custom parameters
-	Parameters      map[string]interface{}    `json:"parameters,omitempty"`
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
 }
 
 // SearchResult represents search results
 type SearchResult struct {
-	QueryID         uuid.UUID                 `json:"query_id"`
-	TotalResults    int                       `json:"total_results"`
-	Results         []DocumentResult          `json:"results"`
-	Facets          []FacetResult             `json:"facets,omitempty"`
-	Suggestions     []QuerySuggestion         `json:"suggestions,omitempty"`
-	SpellCorrections []SpellCorrection        `json:"spell_corrections,omitempty"`
-	
+	QueryID          uuid.UUID         `json:"query_id"`
+	TotalResults     int               `json:"total_results"`
+	Results          []DocumentResult  `json:"results"`
+	Facets           []FacetResult     `json:"facets,omitempty"`
+	Suggestions      []QuerySuggestion `json:"suggestions,omitempty"`
+	SpellCorrections []SpellCorrection `json:"spell_corrections,omitempty"`
+
 	// Performance metrics
-	ExecutionTime   time.Duration             `json:"execution_time"`
-	IndexTime       time.Time                 `json:"index_time"`
-	SearchDetails   *SearchExecutionDetails   `json:"search_details,omitempty"`
-	
+	ExecutionTime time.Duration           `json:"execution_time"`
+	IndexTime     time.Time               `json:"index_time"`
+	SearchDetails *SearchExecutionDetails `json:"search_details,omitempty"`
+
 	// Pagination
-	HasMore         bool                      `json:"has_more"`
-	NextOffset      int                       `json:"next_offset,omitempty"`
-	
+	HasMore    bool `json:"has_more"`
+	NextOffset int  `json:"next_offset,omitempty"`
+
 	// Analytics
-	ResultsAnalytics *SearchAnalytics         `json:"results_analytics,omitempty"`
+	ResultsAnalytics *SearchAnalytics `json:"results_analytics,omitempty"`
 }
 
 // DocumentResult represents a single document in search results
 type DocumentResult struct {
-	Document        *SearchableDocument       `json:"document"`
-	Score           float64                   `json:"score"`
-	Rank            int                       `json:"rank"`
-	Highlights      []SearchHighlight         `json:"highlights,omitempty"`
-	Explanation     *ScoreExplanation         `json:"explanation,omitempty"`
-	
+	Document    *SearchableDocument `json:"document"`
+	Score       float64             `json:"score"`
+	Rank        int                 `json:"rank"`
+	Highlights  []SearchHighlight   `json:"highlights,omitempty"`
+	Explanation *ScoreExplanation   `json:"explanation,omitempty"`
+
 	// Semantic relevance
-	SemanticScore   float64                   `json:"semantic_score"`
-	KeywordScore    float64                   `json:"keyword_score"`
-	PopularityScore float64                   `json:"popularity_score"`
-	RecencyScore    float64                   `json:"recency_score"`
-	
+	SemanticScore   float64 `json:"semantic_score"`
+	KeywordScore    float64 `json:"keyword_score"`
+	PopularityScore float64 `json:"popularity_score"`
+	RecencyScore    float64 `json:"recency_score"`
+
 	// Distance metrics
-	TitleSimilarity float64                   `json:"title_similarity"`
-	ContentSimilarity float64                 `json:"content_similarity"`
-	OverallSimilarity float64                 `json:"overall_similarity"`
+	TitleSimilarity   float64 `json:"title_similarity"`
+	ContentSimilarity float64 `json:"content_similarity"`
+	OverallSimilarity float64 `json:"overall_similarity"`
 }
 
 // Enums and supporting types
@@ -176,14 +176,14 @@ type DocumentResult struct {
 type QueryType string
 
 const (
-	QueryTypeNatural    QueryType = "natural"
-	QueryTypeKeyword    QueryType = "keyword"
-	QueryTypeSemantic   QueryType = "semantic"
-	QueryTypeHybrid     QueryType = "hybrid"
-	QueryTypeFuzzy      QueryType = "fuzzy"
-	QueryTypeWildcard   QueryType = "wildcard"
-	QueryTypePhrase     QueryType = "phrase"
-	QueryTypeBoolean    QueryType = "boolean"
+	QueryTypeNatural  QueryType = "natural"
+	QueryTypeKeyword  QueryType = "keyword"
+	QueryTypeSemantic QueryType = "semantic"
+	QueryTypeHybrid   QueryType = "hybrid"
+	QueryTypeFuzzy    QueryType = "fuzzy"
+	QueryTypeWildcard QueryType = "wildcard"
+	QueryTypePhrase   QueryType = "phrase"
+	QueryTypeBoolean  QueryType = "boolean"
 )
 
 type SearchMode string
@@ -197,24 +197,24 @@ const (
 )
 
 type SearchFilter struct {
-	Field     string      `json:"field"`
-	Operator  string      `json:"operator"`
-	Value     interface{} `json:"value"`
-	Boost     float64     `json:"boost,omitempty"`
+	Field    string      `json:"field"`
+	Operator string      `json:"operator"`
+	Value    interface{} `json:"value"`
+	Boost    float64     `json:"boost,omitempty"`
 }
 
 type SearchFacet struct {
-	Field       string                    `json:"field"`
-	Size        int                       `json:"size,omitempty"`
-	MinCount    int                       `json:"min_count,omitempty"`
-	Aggregation string                    `json:"aggregation,omitempty"`
-	Filters     []SearchFilter            `json:"filters,omitempty"`
+	Field       string         `json:"field"`
+	Size        int            `json:"size,omitempty"`
+	MinCount    int            `json:"min_count,omitempty"`
+	Aggregation string         `json:"aggregation,omitempty"`
+	Filters     []SearchFilter `json:"filters,omitempty"`
 }
 
 type SortCriteria struct {
-	Field     string    `json:"field"`
-	Direction string    `json:"direction"` // asc, desc
-	Mode      string    `json:"mode,omitempty"`
+	Field     string `json:"field"`
+	Direction string `json:"direction"` // asc, desc
+	Mode      string `json:"mode,omitempty"`
 }
 
 type BoostQuery struct {
@@ -223,18 +223,18 @@ type BoostQuery struct {
 }
 
 type UserContext struct {
-	UserID          uuid.UUID                 `json:"user_id"`
-	Role            string                    `json:"role"`
-	Department      string                    `json:"department,omitempty"`
-	Preferences     map[string]interface{}    `json:"preferences,omitempty"`
-	RecentDocuments []uuid.UUID               `json:"recent_documents,omitempty"`
-	SearchHistory   []string                  `json:"search_history,omitempty"`
+	UserID          uuid.UUID              `json:"user_id"`
+	Role            string                 `json:"role"`
+	Department      string                 `json:"department,omitempty"`
+	Preferences     map[string]interface{} `json:"preferences,omitempty"`
+	RecentDocuments []uuid.UUID            `json:"recent_documents,omitempty"`
+	SearchHistory   []string               `json:"search_history,omitempty"`
 }
 
 type FacetResult struct {
-	Field   string         `json:"field"`
-	Values  []FacetValue   `json:"values"`
-	Total   int            `json:"total"`
+	Field  string       `json:"field"`
+	Values []FacetValue `json:"values"`
+	Total  int          `json:"total"`
 }
 
 type FacetValue struct {
@@ -262,10 +262,10 @@ type SearchHighlight struct {
 }
 
 type ScoreExplanation struct {
-	Score       float64                      `json:"score"`
-	Description string                       `json:"description"`
-	Details     []ScoreExplanationDetail     `json:"details,omitempty"`
-	Formula     string                       `json:"formula,omitempty"`
+	Score       float64                  `json:"score"`
+	Description string                   `json:"description"`
+	Details     []ScoreExplanationDetail `json:"details,omitempty"`
+	Formula     string                   `json:"formula,omitempty"`
 }
 
 type ScoreExplanationDetail struct {
@@ -287,9 +287,9 @@ type SearchExecutionDetails struct {
 }
 
 type SearchAnalytics struct {
-	AverageScore    float64 `json:"average_score"`
-	ScoreDistribution map[string]int `json:"score_distribution"`
-	TypeDistribution  map[string]int `json:"type_distribution"`
+	AverageScore         float64        `json:"average_score"`
+	ScoreDistribution    map[string]int `json:"score_distribution"`
+	TypeDistribution     map[string]int `json:"type_distribution"`
 	LanguageDistribution map[string]int `json:"language_distribution"`
 	RecencyDistribution  map[string]int `json:"recency_distribution"`
 }
@@ -303,10 +303,10 @@ type CachedSearchResult struct {
 
 // EmbeddingEngine handles document embeddings
 type EmbeddingEngine struct {
-	model         string
-	dimensions    int
+	model          string
+	dimensions     int
 	embeddingCache map[string][]float64
-	mutex         sync.RWMutex
+	mutex          sync.RWMutex
 }
 
 // IndexEngine manages search indices
@@ -317,33 +317,33 @@ type IndexEngine struct {
 }
 
 type SearchIndex struct {
-	Name        string                              `json:"name"`
-	Type        string                              `json:"type"`
-	Fields      []string                            `json:"fields"`
-	Documents   map[uuid.UUID]*IndexedDocument      `json:"documents"`
-	Terms       map[string][]uuid.UUID              `json:"terms"`
-	Statistics  *IndexStatistics                    `json:"statistics"`
-	CreatedAt   time.Time                           `json:"created_at"`
-	UpdatedAt   time.Time                           `json:"updated_at"`
+	Name       string                         `json:"name"`
+	Type       string                         `json:"type"`
+	Fields     []string                       `json:"fields"`
+	Documents  map[uuid.UUID]*IndexedDocument `json:"documents"`
+	Terms      map[string][]uuid.UUID         `json:"terms"`
+	Statistics *IndexStatistics               `json:"statistics"`
+	CreatedAt  time.Time                      `json:"created_at"`
+	UpdatedAt  time.Time                      `json:"updated_at"`
 }
 
 type IndexedDocument struct {
-	DocumentID uuid.UUID                 `json:"document_id"`
-	Terms      map[string]TermFrequency   `json:"terms"`
-	Vectors    map[string][]float64       `json:"vectors"`
-	Norms      map[string]float64         `json:"norms"`
+	DocumentID uuid.UUID                `json:"document_id"`
+	Terms      map[string]TermFrequency `json:"terms"`
+	Vectors    map[string][]float64     `json:"vectors"`
+	Norms      map[string]float64       `json:"norms"`
 }
 
 type TermFrequency struct {
-	Term      string  `json:"term"`
-	Frequency int     `json:"frequency"`
-	Positions []int   `json:"positions"`
+	Term      string `json:"term"`
+	Frequency int    `json:"frequency"`
+	Positions []int  `json:"positions"`
 }
 
 type IndexStatistics struct {
-	DocumentCount int                 `json:"document_count"`
-	TermCount     int                 `json:"term_count"`
-	AverageDocLength float64          `json:"average_doc_length"`
+	DocumentCount    int                        `json:"document_count"`
+	TermCount        int                        `json:"term_count"`
+	AverageDocLength float64                    `json:"average_doc_length"`
 	FieldStatistics  map[string]FieldStatistics `json:"field_statistics"`
 }
 
@@ -355,16 +355,16 @@ type FieldStatistics struct {
 
 // QueryProcessor handles query analysis and transformation
 type QueryProcessor struct {
-	synonyms      map[string][]string
-	stopWords     map[string]bool
-	stemmer       Stemmer
-	analyzer      TextAnalyzer
-	spellChecker  SpellChecker
+	synonyms     map[string][]string
+	stopWords    map[string]bool
+	stemmer      Stemmer
+	analyzer     TextAnalyzer
+	spellChecker SpellChecker
 }
 
 // RankingEngine handles result ranking and relevance scoring
 type RankingEngine struct {
-	rankingModels map[string]RankingModel
+	rankingModels    map[string]RankingModel
 	featureExtractor FeatureExtractor
 }
 
@@ -401,26 +401,26 @@ type Token struct {
 func NewSemanticSearchEngine(config *SemanticSearchConfig) *SemanticSearchEngine {
 	if config == nil {
 		config = &SemanticSearchConfig{
-			Enabled:                     true,
-			EmbeddingModel:              "sentence-transformers/all-MiniLM-L6-v2",
-			VectorDimensions:            384,
-			SimilarityThreshold:         0.5,
-			MaxResults:                  100,
-			EnableHybridSearch:          true,
-			EnableQueryExpansion:        true,
-			EnableReranking:             true,
-			EnablePersonalization:       false,
-			EnableFacetedSearch:         true,
-			IndexUpdateInterval:         time.Hour,
-			CacheSize:                   1000,
-			CacheTTL:                    time.Hour,
-			BatchSize:                   50,
-			MaxQueryLength:              500,
-			EnableSemanticHighlighting:  true,
-			EnableAutoComplete:          true,
-			EnableSpellCorrection:       true,
-			EnableSynonymExpansion:      true,
-			EnableConceptualSearch:      true,
+			Enabled:                    true,
+			EmbeddingModel:             "sentence-transformers/all-MiniLM-L6-v2",
+			VectorDimensions:           384,
+			SimilarityThreshold:        0.5,
+			MaxResults:                 100,
+			EnableHybridSearch:         true,
+			EnableQueryExpansion:       true,
+			EnableReranking:            true,
+			EnablePersonalization:      false,
+			EnableFacetedSearch:        true,
+			IndexUpdateInterval:        time.Hour,
+			CacheSize:                  1000,
+			CacheTTL:                   time.Hour,
+			BatchSize:                  50,
+			MaxQueryLength:             500,
+			EnableSemanticHighlighting: true,
+			EnableAutoComplete:         true,
+			EnableSpellCorrection:      true,
+			EnableSynonymExpansion:     true,
+			EnableConceptualSearch:     true,
 		}
 	}
 
@@ -583,7 +583,7 @@ func (sse *SemanticSearchEngine) Search(ctx context.Context, query *SearchQuery)
 
 func (sse *SemanticSearchEngine) prepareSearchableText(document *SearchableDocument) string {
 	var parts []string
-	
+
 	if document.Title != "" {
 		parts = append(parts, document.Title)
 	}
@@ -599,34 +599,34 @@ func (sse *SemanticSearchEngine) prepareSearchableText(document *SearchableDocum
 	if len(document.Keywords) > 0 {
 		parts = append(parts, strings.Join(document.Keywords, " "))
 	}
-	
+
 	return strings.Join(parts, " ")
 }
 
 func (sse *SemanticSearchEngine) generateEmbeddings(ctx context.Context, document *SearchableDocument) error {
 	var err error
-	
+
 	if document.Title != "" {
 		document.TitleEmbedding, err = sse.embeddingEngine.GenerateEmbedding(ctx, document.Title)
 		if err != nil {
 			return fmt.Errorf("failed to generate title embedding: %w", err)
 		}
 	}
-	
+
 	if document.Content != "" {
 		document.ContentEmbedding, err = sse.embeddingEngine.GenerateEmbedding(ctx, document.Content)
 		if err != nil {
 			return fmt.Errorf("failed to generate content embedding: %w", err)
 		}
 	}
-	
+
 	if document.Summary != "" {
 		document.SummaryEmbedding, err = sse.embeddingEngine.GenerateEmbedding(ctx, document.Summary)
 		if err != nil {
 			return fmt.Errorf("failed to generate summary embedding: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -635,7 +635,7 @@ func (sse *SemanticSearchEngine) findCandidates(ctx context.Context, query *Sear
 	defer sse.mutex.RUnlock()
 
 	var candidates []*SearchableDocument
-	
+
 	// For now, return all documents as candidates
 	// In a real implementation, this would use more sophisticated candidate selection
 	for _, doc := range sse.documentIndex {
@@ -645,16 +645,16 @@ func (sse *SemanticSearchEngine) findCandidates(ctx context.Context, query *Sear
 		}
 		candidates = append(candidates, doc)
 	}
-	
+
 	return candidates, nil
 }
 
 func (sse *SemanticSearchEngine) rankResults(ctx context.Context, candidates []*SearchableDocument, query *SearchQuery, queryEmbedding []float64) ([]DocumentResult, error) {
 	results := make([]DocumentResult, 0, len(candidates))
-	
+
 	for _, doc := range candidates {
 		score := sse.calculateRelevanceScore(doc, query, queryEmbedding)
-		
+
 		if score >= query.MinScore {
 			result := DocumentResult{
 				Document:        doc,
@@ -664,7 +664,7 @@ func (sse *SemanticSearchEngine) rankResults(ctx context.Context, candidates []*
 				PopularityScore: doc.PopularityScore,
 				RecencyScore:    sse.calculateRecencyScore(doc),
 			}
-			
+
 			// Calculate similarity scores
 			if len(doc.TitleEmbedding) > 0 && len(queryEmbedding) > 0 {
 				result.TitleSimilarity = sse.calculateCosineSimilarity(doc.TitleEmbedding, queryEmbedding)
@@ -673,45 +673,45 @@ func (sse *SemanticSearchEngine) rankResults(ctx context.Context, candidates []*
 				result.ContentSimilarity = sse.calculateCosineSimilarity(doc.ContentEmbedding, queryEmbedding)
 			}
 			result.OverallSimilarity = (result.TitleSimilarity + result.ContentSimilarity) / 2.0
-			
+
 			results = append(results, result)
 		}
 	}
-	
+
 	// Sort by score descending
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
-	
+
 	// Assign ranks
 	for i := range results {
 		results[i].Rank = i + 1
 	}
-	
+
 	return results, nil
 }
 
 func (sse *SemanticSearchEngine) calculateRelevanceScore(doc *SearchableDocument, query *SearchQuery, queryEmbedding []float64) float64 {
 	var score float64
-	
+
 	// Semantic similarity score
 	semanticScore := sse.calculateSemanticScore(doc, queryEmbedding)
 	score += semanticScore * 0.6
-	
+
 	// Keyword matching score
 	keywordScore := sse.calculateKeywordScore(doc, query)
 	score += keywordScore * 0.2
-	
+
 	// Popularity score
 	score += doc.PopularityScore * 0.1
-	
+
 	// Recency score
 	recencyScore := sse.calculateRecencyScore(doc)
 	score += recencyScore * 0.1
-	
+
 	// Apply boost factor
 	score *= doc.BoostFactor
-	
+
 	return score
 }
 
@@ -719,31 +719,31 @@ func (sse *SemanticSearchEngine) calculateSemanticScore(doc *SearchableDocument,
 	if len(doc.ContentEmbedding) == 0 || len(queryEmbedding) == 0 {
 		return 0.0
 	}
-	
+
 	return sse.calculateCosineSimilarity(doc.ContentEmbedding, queryEmbedding)
 }
 
 func (sse *SemanticSearchEngine) calculateKeywordScore(doc *SearchableDocument, query *SearchQuery) float64 {
 	queryWords := strings.Fields(strings.ToLower(query.QueryText))
 	searchableText := strings.ToLower(doc.SearchableText)
-	
+
 	var score float64
 	for _, word := range queryWords {
 		if strings.Contains(searchableText, word) {
 			score += 1.0
 		}
 	}
-	
+
 	if len(queryWords) > 0 {
 		score /= float64(len(queryWords))
 	}
-	
+
 	return score
 }
 
 func (sse *SemanticSearchEngine) calculateRecencyScore(doc *SearchableDocument) float64 {
 	daysSinceModified := time.Since(doc.ModifiedAt).Hours() / 24
-	
+
 	// Exponential decay with half-life of 30 days
 	return math.Exp(-daysSinceModified / 30.0)
 }
@@ -752,22 +752,22 @@ func (sse *SemanticSearchEngine) calculateCosineSimilarity(a, b []float64) float
 	if len(a) != len(b) {
 		return 0.0
 	}
-	
+
 	var dotProduct, normA, normB float64
-	
+
 	for i := 0; i < len(a); i++ {
 		dotProduct += a[i] * b[i]
 		normA += a[i] * a[i]
 		normB += b[i] * b[i]
 	}
-	
+
 	normA = math.Sqrt(normA)
 	normB = math.Sqrt(normB)
-	
+
 	if normA == 0 || normB == 0 {
 		return 0.0
 	}
-	
+
 	return dotProduct / (normA * normB)
 }
 
@@ -775,14 +775,14 @@ func (sse *SemanticSearchEngine) applyFilters(results []DocumentResult, query *S
 	if len(query.Filters) == 0 {
 		return results
 	}
-	
+
 	var filtered []DocumentResult
 	for _, result := range results {
 		if sse.matchesFilters(result.Document, query.Filters) {
 			filtered = append(filtered, result)
 		}
 	}
-	
+
 	return filtered
 }
 
@@ -813,35 +813,35 @@ func (sse *SemanticSearchEngine) applyPagination(results []DocumentResult, query
 	if query.Offset >= len(results) {
 		return []DocumentResult{}
 	}
-	
+
 	end := query.Offset + query.Limit
 	if end > len(results) {
 		end = len(results)
 	}
-	
+
 	return results[query.Offset:end]
 }
 
 func (sse *SemanticSearchEngine) generateFacets(ctx context.Context, candidates []*SearchableDocument, query *SearchQuery) []FacetResult {
 	var facets []FacetResult
-	
+
 	// Generate document type facet
 	typeDistribution := make(map[string]int)
 	for _, doc := range candidates {
 		typeDistribution[doc.DocumentType]++
 	}
-	
+
 	var typeValues []FacetValue
 	for docType, count := range typeDistribution {
 		typeValues = append(typeValues, FacetValue{Value: docType, Count: count})
 	}
-	
+
 	facets = append(facets, FacetResult{
 		Field:  "document_type",
 		Values: typeValues,
 		Total:  len(typeValues),
 	})
-	
+
 	return facets
 }
 
@@ -874,19 +874,19 @@ func (sse *SemanticSearchEngine) generateCacheKey(query *SearchQuery) string {
 func (sse *SemanticSearchEngine) getCachedResult(key string) *CachedSearchResult {
 	sse.mutex.RLock()
 	defer sse.mutex.RUnlock()
-	
+
 	cached, exists := sse.cache[key]
 	if !exists || time.Now().After(cached.ExpiresAt) {
 		return nil
 	}
-	
+
 	return cached
 }
 
 func (sse *SemanticSearchEngine) cacheResult(key string, result *SearchResult) {
 	sse.mutex.Lock()
 	defer sse.mutex.Unlock()
-	
+
 	sse.cache[key] = &CachedSearchResult{
 		Result:    result,
 		CreatedAt: time.Now(),
@@ -899,7 +899,7 @@ func (sse *SemanticSearchEngine) clearCacheForDocument(doc *SearchableDocument) 
 	// In practice, this would be more sophisticated
 	sse.mutex.Lock()
 	defer sse.mutex.Unlock()
-	
+
 	// Clear all cache entries - in practice, would be more selective
 	sse.cache = make(map[string]*CachedSearchResult)
 }
@@ -940,7 +940,7 @@ func (ee *EmbeddingEngine) GenerateEmbedding(ctx context.Context, text string) (
 		norm += val * val
 	}
 	norm = math.Sqrt(norm)
-	
+
 	if norm > 0 {
 		for i := range embedding {
 			embedding[i] /= norm
@@ -965,9 +965,9 @@ func NewIndexEngine() *IndexEngine {
 func (ie *IndexEngine) IndexDocument(ctx context.Context, document *SearchableDocument) error {
 	ie.mutex.Lock()
 	defer ie.mutex.Unlock()
-	
+
 	ie.documents[document.ID] = document
-	
+
 	// In practice, would build inverted indices here
 	return nil
 }
@@ -982,7 +982,7 @@ func NewQueryProcessor() *QueryProcessor {
 func (qp *QueryProcessor) ProcessQuery(ctx context.Context, query *SearchQuery) (*SearchQuery, error) {
 	// Create a copy to avoid modifying the original
 	processed := *query
-	
+
 	// Apply query processing steps here (expansion, normalization, etc.)
 	// For now, just return the original query
 	return &processed, nil

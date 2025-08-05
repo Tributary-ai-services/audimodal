@@ -19,40 +19,40 @@ import (
 
 // WebSocketStreamingService handles real-time document uploads and progress streaming
 type WebSocketStreamingService struct {
-	upgrader     websocket.Upgrader
-	producer     *events.Producer
-	tracer       trace.Tracer
-	config       *WebSocketConfig
-	connections  map[string]*WebSocketConnection
-	connMutex    sync.RWMutex
+	upgrader    websocket.Upgrader
+	producer    *events.Producer
+	tracer      trace.Tracer
+	config      *WebSocketConfig
+	connections map[string]*WebSocketConnection
+	connMutex   sync.RWMutex
 }
 
 // WebSocketConfig contains configuration for WebSocket streaming
 type WebSocketConfig struct {
 	// Connection settings
-	ReadBufferSize    int           `yaml:"read_buffer_size"`
-	WriteBufferSize   int           `yaml:"write_buffer_size"`
-	HandshakeTimeout  time.Duration `yaml:"handshake_timeout"`
-	
+	ReadBufferSize   int           `yaml:"read_buffer_size"`
+	WriteBufferSize  int           `yaml:"write_buffer_size"`
+	HandshakeTimeout time.Duration `yaml:"handshake_timeout"`
+
 	// Message handling
-	MaxMessageSize    int64         `yaml:"max_message_size"`
-	ReadTimeout       time.Duration `yaml:"read_timeout"`
-	WriteTimeout      time.Duration `yaml:"write_timeout"`
-	PongTimeout       time.Duration `yaml:"pong_timeout"`
-	PingPeriod        time.Duration `yaml:"ping_period"`
-	
+	MaxMessageSize int64         `yaml:"max_message_size"`
+	ReadTimeout    time.Duration `yaml:"read_timeout"`
+	WriteTimeout   time.Duration `yaml:"write_timeout"`
+	PongTimeout    time.Duration `yaml:"pong_timeout"`
+	PingPeriod     time.Duration `yaml:"ping_period"`
+
 	// Authentication
-	RequireAuth       bool          `yaml:"require_auth"`
-	JWTSecret         string        `yaml:"jwt_secret"`
-	
+	RequireAuth bool   `yaml:"require_auth"`
+	JWTSecret   string `yaml:"jwt_secret"`
+
 	// Rate limiting
-	MaxConnections    int           `yaml:"max_connections"`
-	MessageRateLimit  int           `yaml:"message_rate_limit"` // messages per minute
-	
+	MaxConnections   int `yaml:"max_connections"`
+	MessageRateLimit int `yaml:"message_rate_limit"` // messages per minute
+
 	// File upload
-	MaxFileSize       int64         `yaml:"max_file_size"`
-	AllowedMimeTypes  []string      `yaml:"allowed_mime_types"`
-	ChunkSize         int           `yaml:"chunk_size"`
+	MaxFileSize      int64    `yaml:"max_file_size"`
+	AllowedMimeTypes []string `yaml:"allowed_mime_types"`
+	ChunkSize        int      `yaml:"chunk_size"`
 }
 
 // DefaultWebSocketConfig returns default WebSocket configuration
@@ -98,20 +98,20 @@ type WebSocketConnection struct {
 
 // UploadState tracks the state of a file upload
 type UploadState struct {
-	FileID       string
-	FileName     string
-	FileSize     int64
-	ContentType  string
-	ChunksTotal  int
+	FileID         string
+	FileName       string
+	FileSize       int64
+	ContentType    string
+	ChunksTotal    int
 	ChunksReceived int
-	ChunkData    map[int][]byte
-	StartedAt    time.Time
-	Metadata     map[string]string
+	ChunkData      map[int][]byte
+	StartedAt      time.Time
+	Metadata       map[string]string
 }
 
 // RateLimiter implements simple rate limiting
 type RateLimiter struct {
-	messages   []time.Time
+	messages    []time.Time
 	maxMessages int
 	window      time.Duration
 	mutex       sync.Mutex
@@ -144,7 +144,7 @@ func NewWebSocketStreamingService(producer *events.Producer, config *WebSocketCo
 
 // HandleWebSocket handles WebSocket upgrade requests
 func (ws *WebSocketStreamingService) HandleWebSocket(w http.ResponseWriter, r *http.Request, tenantID, userID string) {
-	ctx, span := ws.tracer.Start(r.Context(), "websocket_connection")
+	_, span := ws.tracer.Start(r.Context(), "websocket_connection")
 	defer span.End()
 
 	span.SetAttributes(
@@ -341,14 +341,14 @@ func (c *WebSocketConnection) handleFileUploadStart(ctx context.Context, msg *We
 	chunksTotal := int((int64(fileSize) + int64(chunkSize) - 1) / int64(chunkSize))
 
 	c.UploadState = &UploadState{
-		FileID:       fileID,
-		FileName:     fileName,
-		FileSize:     int64(fileSize),
-		ContentType:  contentType,
-		ChunksTotal:  chunksTotal,
-		ChunkData:    make(map[int][]byte),
-		StartedAt:    time.Now(),
-		Metadata:     msg.Metadata,
+		FileID:      fileID,
+		FileName:    fileName,
+		FileSize:    int64(fileSize),
+		ContentType: contentType,
+		ChunksTotal: chunksTotal,
+		ChunkData:   make(map[int][]byte),
+		StartedAt:   time.Now(),
+		Metadata:    msg.Metadata,
 	}
 
 	// Send confirmation
@@ -442,9 +442,9 @@ func (c *WebSocketConnection) handleFileUploadComplete(ctx context.Context, msg 
 		Type: "file_upload_complete",
 		ID:   msg.ID,
 		Data: map[string]interface{}{
-			"file_id":      c.UploadState.FileID,
-			"file_url":     fileURL,
-			"processing":   true,
+			"file_id":    c.UploadState.FileID,
+			"file_url":   fileURL,
+			"processing": true,
 		},
 	})
 
@@ -455,18 +455,18 @@ func (c *WebSocketConnection) handleFileUploadComplete(ctx context.Context, msg 
 // handleProcessingStatusRequest handles requests for processing status
 func (c *WebSocketConnection) handleProcessingStatusRequest(ctx context.Context, msg *WebSocketMessage) {
 	fileID, _ := msg.Data["file_id"].(string)
-	
+
 	// TODO: Query actual processing status
 	// For now, return a mock status
 	c.sendMessage(&WebSocketMessage{
 		Type: "processing_status",
 		ID:   msg.ID,
 		Data: map[string]interface{}{
-			"file_id":            fileID,
-			"status":            "processing",
-			"progress":          75.0,
-			"chunks_created":    10,
-			"embeddings_created": 8,
+			"file_id":              fileID,
+			"status":               "processing",
+			"progress":             75.0,
+			"chunks_created":       10,
+			"embeddings_created":   8,
 			"estimated_completion": time.Now().Add(2 * time.Minute),
 		},
 	})
