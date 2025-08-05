@@ -385,8 +385,8 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*AuthR
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken, // Keep the same refresh token
 		TokenType:    "Bearer",
-		ExpiresIn:    int64(claims.ExpiresAt.Sub(time.Now()).Seconds()),
-		ExpiresAt:    claims.ExpiresAt.Time,
+		ExpiresIn:    int64(claims.RegisteredClaims.ExpiresAt.Sub(time.Now()).Seconds()),
+		ExpiresAt:    claims.RegisteredClaims.ExpiresAt.Time,
 		User:         user,
 		Tenant:       tenant,
 		Scopes:       claims.Scopes,
