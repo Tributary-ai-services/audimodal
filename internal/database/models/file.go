@@ -36,7 +36,7 @@ type File struct {
 
 	// Content analysis
 	Language         string   `json:"language,omitempty"`
-	LanguageConf     float64  `json:"language_confidence,omitempty"`
+	LanguageConf     float64  `gorm:"column:language_confidence" json:"language_confidence,omitempty"`
 	ContentCategory  string   `json:"content_category,omitempty"`
 	SensitivityLevel string   `json:"sensitivity_level,omitempty"`
 	Classifications  []string `gorm:"type:jsonb" json:"classifications,omitempty"`
@@ -49,7 +49,7 @@ type File struct {
 	ChunkingStrategy string `json:"chunking_strategy,omitempty"`
 
 	// Compliance and security
-	PIIDetected      bool     `gorm:"default:false;index" json:"pii_detected"`
+	PIIDetected      bool     `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
 	ComplianceFlags  []string `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
 	EncryptionStatus string   `gorm:"default:'none'" json:"encryption_status"`
 

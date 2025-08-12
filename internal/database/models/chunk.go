@@ -56,7 +56,7 @@ type Chunk struct {
 	EmbeddedAt      *time.Time `json:"embedded_at,omitempty"`
 
 	// Compliance and security
-	PIIDetected     bool     `gorm:"default:false;index" json:"pii_detected"`
+	PIIDetected     bool     `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
 	ComplianceFlags []string `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
 	DLPScanStatus   string   `gorm:"default:'pending'" json:"dlp_scan_status"`
 	DLPScanResult   string   `json:"dlp_scan_result,omitempty"`
