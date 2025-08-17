@@ -640,11 +640,45 @@ Content-Type: application/json
 HTTP/1.1 404 Not Found
 
 {
+  "success": false,
   "error": {
     "code": "FILE_NOT_FOUND",
     "message": "File not found",
     "file_id": "file_invalid"
-  }
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Invalid File ID Format
+
+```http
+HTTP/1.1 400 Bad Request
+
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_FILE_ID",
+    "message": "Invalid file ID format",
+    "details": "File ID must be a valid UUID"
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Missing Tenant Context
+
+```http
+HTTP/1.1 400 Bad Request
+
+{
+  "success": false,
+  "error": {
+    "code": "TENANT_CONTEXT_REQUIRED",
+    "message": "Tenant context required",
+    "details": "All file operations require valid tenant context"
+  },
+  "request_id": "req_123456"
 }
 ```
 
@@ -654,12 +688,14 @@ HTTP/1.1 404 Not Found
 HTTP/1.1 400 Bad Request
 
 {
+  "success": false,
   "error": {
     "code": "UNSUPPORTED_FILE_TYPE",
     "message": "Unsupported file type",
     "file_type": "xyz",
     "supported_types": ["pdf", "docx", "xlsx", "txt", "csv", "json"]
-  }
+  },
+  "request_id": "req_123456"
 }
 ```
 
@@ -669,12 +705,30 @@ HTTP/1.1 400 Bad Request
 HTTP/1.1 413 Payload Too Large
 
 {
+  "success": false,
   "error": {
     "code": "FILE_TOO_LARGE",
     "message": "File exceeds maximum size limit",
     "file_size": 536870912,
     "max_size": 268435456
-  }
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Method Not Allowed
+
+```http
+HTTP/1.1 405 Method Not Allowed
+
+{
+  "success": false,
+  "error": {
+    "code": "METHOD_NOT_ALLOWED",
+    "message": "Method not allowed",
+    "allowed_methods": ["GET", "POST"]
+  },
+  "request_id": "req_123456"
 }
 ```
 
@@ -684,6 +738,7 @@ HTTP/1.1 413 Payload Too Large
 HTTP/1.1 422 Unprocessable Entity
 
 {
+  "success": false,
   "error": {
     "code": "PROCESSING_FAILED",
     "message": "File processing failed",
@@ -693,6 +748,58 @@ HTTP/1.1 422 Unprocessable Entity
       "error": "Corrupted PDF file",
       "retry_possible": false
     }
-  }
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Dataset Not Found (Search)
+
+```http
+HTTP/1.1 404 Not Found
+
+{
+  "success": false,
+  "error": {
+    "code": "DATASET_NOT_FOUND",
+    "message": "Dataset 'default' not found",
+    "details": "The embedding dataset does not exist. Create it first or check dataset name."
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Search Unavailable
+
+**Note**: When search is temporarily unavailable, returns empty results instead of error.
+
+```http
+HTTP/1.1 200 OK
+
+{
+  "success": true,
+  "data": {
+    "results": [],
+    "total_found": 0,
+    "query": "your search query",
+    "dataset": "default"
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Internal Server Error
+
+```http
+HTTP/1.1 500 Internal Server Error
+
+{
+  "success": false,
+  "error": {
+    "code": "INTERNAL_SERVER_ERROR",
+    "message": "An internal server error occurred",
+    "details": "Contact support if this persists"
+  },
+  "request_id": "req_123456"
 }
 ```
