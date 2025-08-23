@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/database/models"
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/pkg/embeddings"
 )
 
 // ProcessingTier defines different processing tiers based on file size and complexity

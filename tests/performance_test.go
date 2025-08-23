@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jscharber/eAIIngest/pkg/auth"
-	"github.com/jscharber/eAIIngest/pkg/chunking"
-	"github.com/jscharber/eAIIngest/pkg/classification"
-	"github.com/jscharber/eAIIngest/pkg/events"
-	"github.com/jscharber/eAIIngest/pkg/workflow"
+	"github.com/jscharber/audimodal/pkg/auth"
+	"github.com/jscharber/audimodal/pkg/chunking"
+	"github.com/jscharber/audimodal/pkg/classification"
+	"github.com/jscharber/audimodal/pkg/events"
+	"github.com/jscharber/audimodal/pkg/workflow"
 )
 
 // Performance benchmarks for various components

@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings"
 )
 
 // DeepLakeAPIClient implements the VectorStore interface using the DeepLake API
@@ -107,8 +108,8 @@ type DatasetResponse struct {
 	StorageLocation string                 `json:"storage_location"`
 	VectorCount     int                    `json:"vector_count"`
 	StorageSize     int64                  `json:"storage_size"`
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
+	CreatedAt       string                 `json:"created_at"`
+	UpdatedAt       string                 `json:"updated_at"`
 	TenantID        string                 `json:"tenant_id,omitempty"`
 }
 
@@ -152,8 +153,8 @@ type VectorResponse struct {
 	ChunkCount  *int                   `json:"chunk_count,omitempty"`
 	Model       string                 `json:"model,omitempty"`
 	Dimensions  int                    `json:"dimensions"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at"`
 	TenantID    string                 `json:"tenant_id,omitempty"`
 }
 
@@ -457,16 +458,24 @@ func (c *DeepLakeAPIClient) Close() error {
 
 // getDatasetIDByName retrieves dataset ID by name
 func (c *DeepLakeAPIClient) getDatasetIDByName(ctx context.Context, name string) (string, error) {
+	// First try listing datasets
 	var datasets []DatasetResponse
 	err := c.makeRequest(ctx, "GET", "/api/v1/datasets/", nil, &datasets)
-	if err != nil {
-		return "", err
+	if err == nil {
+		for _, dataset := range datasets {
+			if dataset.Name == name {
+				return dataset.ID, nil
+			}
+		}
 	}
 
-	for _, dataset := range datasets {
-		if dataset.Name == name {
-			return dataset.ID, nil
-		}
+	// If not found in list or list failed, try direct access
+	// This handles cases where the list endpoint has issues but the dataset exists
+	var dataset DatasetResponse
+	endpoint := fmt.Sprintf("/api/v1/datasets/%s", name)
+	err = c.makeRequest(ctx, "GET", endpoint, nil, &dataset)
+	if err == nil && dataset.Name == name {
+		return dataset.ID, nil
 	}
 
 	return "", &embeddings.EmbeddingError{
@@ -538,6 +547,19 @@ func (c *DeepLakeAPIClient) makeRequest(ctx context.Context, method, endpoint st
 		return c.handleErrorResponse(resp.StatusCode, respBody)
 	}
 
+	// Check for DeepLake's success/failure format in HTTP 200 responses
+	if resp.StatusCode == 200 {
+		var statusCheck map[string]interface{}
+		if err := json.Unmarshal(respBody, &statusCheck); err == nil {
+			if success, exists := statusCheck["success"]; exists {
+				if successBool, ok := success.(bool); ok && !successBool {
+					// Handle HTTP 200 responses with "success": false
+					return c.handleDeepLakeError(respBody)
+				}
+			}
+		}
+	}
+
 	// Parse response
 	if result != nil {
 		return json.Unmarshal(respBody, result)
@@ -576,7 +598,77 @@ func (c *DeepLakeAPIClient) handleErrorResponse(statusCode int, body []byte) err
 	}
 }
 
+// handleDeepLakeError handles DeepLake's HTTP 200 responses with "success": false
+func (c *DeepLakeAPIClient) handleDeepLakeError(body []byte) error {
+	var errorResp map[string]interface{}
+	if err := json.Unmarshal(body, &errorResp); err != nil {
+		return &embeddings.EmbeddingError{
+			Type:    "deeplake_error",
+			Message: "Failed to parse DeepLake error response",
+			Code:    "PARSE_ERROR",
+		}
+	}
+
+	// Extract message
+	message := "Unknown DeepLake error"
+	if msg, ok := errorResp["message"].(string); ok {
+		message = msg
+	}
+
+	// Categorize error types based on message content
+	errorType := "deeplake_error"
+	code := "DEEPLAKE_ERROR"
+
+	// Categorize common DeepLake error patterns
+	if strings.Contains(strings.ToLower(message), "not found") {
+		errorType = "dataset_not_found"
+		code = "DATASET_NOT_FOUND"
+	} else if strings.Contains(strings.ToLower(message), "dimensions mismatch") {
+		errorType = "dimension_mismatch"
+		code = "DIMENSION_MISMATCH"
+	} else if strings.Contains(strings.ToLower(message), "search") || strings.Contains(strings.ToLower(message), "vector") {
+		// Check if it's a search-related error that should return empty results instead
+		if strings.Contains(strings.ToLower(message), "no attribute 'search'") {
+			errorType = "search_unavailable"
+			code = "SEARCH_UNAVAILABLE"
+		} else {
+			errorType = "search_error"
+			code = "SEARCH_ERROR"
+		}
+	}
+
+	return &embeddings.EmbeddingError{
+		Type:    errorType,
+		Message: message,
+		Code:    code,
+		Details: errorResp,
+	}
+}
+
 // Conversion helper methods
+
+func parseTimeString(timeStr string) time.Time {
+	if timeStr == "" {
+		return time.Time{}
+	}
+	
+	// Try common timestamp formats
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05.999999",
+		"2006-01-02T15:04:05",
+		time.RFC3339Nano,
+	}
+	
+	for _, format := range formats {
+		if t, err := time.Parse(format, timeStr); err == nil {
+			return t
+		}
+	}
+	
+	// If parsing fails, return zero time
+	return time.Time{}
+}
 
 func convertMetadata(metadata map[string]interface{}) map[string]string {
 	if metadata == nil {
@@ -637,8 +729,8 @@ func (c *DeepLakeAPIClient) convertVectorResponse(response *VectorResponse) *emb
 		Language:    response.Language,
 		ChunkIndex:  getIntValue(response.ChunkIndex),
 		ChunkCount:  getIntValue(response.ChunkCount),
-		CreatedAt:   response.CreatedAt,
-		UpdatedAt:   response.UpdatedAt,
+		CreatedAt:   parseTimeString(response.CreatedAt),
+		UpdatedAt:   parseTimeString(response.UpdatedAt),
 	}
 }
 
@@ -651,9 +743,9 @@ func (c *DeepLakeAPIClient) convertDatasetResponse(response *DatasetResponse) *e
 		MetricType:     response.MetricType,
 		IndexType:      response.IndexType,
 		StorageSize:    response.StorageSize,
-		CreatedAt:      response.CreatedAt,
-		UpdatedAt:      response.UpdatedAt,
-		LastAccessedAt: response.UpdatedAt, // Use UpdatedAt as approximation
+		CreatedAt:      parseTimeString(response.CreatedAt),
+		UpdatedAt:      parseTimeString(response.UpdatedAt),
+		LastAccessedAt: parseTimeString(response.UpdatedAt), // Use UpdatedAt as approximation
 		Metadata:       response.Metadata,
 	}
 }

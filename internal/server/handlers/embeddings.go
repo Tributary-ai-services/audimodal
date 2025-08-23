@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -9,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/providers"
+	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings/client"
+	"github.com/jscharber/audimodal/pkg/embeddings/providers"
 )
 
 // EmbeddingHandler handles embedding-related HTTP requests
@@ -23,8 +24,10 @@ type EmbeddingHandler struct {
 // NewEmbeddingHandler creates a new embedding handler
 func NewEmbeddingHandler() (*EmbeddingHandler, error) {
 	// Initialize OpenAI provider
+	apiKey := getEnvOrDefault("OPENAI_API_KEY", "")
+	fmt.Printf("DEBUG: OpenAI API Key length: %d\n", len(apiKey))
 	openaiConfig := &providers.OpenAIConfig{
-		APIKey:     getEnvOrDefault("OPENAI_API_KEY", ""),
+		APIKey:     apiKey,
 		Model:      getEnvOrDefault("OPENAI_MODEL", "text-embedding-3-small"),
 		BaseURL:    getEnvOrDefault("OPENAI_BASE_URL", ""),
 		MaxRetries: 3,
@@ -37,7 +40,7 @@ func NewEmbeddingHandler() (*EmbeddingHandler, error) {
 
 	// Initialize DeepLake API client
 	apiConfig := &client.DeepLakeAPIConfig{
-		BaseURL:   getEnvOrDefault("DEEPLAKE_API_URL", "http://localhost:8000"),
+		BaseURL:   getEnvOrDefault("DEEPLAKE_API_URL", "http://deeplake-api_deeplake-service_1:8000"),
 		APIKey:    getEnvOrDefault("DEEPLAKE_API_KEY", "dev-key-12345"),
 		TenantID:  getEnvOrDefault("DEEPLAKE_TENANT_ID", ""),
 		Timeout:   30 * time.Second,

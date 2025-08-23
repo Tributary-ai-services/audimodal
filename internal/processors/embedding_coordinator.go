@@ -3,14 +3,15 @@ package processors
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/providers"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings/client"
+	"github.com/jscharber/audimodal/pkg/embeddings/providers"
 )
 
 // EmbeddingCoordinator orchestrates the complete file processing and embedding pipeline
@@ -91,12 +92,14 @@ func NewEmbeddingCoordinator(db *database.Database, config *EmbeddingCoordinator
 func GetDefaultEmbeddingCoordinatorConfig() *EmbeddingCoordinatorConfig {
 	return &EmbeddingCoordinatorConfig{
 		DeepLakeConfig: &client.DeepLakeAPIConfig{
-			BaseURL: "https://api.deeplake.ai",
+			BaseURL: getEnvOrDefault("DEEPLAKE_API_URL", "http://deeplake-api_deeplake-service_1:8000"),
+			APIKey:  getEnvOrDefault("DEEPLAKE_API_KEY", "UimqLp7vXA3x53H1tPKveeRPFxwLIOypHSCjlddlBe8"), // Generated API key for v1.0.1+
 			Timeout: 30 * time.Second,
 			Retries: 3,
 		},
 		OpenAIConfig: &providers.OpenAIConfig{
-			Model:      "text-embedding-3-small",
+			APIKey:     getEnvOrDefault("OPENAI_API_KEY", ""),
+			Model:      getEnvOrDefault("OPENAI_MODEL", "text-embedding-3-small"),
 			Timeout:    30 * time.Second,
 			MaxRetries: 3,
 		},
@@ -366,4 +369,12 @@ func (ec *EmbeddingCoordinator) RecommendEmbeddingOptions(ctx context.Context, t
 	}
 
 	return baseOptions, nil
+}
+
+// getEnvOrDefault gets an environment variable or returns a default value
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

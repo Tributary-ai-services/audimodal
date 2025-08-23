@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/database/models"
-	"github.com/jscharber/eAIIngest/pkg/dlp"
-	"github.com/jscharber/eAIIngest/pkg/dlp/types"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/pkg/dlp"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 
 // DLPProcessor handles DLP scanning integration with the processing pipeline

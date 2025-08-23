@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/database/models"
-	"github.com/jscharber/eAIIngest/internal/server/response"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/internal/server/response"
 )
 
 // DataSourceHandler handles data source HTTP requests

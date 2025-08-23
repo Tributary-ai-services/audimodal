@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // PSTReader implements DataSourceReader for PST (Personal Storage Table) archive files

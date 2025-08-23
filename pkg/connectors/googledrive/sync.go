@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	drive "google.golang.org/api/drive/v3"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // SyncManager handles file synchronization between Google Drive and local storage

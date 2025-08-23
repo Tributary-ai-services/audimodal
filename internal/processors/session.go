@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/database/models"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/database/models"
 )
 
 // SessionManager manages processing sessions and coordinates file processing

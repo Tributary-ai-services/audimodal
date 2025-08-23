@@ -541,7 +541,7 @@ database:
 
 observability:
   jaeger_endpoint: http://jaeger-collector:14268/api/traces
-  prometheus_port: 9090
+  prometheus_port: 9093
   log_level: info
 
 processing:

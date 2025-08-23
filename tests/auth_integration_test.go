@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/jscharber/eAIIngest/pkg/auth"
+	"github.com/jscharber/audimodal/pkg/auth"
 )
 
 func TestAuthIntegration(t *testing.T) {

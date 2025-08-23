@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/preprocessing"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/preprocessing"
 )
 
 // JSONReader implements DataSourceReader for JSON files with nested object handling

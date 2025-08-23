@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/pkg/dlp/compliance"
-	"github.com/jscharber/eAIIngest/pkg/dlp/scanner"
-	"github.com/jscharber/eAIIngest/pkg/dlp/types"
+	"github.com/jscharber/audimodal/pkg/dlp/compliance"
+	"github.com/jscharber/audimodal/pkg/dlp/scanner"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 
 // Use interfaces from the main package to avoid import cycles

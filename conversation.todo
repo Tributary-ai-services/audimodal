@@ -1,0 +1,118 @@
+# eAIIngest → Audimodal Refactoring - Remaining Tasks
+
+## ✅ COMPLETED
+- [x] **Category 1**: Go Import Paths - All updated and builds passing
+- [x] **Category 2**: Docker/Deployment Names - All services renamed (audimodal-app, audimodal-postgres, etc.)
+- [x] Build tests - All passing (go build, make build, docker build, docker-compose, unit tests)
+
+## 🔄 REMAINING CATEGORIES
+
+### **Category 3: Database Names (Medium Priority)**
+**Status**: Partially completed in helm values, more remain
+**Scope**: Update database identifiers in:
+- Connection strings and SQL references
+- Remaining environment variables
+- Database migration references
+- Test database names (some already updated)
+
+**Files to check**:
+- Connection strings in config files
+- SQL migrations
+- Test configurations
+- Environment variable documentation
+
+### **Category 4: Display Names/UI (Low Priority)**  
+**Status**: Not started
+**Scope**: User-facing names and labels:
+- Web templates: "eAIIngest Dashboard", "eAIIngest API"  
+- CSS comments: "eAIIngest Dashboard Styles"
+- JavaScript comments: "API client for eAIIngest Dashboard" 
+- API responses: `"name": "eAIIngest API"`
+- User-agent strings: "eAIIngest-Go/1.0"
+- CLI output: "eAIIngest Server v1.0.0"
+- Dashboard welcome text: "eAIIngest management dashboard"
+
+**Files identified**:
+- `/cmd/server/main.go:42` - Version display
+- `/internal/server/handlers/web.go:139` - Dashboard text
+- `/web/templates/dashboard.html` - Title and headers
+- `/web/static/css/dashboard.css` - Comments
+- `/web/static/js/*.js` - Comments
+- `/internal/server/server.go:440,471` - API responses
+- Various user-agent strings in examples and config
+
+## 🌐 LEGACY URLS/DOMAINS INVENTORY
+
+### **Production/External Domains (HOLD)**
+**Note**: No production domain exists, only scharber.com TLD available
+**Status**: Holding per user request
+
+**Current legacy references**:
+1. `api.eaiingest.com` (Production helm values)
+2. `staging.eaiingest.example.com` (Staging helm + CI/CD)  
+3. `eaiingest.example.com` (Default helm values)
+
+### **GitHub Repository References**
+**Status**: Some in disabled/backup files, some in docs
+- Documentation examples in DEEPLAKE_SERVICE_SPEC.md
+- Backup test files (.bak, .disabled)
+- Error traces in KNOWN_ISSUES.md
+
+### **Internal Service References**
+**Status**: Should be updated for consistency
+- `eaiingest_backend` in nginx config (`/deployments/kubernetes/configmap.yaml:152`)
+
+## 🎯 PRIORITY RECOMMENDATIONS
+
+### **High Priority (Functional Impact)**
+1. Fix remaining Go import paths in disabled/backup files
+2. Update internal service names (`eaiingest_backend` → `audimodal_backend`)
+
+### **Medium Priority (Consistency)**  
+1. Complete Category 3: Database names
+2. Update development/staging domains for consistency
+
+### **Low Priority (Polish)**
+1. Category 4: Display names and UI text  
+2. Clean up legacy documentation references
+
+## 🚀 QUICK WIN TASKS
+
+### **Easy Updates (< 30 min)**
+- Update CLI version display text
+- Update dashboard welcome message  
+- Update API response names
+- Fix nginx backend service name
+
+### **Medium Updates (30-60 min)**
+- Complete database name consistency
+- Update user-agent strings
+- Update CSS/JS comments
+
+## 🔄 CURRENT STATE
+
+### **What's Working**✅
+- All Go code compiles and runs with new `github.com/jscharber/audimodal` module
+- Docker services run as `audimodal-app`, `audimodal-postgres`
+- Health endpoint reports service as "audimodal"
+- All builds, tests, and deployments passing
+
+### **What's Inconsistent**⚠️
+- Some display names still show "eAIIngest"  
+- Some internal service references still use old names
+- Documentation examples use old import paths
+
+### **What's On Hold**⏸️
+- External domain references (waiting for domain strategy)
+- Legacy documentation (keeping for reference)
+
+## 🎯 NEXT SESSION PRIORITIES
+1. **Quick wins**: Fix display names and CLI output
+2. **Internal consistency**: Update remaining service names  
+3. **Database cleanup**: Complete Category 3 database names
+4. **Polish**: Update comments and documentation
+
+---
+**Last Updated**: 2025-08-11
+**Build Status**: ✅ All tests passing
+**Services**: ✅ Running as audimodal-*

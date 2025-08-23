@@ -11,8 +11,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/pkg/events"
-	"github.com/jscharber/eAIIngest/pkg/metrics"
+	"github.com/jscharber/audimodal/pkg/events"
+	"github.com/jscharber/audimodal/pkg/metrics"
 )
 
 // AlertingService manages alerts and notifications for the system

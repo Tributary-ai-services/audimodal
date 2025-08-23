@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jscharber/eAIIngest/pkg/events"
+	"github.com/jscharber/audimodal/pkg/events"
 )
 
 // EventBus defines the interface for event bus operations needed by workflow engine

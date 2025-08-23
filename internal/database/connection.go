@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -10,7 +12,7 @@ import (
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 
-	"github.com/jscharber/eAIIngest/internal/database/models"
+	"github.com/jscharber/audimodal/internal/database/models"
 )
 
 // Config represents database configuration
@@ -193,7 +195,7 @@ func getLogger(level string, slowThreshold time.Duration) logger.Interface {
 	}
 
 	return logger.New(
-		nil, // Use default writer (stdout)
+		log.New(os.Stdout, "\r\n", log.LstdFlags), // Use standard logger
 		logger.Config{
 			SlowThreshold:             slowThreshold,
 			LogLevel:                  logLevel,

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // TeamsReader implements DataSourceReader for Microsoft Teams exports

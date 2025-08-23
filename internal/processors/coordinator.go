@@ -10,10 +10,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/database/models"
-	"github.com/jscharber/eAIIngest/pkg/readers"
-	"github.com/jscharber/eAIIngest/pkg/strategies"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/pkg/readers"
+	"github.com/jscharber/audimodal/pkg/strategies"
 )
 
 // Coordinator provides a high-level interface for orchestrating file processing

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 func TestFixedSizeStrategy_Basic(t *testing.T) {

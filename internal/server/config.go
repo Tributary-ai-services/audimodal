@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/pkg/config"
-	"github.com/jscharber/eAIIngest/pkg/validation"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/pkg/config"
+	"github.com/jscharber/audimodal/pkg/validation"
 )
 
 // Config represents the server configuration

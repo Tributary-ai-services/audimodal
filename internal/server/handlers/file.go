@@ -2,24 +2,56 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/database/models"
-	"github.com/jscharber/eAIIngest/internal/server/response"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/internal/processors"
+	"github.com/jscharber/audimodal/internal/server/response"
+	"github.com/jscharber/audimodal/internal/services"
+	"github.com/jscharber/audimodal/pkg/embeddings"
+)
+
+const (
+	// MaxMultipartFileSize is the maximum file size for multipart uploads (10MB)
+	MaxMultipartFileSize = 10 << 20 // 10 MB
+	// MaxFormMemory is the maximum memory used for multipart form parsing (32MB)
+	MaxFormMemory = 32 << 20 // 32 MB
 )
 
 // FileHandler handles file HTTP requests
 type FileHandler struct {
-	db *database.Database
+	db                   *database.Database
+	embeddingCoordinator *processors.EmbeddingCoordinator
+	storageService       *services.StorageService
 }
 
 // NewFileHandler creates a new file handler
-func NewFileHandler(db *database.Database) *FileHandler {
-	return &FileHandler{db: db}
+func NewFileHandler(db *database.Database, storageService *services.StorageService) *FileHandler {
+	// Initialize embedding coordinator with default config
+	embeddingCoordinator, err := processors.NewEmbeddingCoordinator(db, nil)
+	if err != nil {
+		// Log error but don't fail - embedding functionality will be disabled
+		// In production, you might want to handle this differently
+		fmt.Printf("WARNING: Failed to initialize embedding coordinator: %v\n", err)
+		fmt.Printf("Embedding functionality will be disabled. Set OPENAI_API_KEY environment variable to enable.\n")
+		embeddingCoordinator = nil
+	}
+
+	return &FileHandler{
+		db:                   db,
+		embeddingCoordinator: embeddingCoordinator,
+		storageService:       storageService,
+	}
 }
 
 // FileResponse represents a file response
@@ -95,6 +127,12 @@ func (h *FileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		default:
 			response.WriteError(w, getRequestID(r), http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed", nil)
 		}
+		return
+	}
+
+	// Handle /api/v1/tenants/{tenant_id}/files/search
+	if len(parts) == fileIndex+2 && parts[fileIndex+1] == "search" {
+		h.SearchSimilarDocuments(w, r, tenantCtx.TenantID)
 		return
 	}
 
@@ -217,23 +255,218 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request, tenantID
 }
 
 // CreateFile handles POST /api/v1/tenants/{tenant_id}/files
+// Supports both JSON requests (for metadata-only file records) and multipart form data (for actual file uploads)
 func (h *FileHandler) CreateFile(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
+	contentType := r.Header.Get("Content-Type")
+	
+	// Handle multipart form data (actual file uploads)
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		h.handleFileUpload(w, r, tenantID)
+		return
+	}
+	
+	// Handle JSON requests (metadata-only file records)
+	h.handleJSONFileCreate(w, r, tenantID)
+}
+
+// handleFileUpload handles multipart form file uploads for files <10MB
+func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
+	// Check content-length header for size validation before parsing
+	if contentLength := r.Header.Get("Content-Length"); contentLength != "" {
+		if size, err := strconv.ParseInt(contentLength, 10, 64); err == nil {
+			if size > MaxMultipartFileSize {
+				response.WriteBadRequest(w, getRequestID(r), fmt.Sprintf("File too large for multipart upload. Files over %d bytes should use S3 direct upload.", MaxMultipartFileSize), nil)
+				return
+			}
+		}
+	}
+
+	// Parse multipart form with size limit
+	if err := r.ParseMultipartForm(MaxFormMemory); err != nil {
+		response.WriteBadRequest(w, getRequestID(r), "Failed to parse multipart form", err.Error())
+		return
+	}
+	
+	// Get the uploaded file
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		response.WriteBadRequest(w, getRequestID(r), "No file provided", err.Error())
+		return
+	}
+	defer file.Close()
+
+	// Validate file size again after parsing
+	if fileHeader.Size > MaxMultipartFileSize {
+		response.WriteBadRequest(w, getRequestID(r), fmt.Sprintf("File too large for multipart upload (%d bytes). Files over %d bytes should use S3 direct upload.", fileHeader.Size, MaxMultipartFileSize), nil)
+		return
+	}
+	
+	// Get data source ID from form
+	dataSourceIDStr := r.FormValue("datasource_id")
+	if dataSourceIDStr == "" {
+		response.WriteBadRequest(w, getRequestID(r), "datasource_id is required", "")
+		return
+	}
+	
+	dataSourceID, err := uuid.Parse(dataSourceIDStr)
+	if err != nil {
+		response.WriteBadRequest(w, getRequestID(r), "Invalid datasource_id format", err.Error())
+		return
+	}
+	
+	// Get tenant repository
+	tenantService := h.db.NewTenantService()
+	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
+	if err != nil {
+		response.WriteNotFound(w, getRequestID(r), "Tenant not found")
+		return
+	}
+	
+	// Parse optional metadata if provided
+	var metadata map[string]interface{}
+	if metadataStr := r.FormValue("metadata"); metadataStr != "" {
+		if err := json.Unmarshal([]byte(metadataStr), &metadata); err != nil {
+			response.WriteBadRequest(w, getRequestID(r), "Invalid metadata JSON", err.Error())
+			return
+		}
+	}
+	
+	// Extract file information
+	filename := fileHeader.Filename
+	extension := filepath.Ext(filename)
+	if len(extension) > 0 && extension[0] == '.' {
+		extension = extension[1:] // Remove leading dot
+	}
+
+	// Detect content type if not provided
+	contentType := fileHeader.Header.Get("Content-Type")
+	if contentType == "" {
+		// Read first 512 bytes to detect content type
+		buffer := make([]byte, 512)
+		n, _ := file.Read(buffer)
+		contentType = http.DetectContentType(buffer[:n])
+		// Reset file reader
+		file.Seek(0, 0)
+	}
+
+	// Store file to local storage first (for files <10MB we can handle in memory/temp storage)
+	var storagePath string
+	var fileURL string
+	
+	// Create temporary file for processing
+	tempDir := os.Getenv("EAI_TEMP_DIR")
+	if tempDir == "" {
+		tempDir = "/tmp"
+	}
+	
+	tempFile, err := os.CreateTemp(tempDir, fmt.Sprintf("upload_%s_*_%s", tenantID.String()[:8], filename))
+	if err != nil {
+		response.WriteInternalServerError(w, getRequestID(r), "Failed to create temporary file", err.Error())
+		return
+	}
+	tempPath := tempFile.Name()
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempPath) // Clean up temp file
+	}()
+	
+	// Copy uploaded file to temp file
+	_, err = io.Copy(tempFile, file)
+	if err != nil {
+		response.WriteInternalServerError(w, getRequestID(r), "Failed to save uploaded file", err.Error())
+		return
+	}
+	
+	// TODO: For production, implement proper storage (S3, local filesystem, etc.)
+	// For now, we store locally and create a file:// URL
+	localStorageDir := os.Getenv("EAI_STORAGE_LOCAL_PATH")
+	if localStorageDir == "" {
+		localStorageDir = "/app/data/storage"
+	}
+	
+	// Ensure storage directory exists
+	if err := os.MkdirAll(filepath.Join(localStorageDir, tenantID.String()), 0755); err != nil {
+		response.WriteInternalServerError(w, getRequestID(r), "Failed to create storage directory", err.Error())
+		return
+	}
+	
+	// Generate unique filename for storage
+	fileUUID := uuid.New()
+	storedFilename := fmt.Sprintf("%s_%s", fileUUID.String(), filename)
+	storagePath = filepath.Join(localStorageDir, tenantID.String(), storedFilename)
+	fileURL = fmt.Sprintf("file://%s", storagePath)
+	
+	// Copy from temp to final storage location
+	tempFile.Seek(0, 0)
+	finalFile, err := os.Create(storagePath)
+	if err != nil {
+		response.WriteInternalServerError(w, getRequestID(r), "Failed to create storage file", err.Error())
+		return
+	}
+	defer finalFile.Close()
+	
+	_, err = io.Copy(finalFile, tempFile)
+	if err != nil {
+		response.WriteInternalServerError(w, getRequestID(r), "Failed to store file", err.Error())
+		return
+	}
+	
+	// Create file record with storage information
+	fileRecord := &models.File{
+		TenantID:         tenantID,
+		DataSourceID:     &dataSourceID,
+		URL:              fileURL,
+		Path:             storagePath,
+		Filename:         filename,
+		Extension:        extension,
+		ContentType:      contentType,
+		Size:             fileHeader.Size,
+		Status:           models.FileStatusDiscovered,
+		EncryptionStatus: "none",
+		Metadata:         metadata,
+		LastModified:     time.Now(),
+	}
+	
+	if err := tenantRepo.ValidateAndCreate(fileRecord); err != nil {
+		// Clean up stored file on database error
+		os.Remove(storagePath)
+		if strings.Contains(err.Error(), "validation") {
+			response.WriteValidationError(w, getRequestID(r), err.Error())
+			return
+		}
+		response.WriteInternalServerError(w, getRequestID(r), "Failed to create file record", err.Error())
+		return
+	}
+	
+	responseData := h.toFileResponse(fileRecord)
+	response.WriteCreated(w, getRequestID(r), responseData)
+}
+
+// handleJSONFileCreate handles JSON requests for S3 URLs and metadata-only file records
+func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	var req struct {
-		URL                 string                 `json:"url"`
-		Path                string                 `json:"path"`
-		Filename            string                 `json:"filename"`
-		Extension           string                 `json:"extension"`
-		ContentType         string                 `json:"content_type"`
-		Size                int64                  `json:"size"`
-		Checksum            string                 `json:"checksum"`
-		ChecksumType        string                 `json:"checksum_type"`
+		URL                 string                 `json:"url"`                   // S3 URL or existing file URL
+		Path                string                 `json:"path,omitempty"`        // Optional: local path
+		Filename            string                 `json:"filename,omitempty"`    // Optional: will be extracted from URL if not provided
+		Extension           string                 `json:"extension,omitempty"`   // Optional: will be extracted if not provided
+		ContentType         string                 `json:"content_type,omitempty"`// Optional: will be detected if not provided
+		Size                int64                  `json:"size,omitempty"`        // Optional: will be retrieved if not provided
+		Checksum            string                 `json:"checksum,omitempty"`
+		ChecksumType        string                 `json:"checksum_type,omitempty"`
 		DataSourceID        *uuid.UUID             `json:"data_source_id,omitempty"`
 		ProcessingSessionID *uuid.UUID             `json:"processing_session_id,omitempty"`
 		Metadata            map[string]interface{} `json:"metadata,omitempty"`
+		ValidateAccess      bool                   `json:"validate_access,omitempty"` // Whether to validate S3 access
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteBadRequest(w, getRequestID(r), "Invalid JSON request", err.Error())
+		return
+	}
+
+	// URL is required
+	if req.URL == "" {
+		response.WriteBadRequest(w, getRequestID(r), "URL is required", nil)
 		return
 	}
 
@@ -244,34 +477,101 @@ func (h *FileHandler) CreateFile(w http.ResponseWriter, r *http.Request, tenantI
 		return
 	}
 
-	// Create file record
-	file := &models.File{
-		TenantID:            tenantID,
-		DataSourceID:        req.DataSourceID,
-		ProcessingSessionID: req.ProcessingSessionID,
-		URL:                 req.URL,
-		Path:                req.Path,
-		Filename:            req.Filename,
-		Extension:           req.Extension,
-		ContentType:         req.ContentType,
-		Size:                req.Size,
-		Checksum:            req.Checksum,
-		ChecksumType:        req.ChecksumType,
-		Status:              models.FileStatusDiscovered,
-		EncryptionStatus:    "none",
-		Metadata:            req.Metadata,
-	}
+	var fileRecord *models.File
 
-	if err := tenantRepo.ValidateAndCreate(file); err != nil {
-		if strings.Contains(err.Error(), "validation") {
-			response.WriteValidationError(w, getRequestID(r), err.Error())
+	// Check if this is an S3 URL or cloud storage URL
+	if h.storageService != nil && (strings.HasPrefix(req.URL, "s3://") || strings.HasPrefix(req.URL, "gs://") || strings.HasPrefix(req.URL, "https://")) {
+		// Use storage service to validate and get file info
+		if req.ValidateAccess {
+			if err := h.storageService.ValidateDataSourceURL(r.Context(), tenantID, req.URL); err != nil {
+				response.WriteBadRequest(w, getRequestID(r), "Cannot access the provided URL", err.Error())
+				return
+			}
+		}
+
+		// Get file info from storage service if size/metadata not provided
+		if req.Size == 0 || req.Filename == "" || req.ContentType == "" {
+			fileInfo, err := h.storageService.GetFileInfoFromURL(r.Context(), tenantID, req.URL)
+			if err != nil {
+				response.WriteInternalServerError(w, getRequestID(r), "Failed to get file information from URL", err.Error())
+				return
+			}
+
+			// Use storage service data if not provided in request
+			if req.Size == 0 {
+				req.Size = fileInfo.Size
+			}
+			if req.Filename == "" {
+				// Extract filename from URL or use the name from fileInfo
+				if urlParts := strings.Split(req.URL, "/"); len(urlParts) > 0 {
+					req.Filename = urlParts[len(urlParts)-1]
+				}
+				if req.Filename == "" {
+					req.Filename = fileInfo.Name
+				}
+			}
+			if req.ContentType == "" {
+				req.ContentType = fileInfo.ContentType
+			}
+			if req.Checksum == "" {
+				req.Checksum = fileInfo.Checksum
+				req.ChecksumType = fileInfo.ChecksumType
+			}
+		}
+
+		// Extract extension if not provided
+		if req.Extension == "" && req.Filename != "" {
+			if ext := filepath.Ext(req.Filename); ext != "" && ext[0] == '.' {
+				req.Extension = ext[1:] // Remove leading dot
+			}
+		}
+
+		// Create file record using storage service
+		fileRecord, err = h.storageService.CreateFileFromURL(r.Context(), tenantID, req.URL, req.DataSourceID, req.ProcessingSessionID)
+		if err != nil {
+			response.WriteInternalServerError(w, getRequestID(r), "Failed to create file from URL", err.Error())
 			return
 		}
-		response.WriteInternalServerError(w, getRequestID(r), "Failed to create file", err.Error())
-		return
+
+		// Update any metadata provided in the request
+		if req.Metadata != nil {
+			fileRecord.Metadata = req.Metadata
+			if err := tenantRepo.DB().Save(fileRecord).Error; err != nil {
+				response.WriteInternalServerError(w, getRequestID(r), "Failed to update file metadata", err.Error())
+				return
+			}
+		}
+	} else {
+		// Handle local file URLs or manual metadata-only records
+		fileRecord = &models.File{
+			TenantID:            tenantID,
+			DataSourceID:        req.DataSourceID,
+			ProcessingSessionID: req.ProcessingSessionID,
+			URL:                 req.URL,
+			Path:                req.Path,
+			Filename:            req.Filename,
+			Extension:           req.Extension,
+			ContentType:         req.ContentType,
+			Size:                req.Size,
+			Checksum:            req.Checksum,
+			ChecksumType:        req.ChecksumType,
+			Status:              models.FileStatusDiscovered,
+			EncryptionStatus:    "none",
+			Metadata:            req.Metadata,
+			LastModified:        time.Now(),
+		}
+
+		if err := tenantRepo.ValidateAndCreate(fileRecord); err != nil {
+			if strings.Contains(err.Error(), "validation") {
+				response.WriteValidationError(w, getRequestID(r), err.Error())
+				return
+			}
+			response.WriteInternalServerError(w, getRequestID(r), "Failed to create file", err.Error())
+			return
+		}
 	}
 
-	responseData := h.toFileResponse(file)
+	responseData := h.toFileResponse(fileRecord)
 	response.WriteCreated(w, getRequestID(r), responseData)
 }
 
@@ -378,7 +678,8 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request, tenantI
 		return
 	}
 
-	if err := tenantRepo.DB().Delete(&file).Error; err != nil {
+	// Use Unscoped() to perform hard delete instead of soft delete
+	if err := tenantRepo.DB().Unscoped().Delete(&file).Error; err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to delete file", err.Error())
 		return
 	}
@@ -469,7 +770,31 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	// TODO: Trigger actual file processing pipeline
+	// Trigger file processing pipeline with embedding generation
+	if h.embeddingCoordinator != nil {
+		// Process file with embeddings in background
+		go func() {
+			options := map[string]any{
+				"embeddings_enabled": true,
+				"dlp_scan_enabled":   req.DLPScanEnabled,
+				"priority":           req.Priority,
+			}
+			if req.ChunkingStrategy != "" {
+				options["chunking_strategy"] = req.ChunkingStrategy
+			}
+
+			_, err := h.embeddingCoordinator.ProcessSingleFileWithEmbeddings(r.Context(), tenantID, fileID, options)
+			if err != nil {
+				// Update file status to error
+				file.MarkAsError("Failed to process file with embeddings: " + err.Error())
+				tenantRepo.DB().Save(&file)
+			} else {
+				// Update file status to processed
+				file.MarkAsProcessed(0, req.ChunkingStrategy) // Chunk count will be updated by processor
+				tenantRepo.DB().Save(&file)
+			}
+		}()
+	}
 
 	responseData := map[string]interface{}{
 		"message":  "File processing started",
@@ -638,4 +963,131 @@ func (h *FileHandler) toFileResponse(file *models.File) FileResponse {
 	}
 
 	return responseData
+}
+
+// SearchSimilarDocuments handles POST /api/v1/tenants/{tenant_id}/files/search
+func (h *FileHandler) SearchSimilarDocuments(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
+	if r.Method != http.MethodPost {
+		response.WriteError(w, getRequestID(r), http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed", nil)
+		return
+	}
+
+	if h.embeddingCoordinator == nil {
+		response.WriteError(w, getRequestID(r), http.StatusServiceUnavailable, "EMBEDDING_SERVICE_UNAVAILABLE", "Vector search service is not available", nil)
+		return
+	}
+
+	var req struct {
+		Query     string                 `json:"query"`
+		TopK      int                    `json:"top_k,omitempty"`
+		Threshold float32                `json:"threshold,omitempty"`
+		Filters   map[string]interface{} `json:"filters,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		response.WriteBadRequest(w, getRequestID(r), "Invalid JSON request", err.Error())
+		return
+	}
+
+	if req.Query == "" {
+		response.WriteBadRequest(w, getRequestID(r), "Query is required", nil)
+		return
+	}
+
+	// Set default values
+	if req.TopK <= 0 {
+		req.TopK = 10
+	}
+	if req.Threshold <= 0 {
+		req.Threshold = 0.7
+	}
+
+	// Prepare search options
+	searchOptions := &embeddings.SearchOptions{
+		TopK:            req.TopK,
+		Threshold:       req.Threshold,
+		MetricType:      "cosine",
+		IncludeContent:  true,
+		IncludeMetadata: true,
+		Filters:         req.Filters,
+	}
+
+	// Perform search
+	searchResults, err := h.embeddingCoordinator.SearchSimilarDocuments(r.Context(), tenantID, req.Query, searchOptions)
+	if err != nil {
+		h.handleSearchError(w, r, err, req.Query)
+		return
+	}
+
+	response.WriteSuccess(w, getRequestID(r), searchResults, nil)
+}
+
+// handleSearchError categorizes search errors and returns appropriate HTTP responses
+func (h *FileHandler) handleSearchError(w http.ResponseWriter, r *http.Request, err error, query string) {
+	requestID := getRequestID(r)
+	
+	// Check if it's an EmbeddingError with specific types
+	if embErr, ok := err.(*embeddings.EmbeddingError); ok {
+		switch embErr.Type {
+		case "dataset_not_found":
+			// Dataset doesn't exist - return 404
+			response.WriteNotFound(w, requestID, "Dataset not found: " + embErr.Message)
+			return
+		case "dimension_mismatch":
+			// Client sent wrong dimensions - return 400
+			response.WriteBadRequest(w, requestID, "Invalid query dimensions", embErr.Message)
+			return
+		case "search_unavailable":
+			// DeepLake search functionality not available - return empty results instead of error
+			// This handles the case where DeepLake dataset exists but search isn't implemented
+			emptyResults := &embeddings.SearchResponse{
+				Results:    []*embeddings.SimilarityResult{},
+				TotalFound: 0,
+				QueryTime:  0,
+				HasMore:    false,
+				Query:      query,
+				Dataset:    "default",
+			}
+			response.WriteSuccess(w, requestID, emptyResults, nil)
+			return
+		case "search_error":
+			// General search errors that might be recoverable
+			if strings.Contains(strings.ToLower(embErr.Message), "no results") || 
+			   strings.Contains(strings.ToLower(embErr.Message), "empty") {
+				// Return empty results for "no results" scenarios
+				emptyResults := &embeddings.SearchResponse{
+					Results:    []*embeddings.SimilarityResult{},
+					TotalFound: 0,
+					QueryTime:  0,
+					HasMore:    false,
+					Query:      query,
+					Dataset:    "default",
+				}
+				response.WriteSuccess(w, requestID, emptyResults, nil)
+				return
+			}
+			// Other search errors are server errors
+			response.WriteInternalServerError(w, requestID, "Search operation failed", embErr.Message)
+			return
+		case "invalid_input":
+			// Bad input parameters - return 400
+			response.WriteBadRequest(w, requestID, "Invalid search parameters", embErr.Message)
+			return
+		default:
+			// Unknown embedding error - return 500
+			response.WriteInternalServerError(w, requestID, "Search service error", embErr.Message)
+			return
+		}
+	}
+	
+	// For non-EmbeddingError types, check the error message for common patterns
+	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, "not found") {
+		response.WriteNotFound(w, requestID, "Resource not found: " + err.Error())
+	} else if strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "bad request") {
+		response.WriteBadRequest(w, requestID, "Invalid request", err.Error())
+	} else {
+		// Default to internal server error
+		response.WriteInternalServerError(w, requestID, "Failed to search documents", err.Error())
+	}
 }

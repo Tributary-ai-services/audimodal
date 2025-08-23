@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/pkg/dlp/patterns"
-	"github.com/jscharber/eAIIngest/pkg/dlp/types"
+	"github.com/jscharber/audimodal/pkg/dlp/patterns"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 
 // BasicDLPScanner implements a basic DLP scanner using pattern matching

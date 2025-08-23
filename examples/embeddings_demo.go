@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/providers"
+	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings/client"
+	"github.com/jscharber/audimodal/pkg/embeddings/providers"
 )
 
 func runEmbeddingsDemo() {

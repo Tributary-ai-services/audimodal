@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // Common cache errors

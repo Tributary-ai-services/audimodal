@@ -3,7 +3,7 @@ package dlp
 import (
 	"context"
 
-	"github.com/jscharber/eAIIngest/pkg/dlp/types"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 
 // DLPScanner is the main interface for data loss prevention scanning

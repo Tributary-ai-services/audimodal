@@ -6,8 +6,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
+	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings/client"
 )
 
 // Example program to test the DeepLake API integration

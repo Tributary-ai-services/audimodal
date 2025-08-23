@@ -10,9 +10,9 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/processors"
-	"github.com/jscharber/eAIIngest/pkg/events"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/processors"
+	"github.com/jscharber/audimodal/pkg/events"
 )
 
 // StreamingIngestionService handles real-time document processing via Kafka streams

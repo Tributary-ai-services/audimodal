@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/pkg/anomaly"
+	"github.com/jscharber/audimodal/pkg/anomaly"
 )
 
 // AnomalyController handles anomaly detection API endpoints

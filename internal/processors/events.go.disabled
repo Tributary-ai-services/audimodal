@@ -1,5 +1,10 @@
 package processors
 
+// Temporarily commented out entire file due to Kafka dependency issues
+// This file contains event handling functionality that will be re-enabled
+// once Kafka dependencies are resolved
+
+/*
 import (
 	"context"
 	"fmt"
@@ -7,13 +12,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/pkg/events"
+	"github.com/jscharber/audimodal/pkg/events"
 )
+*/
 
 // EventHandler handles processing-related events
+// Temporarily commented out due to Kafka dependency issues
 type EventHandler struct {
 	coordinator *Coordinator
-	producer    *events.Producer
+	// producer    *events.Producer
 }
 
 // ProcessingEventData represents data for processing events

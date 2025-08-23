@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/preprocessing"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/preprocessing"
 )
 
 // XMLReader implements DataSourceReader for XML files with schema detection

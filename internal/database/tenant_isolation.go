@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/jscharber/eAIIngest/internal/database/models"
+	"github.com/jscharber/audimodal/internal/database/models"
 )
 
 // TenantContext represents the tenant context for database operations

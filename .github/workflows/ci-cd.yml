@@ -23,7 +23,7 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: eaiingest_test
+          POSTGRES_DB: audimodal_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -108,7 +108,7 @@ jobs:
       env:
         EAI_DB_HOST: localhost
         EAI_DB_PORT: 5432
-        EAI_DB_NAME: eaiingest_test
+        EAI_DB_NAME: audimodal_test
         EAI_DB_USER: postgres
         EAI_DB_PASSWORD: postgres
         EAI_REDIS_HOST: localhost
@@ -128,7 +128,7 @@ jobs:
       env:
         EAI_DB_HOST: localhost
         EAI_DB_PORT: 5432
-        EAI_DB_NAME: eaiingest_test
+        EAI_DB_NAME: audimodal_test
         EAI_DB_USER: postgres
         EAI_DB_PASSWORD: postgres
         EAI_REDIS_HOST: localhost
@@ -229,15 +229,15 @@ jobs:
       run: |
         ./scripts/deployment/deploy.sh \
           --environment staging \
-          --namespace eaiingest-staging \
+          --namespace audimodal-staging \
           --registry ${{ env.REGISTRY }} \
           --tag ${{ github.sha }} \
           --verbose
     
     - name: Run smoke tests
       run: |
-        kubectl wait --for=condition=available --timeout=300s deployment/eaiingest-app -n eaiingest-staging
-        kubectl port-forward service/eaiingest-service 8080:8080 -n eaiingest-staging &
+        kubectl wait --for=condition=available --timeout=300s deployment/audimodal-app -n audimodal-staging
+        kubectl port-forward service/audimodal-service 8080:8080 -n audimodal-staging &
         sleep 10
         curl -f http://localhost:8080/health || exit 1
         curl -f http://localhost:8080/ready || exit 1
@@ -269,15 +269,15 @@ jobs:
       run: |
         ./scripts/deployment/deploy.sh \
           --environment production \
-          --namespace eaiingest \
+          --namespace audimodal \
           --registry ${{ env.REGISTRY }} \
           --tag ${GITHUB_REF#refs/tags/} \
           --verbose
     
     - name: Run production health checks
       run: |
-        kubectl wait --for=condition=available --timeout=600s deployment/eaiingest-app -n eaiingest
-        kubectl port-forward service/eaiingest-service 8080:8080 -n eaiingest &
+        kubectl wait --for=condition=available --timeout=600s deployment/audimodal-app -n audimodal
+        kubectl port-forward service/audimodal-service 8080:8080 -n audimodal &
         sleep 15
         curl -f http://localhost:8080/health || exit 1
         curl -f http://localhost:8080/ready || exit 1
@@ -302,7 +302,7 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: eaiingest_test
+          POSTGRES_DB: audimodal_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -344,7 +344,7 @@ jobs:
       env:
         EAI_DB_HOST: localhost
         EAI_DB_PORT: 5432
-        EAI_DB_NAME: eaiingest_test
+        EAI_DB_NAME: audimodal_test
         EAI_DB_USER: postgres
         EAI_DB_PASSWORD: postgres
         EAI_REDIS_HOST: localhost

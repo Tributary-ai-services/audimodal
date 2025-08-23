@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // RowBasedStrategy implements ChunkingStrategy for structured data (CSV, database tables)

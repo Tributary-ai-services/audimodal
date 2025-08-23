@@ -2,6 +2,7 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // DataSourceSpec defines the desired state of DataSource
@@ -193,7 +194,7 @@ type DataSourceCustomProcessor struct {
 	// Type is the processor type
 	Type string `json:"type"`
 	// Config is the processor configuration
-	Config map[string]interface{} `json:"config,omitempty"`
+	Config *runtime.RawExtension `json:"config,omitempty"`
 }
 
 // DataSourceMonitoring contains monitoring and alerting configuration

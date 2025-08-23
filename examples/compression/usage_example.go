@@ -8,9 +8,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
-	"github.com/jscharber/eAIIngest/pkg/storage/cache"
-	"github.com/jscharber/eAIIngest/pkg/storage/compression"
+	"github.com/jscharber/audimodal/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage/cache"
+	"github.com/jscharber/audimodal/pkg/storage/compression"
 )
 
 func main() {

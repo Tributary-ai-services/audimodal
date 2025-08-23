@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -123,8 +123,8 @@ func (m *mockDeepLakeServer) handleDatasets(w http.ResponseWriter, r *http.Reque
 				Metadata:    map[string]interface{}{"test": "true"},
 				VectorCount: 10,
 				StorageSize: 1024,
-				CreatedAt:   time.Now(),
-				UpdatedAt:   time.Now(),
+				CreatedAt:   time.Now().Format(time.RFC3339),
+				UpdatedAt:   time.Now().Format(time.RFC3339),
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -144,8 +144,8 @@ func (m *mockDeepLakeServer) handleDatasets(w http.ResponseWriter, r *http.Reque
 			Metadata:    map[string]interface{}{},
 			VectorCount: 0,
 			StorageSize: 0,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			CreatedAt:   time.Now().Format(time.RFC3339),
+			UpdatedAt:   time.Now().Format(time.RFC3339),
 		}
 		json.NewEncoder(w).Encode(response)
 
@@ -170,8 +170,8 @@ func (m *mockDeepLakeServer) handleDataset(w http.ResponseWriter, r *http.Reques
 			Metadata:    map[string]interface{}{"test": "true"},
 			VectorCount: 10,
 			StorageSize: 1024,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			CreatedAt:   time.Now().Format(time.RFC3339),
+			UpdatedAt:   time.Now().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(dataset)
@@ -196,8 +196,8 @@ func (m *mockDeepLakeServer) handleDatasetStats(w http.ResponseWriter, r *http.R
 			Metadata:    map[string]interface{}{"test": "true"},
 			VectorCount: 10,
 			StorageSize: 1024,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			CreatedAt:   time.Now().Format(time.RFC3339),
+			UpdatedAt:   time.Now().Format(time.RFC3339),
 		},
 		VectorCount: 10,
 		StorageSize: 1024,
@@ -260,8 +260,8 @@ func (m *mockDeepLakeServer) handleVector(w http.ResponseWriter, r *http.Request
 			Content:    "Test content",
 			Metadata:   map[string]interface{}{"test": "true"},
 			Dimensions: 3,
-			CreatedAt:  time.Now(),
-			UpdatedAt:  time.Now(),
+			CreatedAt:  time.Now().Format(time.RFC3339),
+			UpdatedAt:  time.Now().Format(time.RFC3339),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(vector)
@@ -309,8 +309,8 @@ func (m *mockDeepLakeServer) handleSearch(w http.ResponseWriter, r *http.Request
 					Content:    "Test content 1",
 					Metadata:   map[string]interface{}{"category": "test"},
 					Dimensions: 3,
-					CreatedAt:  time.Now(),
-					UpdatedAt:  time.Now(),
+					CreatedAt:  time.Now().Format(time.RFC3339),
+					UpdatedAt:  time.Now().Format(time.RFC3339),
 				},
 				Score:    0.95,
 				Distance: 0.05,
@@ -352,8 +352,8 @@ func (m *mockDeepLakeServer) handleTextSearch(w http.ResponseWriter, r *http.Req
 					Content:    "Text search result",
 					Metadata:   map[string]interface{}{"category": "text"},
 					Dimensions: 3,
-					CreatedAt:  time.Now(),
-					UpdatedAt:  time.Now(),
+					CreatedAt:  time.Now().Format(time.RFC3339),
+					UpdatedAt:  time.Now().Format(time.RFC3339),
 				},
 				Score:    0.88,
 				Distance: 0.12,
@@ -791,8 +791,166 @@ func TestDeepLakeAPIClient_ErrorHandling(t *testing.T) {
 
 		embeddingErr, ok := err.(*embeddings.EmbeddingError)
 		assert.True(t, ok)
-		// The client returns api_error for HTTP errors
-		assert.Equal(t, "api_error", embeddingErr.Type)
+		// With improved error handling, dataset not found errors are properly categorized
+		assert.Equal(t, "dataset_not_found", embeddingErr.Type)
+	})
+}
+
+// Test DeepLake-specific error handling (HTTP 200 with success: false)
+func TestDeepLakeAPIClient_DeepLakeErrorHandling(t *testing.T) {
+	// Test server that returns DeepLake-style errors (HTTP 200 with success: false)
+	deepLakeErrorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		
+		switch r.URL.Path {
+		case "/api/v1/datasets/", "/api/v1/datasets":
+			// Handle both GET (ListDatasets) and POST (CreateDataset)
+			if r.Method == "GET" {
+				// For ListDatasets - return dataset not found error
+				w.WriteHeader(http.StatusOK)
+				response := map[string]interface{}{
+					"success": false,
+					"message": "dataset 'default' not found",
+				}
+				json.NewEncoder(w).Encode(response)
+			} else if r.Method == "POST" {
+				// For CreateDataset - return generic DeepLake error
+				w.WriteHeader(http.StatusOK)
+				response := map[string]interface{}{
+					"success": false,
+					"message": "unknown deeplake error",
+				}
+				json.NewEncoder(w).Encode(response)
+			}
+		case "/api/v1/datasets/test-dataset":
+			// Return success with dataset info to allow subsequent operations
+			w.WriteHeader(http.StatusOK)
+			dataset := DatasetResponse{
+				ID:          "test-dataset-id",
+				Name:        "test-dataset",
+				Description: "Test dataset",
+				Dimensions:  1536,
+				MetricType:  "cosine",
+				IndexType:   "hnsw",
+				Metadata:    map[string]interface{}{"test": "true"},
+				VectorCount: 10,
+				StorageSize: 1024,
+				CreatedAt:   time.Now().Format(time.RFC3339),
+				UpdatedAt:   time.Now().Format(time.RFC3339),
+			}
+			json.NewEncoder(w).Encode(dataset)
+		case "/api/v1/datasets/test-dataset-id/search":
+			// Search unavailable error
+			w.WriteHeader(http.StatusOK)
+			response := map[string]interface{}{
+				"success": false,
+				"message": "AttributeError: 'NoneType' object has no attribute 'search'",
+			}
+			json.NewEncoder(w).Encode(response)
+		case "/api/v1/datasets/test-dataset-id/vectors/batch":
+			// Dimension mismatch error
+			w.WriteHeader(http.StatusOK)
+			response := map[string]interface{}{
+				"success": false,
+				"message": "dimensions mismatch: expected 1536, got 512",
+			}
+			json.NewEncoder(w).Encode(response)
+		case "/api/v1/datasets/generic-error":
+			// Generic DeepLake error
+			w.WriteHeader(http.StatusOK)
+			response := map[string]interface{}{
+				"success": false,
+				"message": "unknown deeplake error",
+			}
+			json.NewEncoder(w).Encode(response)
+		default:
+			// Return not found for unhandled paths
+			w.WriteHeader(http.StatusNotFound)
+			response := map[string]interface{}{
+				"detail": "Not found",
+			}
+			json.NewEncoder(w).Encode(response)
+		}
+	}))
+	defer deepLakeErrorServer.Close()
+
+	config := &DeepLakeAPIConfig{
+		BaseURL:   deepLakeErrorServer.URL,
+		APIKey:    "test-key",
+		Timeout:   1 * time.Second,
+		Retries:   0,
+		UserAgent: "test-client",
+	}
+
+	client, err := NewDeepLakeAPIClient(config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	ctx := context.Background()
+
+	t.Run("DatasetNotFoundError", func(t *testing.T) {
+		_, err := client.ListDatasets(ctx)
+		assert.Error(t, err)
+
+		embeddingErr, ok := err.(*embeddings.EmbeddingError)
+		if !ok {
+			t.Logf("Error is not an EmbeddingError: %T: %v", err, err)
+			t.SkipNow()
+		}
+		assert.Equal(t, "dataset_not_found", embeddingErr.Type)
+		assert.Equal(t, "DATASET_NOT_FOUND", embeddingErr.Code)
+		assert.Contains(t, embeddingErr.Message, "dataset 'default' not found")
+	})
+
+	t.Run("SearchUnavailableError", func(t *testing.T) {
+		queryVector := []float32{0.1, 0.2, 0.3}
+		options := &embeddings.SearchOptions{TopK: 5}
+		
+		_, err := client.SearchSimilar(ctx, "test-dataset", queryVector, options)
+		assert.Error(t, err)
+
+		embeddingErr, ok := err.(*embeddings.EmbeddingError)
+		assert.True(t, ok)
+		assert.Equal(t, "search_unavailable", embeddingErr.Type)
+		assert.Equal(t, "SEARCH_UNAVAILABLE", embeddingErr.Code)
+		assert.Contains(t, embeddingErr.Message, "no attribute 'search'")
+	})
+
+	t.Run("DimensionMismatchError", func(t *testing.T) {
+		vectors := []*embeddings.DocumentVector{
+			{
+				ID:         "vec-1",
+				DocumentID: "doc-1",
+				Vector:     []float32{0.1, 0.2, 0.3},
+				Content:    "Test content",
+			},
+		}
+		
+		err := client.InsertVectors(ctx, "test-dataset", vectors)
+		assert.Error(t, err)
+
+		embeddingErr, ok := err.(*embeddings.EmbeddingError)
+		assert.True(t, ok)
+		assert.Equal(t, "dimension_mismatch", embeddingErr.Type)
+		assert.Equal(t, "DIMENSION_MISMATCH", embeddingErr.Code)
+		assert.Contains(t, embeddingErr.Message, "dimensions mismatch")
+	})
+
+	t.Run("GenericDeepLakeError", func(t *testing.T) {
+		// Use CreateDataset to trigger the generic error directly without dataset ID lookup
+		config := &embeddings.DatasetConfig{
+			Name:        "test-generic-error",
+			Description: "Test dataset for generic error",
+			Dimensions:  1536,
+		}
+		err := client.CreateDataset(ctx, config)
+		assert.Error(t, err)
+
+		embeddingErr, ok := err.(*embeddings.EmbeddingError)
+		assert.True(t, ok)
+		assert.Equal(t, "deeplake_error", embeddingErr.Type)
+		assert.Equal(t, "DEEPLAKE_ERROR", embeddingErr.Code)
+		assert.Contains(t, embeddingErr.Message, "unknown deeplake error")
 	})
 }
 

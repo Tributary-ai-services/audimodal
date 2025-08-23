@@ -32,7 +32,7 @@ This directory contains deployment configurations and scripts for the AudiModal 
 2. **Access development services:**
    - Application: http://localhost:8080
    - Grafana: http://localhost:3000 (admin/admin123)
-   - Prometheus: http://localhost:9090
+   - Prometheus: http://localhost:9093
    - pgAdmin: http://localhost:5050 (admin@audimodal.dev/admin123)
    - Redis Commander: http://localhost:8081
    - MinIO Console: http://localhost:9001 (minioadmin/minioadmin123)

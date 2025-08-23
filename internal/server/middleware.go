@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
-	"github.com/jscharber/eAIIngest/internal/database"
+	"github.com/jscharber/audimodal/internal/database"
 )
 
 // Middleware represents HTTP middleware
@@ -158,6 +158,9 @@ func LoggingMiddleware(config *Config) Middleware {
 func AuthenticationMiddleware(config *Config, db *database.Database) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Debug logging
+			// TODO: Add proper logger to context
+			
 			if !config.AuthEnabled {
 				next.ServeHTTP(w, r)
 				return
@@ -200,8 +203,12 @@ func AuthenticationMiddleware(config *Config, db *database.Database) Middleware 
 func TenantMiddleware(db *database.Database) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Debug logging
+			// TODO: Add proper logger to context
+			
 			// Extract tenant ID from path or header
 			tenantID := extractTenantID(r)
+			
 			if tenantID == "" {
 				http.Error(w, "Tenant ID required", http.StatusBadRequest)
 				return

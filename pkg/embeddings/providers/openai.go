@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings"
 )
 
 // OpenAIProvider implements the EmbeddingProvider interface for OpenAI

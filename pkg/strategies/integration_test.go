@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/registry"
-	"github.com/jscharber/eAIIngest/pkg/strategies/hybrid"
-	"github.com/jscharber/eAIIngest/pkg/strategies/structured"
-	"github.com/jscharber/eAIIngest/pkg/strategies/text"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/registry"
+	"github.com/jscharber/audimodal/pkg/strategies/hybrid"
+	"github.com/jscharber/audimodal/pkg/strategies/structured"
+	"github.com/jscharber/audimodal/pkg/strategies/text"
 )
 
 func TestBasicStrategiesIntegration(t *testing.T) {

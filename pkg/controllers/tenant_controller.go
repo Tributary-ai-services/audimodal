@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	audimodalv1 "github.com/jscharber/eAIIngest/api/v1"
+	audimodalv1 "github.com/jscharber/audimodal/api/v1"
 )
 
 // TenantReconciler reconciles a Tenant object

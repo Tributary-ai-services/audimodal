@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/jscharber/eAIIngest/pkg/dlp/types"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 
 // BasicRedactionEngine implements basic redaction/masking functionality

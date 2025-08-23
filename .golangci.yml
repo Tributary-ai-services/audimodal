@@ -35,7 +35,7 @@ linters-settings:
     min-complexity: 15
   
   goimports:
-    local-prefixes: github.com/jscharber/eAIIngest
+    local-prefixes: github.com/jscharber/audimodal
   
   
   govet:
