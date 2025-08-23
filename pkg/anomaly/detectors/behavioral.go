@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jscharber/eAIIngest/pkg/anomaly"
+	"github.com/jscharber/audimodal/pkg/anomaly"
 )
 
 // BehavioralDetector implements behavioral anomaly detection

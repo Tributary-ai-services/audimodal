@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/pkg/metrics"
+	"github.com/jscharber/audimodal/pkg/metrics"
 )
 
 // DashboardService provides monitoring dashboards and real-time metrics

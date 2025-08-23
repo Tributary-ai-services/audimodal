@@ -1,0 +1,479 @@
+package tests
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/internal/server"
+	"github.com/jscharber/audimodal/internal/server/handlers"
+	"github.com/jscharber/audimodal/internal/services"
+)
+
+// TestFileUploadIntegration tests file upload functionality end-to-end
+func TestFileUploadIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Setup test database
+	ctx := context.Background()
+	testDB, cleanup := setupTestDatabase(t)
+	defer cleanup()
+
+	// Create test tenant
+	tenant := createTestTenant(t, testDB)
+
+	// Create test data source
+	dataSource := createTestDataSource(t, testDB, tenant.ID)
+
+	// Setup storage service
+	encryptionKey := []byte("test-encryption-key-32-bytes-xxx")
+	storageService := services.NewStorageService(testDB, encryptionKey)
+
+	// Create file handler
+	fileHandler := handlers.NewFileHandler(testDB, storageService)
+
+	// Create test server
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add tenant context
+		ctx := context.WithValue(r.Context(), "tenant_context", &database.TenantContext{
+			TenantID: tenant.ID,
+		})
+		ctx = context.WithValue(ctx, "request_id", uuid.New().String())
+		r = r.WithContext(ctx)
+
+		// Route to file handler
+		fileHandler.ServeHTTP(w, r)
+	}))
+	defer testServer.Close()
+
+	t.Run("multipart_upload_small_file", func(t *testing.T) {
+		// Create multipart form
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+
+		// Add file
+		part, err := writer.CreateFormFile("file", "test-document.pdf")
+		require.NoError(t, err)
+
+		testContent := []byte("This is a test PDF content")
+		_, err = part.Write(testContent)
+		require.NoError(t, err)
+
+		// Add datasource_id
+		err = writer.WriteField("datasource_id", dataSource.ID.String())
+		require.NoError(t, err)
+
+		// Add metadata
+		metadata := map[string]interface{}{
+			"description": "Test document",
+			"tags":        []string{"test", "integration"},
+		}
+		metadataJSON, _ := json.Marshal(metadata)
+		err = writer.WriteField("metadata", string(metadataJSON))
+		require.NoError(t, err)
+
+		err = writer.Close()
+		require.NoError(t, err)
+
+		// Make request
+		req, err := http.NewRequest("POST", testServer.URL+"/api/v1/tenants/"+tenant.ID.String()+"/files", &buf)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		// Check response
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		data := response["data"].(map[string]interface{})
+		assert.Equal(t, "test-document.pdf", data["filename"])
+		assert.Equal(t, float64(len(testContent)), data["size"])
+		assert.NotEmpty(t, data["id"])
+		assert.NotEmpty(t, data["url"])
+
+		// Verify file was created in database
+		fileID := data["id"].(string)
+		fileUUID, err := uuid.Parse(fileID)
+		require.NoError(t, err)
+
+		var file models.File
+		err = testDB.DB().Where("id = ?", fileUUID).First(&file).Error
+		require.NoError(t, err)
+		assert.Equal(t, "test-document.pdf", file.Filename)
+		assert.Equal(t, int64(len(testContent)), file.Size)
+		assert.Equal(t, dataSource.ID, *file.DataSourceID)
+	})
+
+	t.Run("json_upload_s3_url", func(t *testing.T) {
+		// Create JSON request for S3 URL
+		reqBody := map[string]interface{}{
+			"url":            "s3://test-bucket/large-document.pdf",
+			"filename":       "large-document.pdf",
+			"size":           50 * 1024 * 1024, // 50MB
+			"content_type":   "application/pdf",
+			"data_source_id": dataSource.ID.String(),
+			"metadata": map[string]interface{}{
+				"upload_method": "s3_direct",
+				"source":        "integration_test",
+			},
+		}
+
+		bodyJSON, err := json.Marshal(reqBody)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest("POST", testServer.URL+"/api/v1/tenants/"+tenant.ID.String()+"/files", bytes.NewReader(bodyJSON))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		// Check response
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		data := response["data"].(map[string]interface{})
+		assert.Equal(t, "large-document.pdf", data["filename"])
+		assert.Equal(t, float64(50*1024*1024), data["size"])
+		assert.Equal(t, "s3://test-bucket/large-document.pdf", data["url"])
+
+		// Verify file was created in database
+		fileID := data["id"].(string)
+		fileUUID, err := uuid.Parse(fileID)
+		require.NoError(t, err)
+
+		var file models.File
+		err = testDB.DB().Where("id = ?", fileUUID).First(&file).Error
+		require.NoError(t, err)
+		assert.Equal(t, "large-document.pdf", file.Filename)
+		assert.Equal(t, int64(50*1024*1024), file.Size)
+		assert.Equal(t, "s3://test-bucket/large-document.pdf", file.URL)
+	})
+
+	t.Run("file_size_threshold_enforcement", func(t *testing.T) {
+		// Test that files > 10MB are rejected via multipart
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+
+		part, err := writer.CreateFormFile("file", "large-file.pdf")
+		require.NoError(t, err)
+		
+		// Write some content
+		part.Write([]byte("Large file header"))
+		
+		err = writer.WriteField("datasource_id", dataSource.ID.String())
+		require.NoError(t, err)
+		
+		err = writer.Close()
+		require.NoError(t, err)
+
+		req, err := http.NewRequest("POST", testServer.URL+"/api/v1/tenants/"+tenant.ID.String()+"/files", &buf)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.ContentLength = 11 * 1024 * 1024 // 11MB
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		// Should fail with appropriate error
+		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, false, response["success"])
+		errorData := response["error"].(map[string]interface{})
+		assert.Contains(t, errorData["message"], "File too large for multipart upload")
+	})
+
+	t.Run("invalid_datasource_id", func(t *testing.T) {
+		// Test with non-existent data source
+		nonExistentID := uuid.New()
+
+		reqBody := map[string]interface{}{
+			"url":            "s3://test-bucket/file.pdf",
+			"filename":       "file.pdf",
+			"size":           1024,
+			"data_source_id": nonExistentID.String(),
+		}
+
+		bodyJSON, err := json.Marshal(reqBody)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest("POST", testServer.URL+"/api/v1/tenants/"+tenant.ID.String()+"/files", bytes.NewReader(bodyJSON))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		// Should fail with not found
+		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, false, response["success"])
+		errorData := response["error"].(map[string]interface{})
+		assert.Contains(t, errorData["message"], "Data source not found")
+	})
+
+	t.Run("wrong_tenant_datasource", func(t *testing.T) {
+		// Create another tenant and data source
+		otherTenant := createTestTenant(t, testDB)
+		otherDataSource := createTestDataSource(t, testDB, otherTenant.ID)
+
+		// Try to use other tenant's data source
+		reqBody := map[string]interface{}{
+			"url":            "s3://test-bucket/file.pdf",
+			"filename":       "file.pdf",
+			"size":           1024,
+			"data_source_id": otherDataSource.ID.String(),
+		}
+
+		bodyJSON, err := json.Marshal(reqBody)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest("POST", testServer.URL+"/api/v1/tenants/"+tenant.ID.String()+"/files", bytes.NewReader(bodyJSON))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		// Should fail with forbidden
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, false, response["success"])
+		errorData := response["error"].(map[string]interface{})
+		assert.Contains(t, errorData["message"], "Data source does not belong to tenant")
+	})
+}
+
+// TestFileUploadWithStorageIntegration tests file upload with actual storage
+func TestFileUploadWithStorageIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	// Check if MinIO is available
+	minioEndpoint := os.Getenv("AWS_ENDPOINT_URL")
+	if minioEndpoint == "" {
+		t.Skip("MinIO not configured, skipping storage integration test")
+	}
+
+	// Setup test database
+	ctx := context.Background()
+	testDB, cleanup := setupTestDatabase(t)
+	defer cleanup()
+
+	// Create test tenant
+	tenant := createTestTenant(t, testDB)
+
+	// Create test data source
+	dataSource := createTestDataSource(t, testDB, tenant.ID)
+
+	// Setup storage service with MinIO
+	encryptionKey := []byte("test-encryption-key-32-bytes-xxx")
+	storageService := services.NewStorageService(testDB, encryptionKey)
+
+	// Create file handler
+	fileHandler := handlers.NewFileHandler(testDB, storageService)
+
+	// Create test server
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add tenant context
+		ctx := context.WithValue(r.Context(), "tenant_context", &database.TenantContext{
+			TenantID: tenant.ID,
+		})
+		ctx = context.WithValue(ctx, "request_id", uuid.New().String())
+		r = r.WithContext(ctx)
+
+		// Route to file handler
+		fileHandler.ServeHTTP(w, r)
+	}))
+	defer testServer.Close()
+
+	t.Run("multipart_upload_with_actual_storage", func(t *testing.T) {
+		// Create multipart form
+		var buf bytes.Buffer
+		writer := multipart.NewWriter(&buf)
+
+		// Add file
+		part, err := writer.CreateFormFile("file", "test-storage.txt")
+		require.NoError(t, err)
+
+		testContent := []byte("This content should be stored in MinIO")
+		_, err = part.Write(testContent)
+		require.NoError(t, err)
+
+		// Add datasource_id
+		err = writer.WriteField("datasource_id", dataSource.ID.String())
+		require.NoError(t, err)
+
+		err = writer.Close()
+		require.NoError(t, err)
+
+		// Make request
+		req, err := http.NewRequest("POST", testServer.URL+"/api/v1/tenants/"+tenant.ID.String()+"/files", &buf)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+
+		// Check response
+		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		var response map[string]interface{}
+		err = json.NewDecoder(resp.Body).Decode(&response)
+		require.NoError(t, err)
+
+		assert.Equal(t, "success", response["status"])
+		data := response["data"].(map[string]interface{})
+		
+		// Verify the file URL is an S3 URL
+		fileURL := data["url"].(string)
+		assert.Contains(t, fileURL, "s3://")
+		
+		// Verify we can retrieve the file from storage
+		// This would require implementing GetFileContent in storage service
+		t.Logf("File stored at: %s", fileURL)
+	})
+}
+
+// Helper functions
+func setupTestDatabase(t *testing.T) (*database.Database, func()) {
+	// Use test database configuration
+	config := &database.Config{
+		Host:     getEnvOrDefault("TEST_DB_HOST", "localhost"),
+		Port:     getEnvOrDefault("TEST_DB_PORT", "5433"),
+		Database: getEnvOrDefault("TEST_DB_NAME", "audimodal_test"),
+		Username: getEnvOrDefault("TEST_DB_USER", "audimodal-admin"),
+		Password: getEnvOrDefault("TEST_DB_PASSWORD", "eaipassword"),
+		SSLMode:  "disable",
+	}
+
+	// Create database connection
+	db, err := database.New(config)
+	require.NoError(t, err)
+
+	// Run migrations
+	err = db.Migrate()
+	require.NoError(t, err)
+
+	// Cleanup function
+	cleanup := func() {
+		// Clean up test data
+		db.DB().Exec("DELETE FROM files")
+		db.DB().Exec("DELETE FROM data_sources")
+		db.DB().Exec("DELETE FROM tenants")
+		
+		// Close database
+		db.Close()
+	}
+
+	return db, cleanup
+}
+
+func createTestTenant(t *testing.T, db *database.Database) *models.Tenant {
+	tenant := &models.Tenant{
+		ID:             uuid.New(),
+		Name:           "Test Tenant " + uuid.New().String()[:8],
+		Domain:         "test-" + uuid.New().String()[:8] + ".example.com",
+		Status:         "active",
+		SubscriptionID: uuid.New().String(),
+		Settings: models.TenantSettings{
+			MaxUsers:    10,
+			MaxStorage:  1000000000, // 1GB
+			MaxFiles:    1000,
+			MaxAPIKeys:  5,
+			MaxWebhooks: 10,
+		},
+		Features: models.TenantFeatures{
+			EmbeddingsEnabled:     true,
+			ProcessingEnabled:     true,
+			WebhooksEnabled:       true,
+			CustomModelsEnabled:   false,
+			AdvancedSearchEnabled: true,
+			ComplianceMode:        "standard",
+		},
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	err := db.DB().Create(tenant).Error
+	require.NoError(t, err)
+
+	return tenant
+}
+
+func createTestDataSource(t *testing.T, db *database.Database, tenantID uuid.UUID) *models.DataSource {
+	dataSource := &models.DataSource{
+		ID:       uuid.New(),
+		TenantID: tenantID,
+		Name:     "Test Data Source",
+		Type:     "file_upload",
+		Config: models.DataSourceConfig{
+			"auto_processing": true,
+			"file_types":      []string{"pdf", "txt", "docx"},
+		},
+		Status:      "active",
+		LastSyncAt:  nil,
+		SyncStatus:  "never_synced",
+		SyncMessage: "",
+		IsActive:    true,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	err := db.DB().Create(dataSource).Error
+	require.NoError(t, err)
+
+	return dataSource
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}

@@ -23,9 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// Import AudiModal APIs and controllers
-	audimodalv1 "github.com/jscharber/eAIIngest/api/v1"
-	"github.com/jscharber/eAIIngest/pkg/controllers"
-	"github.com/jscharber/eAIIngest/pkg/tracing"
+	audimodalv1 "github.com/jscharber/audimodal/api/v1"
+	"github.com/jscharber/audimodal/pkg/controllers"
+	"github.com/jscharber/audimodal/pkg/tracing"
 )
 
 var (

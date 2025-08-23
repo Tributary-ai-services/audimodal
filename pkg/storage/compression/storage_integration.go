@@ -12,8 +12,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
-	"github.com/jscharber/eAIIngest/pkg/storage/cache"
+	"github.com/jscharber/audimodal/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage/cache"
 )
 
 // CompressedStorageResolver wraps a storage resolver with compression capabilities

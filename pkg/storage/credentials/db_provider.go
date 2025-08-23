@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // DatabaseCredentialProvider implements CredentialProvider using database storage

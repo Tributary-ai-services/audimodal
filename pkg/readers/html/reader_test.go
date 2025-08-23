@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 func TestHTMLReader_GetConfigSpec(t *testing.T) {

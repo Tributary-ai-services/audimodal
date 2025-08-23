@@ -1,13 +1,13 @@
 version: '3.8'
 
 services:
-  # Production eAIIngest application
-  eaiingest:
+  # Production Audimodal application
+  audimodal:
     build:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: eaiingest-app-prod
+    container_name: audimodal-app-prod
     ports:
       - "8080:8080"
     environment:
@@ -56,7 +56,7 @@ services:
         delay: 10s
         failure_action: rollback
     networks:
-      - eaiingest-network
+      - audimodal-network
     logging:
       driver: "json-file"
       options:
@@ -72,7 +72,7 @@ services:
   # Nginx reverse proxy and load balancer
   nginx:
     image: nginx:alpine
-    container_name: eaiingest-nginx
+    container_name: audimodal-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -82,9 +82,9 @@ services:
       - ./deployments/ssl:/etc/ssl:ro
       - /var/log/nginx:/var/log/nginx
     depends_on:
-      - eaiingest
+      - audimodal
     networks:
-      - eaiingest-network
+      - audimodal-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -93,5 +93,5 @@ services:
         max-file: "3"
 
 networks:
-  eaiingest-network:
+  audimodal-network:
     external: true

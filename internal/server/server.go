@@ -13,6 +13,7 @@ import (
 	"github.com/jscharber/audimodal/internal/database"
 	"github.com/jscharber/audimodal/internal/server/handlers"
 	"github.com/jscharber/audimodal/internal/server/response"
+	"github.com/jscharber/audimodal/internal/services"
 	"github.com/jscharber/audimodal/pkg/health"
 	"github.com/jscharber/audimodal/pkg/logger"
 	"github.com/jscharber/audimodal/pkg/metrics"
@@ -313,10 +314,10 @@ func (r *Router) setupMiddleware() {
 func (r *Router) setupRoutes() {
 	r.logger.Info("Setting up routes", "api_prefix", r.config.APIPrefix)
 	
-	// Health check endpoints (no auth required) - TEMPORARILY COMMENTED OUT FOR DEBUG
-	// r.ServeMux.HandleFunc(r.config.HealthCheckPath, r.healthHandler.HealthCheckHandler())
-	// r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
-	// r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/live", r.healthHandler.LivenessHandler())
+	// Health check endpoints (no auth required) - Register these FIRST to avoid conflicts
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath, r.healthHandler.HealthCheckHandler())
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/live", r.healthHandler.LivenessHandler())
 
 	// Metrics endpoint (no auth required)
 	if r.config.MetricsEnabled {
@@ -326,12 +327,20 @@ func (r *Router) setupRoutes() {
 	// API routes with authentication
 	apiPrefix := r.config.APIPrefix
 
+	// Create storage service first (needed by file handler)
+	encryptionKey := os.Getenv("EAI_ENCRYPTION_KEY")
+	if encryptionKey == "" {
+		encryptionKey = "your-32-byte-encryption-key-here"
+	}
+	storageService := services.NewStorageService(r.db, []byte(encryptionKey))
+	storageHandler := handlers.NewStorageHandler(r.db, storageService)
+
 	// Create handlers
 	tenantHandler := handlers.NewTenantHandler(r.db)
 	dataSourceHandler := handlers.NewDataSourceHandler(r.db)
 	sessionHandler := handlers.NewProcessingSessionHandler(r.db)
 	dlpHandler := handlers.NewDLPHandler(r.db)
-	fileHandler := handlers.NewFileHandler(r.db)
+	fileHandler := handlers.NewFileHandler(r.db, storageService)
 	chunkHandler := handlers.NewChunkHandler(r.db)
 	webHandler := handlers.NewWebHandler(r.db, r.logger)
 	mlAnalysisHandler := handlers.NewMLAnalysisHandler(r.db, r.logger)
@@ -389,8 +398,11 @@ func (r *Router) setupRoutes() {
 			} else if isDLPRoute(req.URL.Path, apiPrefix) {
 				r.logger.Debug("Routing to DLP handler", "path", req.URL.Path)
 				dlpHandler.ServeHTTP(w, req)
+			} else if isStorageRoute(req.URL.Path, apiPrefix) {
+				r.logger.Debug("Routing to storage handler", "path", req.URL.Path)
+				storageHandler.ServeHTTP(w, req)
 			} else if isFileRoute(req.URL.Path, apiPrefix) {
-				r.logger.Debug("Routing to file handler", "path", req.URL.Path)
+				r.logger.Info("Routing to file handler", "path", req.URL.Path)
 				fileHandler.ServeHTTP(w, req)
 			} else if isChunkRoute(req.URL.Path, apiPrefix) {
 				r.logger.Debug("Routing to chunk handler", "path", req.URL.Path)
@@ -454,6 +466,7 @@ func (r *Router) docsHandler(w http.ResponseWriter, req *http.Request) {
 			"dlp_policies":        fmt.Sprintf("%s/tenants/{tenant_id}/dlp-policies", r.config.APIPrefix),
 			"files":               fmt.Sprintf("%s/tenants/{tenant_id}/files", r.config.APIPrefix),
 			"chunks":              fmt.Sprintf("%s/tenants/{tenant_id}/chunks", r.config.APIPrefix),
+			"storage":             fmt.Sprintf("%s/tenants/{tenant_id}/storage", r.config.APIPrefix),
 		},
 		"authentication": map[string]interface{}{
 			"type":        "API Key or JWT Bearer Token",
@@ -503,22 +516,32 @@ func isDLPRoute(path, apiPrefix string) bool {
 }
 
 func isFileRoute(path, apiPrefix string) bool {
-	return contains(path, "/files")
+	return strings.Contains(path, "/files")
 }
 
 func isChunkRoute(path, apiPrefix string) bool {
 	return contains(path, "/chunks")
 }
 
+func isStorageRoute(path, apiPrefix string) bool {
+	return contains(path, "/storage")
+}
+
 func isMLAnalysisRoute(path, apiPrefix string) bool {
-	return contains(path, "/ml-analysis")
+	return strings.Contains(path, "/ml-analysis") || strings.Contains(path, "/ml/insights")
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr ||
+	result := len(s) >= len(substr) && s[len(s)-len(substr):] == substr ||
 		len(s) > len(substr) && s[len(s)-len(substr)-1:len(s)-len(substr)] == "/" && s[len(s)-len(substr):] == substr ||
 		s == substr ||
 		(len(s) > len(substr) && s[:len(substr)] == substr && s[len(substr)] == '/')
+	
+	// Debug specific cases
+	if substr == "/ml/insights" || substr == "/ml-analysis" {
+		fmt.Printf("DEBUG: contains('%s', '%s') = %t\n", s, substr, result)
+	}
+	return result
 }
 
 // RunServer is a convenience function to run the server

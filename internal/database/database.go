@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/jscharber/eAIIngest/internal/database/models"
+	"github.com/jscharber/audimodal/internal/database/models"
 )
 
 // Database represents the main database interface for the application

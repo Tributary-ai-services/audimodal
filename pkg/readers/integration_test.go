@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/readers/csv"
-	"github.com/jscharber/eAIIngest/pkg/readers/json"
-	"github.com/jscharber/eAIIngest/pkg/readers/text"
-	"github.com/jscharber/eAIIngest/pkg/registry"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/readers/csv"
+	"github.com/jscharber/audimodal/pkg/readers/json"
+	"github.com/jscharber/audimodal/pkg/readers/text"
+	"github.com/jscharber/audimodal/pkg/registry"
 )
 
 func TestBasicReadersIntegration(t *testing.T) {

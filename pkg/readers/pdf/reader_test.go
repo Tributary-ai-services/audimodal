@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 func TestPDFReader_GetConfigSpec(t *testing.T) {

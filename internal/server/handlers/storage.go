@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/server/response"
-	"github.com/jscharber/eAIIngest/internal/services"
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/server/response"
+	"github.com/jscharber/audimodal/internal/services"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // StorageHandler handles cloud storage related HTTP requests

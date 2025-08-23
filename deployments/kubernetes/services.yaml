@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/component: application
   annotations:
     prometheus.io/scrape: "true"
-    prometheus.io/port: "9090"
+    prometheus.io/port: "9093"
     prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
@@ -18,7 +18,7 @@ spec:
     targetPort: http
     protocol: TCP
   - name: metrics
-    port: 9090
+    port: 9093
     targetPort: metrics
     protocol: TCP
   selector:

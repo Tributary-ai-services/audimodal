@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/chunking"
+	"github.com/jscharber/audimodal/pkg/chunking"
 )
 
 const (

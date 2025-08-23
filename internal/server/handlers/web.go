@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/pkg/logger"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/pkg/logger"
 )
 
 // WebHandler handles web UI requests

@@ -2,13 +2,13 @@ version: '3.8'
 
 # Development environment with hot reload and debugging
 services:
-  # eAIIngest development application
-  eaiingest-dev:
+  # Audimodal development application
+  audimodal-dev:
     build:
       context: .
       dockerfile: Dockerfile
       target: builder  # Use builder stage for development
-    container_name: eaiingest-app-dev
+    container_name: audimodal-app-dev
     ports:
       - "8080:8080"
       - "2345:2345"  # Delve debugger port
@@ -17,7 +17,7 @@ services:
       - EAI_LOG_LEVEL=debug
       - EAI_DB_HOST=postgres-dev
       - EAI_DB_PORT=5432
-      - EAI_DB_NAME=eaiingest_dev
+      - EAI_DB_NAME=audimodal_dev
       - EAI_DB_USER=eaiuser
       - EAI_DB_PASSWORD=devpassword
       - EAI_REDIS_HOST=redis-dev
@@ -47,15 +47,15 @@ services:
       - redis-dev
       - mailhog
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
 
   # PostgreSQL for development
   postgres-dev:
     image: postgres:15-alpine
-    container_name: eaiingest-postgres-dev
+    container_name: audimodal-postgres-dev
     environment:
-      - POSTGRES_DB=eaiingest_dev
+      - POSTGRES_DB=audimodal_dev
       - POSTGRES_USER=eaiuser
       - POSTGRES_PASSWORD=devpassword
       - PGDATA=/var/lib/postgresql/data/pgdata
@@ -65,26 +65,26 @@ services:
     ports:
       - "5433:5432"  # Different port to avoid conflicts
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
 
   # Redis for development
   redis-dev:
     image: redis:7-alpine
-    container_name: eaiingest-redis-dev
+    container_name: audimodal-redis-dev
     command: redis-server --appendonly yes --requirepass devpassword
     ports:
       - "6380:6379"  # Different port to avoid conflicts
     volumes:
       - redis_dev_data:/data
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
 
   # MinIO for local S3 testing
   minio-dev:
     image: minio/minio:latest
-    container_name: eaiingest-minio-dev
+    container_name: audimodal-minio-dev
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=minioadmin
@@ -95,24 +95,24 @@ services:
     volumes:
       - minio_dev_data:/data
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
 
   # MailHog for email testing
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: eaiingest-mailhog
+    container_name: audimodal-mailhog
     ports:
       - "1025:1025"  # SMTP
       - "8025:8025"  # Web UI
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
 
   # Jaeger for distributed tracing
   jaeger:
     image: jaegertracing/all-in-one:latest
-    container_name: eaiingest-jaeger-dev
+    container_name: audimodal-jaeger-dev
     environment:
       - COLLECTOR_ZIPKIN_HOST_PORT=:9411
     ports:
@@ -125,13 +125,13 @@ services:
       - "14250:14250"
       - "9411:9411"
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
 
   # Prometheus for metrics (development)
   prometheus-dev:
     image: prom/prometheus:latest
-    container_name: eaiingest-prometheus-dev
+    container_name: audimodal-prometheus-dev
     ports:
       - "9090:9090"
     volumes:
@@ -146,13 +146,13 @@ services:
       - '--web.enable-lifecycle'
       - '--web.enable-admin-api'
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
 
   # Grafana for visualization (development)
   grafana-dev:
     image: grafana/grafana:latest
-    container_name: eaiingest-grafana-dev
+    container_name: audimodal-grafana-dev
     ports:
       - "3000:3000"
     environment:
@@ -164,7 +164,7 @@ services:
       - ./deployments/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./deployments/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
     depends_on:
       - prometheus-dev
@@ -172,16 +172,16 @@ services:
   # pgAdmin for database management
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: eaiingest-pgadmin-dev
+    container_name: audimodal-pgadmin-dev
     environment:
-      - PGADMIN_DEFAULT_EMAIL=admin@eaiingest.dev
+      - PGADMIN_DEFAULT_EMAIL=admin@audimodal.dev
       - PGADMIN_DEFAULT_PASSWORD=admin123
     ports:
       - "5050:80"
     volumes:
       - pgadmin_dev_data:/var/lib/pgadmin
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
     depends_on:
       - postgres-dev
@@ -189,13 +189,13 @@ services:
   # Redis Commander for Redis management
   redis-commander:
     image: rediscommander/redis-commander:latest
-    container_name: eaiingest-redis-commander
+    container_name: audimodal-redis-commander
     environment:
       - REDIS_HOSTS=local:redis-dev:6379:0:devpassword
     ports:
       - "8081:8081"
     networks:
-      - eaiingest-dev-network
+      - audimodal-dev-network
     restart: unless-stopped
     depends_on:
       - redis-dev
@@ -217,7 +217,7 @@ volumes:
     driver: local
 
 networks:
-  eaiingest-dev-network:
+  audimodal-dev-network:
     driver: bridge
     ipam:
       config:

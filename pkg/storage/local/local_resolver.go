@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // LocalResolver implements StorageResolver for local file system

@@ -1,21 +1,21 @@
 package readers
 
 import (
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/readers/archive"
-	"github.com/jscharber/eAIIngest/pkg/readers/csv"
-	"github.com/jscharber/eAIIngest/pkg/readers/email"
-	"github.com/jscharber/eAIIngest/pkg/readers/html"
-	"github.com/jscharber/eAIIngest/pkg/readers/image"
-	"github.com/jscharber/eAIIngest/pkg/readers/json"
-	"github.com/jscharber/eAIIngest/pkg/readers/markdown"
-	"github.com/jscharber/eAIIngest/pkg/readers/microsoft"
-	"github.com/jscharber/eAIIngest/pkg/readers/office"
-	"github.com/jscharber/eAIIngest/pkg/readers/pdf"
-	"github.com/jscharber/eAIIngest/pkg/readers/rtf"
-	"github.com/jscharber/eAIIngest/pkg/readers/text"
-	"github.com/jscharber/eAIIngest/pkg/readers/xml"
-	"github.com/jscharber/eAIIngest/pkg/registry"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/readers/archive"
+	"github.com/jscharber/audimodal/pkg/readers/csv"
+	"github.com/jscharber/audimodal/pkg/readers/email"
+	"github.com/jscharber/audimodal/pkg/readers/html"
+	"github.com/jscharber/audimodal/pkg/readers/image"
+	"github.com/jscharber/audimodal/pkg/readers/json"
+	"github.com/jscharber/audimodal/pkg/readers/markdown"
+	"github.com/jscharber/audimodal/pkg/readers/microsoft"
+	"github.com/jscharber/audimodal/pkg/readers/office"
+	"github.com/jscharber/audimodal/pkg/readers/pdf"
+	"github.com/jscharber/audimodal/pkg/readers/rtf"
+	"github.com/jscharber/audimodal/pkg/readers/text"
+	"github.com/jscharber/audimodal/pkg/readers/xml"
+	"github.com/jscharber/audimodal/pkg/registry"
 )
 
 // RegisterBasicReaders registers all basic file readers with the global registry

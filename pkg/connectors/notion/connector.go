@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage"
 	"go.opentelemetry.io/otel/trace"
 )
 

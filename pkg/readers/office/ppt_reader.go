@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // PPTReader implements DataSourceReader for legacy Microsoft PowerPoint presentations (.ppt)

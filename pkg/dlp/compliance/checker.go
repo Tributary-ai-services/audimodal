@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/dlp/types"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 
 // BasicComplianceChecker implements basic compliance checking functionality

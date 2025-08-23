@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/strategies/hybrid"
-	"github.com/jscharber/eAIIngest/pkg/strategies/text"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/strategies/hybrid"
+	"github.com/jscharber/audimodal/pkg/strategies/text"
 )
 
 // Chunker interface defines chunking functionality

@@ -1,0 +1,10 @@
+{
+  "url": "file:///app/test_document.txt",
+  "path": "/test_document.txt", 
+  "filename": "test_document.txt",
+  "extension": ".txt",
+  "content_type": "text/plain",
+  "size": 1195,
+  "checksum": "458ab3ecd52039faa99c2c24b5cf02f4",
+  "checksum_type": "md5"
+}

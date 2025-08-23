@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // TIFFReader implements DataSourceReader for TIFF image files with OCR support

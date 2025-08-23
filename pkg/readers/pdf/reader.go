@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // PDFReader implements DataSourceReader for PDF files with OCR support

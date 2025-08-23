@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jscharber/eAIIngest/pkg/auth"
-	"github.com/jscharber/eAIIngest/pkg/chunking"
-	"github.com/jscharber/eAIIngest/pkg/classification"
-	"github.com/jscharber/eAIIngest/pkg/events"
-	"github.com/jscharber/eAIIngest/pkg/storage"
-	"github.com/jscharber/eAIIngest/pkg/storage/local"
-	"github.com/jscharber/eAIIngest/pkg/workflow"
+	"github.com/jscharber/audimodal/pkg/auth"
+	"github.com/jscharber/audimodal/pkg/chunking"
+	"github.com/jscharber/audimodal/pkg/classification"
+	"github.com/jscharber/audimodal/pkg/events"
+	"github.com/jscharber/audimodal/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage/local"
+	"github.com/jscharber/audimodal/pkg/workflow"
 )
 
 // EventBusAdapter adapts the events.EventBusInterface to workflow.EventBus

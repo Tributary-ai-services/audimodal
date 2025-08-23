@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // PNGReader implements DataSourceReader for PNG image files with OCR support

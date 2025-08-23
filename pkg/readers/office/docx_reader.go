@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // DOCXReader implements DataSourceReader for Microsoft Word documents

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // DOCReader implements DataSourceReader for legacy Microsoft Word documents (.doc)

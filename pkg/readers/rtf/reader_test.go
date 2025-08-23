@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 func TestRTFReader_GetConfigSpec(t *testing.T) {

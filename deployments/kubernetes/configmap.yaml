@@ -24,7 +24,7 @@ data:
     metrics:
       enabled: true
       path: "/metrics"
-      port: 9090
+      port: 9093
       
     tracing:
       enabled: true

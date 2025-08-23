@@ -1,11 +1,51 @@
 package models
 
 import (
+	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// JSONBMap is a custom type for JSONB map fields that handles scanning from PostgreSQL
+type JSONBMap map[string]interface{}
+
+// Scan implements the sql.Scanner interface for JSONBMap
+func (j *JSONBMap) Scan(value interface{}) error {
+	if value == nil {
+		*j = make(map[string]interface{})
+		return nil
+	}
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return errors.New("cannot scan non-string/[]byte into JSONBMap")
+	}
+
+	if len(bytes) == 0 {
+		*j = make(map[string]interface{})
+		return nil
+	}
+
+	return json.Unmarshal(bytes, j)
+}
+
+// Value implements the driver.Valuer interface for JSONBMap
+func (j JSONBMap) Value() (driver.Value, error) {
+	if len(j) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(j)
+}
+
+
 
 // File represents a file in the system
 type File struct {
@@ -39,7 +79,7 @@ type File struct {
 	LanguageConf     float64  `gorm:"column:language_confidence" json:"language_confidence,omitempty"`
 	ContentCategory  string   `json:"content_category,omitempty"`
 	SensitivityLevel string   `json:"sensitivity_level,omitempty"`
-	Classifications  []string `gorm:"type:jsonb" json:"classifications,omitempty"`
+	Classifications  Classifications `gorm:"type:jsonb" json:"classifications,omitempty"`
 
 	// Schema and structure information
 	SchemaInfo FileSchemaInfo `gorm:"type:jsonb" json:"schema_info"`
@@ -50,12 +90,12 @@ type File struct {
 
 	// Compliance and security
 	PIIDetected      bool     `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
-	ComplianceFlags  []string `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
+	ComplianceFlags  ComplianceFlags `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
 	EncryptionStatus string   `gorm:"default:'none'" json:"encryption_status"`
 
 	// Metadata and custom fields
-	Metadata     map[string]interface{} `gorm:"type:jsonb" json:"metadata,omitempty"`
-	CustomFields map[string]interface{} `gorm:"type:jsonb" json:"custom_fields,omitempty"`
+	Metadata     JSONBMap `gorm:"type:jsonb" json:"metadata,omitempty"`
+	CustomFields JSONBMap `gorm:"type:jsonb" json:"custom_fields,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time  `gorm:"not null" json:"created_at"`
@@ -107,12 +147,29 @@ type FieldStats struct {
 // GORM hooks for JSON serialization
 func (f *FileSchemaInfo) Scan(value interface{}) error {
 	if value == nil {
+		*f = FileSchemaInfo{}
 		return nil
 	}
-	return json.Unmarshal(value.([]byte), f)
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return errors.New("cannot scan non-string/[]byte into FileSchemaInfo")
+	}
+
+	if len(bytes) == 0 {
+		*f = FileSchemaInfo{}
+		return nil
+	}
+
+	return json.Unmarshal(bytes, f)
 }
 
-func (f FileSchemaInfo) Value() (interface{}, error) {
+func (f FileSchemaInfo) Value() (driver.Value, error) {
 	return json.Marshal(f)
 }
 
@@ -144,23 +201,57 @@ type ComplianceFlags []string
 
 func (c *Classifications) Scan(value interface{}) error {
 	if value == nil {
+		*c = Classifications{}
 		return nil
 	}
-	return json.Unmarshal(value.([]byte), c)
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return errors.New("cannot scan non-string/[]byte into Classifications")
+	}
+
+	if len(bytes) == 0 {
+		*c = Classifications{}
+		return nil
+	}
+
+	return json.Unmarshal(bytes, c)
 }
 
-func (c Classifications) Value() (interface{}, error) {
+func (c Classifications) Value() (driver.Value, error) {
 	return json.Marshal(c)
 }
 
 func (c *ComplianceFlags) Scan(value interface{}) error {
 	if value == nil {
+		*c = ComplianceFlags{}
 		return nil
 	}
-	return json.Unmarshal(value.([]byte), c)
+
+	var bytes []byte
+	switch v := value.(type) {
+	case []byte:
+		bytes = v
+	case string:
+		bytes = []byte(v)
+	default:
+		return errors.New("cannot scan non-string/[]byte into ComplianceFlags")
+	}
+
+	if len(bytes) == 0 {
+		*c = ComplianceFlags{}
+		return nil
+	}
+
+	return json.Unmarshal(bytes, c)
 }
 
-func (c ComplianceFlags) Value() (interface{}, error) {
+func (c ComplianceFlags) Value() (driver.Value, error) {
 	return json.Marshal(c)
 }
 

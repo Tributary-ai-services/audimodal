@@ -3009,7 +3009,7 @@ observability:
   service_version: ${SERVICE_VERSION}
   environment: ${ENVIRONMENT}
   jaeger_endpoint: http://jaeger-collector.observability.svc.cluster.local:14268/api/traces
-  prometheus_port: 9090
+  prometheus_port: 9093
   sampling_ratio: 1.0
   log_level: info
   crd_metrics:

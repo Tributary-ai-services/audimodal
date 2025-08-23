@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/pkg/events"
+	"github.com/jscharber/audimodal/pkg/events"
 )
 
 // SharePointConnector handles integration with Microsoft SharePoint

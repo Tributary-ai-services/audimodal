@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/urls/schemes"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/urls/schemes"
 )
 
 // URLSchemeRegistry manages URL resolvers for different schemes

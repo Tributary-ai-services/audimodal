@@ -104,7 +104,7 @@ ingress:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: eaiingest-production-tls
+    - secretName: audimodal-production-tls
       hosts:
         - api.eaiingest.com
 
@@ -136,7 +136,7 @@ networkPolicy:
     to:
       - namespaceSelector:
           matchLabels:
-            name: eaiingest
+            name: audimodal
 
 # Production backup configuration
 backup:

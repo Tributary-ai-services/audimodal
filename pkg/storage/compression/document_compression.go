@@ -12,8 +12,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
-	"github.com/jscharber/eAIIngest/pkg/storage/cache"
+	"github.com/jscharber/audimodal/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage/cache"
 )
 
 // DocumentCompressionStrategy defines compression strategies for different document types

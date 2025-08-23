@@ -17,7 +17,7 @@ import (
 	drive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // GoogleDriveConnector implements storage.StorageConnector for Google Drive

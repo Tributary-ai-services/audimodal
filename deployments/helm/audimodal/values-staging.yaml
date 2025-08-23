@@ -23,7 +23,7 @@ postgresql:
     postgresPassword: "staging-password-change-me"
     username: "eaiuser"
     password: "staging-password-change-me"
-    database: "eaiingest_staging"
+    database: "audimodal_staging"
   primary:
     persistence:
       enabled: true
@@ -86,7 +86,7 @@ ingress:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: eaiingest-staging-tls
+    - secretName: audimodal-staging-tls
       hosts:
         - staging.eaiingest.example.com
 

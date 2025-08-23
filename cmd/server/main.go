@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/server"
-	"github.com/jscharber/eAIIngest/pkg/config"
-	"github.com/jscharber/eAIIngest/pkg/logger"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/server"
+	"github.com/jscharber/audimodal/pkg/config"
+	"github.com/jscharber/audimodal/pkg/logger"
 )
 
 func main() {

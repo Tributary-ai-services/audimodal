@@ -13,11 +13,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/jscharber/eAIIngest/pkg/analysis/insights"
-	"github.com/jscharber/eAIIngest/pkg/analysis/intelligence"
-	"github.com/jscharber/eAIIngest/pkg/analysis/prediction"
-	"github.com/jscharber/eAIIngest/pkg/analysis/search"
-	"github.com/jscharber/eAIIngest/pkg/analysis/training"
+	"github.com/jscharber/audimodal/pkg/analysis/insights"
+	"github.com/jscharber/audimodal/pkg/analysis/intelligence"
+	"github.com/jscharber/audimodal/pkg/analysis/prediction"
+	"github.com/jscharber/audimodal/pkg/analysis/search"
+	"github.com/jscharber/audimodal/pkg/analysis/training"
 )
 
 // MLHandlers contains handlers for ML/AI API endpoints

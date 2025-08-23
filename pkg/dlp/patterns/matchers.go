@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jscharber/eAIIngest/pkg/dlp/types"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 
 // PatternMatcher defines the interface for pattern matchers (avoiding import cycle)

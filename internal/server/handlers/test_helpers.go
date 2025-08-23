@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings"
 )
 
 // TestDataFactory provides methods to create test data with consistent defaults

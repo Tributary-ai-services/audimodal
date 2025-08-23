@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // JPGReader implements DataSourceReader for JPEG image files with OCR support
