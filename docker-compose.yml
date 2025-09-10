@@ -22,6 +22,7 @@ services:
       - EAI_REDIS_PORT=6379
       - JWT_SECRET=your-jwt-secret-change-in-production
       - AUTH_ENABLED=false
+      - METRICS_ENABLED=true
       - EAI_ENCRYPTION_KEY=your-32-byte-encryption-key-here
       - EAI_STORAGE_LOCAL_PATH=/app/data/storage
       - EAI_TEMP_DIR=/app/temp
