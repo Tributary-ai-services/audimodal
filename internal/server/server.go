@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/jscharber/audimodal/internal/database"
 	"github.com/jscharber/audimodal/internal/server/handlers"
 	"github.com/jscharber/audimodal/internal/server/response"
@@ -319,9 +321,11 @@ func (r *Router) setupRoutes() {
 	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
 	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/live", r.healthHandler.LivenessHandler())
 
-	// Metrics endpoint (no auth required)
+	// Metrics endpoints (no auth required)
 	if r.config.MetricsEnabled {
 		r.ServeMux.HandleFunc(r.config.MetricsPath, r.metricsHandler)
+		// Add Prometheus-formatted metrics endpoint
+		r.ServeMux.Handle("/metrics/prometheus", promhttp.Handler())
 	}
 
 	// API routes with authentication
