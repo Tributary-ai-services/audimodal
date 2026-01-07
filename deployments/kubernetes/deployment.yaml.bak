@@ -103,11 +103,6 @@ spec:
             secretKeyRef:
               name: eaiingest-secrets
               key: encryption-key
-        - name: OPENAI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: eaiingest-secrets
-              key: openai-api-key
         - name: EAI_AWS_REGION
           valueFrom:
             secretKeyRef:

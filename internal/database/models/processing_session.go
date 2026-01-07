@@ -15,8 +15,8 @@ type ProcessingSession struct {
 	DisplayName string    `gorm:"not null" json:"display_name"`
 
 	// Session configuration
-	FileSpecs []ProcessingFileSpec `gorm:"column:files;type:jsonb" json:"file_specs"`
-	Options   ProcessingOptions    `gorm:"type:jsonb" json:"options"`
+	FileSpecs ProcessingFileSpecs `gorm:"column:files;type:jsonb" json:"file_specs"`
+	Options   ProcessingOptions   `gorm:"type:jsonb" json:"options"`
 
 	// Status and progress
 	Status         string  `gorm:"not null;default:'pending'" json:"status"`

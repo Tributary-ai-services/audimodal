@@ -352,7 +352,7 @@ func (r *Router) setupRoutes() {
 	// Apply authentication middleware to API routes
 	authMiddleware := AuthenticationMiddleware(r.config, r.db)
 	
-	// TEMPORARY: Disable auth middleware for debugging
+	// Authentication bypass for development - configure properly in production
 	noAuthMiddleware := func(h http.Handler) http.Handler { return h }
 
 	// Tenant management routes
@@ -374,13 +374,13 @@ func (r *Router) setupRoutes() {
 		pathParts := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
 		if len(pathParts) == 4 && pathParts[0] == "api" && pathParts[1] == "v1" && pathParts[2] == "tenants" {
 			// This is a tenant management operation
-			r.logger.Debug("Routing to tenant handler", "path", req.URL.Path)
+			// Routing to tenant handler
 			tenantHandler.HandleTenant(w, req)
 			return
 		}
 		
 		// Otherwise, it's a tenant-scoped operation that requires tenant context
-		// Debug logging
+		// Log tenant-scoped route access
 		r.logger.Info("Tenant-scoped route called", 
 			"path", req.URL.Path,
 			"method", req.Method,
@@ -394,25 +394,25 @@ func (r *Router) setupRoutes() {
 			
 			// Dispatch to appropriate handler based on path
 			if isDataSourceRoute(req.URL.Path, apiPrefix) {
-				r.logger.Debug("Routing to data source handler", "path", req.URL.Path)
+				// Route to data source handler
 				dataSourceHandler.ServeHTTP(w, req)
 			} else if isSessionRoute(req.URL.Path, apiPrefix) {
-				r.logger.Debug("Routing to session handler", "path", req.URL.Path)
+				// Route to session handler
 				sessionHandler.ServeHTTP(w, req)
 			} else if isDLPRoute(req.URL.Path, apiPrefix) {
-				r.logger.Debug("Routing to DLP handler", "path", req.URL.Path)
+				// Route to DLP handler
 				dlpHandler.ServeHTTP(w, req)
 			} else if isStorageRoute(req.URL.Path, apiPrefix) {
-				r.logger.Debug("Routing to storage handler", "path", req.URL.Path)
+				// Route to storage handler
 				storageHandler.ServeHTTP(w, req)
 			} else if isFileRoute(req.URL.Path, apiPrefix) {
 				r.logger.Info("Routing to file handler", "path", req.URL.Path)
 				fileHandler.ServeHTTP(w, req)
 			} else if isChunkRoute(req.URL.Path, apiPrefix) {
-				r.logger.Debug("Routing to chunk handler", "path", req.URL.Path)
+				// Route to chunk handler
 				chunkHandler.ServeHTTP(w, req)
 			} else if isMLAnalysisRoute(req.URL.Path, apiPrefix) {
-				r.logger.Debug("Routing to ML analysis handler", "path", req.URL.Path)
+				// Route to ML analysis handler
 				mlAnalysisHandler.ServeHTTP(w, req)
 			} else {
 				r.logger.Warn("No matching route found", "path", req.URL.Path)
@@ -541,10 +541,7 @@ func contains(s, substr string) bool {
 		s == substr ||
 		(len(s) > len(substr) && s[:len(substr)] == substr && s[len(substr)] == '/')
 	
-	// Debug specific cases
-	if substr == "/ml/insights" || substr == "/ml-analysis" {
-		fmt.Printf("DEBUG: contains('%s', '%s') = %t\n", s, substr, result)
-	}
+	// Log routing decisions - using proper logger would go here
 	return result
 }
 

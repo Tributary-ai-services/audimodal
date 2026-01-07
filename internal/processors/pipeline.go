@@ -16,6 +16,8 @@ import (
 	"github.com/jscharber/audimodal/pkg/readers"
 	"github.com/jscharber/audimodal/pkg/registry"
 	"github.com/jscharber/audimodal/pkg/strategies"
+
+	"log"
 )
 
 // Pipeline orchestrates the complete file processing workflow
@@ -25,6 +27,14 @@ type Pipeline struct {
 	config   *PipelineConfig
 	metrics  *PipelineMetrics
 	mu       sync.RWMutex
+}
+
+// RegisterBasicPlugins ensures all basic readers and strategies are registered
+func RegisterBasicPlugins() {
+	// Register readers
+	readers.RegisterBasicReaders()
+	// Register strategies  
+	strategies.RegisterBasicStrategies()
 }
 
 // PipelineConfig contains configuration for the processing pipeline
@@ -89,6 +99,10 @@ func NewPipeline(db *database.Database, config *PipelineConfig) *Pipeline {
 	if config == nil {
 		config = GetDefaultPipelineConfig()
 	}
+
+	// Ensure basic strategies and readers are registered
+	// This is safe to call multiple times as it will just overwrite existing registrations
+	RegisterBasicPlugins()
 
 	return &Pipeline{
 		db:       db,
@@ -311,6 +325,11 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 			Context:     p.buildChunkContext(request),
 		}
 
+		// DEBUG: Log raw chunk data before strategy processing
+		log.Printf("[DEBUG] Raw iterator chunk data (length=%d): %.200s...", 
+			len(fmt.Sprintf("%v", rawChunk.Data)), 
+			fmt.Sprintf("%v", rawChunk.Data))
+
 		// Apply chunking strategy
 		processedChunks, err := strategy.ProcessChunk(ctx, rawChunk.Data, metadata)
 		if err != nil {
@@ -319,6 +338,11 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 
 		// Convert to database models and apply quality filter
 		for _, processedChunk := range processedChunks {
+			// DEBUG: Log input chunk data before conversion
+			log.Printf("[DEBUG] Raw chunk data (length=%d): %.200s...", 
+				len(fmt.Sprintf("%v", processedChunk.Data)), 
+				fmt.Sprintf("%v", processedChunk.Data))
+
 			dbChunk := p.convertToDBChunk(processedChunk, request)
 
 			// Apply quality filter if enabled

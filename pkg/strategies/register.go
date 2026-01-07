@@ -10,7 +10,7 @@ import (
 
 // RegisterBasicStrategies registers all basic chunking strategies with the global registry
 func RegisterBasicStrategies() {
-	// Register text strategies
+	// Register text strategies with full names
 	registry.GlobalRegistry.RegisterStrategy("fixed_size_text", func() core.ChunkingStrategy {
 		return text.NewFixedSizeStrategy()
 	})
@@ -26,6 +26,28 @@ func RegisterBasicStrategies() {
 
 	// Register hybrid strategies
 	registry.GlobalRegistry.RegisterStrategy("adaptive_hybrid", func() core.ChunkingStrategy {
+		return hybrid.NewAdaptiveStrategy()
+	})
+
+	// Register convenient aliases for common usage
+	registry.GlobalRegistry.RegisterStrategy("fixed", func() core.ChunkingStrategy {
+		return text.NewFixedSizeStrategy()
+	})
+
+	registry.GlobalRegistry.RegisterStrategy("semantic", func() core.ChunkingStrategy {
+		return text.NewSemanticStrategy()
+	})
+
+	registry.GlobalRegistry.RegisterStrategy("row_based", func() core.ChunkingStrategy {
+		return structured.NewRowBasedStrategy()
+	})
+
+	registry.GlobalRegistry.RegisterStrategy("adaptive", func() core.ChunkingStrategy {
+		return hybrid.NewAdaptiveStrategy()
+	})
+
+	// Register default strategy alias
+	registry.GlobalRegistry.RegisterStrategy("default", func() core.ChunkingStrategy {
 		return hybrid.NewAdaptiveStrategy()
 	})
 }

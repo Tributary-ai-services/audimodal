@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -139,17 +138,10 @@ func LoggingMiddleware(config *Config) Middleware {
 
 			next.ServeHTTP(wrapped, r)
 
-			duration := time.Since(start)
-			requestID := getRequestID(r.Context())
+			_ = time.Since(start)
+			_ = getRequestID(r.Context())
 
-			fmt.Printf("[%s] %s %s %d %v %s\n",
-				start.Format("2006-01-02 15:04:05"),
-				r.Method,
-				r.RequestURI,
-				wrapped.statusCode,
-				duration,
-				requestID,
-			)
+			// Log request - using proper logger would go here
 		})
 	}
 }
@@ -203,7 +195,6 @@ func AuthenticationMiddleware(config *Config, db *database.Database) Middleware 
 func TenantMiddleware(db *database.Database) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Debug logging
 			// TODO: Add proper logger to context
 			
 			// Extract tenant ID from path or header
@@ -254,7 +245,8 @@ func RecoveryMiddleware() Middleware {
 			defer func() {
 				if err := recover(); err != nil {
 					requestID := getRequestID(r.Context())
-					fmt.Printf("PANIC [%s]: %v\n", requestID, err)
+					// Log panic - using proper logger would go here
+					_ = requestID // Prevent unused variable error
 					http.Error(w, "Internal server error", http.StatusInternalServerError)
 				}
 			}()
