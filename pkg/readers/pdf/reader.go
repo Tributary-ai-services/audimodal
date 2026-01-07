@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/jscharber/audimodal/pkg/core"
+
+	"log"
 )
 
 // PDFReader implements DataSourceReader for PDF files with OCR support
@@ -444,6 +446,10 @@ func (r *PDFReader) extractPageText(sourcePath string, pageNum int, config map[s
 	extractionMethod := "text"
 	confidence := 1.0
 
+	// DEBUG: Log extracted text content
+	log.Printf("[DEBUG] PDF Text Extraction - Page %d from %s (method=%s, confidence=%.2f): %.200s...", 
+		pageNum, sourcePath, extractionMethod, confidence, extractedText)
+
 	// Simulate OCR if mode requires it
 	if mode == "ocr" || (mode == "auto" && len(extractedText) < 50) {
 		extractionMethod = "ocr"
@@ -492,6 +498,10 @@ func (it *PDFIterator) Next(ctx context.Context) (core.Chunk, error) {
 	if err != nil {
 		return core.Chunk{}, fmt.Errorf("failed to extract text from page %d: %w", it.currentPage, err)
 	}
+
+	// DEBUG: Log chunk data being created
+	log.Printf("[DEBUG] PDF Chunk Creation - Page %d (length=%d): %.200s...", 
+		it.currentPage, len(pageText), pageText)
 
 	chunk := core.Chunk{
 		Data: pageText,

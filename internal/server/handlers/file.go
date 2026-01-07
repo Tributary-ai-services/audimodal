@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,10 +34,15 @@ type FileHandler struct {
 	db                   *database.Database
 	embeddingCoordinator *processors.EmbeddingCoordinator
 	storageService       *services.StorageService
+	pipeline             *processors.Pipeline
 }
 
 // NewFileHandler creates a new file handler
 func NewFileHandler(db *database.Database, storageService *services.StorageService) *FileHandler {
+	// Initialize processing pipeline
+	pipelineConfig := processors.GetDefaultPipelineConfig()
+	pipeline := processors.NewPipeline(db, pipelineConfig)
+
 	// Initialize embedding coordinator with default config
 	embeddingCoordinator, err := processors.NewEmbeddingCoordinator(db, nil)
 	if err != nil {
@@ -51,6 +57,7 @@ func NewFileHandler(db *database.Database, storageService *services.StorageServi
 		db:                   db,
 		embeddingCoordinator: embeddingCoordinator,
 		storageService:       storageService,
+		pipeline:             pipeline,
 	}
 }
 
@@ -770,30 +777,51 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	// Trigger file processing pipeline with embedding generation
-	if h.embeddingCoordinator != nil {
-		// Process file with embeddings in background
+	// Use the pipeline for processing
+	if h.pipeline != nil {
+		// Process file in background using the pipeline
 		go func() {
-			options := map[string]any{
-				"embeddings_enabled": true,
-				"dlp_scan_enabled":   req.DLPScanEnabled,
-				"priority":           req.Priority,
-			}
-			if req.ChunkingStrategy != "" {
-				options["chunking_strategy"] = req.ChunkingStrategy
+			// Create processing request
+			processingRequest := &processors.ProcessingRequest{
+				TenantID:        tenantID,
+				FileID:          fileID,
+				FilePath:        file.Path,
+				StrategyType:    req.ChunkingStrategy,
+				Priority:        req.Priority,
+				DLPScanEnabled:  req.DLPScanEnabled,
 			}
 
-			_, err := h.embeddingCoordinator.ProcessSingleFileWithEmbeddings(r.Context(), tenantID, fileID, options)
-			if err != nil {
-				// Update file status to error
-				file.MarkAsError("Failed to process file with embeddings: " + err.Error())
-				tenantRepo.DB().Save(&file)
+			// Process the file through the pipeline (use background context to avoid cancellation)
+			ctx := context.Background()
+			result, err := h.pipeline.ProcessFile(ctx, processingRequest)
+			
+			// Update file status based on results - create a fresh tenant service and repository
+			backgroundTenantService := h.db.NewTenantService()
+			backgroundTenantRepo, repoErr := backgroundTenantService.GetTenantRepository(ctx, tenantID)
+			if repoErr != nil {
+				fmt.Printf("ERROR: Failed to get tenant repository for status update: %v\n", repoErr)
+				return
+			}
+
+			var updatedFile models.File
+			if dbErr := backgroundTenantRepo.DB().Where("id = ?", fileID).First(&updatedFile).Error; dbErr == nil {
+				if err != nil {
+					// Processing failed - mark as error
+					updatedFile.MarkAsError("Failed to process file: " + err.Error())
+				} else if result != nil {
+					// Processing succeeded - mark as processed with chunk count
+					updatedFile.MarkAsProcessed(result.ChunksCreated, req.ChunkingStrategy)
+					now := time.Now()
+					updatedFile.ProcessedAt = &now
+				}
+				backgroundTenantRepo.DB().Save(&updatedFile)
 			} else {
-				// Update file status to processed
-				file.MarkAsProcessed(0, req.ChunkingStrategy) // Chunk count will be updated by processor
-				tenantRepo.DB().Save(&file)
+				fmt.Printf("ERROR: Failed to reload file %s for status update: %v\n", fileID.String(), dbErr)
 			}
 		}()
+	} else {
+		// Fallback: mark as processing but warn about lack of pipeline
+		fmt.Printf("WARNING: No processing pipeline available for file %s\n", fileID.String())
 	}
 
 	responseData := map[string]interface{}{

@@ -30,8 +30,8 @@ type Chunk struct {
 	LineNumber    *int   `json:"line_number,omitempty"`
 
 	// Relationships to other chunks
-	ParentChunkID *uuid.UUID `gorm:"type:uuid;index" json:"parent_chunk_id,omitempty"`
-	Relationships []string   `gorm:"type:jsonb" json:"relationships,omitempty"`
+	ParentChunkID *uuid.UUID       `gorm:"type:uuid;index" json:"parent_chunk_id,omitempty"`
+	Relationships ChunkRelationships `gorm:"type:jsonb" json:"relationships,omitempty"`
 
 	// Processing metadata
 	ProcessedAt    time.Time `gorm:"not null" json:"processed_at"`
@@ -42,34 +42,34 @@ type Chunk struct {
 	Quality ChunkQualityMetrics `gorm:"type:jsonb" json:"quality"`
 
 	// Content analysis
-	Language         string   `json:"language,omitempty"`
-	LanguageConf     float64  `json:"language_confidence,omitempty"`
-	ContentCategory  string   `json:"content_category,omitempty"`
-	SensitivityLevel string   `json:"sensitivity_level,omitempty"`
-	Classifications  []string `gorm:"type:jsonb" json:"classifications,omitempty"`
+	Language         string               `json:"language,omitempty"`
+	LanguageConf     float64              `gorm:"column:language_confidence" json:"language_confidence,omitempty"`
+	ContentCategory  string               `json:"content_category,omitempty"`
+	SensitivityLevel string               `json:"sensitivity_level,omitempty"`
+	Classifications  ChunkClassifications `gorm:"type:jsonb" json:"classifications,omitempty"`
 
 	// Embedding information
-	EmbeddingStatus string     `gorm:"default:'pending'" json:"embedding_status"`
-	EmbeddingModel  string     `json:"embedding_model,omitempty"`
-	EmbeddingVector []float64  `gorm:"type:jsonb" json:"embedding_vector,omitempty"`
-	EmbeddingDim    int        `json:"embedding_dimension,omitempty"`
-	EmbeddedAt      *time.Time `json:"embedded_at,omitempty"`
+	EmbeddingStatus string          `gorm:"default:'pending'" json:"embedding_status"`
+	EmbeddingModel  string          `json:"embedding_model,omitempty"`
+	EmbeddingVector EmbeddingVector `gorm:"type:jsonb" json:"embedding_vector,omitempty"`
+	EmbeddingDim    int             `gorm:"column:embedding_dimension" json:"embedding_dimension,omitempty"`
+	EmbeddedAt      *time.Time      `json:"embedded_at,omitempty"`
 
 	// Compliance and security
-	PIIDetected     bool     `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
-	ComplianceFlags []string `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
-	DLPScanStatus   string   `gorm:"default:'pending'" json:"dlp_scan_status"`
-	DLPScanResult   string   `json:"dlp_scan_result,omitempty"`
+	PIIDetected     bool                  `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
+	ComplianceFlags ChunkComplianceFlags `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
+	DLPScanStatus   string                `gorm:"default:'pending'" json:"dlp_scan_status"`
+	DLPScanResult   string                `json:"dlp_scan_result,omitempty"` 
 
 	// Context information
-	Context map[string]string `gorm:"type:jsonb" json:"context,omitempty"`
+	Context ChunkContext `gorm:"type:jsonb" json:"context,omitempty"`
 
 	// Schema information for structured chunks
-	SchemaInfo map[string]interface{} `gorm:"type:jsonb" json:"schema_info,omitempty"`
+	SchemaInfo ChunkSchemaInfo `gorm:"type:jsonb" json:"schema_info,omitempty"`
 
 	// Metadata
-	Metadata     map[string]interface{} `gorm:"type:jsonb" json:"metadata,omitempty"`
-	CustomFields map[string]interface{} `gorm:"type:jsonb" json:"custom_fields,omitempty"`
+	Metadata     ChunkMetadata     `gorm:"type:jsonb" json:"metadata,omitempty"`
+	CustomFields ChunkCustomFields `gorm:"type:jsonb" json:"custom_fields,omitempty"`
 
 	// Timestamps
 	CreatedAt time.Time  `gorm:"not null" json:"created_at"`
@@ -114,6 +114,12 @@ type ChunkComplianceFlags []string
 type ChunkRelationships []string
 type EmbeddingVector []float64
 
+// Custom map types for GORM JSON handling
+type ChunkContext map[string]string
+type ChunkSchemaInfo map[string]interface{}
+type ChunkMetadata map[string]interface{}
+type ChunkCustomFields map[string]interface{}
+
 func (c *ChunkClassifications) Scan(value interface{}) error {
 	if value == nil {
 		return nil
@@ -156,6 +162,51 @@ func (e *EmbeddingVector) Scan(value interface{}) error {
 
 func (e EmbeddingVector) Value() (interface{}, error) {
 	return json.Marshal(e)
+}
+
+// Map type JSON serialization methods
+func (c *ChunkContext) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	return json.Unmarshal(value.([]byte), c)
+}
+
+func (c ChunkContext) Value() (interface{}, error) {
+	return json.Marshal(c)
+}
+
+func (c *ChunkSchemaInfo) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	return json.Unmarshal(value.([]byte), c)
+}
+
+func (c ChunkSchemaInfo) Value() (interface{}, error) {
+	return json.Marshal(c)
+}
+
+func (c *ChunkMetadata) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	return json.Unmarshal(value.([]byte), c)
+}
+
+func (c ChunkMetadata) Value() (interface{}, error) {
+	return json.Marshal(c)
+}
+
+func (c *ChunkCustomFields) Scan(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	return json.Unmarshal(value.([]byte), c)
+}
+
+func (c ChunkCustomFields) Value() (interface{}, error) {
+	return json.Marshal(c)
 }
 
 // TableName returns the table name for Chunk model
