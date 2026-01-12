@@ -481,15 +481,6 @@ func BenchmarkFullPipeline(b *testing.B) {
 	}
 }
 
-func generateLargeContent(sentences int) string {
-	baseContent := " This is a sample sentence for testing purposes with various content types and structures."
-	result := ""
-	for i := 0; i < sentences; i++ {
-		result += baseContent
-	}
-	return result
-}
-
 // Helper function to create test configuration
 func createTestConfig() map[string]interface{} {
 	return map[string]interface{}{

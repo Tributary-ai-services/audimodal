@@ -11,12 +11,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// addAudiModalAuth adds authentication headers to AudiModal requests
+func addAudiModalAuth(req *http.Request) {
+	req.Header.Set("X-Tenant-ID", testTenantID)
+	req.Header.Set("X-API-Key", testAPIKey)
+}
+
 // TestSearchErrorHandling tests the improved search error handling we implemented
 func TestSearchErrorHandling(t *testing.T) {
-	const (
-		baseURL  = "http://localhost:8084"
-		tenantID = "9855e094-36a6-4d3a-a4f5-d77da4614439"
-	)
+	// Use shared baseURL and testTenantID from test_helpers.go
+	// For local testing, set AUDIMODAL_URL environment variable
 
 	client := &http.Client{}
 
@@ -29,10 +33,11 @@ func TestSearchErrorHandling(t *testing.T) {
 			"threshold": 0.7,
 		}
 
-		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, tenantID)
+		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, testTenantID)
 		body, _ := json.Marshal(searchData)
 		req, _ := http.NewRequest("POST", searchURL, bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
+		addAudiModalAuth(req)
 
 		resp, err := client.Do(req)
 		require.NoError(t, err)
@@ -85,10 +90,11 @@ func TestSearchErrorHandling(t *testing.T) {
 			"threshold": 0.7,
 		}
 
-		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, tenantID)
+		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, testTenantID)
 		body, _ := json.Marshal(searchData)
 		req, _ := http.NewRequest("POST", searchURL, bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
+		addAudiModalAuth(req)
 
 		resp, err := client.Do(req)
 		require.NoError(t, err)
@@ -115,11 +121,12 @@ func TestSearchErrorHandling(t *testing.T) {
 
 	t.Run("Search with invalid JSON returns HTTP 400", func(t *testing.T) {
 		// Test that malformed JSON returns proper validation errors
-		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, tenantID)
+		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, testTenantID)
 		invalidJSON := `{"query": "test", "top_k": invalid_number}`
-		
+
 		req, _ := http.NewRequest("POST", searchURL, bytes.NewBufferString(invalidJSON))
 		req.Header.Set("Content-Type", "application/json")
+		addAudiModalAuth(req)
 
 		resp, err := client.Do(req)
 		require.NoError(t, err)
@@ -157,6 +164,9 @@ func TestSearchErrorHandling(t *testing.T) {
 		body, _ := json.Marshal(searchData)
 		req, _ := http.NewRequest("POST", searchURL, bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
+		// Use proper API key but with nonexistent tenant to test tenant validation
+		req.Header.Set("X-Tenant-ID", nonexistentTenant)
+		req.Header.Set("X-API-Key", testAPIKey)
 
 		resp, err := client.Do(req)
 		require.NoError(t, err)
@@ -191,10 +201,11 @@ func TestSearchErrorHandling(t *testing.T) {
 			"threshold": 0.7,
 		}
 
-		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, tenantID)
+		searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, testTenantID)
 		body, _ := json.Marshal(searchData)
 		req, _ := http.NewRequest("POST", searchURL, bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
+		addAudiModalAuth(req)
 
 		resp, err := client.Do(req)
 		require.NoError(t, err)
@@ -248,10 +259,7 @@ func TestSearchErrorHandling(t *testing.T) {
 
 // TestSearchStatusCodeMapping validates that our error handling maps to correct HTTP status codes
 func TestSearchStatusCodeMapping(t *testing.T) {
-	const (
-		baseURL  = "http://localhost:8084"
-		tenantID = "9855e094-36a6-4d3a-a4f5-d77da4614439"
-	)
+	// Use shared baseURL and testTenantID from test_helpers.go
 
 	tests := []struct {
 		name           string
@@ -308,10 +316,11 @@ func TestSearchStatusCodeMapping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, tenantID)
+			searchURL := fmt.Sprintf("%s/api/v1/tenants/%s/files/search", baseURL, testTenantID)
 			body, _ := json.Marshal(tt.searchData)
 			req, _ := http.NewRequest("POST", searchURL, bytes.NewBuffer(body))
 			req.Header.Set("Content-Type", "application/json")
+			addAudiModalAuth(req)
 
 			resp, err := client.Do(req)
 			require.NoError(t, err)

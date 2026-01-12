@@ -31,7 +31,6 @@ func TestFileUploadIntegration(t *testing.T) {
 	}
 
 	// Setup test database
-	ctx := context.Background()
 	testDB, cleanup := setupTestDatabase(t)
 	defer cleanup()
 
@@ -39,7 +38,7 @@ func TestFileUploadIntegration(t *testing.T) {
 	tenant := createTestTenant(t, testDB)
 
 	// Create test data source
-	dataSource := createTestDataSource(t, testDB, tenant.ID)
+	dataSource := createTestDataSourceDB(t, testDB, tenant.ID)
 
 	// Setup storage service
 	encryptionKey := []byte("test-encryption-key-32-bytes-xxx")
@@ -253,7 +252,7 @@ func TestFileUploadIntegration(t *testing.T) {
 	t.Run("wrong_tenant_datasource", func(t *testing.T) {
 		// Create another tenant and data source
 		otherTenant := createTestTenant(t, testDB)
-		otherDataSource := createTestDataSource(t, testDB, otherTenant.ID)
+		otherDataSource := createTestDataSourceDB(t, testDB, otherTenant.ID)
 
 		// Try to use other tenant's data source
 		reqBody := map[string]interface{}{
@@ -300,7 +299,6 @@ func TestFileUploadWithStorageIntegration(t *testing.T) {
 	}
 
 	// Setup test database
-	ctx := context.Background()
 	testDB, cleanup := setupTestDatabase(t)
 	defer cleanup()
 
@@ -308,7 +306,7 @@ func TestFileUploadWithStorageIntegration(t *testing.T) {
 	tenant := createTestTenant(t, testDB)
 
 	// Create test data source
-	dataSource := createTestDataSource(t, testDB, tenant.ID)
+	dataSource := createTestDataSourceDB(t, testDB, tenant.ID)
 
 	// Setup storage service with MinIO
 	encryptionKey := []byte("test-encryption-key-32-bytes-xxx")
@@ -446,7 +444,7 @@ func createTestTenant(t *testing.T, db *database.Database) *models.Tenant {
 	return tenant
 }
 
-func createTestDataSource(t *testing.T, db *database.Database, tenantID uuid.UUID) *models.DataSource {
+func createTestDataSourceDB(t *testing.T, db *database.Database, tenantID uuid.UUID) *models.DataSource {
 	dataSource := &models.DataSource{
 		ID:       uuid.New(),
 		TenantID: tenantID,
@@ -469,11 +467,4 @@ func createTestDataSource(t *testing.T, db *database.Database, tenantID uuid.UUI
 	require.NoError(t, err)
 
 	return dataSource
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
