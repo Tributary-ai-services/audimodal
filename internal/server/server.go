@@ -358,7 +358,7 @@ func (r *Router) setupRoutes() {
 	// Tenant management routes
 	tenantsPath := fmt.Sprintf("%s/tenants", apiPrefix)
 	r.logger.Info("Registering tenant management route", "path", tenantsPath)
-	r.ServeMux.Handle(tenantsPath, noAuthMiddleware(http.HandlerFunc(tenantHandler.ListTenants)))
+	r.ServeMux.Handle(tenantsPath, noAuthMiddleware(http.HandlerFunc(tenantHandler.HandleTenant)))
 
 	// Tenant-scoped routes (require tenant context)
 	tenantMiddleware := TenantMiddleware(r.db)
@@ -420,6 +420,32 @@ func (r *Router) setupRoutes() {
 			}
 		})).ServeHTTP(w, req)
 	})))
+
+	// Embedding API routes (must be registered before the catch-all apiRootHandler)
+	embeddingHandler, err := handlers.NewEmbeddingHandler()
+	if err != nil {
+		r.logger.Warn("Failed to initialize embedding handler, embedding routes will be disabled", "error", err.Error())
+	} else {
+		r.logger.Info("Registering embedding API routes")
+		// Register embedding routes with explicit paths
+		// Note: Only registering routes that don't require path variables (mux.Vars)
+		// Routes with path variables need adapter methods to use r.PathValue() instead
+		embeddingsPrefix := fmt.Sprintf("%s/embeddings", apiPrefix)
+
+		// Document processing (POST doesn't need path vars)
+		r.ServeMux.HandleFunc(fmt.Sprintf("POST %s/documents", embeddingsPrefix), embeddingHandler.ProcessDocument)
+
+		// Search
+		r.ServeMux.HandleFunc(fmt.Sprintf("POST %s/search", embeddingsPrefix), embeddingHandler.SearchDocuments)
+
+		// Datasets (GET list and POST create don't need path vars)
+		r.ServeMux.HandleFunc(fmt.Sprintf("GET %s/datasets", embeddingsPrefix), embeddingHandler.ListDatasets)
+		r.ServeMux.HandleFunc(fmt.Sprintf("POST %s/datasets", embeddingsPrefix), embeddingHandler.CreateDataset)
+
+		// Health and stats
+		r.ServeMux.HandleFunc(fmt.Sprintf("GET %s/health", embeddingsPrefix), embeddingHandler.HealthCheck)
+		r.ServeMux.HandleFunc(fmt.Sprintf("GET %s/stats", embeddingsPrefix), embeddingHandler.GetServiceStats)
+	}
 
 	// API documentation route
 	r.logger.Info("Registering API docs and root", "docs_path", fmt.Sprintf("%s/docs", apiPrefix), "root_path", fmt.Sprintf("%s/", apiPrefix))
