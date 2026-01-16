@@ -1,23 +1,25 @@
+// Package events provides event schemas and utilities for the event-driven processing pipeline.
+// This file contains stub implementations for the Kafka producer when the Confluent library is not available.
+// For full Kafka support, rename producer.go.confluent to producer.go and ensure CGO is enabled.
 package events
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"sync"
 	"time"
-
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
-// Producer wraps Kafka producer with event-specific functionality
+// Producer wraps Kafka producer with event-specific functionality.
+// This is a stub implementation that logs events instead of sending to Kafka.
+// For production use with Kafka, use the Confluent implementation.
 type Producer struct {
-	producer  *kafka.Producer
 	validator *EventValidator
-	tracer    trace.Tracer
 	config    ProducerConfig
+	mu        sync.Mutex
+	closed    bool
 }
 
 // ProducerConfig contains configuration for the event producer
@@ -53,154 +55,60 @@ func DefaultProducerConfig() ProducerConfig {
 	}
 }
 
-// NewProducer creates a new event producer
+// NewProducer creates a new event producer.
+// This stub implementation logs events locally instead of sending to Kafka.
 func NewProducer(config ProducerConfig) (*Producer, error) {
-	// Build Kafka configuration
-	kafkaConfig := &kafka.ConfigMap{
-		"bootstrap.servers":                     config.BootstrapServers,
-		"security.protocol":                     config.SecurityProtocol,
-		"client.id":                             config.ClientID,
-		"acks":                                  config.Acks,
-		"retries":                               config.Retries,
-		"retry.backoff.ms":                      int(config.RetryBackoff.Milliseconds()),
-		"batch.size":                            config.BatchSize,
-		"linger.ms":                             config.LingerMS,
-		"compression.type":                      config.CompressionType,
-		"enable.idempotence":                    true,
-		"max.in.flight.requests.per.connection": 1,
-	}
-
-	// Add SASL configuration if needed
-	if config.SecurityProtocol != "PLAINTEXT" {
-		kafkaConfig.SetKey("sasl.mechanism", config.SASLMechanism)
-		kafkaConfig.SetKey("sasl.username", config.SASLUsername)
-		kafkaConfig.SetKey("sasl.password", config.SASLPassword)
-	}
-
-	// Create Kafka producer
-	producer, err := kafka.NewProducer(kafkaConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kafka producer: %w", err)
-	}
+	log.Printf("[events] Creating stub producer (Kafka disabled). Events will be logged locally. Bootstrap: %s", config.BootstrapServers)
 
 	return &Producer{
-		producer:  producer,
 		validator: NewEventValidator(),
-		tracer:    otel.Tracer("event-producer"),
 		config:    config,
 	}, nil
 }
 
-// PublishEvent publishes an event to the appropriate topic
+// PublishEvent publishes an event.
+// Stub implementation: logs the event instead of sending to Kafka.
 func (p *Producer) PublishEvent(ctx context.Context, event interface{}) error {
-	ctx, span := p.tracer.Start(ctx, "publish_event")
-	defer span.End()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.closed {
+		return fmt.Errorf("producer is closed")
+	}
 
 	// Validate event
 	if err := p.validator.ValidateEvent(event); err != nil {
-		span.RecordError(err)
 		return fmt.Errorf("event validation failed: %w", err)
 	}
 
-	// Determine topic and partition key
-	topic, partitionKey, eventType := p.getTopicAndKey(event)
+	// Determine topic and event type
+	topic, _, eventType := p.getTopicAndKey(event)
 
-	// Serialize event
+	// Serialize event for logging
 	eventData, err := json.Marshal(event)
 	if err != nil {
-		span.RecordError(err)
 		return fmt.Errorf("failed to serialize event: %w", err)
 	}
 
-	// Create envelope with metadata
-	envelope := EventEnvelope{
-		Event:       eventData,
-		EventType:   eventType,
-		TenantID:    p.extractTenantID(event),
-		Priority:    p.getEventPriority(event),
-		PublishedAt: time.Now(),
-		Retries:     0,
-	}
-
-	envelopeData, err := json.Marshal(envelope)
-	if err != nil {
-		span.RecordError(err)
-		return fmt.Errorf("failed to serialize envelope: %w", err)
-	}
-
-	// Add tracing headers
-	headers := p.addTracingHeaders(ctx)
-
-	// Create Kafka message
-	message := &kafka.Message{
-		TopicPartition: kafka.TopicPartition{
-			Topic:     &topic,
-			Partition: kafka.PartitionAny,
-		},
-		Key:     []byte(partitionKey),
-		Value:   envelopeData,
-		Headers: headers,
-	}
-
-	// Publish message
-	deliveryChan := make(chan kafka.Event)
-	err = p.producer.Produce(message, deliveryChan)
-	if err != nil {
-		span.RecordError(err)
-		return fmt.Errorf("failed to produce message: %w", err)
-	}
-
-	// Wait for delivery confirmation
-	select {
-	case e := <-deliveryChan:
-		m := e.(*kafka.Message)
-		if m.TopicPartition.Error != nil {
-			span.RecordError(m.TopicPartition.Error)
-			return fmt.Errorf("message delivery failed: %w", m.TopicPartition.Error)
-		}
-
-		// Add success attributes to span
-		span.SetAttributes(
-			attribute.String("kafka.topic", topic),
-			attribute.String("kafka.partition", fmt.Sprintf("%d", m.TopicPartition.Partition)),
-			attribute.String("kafka.offset", fmt.Sprintf("%d", m.TopicPartition.Offset)),
-			attribute.String("event.type", eventType),
-			attribute.String("tenant.id", envelope.TenantID),
-		)
-
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	// Log the event (stub behavior)
+	log.Printf("[events] STUB PublishEvent: topic=%s type=%s tenant=%s data=%s",
+		topic, eventType, p.extractTenantID(event), string(eventData))
 
 	return nil
 }
 
-// PublishBatch publishes multiple events in a batch for better performance
+// PublishBatch publishes multiple events in a batch.
+// Stub implementation: logs each event.
 func (p *Producer) PublishBatch(ctx context.Context, events []interface{}) error {
-	ctx, span := p.tracer.Start(ctx, "publish_batch")
-	defer span.End()
-
-	span.SetAttributes(attribute.Int("batch.size", len(events)))
-
-	results := make(chan error, len(events))
-
-	// Publish all events concurrently
-	for _, event := range events {
-		go func(e interface{}) {
-			results <- p.PublishEvent(ctx, e)
-		}(event)
-	}
-
-	// Collect results
 	var errors []error
-	for i := 0; i < len(events); i++ {
-		if err := <-results; err != nil {
+
+	for _, event := range events {
+		if err := p.PublishEvent(ctx, event); err != nil {
 			errors = append(errors, err)
 		}
 	}
 
 	if len(errors) > 0 {
-		span.SetAttributes(attribute.Int("batch.errors", len(errors)))
 		return fmt.Errorf("batch publish failed with %d errors: %v", len(errors), errors[0])
 	}
 
@@ -263,83 +171,42 @@ func (p *Producer) extractTenantID(event interface{}) string {
 	}
 }
 
-// getEventPriority determines event priority for processing order
-func (p *Producer) getEventPriority(event interface{}) int {
-	switch event.(type) {
-	case *DLPViolationEvent:
-		return 10 // Highest priority
-	case *ProcessingFailedEvent:
-		return 8
-	case *FileDiscoveredEvent:
-		return 5 // Normal priority
-	case *SessionStartedEvent, *SessionCompletedEvent:
-		return 3
-	default:
-		return 5 // Default priority
-	}
-}
-
-// addTracingHeaders adds OpenTelemetry tracing headers to Kafka message
-func (p *Producer) addTracingHeaders(ctx context.Context) []kafka.Header {
-	if !p.config.EnableTracing {
-		return nil
-	}
-
-	span := trace.SpanFromContext(ctx)
-	if !span.IsRecording() {
-		return nil
-	}
-
-	spanContext := span.SpanContext()
-	traceID := spanContext.TraceID().String()
-	spanID := spanContext.SpanID().String()
-
-	return []kafka.Header{
-		{Key: "trace-id", Value: []byte(traceID)},
-		{Key: "span-id", Value: []byte(spanID)},
-		{Key: "trace-flags", Value: []byte(fmt.Sprintf("%d", spanContext.TraceFlags()))},
-	}
-}
-
-// Flush waits for all outstanding messages to be delivered
+// Flush waits for all outstanding messages to be delivered.
+// Stub implementation: no-op since there's no real queue.
 func (p *Producer) Flush(timeout time.Duration) error {
-	remaining := p.producer.Flush(int(timeout.Milliseconds()))
-	if remaining > 0 {
-		return fmt.Errorf("failed to flush %d messages within timeout", remaining)
-	}
 	return nil
 }
 
 // Close closes the producer and releases resources
 func (p *Producer) Close() error {
-	// Flush any remaining messages
-	p.producer.Flush(5000) // 5 second timeout
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	// Close producer
-	p.producer.Close()
+	if p.closed {
+		return nil
+	}
+
+	p.closed = true
+	log.Printf("[events] Stub producer closed")
 	return nil
 }
 
-// GetMetrics returns producer metrics
+// GetMetrics returns producer metrics.
+// Stub implementation: returns empty metrics.
 func (p *Producer) GetMetrics() (map[string]interface{}, error) {
-	metadata, err := p.producer.GetMetadata(nil, false, 1000)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get metadata: %w", err)
-	}
-
 	return map[string]interface{}{
-		"broker_count":  len(metadata.Brokers),
-		"topic_count":   len(metadata.Topics),
-		"out_queue_len": p.producer.Len(),
+		"broker_count":  0,
+		"topic_count":   0,
+		"out_queue_len": 0,
+		"stub_mode":     true,
 	}, nil
 }
 
-// HealthCheck performs a health check on the producer
+// HealthCheck performs a health check on the producer.
+// Stub implementation: always returns healthy.
 func (p *Producer) HealthCheck(ctx context.Context) error {
-	// Try to get metadata as a health check
-	_, err := p.producer.GetMetadata(nil, false, 1000)
-	if err != nil {
-		return fmt.Errorf("producer health check failed: %w", err)
+	if p.closed {
+		return fmt.Errorf("producer is closed")
 	}
 	return nil
 }
