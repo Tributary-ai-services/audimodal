@@ -1,30 +1,27 @@
+// Package events provides event schemas and utilities for the event-driven processing pipeline.
+// This file contains stub implementations for the Kafka consumer when the Confluent library is not available.
+// For full Kafka support, rename consumer.go.confluent to consumer.go and ensure CGO is enabled.
 package events
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"time"
-
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
-// EventHandler interface is now defined in types.go
-
-// Consumer wraps Kafka consumer with event-specific functionality
+// Consumer wraps Kafka consumer with event-specific functionality.
+// This is a stub implementation that doesn't actually consume from Kafka.
+// For production use with Kafka, use the Confluent implementation.
 type Consumer struct {
-	consumer     *kafka.Consumer
 	handlers     map[string]EventHandler
-	tracer       trace.Tracer
 	config       ConsumerConfig
 	running      bool
 	stopChan     chan struct{}
 	wg           sync.WaitGroup
 	errorHandler ErrorHandler
+	mu           sync.Mutex
 }
 
 // ConsumerConfig contains configuration for the event consumer
@@ -66,10 +63,11 @@ func DefaultConsumerConfig(groupID string) ConsumerConfig {
 
 // ErrorHandler defines how to handle processing errors
 type ErrorHandler interface {
-	HandleError(ctx context.Context, err error, event interface{}, message *kafka.Message) error
+	HandleError(ctx context.Context, err error, event interface{}, message interface{}) error
 }
 
-// DefaultErrorHandler provides basic error handling with retries and dead letter queue
+// DefaultErrorHandler provides basic error handling with retries and dead letter queue.
+// This is a stub implementation.
 type DefaultErrorHandler struct {
 	producer        *Producer
 	maxRetries      int
@@ -85,97 +83,21 @@ func NewDefaultErrorHandler(producer *Producer, maxRetries int, deadLetterTopic 
 	}
 }
 
-// HandleError implements ErrorHandler interface
-func (h *DefaultErrorHandler) HandleError(ctx context.Context, err error, event interface{}, message *kafka.Message) error {
-	// Extract retry count from headers
-	retryCount := 0
-	for _, header := range message.Headers {
-		if header.Key == "retry-count" {
-			fmt.Sscanf(string(header.Value), "%d", &retryCount)
-			break
-		}
-	}
-
-	if retryCount < h.maxRetries {
-		// Retry the message
-		return h.retryMessage(ctx, message, retryCount+1)
-	}
-
-	// Send to dead letter queue
-	return h.sendToDeadLetter(ctx, message, err)
+// HandleError implements ErrorHandler interface.
+// Stub implementation: logs the error.
+func (h *DefaultErrorHandler) HandleError(ctx context.Context, err error, event interface{}, message interface{}) error {
+	log.Printf("[events] STUB HandleError: error=%v event=%T", err, event)
+	return nil
 }
 
-func (h *DefaultErrorHandler) retryMessage(ctx context.Context, message *kafka.Message, retryCount int) error {
-	// Add retry headers
-	headers := append(message.Headers, kafka.Header{
-		Key:   "retry-count",
-		Value: []byte(fmt.Sprintf("%d", retryCount)),
-	})
-
-	retryMessage := &kafka.Message{
-		TopicPartition: kafka.TopicPartition{
-			Topic:     message.TopicPartition.Topic,
-			Partition: kafka.PartitionAny,
-		},
-		Key:     message.Key,
-		Value:   message.Value,
-		Headers: headers,
-	}
-
-	return h.producer.producer.Produce(retryMessage, nil)
-}
-
-func (h *DefaultErrorHandler) sendToDeadLetter(ctx context.Context, message *kafka.Message, processingError error) error {
-	deadLetterMessage := &kafka.Message{
-		TopicPartition: kafka.TopicPartition{
-			Topic:     &h.deadLetterTopic,
-			Partition: kafka.PartitionAny,
-		},
-		Key:   message.Key,
-		Value: message.Value,
-		Headers: append(message.Headers,
-			kafka.Header{Key: "original-topic", Value: []byte(*message.TopicPartition.Topic)},
-			kafka.Header{Key: "error", Value: []byte(processingError.Error())},
-			kafka.Header{Key: "failed-at", Value: []byte(time.Now().Format(time.RFC3339))},
-		),
-	}
-
-	return h.producer.producer.Produce(deadLetterMessage, nil)
-}
-
-// NewConsumer creates a new event consumer
+// NewConsumer creates a new event consumer.
+// This stub implementation doesn't actually connect to Kafka.
 func NewConsumer(config ConsumerConfig, errorHandler ErrorHandler) (*Consumer, error) {
-	// Build Kafka configuration
-	kafkaConfig := &kafka.ConfigMap{
-		"bootstrap.servers":               config.BootstrapServers,
-		"security.protocol":               config.SecurityProtocol,
-		"group.id":                        config.GroupID,
-		"client.id":                       config.ClientID,
-		"auto.offset.reset":               config.AutoOffsetReset,
-		"enable.auto.commit":              config.EnableAutoCommit,
-		"max.poll.records":                config.MaxPollRecords,
-		"session.timeout.ms":              int(config.SessionTimeout.Milliseconds()),
-		"heartbeat.interval.ms":           int(config.HeartbeatInterval.Milliseconds()),
-		"go.application.rebalance.enable": true,
-	}
-
-	// Add SASL configuration if needed
-	if config.SecurityProtocol != "PLAINTEXT" {
-		kafkaConfig.SetKey("sasl.mechanism", config.SASLMechanism)
-		kafkaConfig.SetKey("sasl.username", config.SASLUsername)
-		kafkaConfig.SetKey("sasl.password", config.SASLPassword)
-	}
-
-	// Create Kafka consumer
-	consumer, err := kafka.NewConsumer(kafkaConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Kafka consumer: %w", err)
-	}
+	log.Printf("[events] Creating stub consumer (Kafka disabled). GroupID: %s, Bootstrap: %s",
+		config.GroupID, config.BootstrapServers)
 
 	return &Consumer{
-		consumer:     consumer,
 		handlers:     make(map[string]EventHandler),
-		tracer:       otel.Tracer("event-consumer"),
 		config:       config,
 		stopChan:     make(chan struct{}),
 		errorHandler: errorHandler,
@@ -184,251 +106,91 @@ func NewConsumer(config ConsumerConfig, errorHandler ErrorHandler) (*Consumer, e
 
 // RegisterHandler registers an event handler for specific event types
 func (c *Consumer) RegisterHandler(handler EventHandler) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	for _, eventType := range handler.GetEventTypes() {
 		c.handlers[eventType] = handler
+		log.Printf("[events] STUB: Registered handler for event type: %s", eventType)
 	}
 }
 
-// Subscribe subscribes to topics and starts consuming
+// Subscribe subscribes to topics.
+// Stub implementation: logs the subscription.
 func (c *Consumer) Subscribe(topics []string) error {
-	return c.consumer.SubscribeTopics(topics, nil)
+	log.Printf("[events] STUB Subscribe: topics=%v", topics)
+	return nil
 }
 
-// Start starts the consumer loop
+// Start starts the consumer loop.
+// Stub implementation: starts a goroutine that does nothing but wait.
 func (c *Consumer) Start(ctx context.Context) error {
+	c.mu.Lock()
 	if c.running {
+		c.mu.Unlock()
 		return fmt.Errorf("consumer is already running")
 	}
-
 	c.running = true
-	c.wg.Add(1)
+	c.mu.Unlock()
 
+	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		c.consume(ctx)
+		log.Printf("[events] STUB consumer started (no-op mode)")
+
+		select {
+		case <-c.stopChan:
+			log.Printf("[events] STUB consumer stopped via stopChan")
+		case <-ctx.Done():
+			log.Printf("[events] STUB consumer stopped via context")
+		}
 	}()
 
 	return nil
 }
 
-// consume is the main consumer loop
-func (c *Consumer) consume(ctx context.Context) {
-	for {
-		select {
-		case <-c.stopChan:
-			return
-		case <-ctx.Done():
-			return
-		default:
-			message, err := c.consumer.ReadMessage(100 * time.Millisecond)
-			if err != nil {
-				if err.(kafka.Error).Code() == kafka.ErrTimedOut {
-					continue // Timeout is expected, continue polling
-				}
-				fmt.Printf("Consumer error: %v\n", err)
-				continue
-			}
-
-			if err := c.processMessage(ctx, message); err != nil {
-				fmt.Printf("Failed to process message: %v\n", err)
-			}
-		}
-	}
-}
-
-// processMessage processes a single Kafka message
-func (c *Consumer) processMessage(ctx context.Context, message *kafka.Message) error {
-	ctx, span := c.tracer.Start(ctx, "process_message")
-	defer span.End()
-
-	// Extract tracing information if available
-	if c.config.EnableTracing {
-		ctx = c.extractTracingContext(ctx, message)
-	}
-
-	// Deserialize envelope
-	var envelope EventEnvelope
-	if err := json.Unmarshal(message.Value, &envelope); err != nil {
-		span.RecordError(err)
-		return fmt.Errorf("failed to deserialize envelope: %w", err)
-	}
-
-	// Add span attributes
-	span.SetAttributes(
-		attribute.String("kafka.topic", *message.TopicPartition.Topic),
-		attribute.String("kafka.partition", fmt.Sprintf("%d", message.TopicPartition.Partition)),
-		attribute.String("kafka.offset", fmt.Sprintf("%d", message.TopicPartition.Offset)),
-		attribute.String("event.type", envelope.EventType),
-		attribute.String("tenant.id", envelope.TenantID),
-	)
-
-	// Find handler for event type
-	handler, exists := c.handlers[envelope.EventType]
-	if !exists {
-		return fmt.Errorf("no handler registered for event type: %s", envelope.EventType)
-	}
-
-	// Deserialize actual event based on type
-	event, err := c.deserializeEvent(envelope.EventType, envelope.Event)
-	if err != nil {
-		span.RecordError(err)
-		return fmt.Errorf("failed to deserialize event: %w", err)
-	}
-
-	// Process event with retry logic
-	var lastErr error
-	for attempt := 0; attempt <= c.config.RetryAttempts; attempt++ {
-		if attempt > 0 {
-			// Wait before retry
-			time.Sleep(c.config.RetryDelay * time.Duration(attempt))
-			span.AddEvent("retrying", trace.WithAttributes(
-				attribute.Int("attempt", attempt),
-			))
-		}
-
-		err = handler.HandleEvent(ctx, event)
-		if err == nil {
-			// Success - commit offset
-			if !c.config.EnableAutoCommit {
-				_, err := c.consumer.CommitMessage(message)
-				if err != nil {
-					span.RecordError(err)
-					return fmt.Errorf("failed to commit offset: %w", err)
-				}
-			}
-			return nil
-		}
-
-		lastErr = err
-		span.RecordError(err)
-	}
-
-	// All retries failed - use error handler
-	if c.errorHandler != nil {
-		return c.errorHandler.HandleError(ctx, lastErr, event, message)
-	}
-
-	return lastErr
-}
-
-// deserializeEvent deserializes an event based on its type
-func (c *Consumer) deserializeEvent(eventType string, eventData json.RawMessage) (interface{}, error) {
-	switch eventType {
-	case EventFileDiscovered:
-		var event FileDiscoveredEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventFileResolved:
-		var event FileResolvedEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventFileClassified:
-		var event FileClassifiedEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventFileChunked:
-		var event FileChunkedEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventChunkEmbedded:
-		var event ChunkEmbeddedEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventDLPViolation:
-		var event DLPViolationEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventProcessingComplete:
-		var event ProcessingCompleteEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventProcessingFailed:
-		var event ProcessingFailedEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventSessionStarted:
-		var event SessionStartedEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	case EventSessionCompleted:
-		var event SessionCompletedEvent
-		err := json.Unmarshal(eventData, &event)
-		return &event, err
-	default:
-		return nil, fmt.Errorf("unknown event type: %s", eventType)
-	}
-}
-
-// extractTracingContext extracts OpenTelemetry context from Kafka headers
-func (c *Consumer) extractTracingContext(ctx context.Context, message *kafka.Message) context.Context {
-	var traceID, spanID string
-
-	for _, header := range message.Headers {
-		switch header.Key {
-		case "trace-id":
-			traceID = string(header.Value)
-		case "span-id":
-			spanID = string(header.Value)
-		}
-	}
-
-	if traceID != "" && spanID != "" {
-		// In a real implementation, you would reconstruct the trace context
-		// This is simplified for the example
-		ctx = trace.ContextWithSpanContext(ctx, trace.NewSpanContext(trace.SpanContextConfig{}))
-	}
-
-	return ctx
-}
-
 // Stop stops the consumer
 func (c *Consumer) Stop() error {
+	c.mu.Lock()
 	if !c.running {
+		c.mu.Unlock()
 		return nil
 	}
 
 	close(c.stopChan)
 	c.running = false
+	c.mu.Unlock()
 
 	// Wait for consumer loop to finish
 	c.wg.Wait()
 
-	// Close consumer
-	return c.consumer.Close()
-}
-
-// HealthCheck performs a health check on the consumer
-func (c *Consumer) HealthCheck(ctx context.Context) error {
-	// Check if consumer is running
-	if !c.running {
-		return fmt.Errorf("consumer is not running")
-	}
-
-	// Try to get metadata as a health check
-	_, err := c.consumer.GetMetadata(nil, false, 1000)
-	if err != nil {
-		return fmt.Errorf("consumer health check failed: %w", err)
-	}
-
+	log.Printf("[events] STUB consumer stopped")
 	return nil
 }
 
-// GetMetrics returns consumer metrics
-func (c *Consumer) GetMetrics() (map[string]interface{}, error) {
-	metadata, err := c.consumer.GetMetadata(nil, false, 1000)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get metadata: %w", err)
-	}
+// HealthCheck performs a health check on the consumer.
+// Stub implementation: returns healthy if running.
+func (c *Consumer) HealthCheck(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	assignment, err := c.consumer.Assignment()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get assignment: %w", err)
+	if !c.running {
+		return fmt.Errorf("consumer is not running")
 	}
+	return nil
+}
+
+// GetMetrics returns consumer metrics.
+// Stub implementation: returns empty metrics.
+func (c *Consumer) GetMetrics() (map[string]interface{}, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	return map[string]interface{}{
-		"broker_count":        len(metadata.Brokers),
-		"topic_count":         len(metadata.Topics),
-		"assigned_partitions": len(assignment),
+		"broker_count":        0,
+		"topic_count":         0,
+		"assigned_partitions": 0,
 		"running":             c.running,
+		"stub_mode":           true,
 	}, nil
 }

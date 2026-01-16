@@ -220,7 +220,13 @@ type ProcessingCompleteEvent struct {
 	Data ProcessingCompleteData `json:"data"`
 }
 
+// GetBase returns the BaseEvent for the ProcessingCompleteEvent
+func (e *ProcessingCompleteEvent) GetBase() BaseEvent {
+	return e.BaseEvent
+}
+
 type ProcessingCompleteData struct {
+	FileID              string        `json:"file_id"` // AudiModal file UUID
 	URL                 string        `json:"url"`
 	TotalProcessingTime time.Duration `json:"total_processing_time"`
 	ChunksCreated       int           `json:"chunks_created"`

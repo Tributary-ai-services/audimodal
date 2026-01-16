@@ -13,9 +13,11 @@ func TestPDFReader_GetConfigSpec(t *testing.T) {
 
 	// Verify we have expected config specs
 	expectedSpecs := []string{
+		"processing_mode", "mapreduce_page_threshold", "mapreduce_workers",
 		"extract_mode", "ocr_language", "ocr_dpi", "include_images",
 		"preserve_layout", "extract_metadata", "password", "max_pages",
-		"skip_images_larger_than_mb",
+		"skip_images_larger_than_mb", "ocr_any_image", "ocr_image_min_width",
+		"ocr_image_min_height",
 	}
 
 	if len(specs) != len(expectedSpecs) {

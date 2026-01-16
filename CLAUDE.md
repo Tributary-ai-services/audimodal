@@ -61,6 +61,32 @@ This service's data models are comprehensively documented in the centralized dat
 - Enterprise connectors (SharePoint, Confluence, Jira, Slack)
 - Performance: 10,000+ files per hour per tenant
 
+## PDF Processing Configuration
+
+### Image Detection for OCR
+
+The PDF processor supports configurable image detection settings that control when OCR is triggered:
+
+| Config Option | Default | Description |
+|---------------|---------|-------------|
+| `ocr_any_image` | `false` | If true, trigger OCR for ANY image on page regardless of size |
+| `ocr_image_min_width` | `200` | Minimum image width in pixels to trigger OCR |
+| `ocr_image_min_height` | `200` | Minimum image height in pixels to trigger OCR |
+
+These settings are used by both the streaming and map-reduce PDF processing pipelines.
+
+### Map-Reduce Processing Mode
+
+For large PDFs (>50 pages by default), the system uses a map-reduce pipeline with subprocess isolation to prevent OOM issues:
+
+| Config Option | Default | Description |
+|---------------|---------|-------------|
+| `processing_mode` | `auto` | Processing mode: `streaming`, `mapreduce`, or `auto` |
+| `mapreduce_page_threshold` | `50` | Use map-reduce for PDFs with more than this many pages |
+| `mapreduce_workers` | `4` | Number of parallel workers for map-reduce mode |
+| `ocr_dpi` | `150` | OCR image resolution in DPI (lower = less memory) |
+| `ocr_language` | `eng` | OCR language code (ISO 639-2) |
+
 ## Common Commands
 
 See the comprehensive documentation in:
