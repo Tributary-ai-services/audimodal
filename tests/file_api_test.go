@@ -21,7 +21,7 @@ import (
 // Use shared constants from test_helpers.go for K8s compatibility
 // baseURL and testTenantID are defined in test_helpers.go
 var (
-	fileAPIBaseURL      = baseURL     // Uses AUDIMODAL_URL env or default
+	fileAPIBaseURL      = baseURL // Uses AUDIMODAL_URL env or default
 	fileAPIPrefix       = "/api/v1"
 	fileAPITestTenantID = testTenantID // Uses shared test tenant UUID
 )

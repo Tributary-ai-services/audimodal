@@ -16,6 +16,7 @@ import (
 	"github.com/jscharber/audimodal/internal/server/handlers"
 	"github.com/jscharber/audimodal/internal/server/response"
 	"github.com/jscharber/audimodal/internal/services"
+	"github.com/jscharber/audimodal/pkg/events"
 	"github.com/jscharber/audimodal/pkg/health"
 	"github.com/jscharber/audimodal/pkg/logger"
 	"github.com/jscharber/audimodal/pkg/metrics"
@@ -315,7 +316,7 @@ func (r *Router) setupMiddleware() {
 // setupRoutes configures all API routes
 func (r *Router) setupRoutes() {
 	r.logger.Info("Setting up routes", "api_prefix", r.config.APIPrefix)
-	
+
 	// Health check endpoints (no auth required) - Register these FIRST to avoid conflicts
 	r.ServeMux.HandleFunc(r.config.HealthCheckPath, r.healthHandler.HealthCheckHandler())
 	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
@@ -339,19 +340,35 @@ func (r *Router) setupRoutes() {
 	storageService := services.NewStorageService(r.db, []byte(encryptionKey))
 	storageHandler := handlers.NewStorageHandler(r.db, storageService)
 
+	// Initialize Kafka event producer if enabled (using pure Go kafka-go library)
+	var eventProducer *events.SimpleProducer
+	if r.config.Kafka != nil && r.config.Kafka.Enabled {
+		producerConfig := events.SimpleProducerConfig{
+			BootstrapServers: r.config.Kafka.BootstrapServers,
+			ClientID:         r.config.Kafka.ClientID,
+		}
+		var err error
+		eventProducer, err = events.NewSimpleProducer(producerConfig)
+		if err != nil {
+			r.logger.Warn("Failed to initialize Kafka producer, events will not be published", "error", err)
+		} else {
+			r.logger.Info("Kafka event producer initialized", "brokers", r.config.Kafka.BootstrapServers)
+		}
+	}
+
 	// Create handlers
 	tenantHandler := handlers.NewTenantHandler(r.db)
 	dataSourceHandler := handlers.NewDataSourceHandler(r.db)
 	sessionHandler := handlers.NewProcessingSessionHandler(r.db)
 	dlpHandler := handlers.NewDLPHandler(r.db)
-	fileHandler := handlers.NewFileHandler(r.db, storageService)
+	fileHandler := handlers.NewFileHandler(r.db, storageService, eventProducer)
 	chunkHandler := handlers.NewChunkHandler(r.db)
 	webHandler := handlers.NewWebHandler(r.db, r.logger)
 	mlAnalysisHandler := handlers.NewMLAnalysisHandler(r.db, r.logger)
 
 	// Apply authentication middleware to API routes
 	authMiddleware := AuthenticationMiddleware(r.config, r.db)
-	
+
 	// Authentication bypass for development - configure properly in production
 	noAuthMiddleware := func(h http.Handler) http.Handler { return h }
 
@@ -378,20 +395,20 @@ func (r *Router) setupRoutes() {
 			tenantHandler.HandleTenant(w, req)
 			return
 		}
-		
+
 		// Otherwise, it's a tenant-scoped operation that requires tenant context
 		// Log tenant-scoped route access
-		r.logger.Info("Tenant-scoped route called", 
+		r.logger.Info("Tenant-scoped route called",
 			"path", req.URL.Path,
 			"method", req.Method,
 			"request_id", getRequestID(req.Context()))
-		
+
 		// Apply tenant middleware and dispatch
 		tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			r.logger.Info("After tenant middleware", 
+			r.logger.Info("After tenant middleware",
 				"path", req.URL.Path,
 				"tenant_context", getTenantContext(req.Context()))
-			
+
 			// Dispatch to appropriate handler based on path
 			if isDataSourceRoute(req.URL.Path, apiPrefix) {
 				// Route to data source handler
@@ -566,7 +583,7 @@ func contains(s, substr string) bool {
 		len(s) > len(substr) && s[len(s)-len(substr)-1:len(s)-len(substr)] == "/" && s[len(s)-len(substr):] == substr ||
 		s == substr ||
 		(len(s) > len(substr) && s[:len(substr)] == substr && s[len(substr)] == '/')
-	
+
 	// Log routing decisions - using proper logger would go here
 	return result
 }

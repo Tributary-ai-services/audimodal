@@ -20,6 +20,7 @@ import (
 	"github.com/jscharber/audimodal/internal/server/response"
 	"github.com/jscharber/audimodal/internal/services"
 	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/events"
 )
 
 const (
@@ -35,10 +36,12 @@ type FileHandler struct {
 	embeddingCoordinator *processors.EmbeddingCoordinator
 	storageService       *services.StorageService
 	pipeline             *processors.Pipeline
+	mlAnalysisService    *services.MLAnalysisService
+	eventProducer        *events.SimpleProducer
 }
 
 // NewFileHandler creates a new file handler
-func NewFileHandler(db *database.Database, storageService *services.StorageService) *FileHandler {
+func NewFileHandler(db *database.Database, storageService *services.StorageService, eventProducer *events.SimpleProducer) *FileHandler {
 	// Initialize processing pipeline
 	pipelineConfig := processors.GetDefaultPipelineConfig()
 	pipeline := processors.NewPipeline(db, pipelineConfig)
@@ -53,11 +56,17 @@ func NewFileHandler(db *database.Database, storageService *services.StorageServi
 		embeddingCoordinator = nil
 	}
 
+	// Initialize ML analysis service
+	mlAnalysisConfig := services.DefaultMLAnalysisServiceConfig()
+	mlAnalysisService := services.NewMLAnalysisService(db, nil, mlAnalysisConfig)
+
 	return &FileHandler{
 		db:                   db,
 		embeddingCoordinator: embeddingCoordinator,
 		storageService:       storageService,
 		pipeline:             pipeline,
+		mlAnalysisService:    mlAnalysisService,
+		eventProducer:        eventProducer,
 	}
 }
 
@@ -265,13 +274,13 @@ func (h *FileHandler) ListFiles(w http.ResponseWriter, r *http.Request, tenantID
 // Supports both JSON requests (for metadata-only file records) and multipart form data (for actual file uploads)
 func (h *FileHandler) CreateFile(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	contentType := r.Header.Get("Content-Type")
-	
+
 	// Handle multipart form data (actual file uploads)
 	if strings.HasPrefix(contentType, "multipart/form-data") {
 		h.handleFileUpload(w, r, tenantID)
 		return
 	}
-	
+
 	// Handle JSON requests (metadata-only file records)
 	h.handleJSONFileCreate(w, r, tenantID)
 }
@@ -293,7 +302,7 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		response.WriteBadRequest(w, getRequestID(r), "Failed to parse multipart form", err.Error())
 		return
 	}
-	
+
 	// Get the uploaded file
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
@@ -307,20 +316,20 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		response.WriteBadRequest(w, getRequestID(r), fmt.Sprintf("File too large for multipart upload (%d bytes). Files over %d bytes should use S3 direct upload.", fileHeader.Size, MaxMultipartFileSize), nil)
 		return
 	}
-	
+
 	// Get data source ID from form
 	dataSourceIDStr := r.FormValue("datasource_id")
 	if dataSourceIDStr == "" {
 		response.WriteBadRequest(w, getRequestID(r), "datasource_id is required", "")
 		return
 	}
-	
+
 	dataSourceID, err := uuid.Parse(dataSourceIDStr)
 	if err != nil {
 		response.WriteBadRequest(w, getRequestID(r), "Invalid datasource_id format", err.Error())
 		return
 	}
-	
+
 	// Get tenant repository
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
@@ -328,7 +337,7 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		response.WriteNotFound(w, getRequestID(r), "Tenant not found")
 		return
 	}
-	
+
 	// Parse optional metadata if provided
 	var metadata map[string]interface{}
 	if metadataStr := r.FormValue("metadata"); metadataStr != "" {
@@ -337,7 +346,7 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 			return
 		}
 	}
-	
+
 	// Extract file information
 	filename := fileHeader.Filename
 	extension := filepath.Ext(filename)
@@ -359,13 +368,13 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 	// Store file to local storage first (for files <10MB we can handle in memory/temp storage)
 	var storagePath string
 	var fileURL string
-	
+
 	// Create temporary file for processing
 	tempDir := os.Getenv("EAI_TEMP_DIR")
 	if tempDir == "" {
 		tempDir = "/tmp"
 	}
-	
+
 	tempFile, err := os.CreateTemp(tempDir, fmt.Sprintf("upload_%s_*_%s", tenantID.String()[:8], filename))
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to create temporary file", err.Error())
@@ -376,33 +385,33 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		tempFile.Close()
 		os.Remove(tempPath) // Clean up temp file
 	}()
-	
+
 	// Copy uploaded file to temp file
 	_, err = io.Copy(tempFile, file)
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to save uploaded file", err.Error())
 		return
 	}
-	
+
 	// TODO: For production, implement proper storage (S3, local filesystem, etc.)
 	// For now, we store locally and create a file:// URL
 	localStorageDir := os.Getenv("EAI_STORAGE_LOCAL_PATH")
 	if localStorageDir == "" {
 		localStorageDir = "/app/data/storage"
 	}
-	
+
 	// Ensure storage directory exists
 	if err := os.MkdirAll(filepath.Join(localStorageDir, tenantID.String()), 0755); err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to create storage directory", err.Error())
 		return
 	}
-	
+
 	// Generate unique filename for storage
 	fileUUID := uuid.New()
 	storedFilename := fmt.Sprintf("%s_%s", fileUUID.String(), filename)
 	storagePath = filepath.Join(localStorageDir, tenantID.String(), storedFilename)
 	fileURL = fmt.Sprintf("file://%s", storagePath)
-	
+
 	// Copy from temp to final storage location
 	tempFile.Seek(0, 0)
 	finalFile, err := os.Create(storagePath)
@@ -411,13 +420,13 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 	defer finalFile.Close()
-	
+
 	_, err = io.Copy(finalFile, tempFile)
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to store file", err.Error())
 		return
 	}
-	
+
 	// Create file record with storage information
 	fileRecord := &models.File{
 		TenantID:         tenantID,
@@ -433,7 +442,7 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		Metadata:         metadata,
 		LastModified:     time.Now(),
 	}
-	
+
 	if err := tenantRepo.ValidateAndCreate(fileRecord); err != nil {
 		// Clean up stored file on database error
 		os.Remove(storagePath)
@@ -444,7 +453,7 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to create file record", err.Error())
 		return
 	}
-	
+
 	responseData := h.toFileResponse(fileRecord)
 	response.WriteCreated(w, getRequestID(r), responseData)
 }
@@ -452,12 +461,12 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 // handleJSONFileCreate handles JSON requests for S3 URLs and metadata-only file records
 func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	var req struct {
-		URL                 string                 `json:"url"`                   // S3 URL or existing file URL
-		Path                string                 `json:"path,omitempty"`        // Optional: local path
-		Filename            string                 `json:"filename,omitempty"`    // Optional: will be extracted from URL if not provided
-		Extension           string                 `json:"extension,omitempty"`   // Optional: will be extracted if not provided
-		ContentType         string                 `json:"content_type,omitempty"`// Optional: will be detected if not provided
-		Size                int64                  `json:"size,omitempty"`        // Optional: will be retrieved if not provided
+		URL                 string                 `json:"url"`                    // S3 URL or existing file URL
+		Path                string                 `json:"path,omitempty"`         // Optional: local path
+		Filename            string                 `json:"filename,omitempty"`     // Optional: will be extracted from URL if not provided
+		Extension           string                 `json:"extension,omitempty"`    // Optional: will be extracted if not provided
+		ContentType         string                 `json:"content_type,omitempty"` // Optional: will be detected if not provided
+		Size                int64                  `json:"size,omitempty"`         // Optional: will be retrieved if not provided
 		Checksum            string                 `json:"checksum,omitempty"`
 		ChecksumType        string                 `json:"checksum_type,omitempty"`
 		DataSourceID        *uuid.UUID             `json:"data_source_id,omitempty"`
@@ -777,24 +786,24 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	// Use the pipeline for processing
-	if h.pipeline != nil {
-		// Process file in background using the pipeline
+	// Use the embedding coordinator for processing (includes chunk creation + embedding generation)
+	// Fall back to basic pipeline if embedding coordinator is not available
+	if h.embeddingCoordinator != nil {
+		// Process file in background using the embedding coordinator (includes embeddings)
 		go func() {
-			// Create processing request
-			processingRequest := &processors.ProcessingRequest{
-				TenantID:        tenantID,
-				FileID:          fileID,
-				FilePath:        file.Path,
-				StrategyType:    req.ChunkingStrategy,
-				Priority:        req.Priority,
-				DLPScanEnabled:  req.DLPScanEnabled,
+			// Process the file through the embedding coordinator (use background context to avoid cancellation)
+			ctx := context.Background()
+
+			// Create processing options
+			options := map[string]any{
+				"strategy_type":    req.ChunkingStrategy,
+				"priority":         req.Priority,
+				"dlp_scan_enabled": req.DLPScanEnabled,
+				"dataset":          "documents", // Use shared documents dataset
 			}
 
-			// Process the file through the pipeline (use background context to avoid cancellation)
-			ctx := context.Background()
-			result, err := h.pipeline.ProcessFile(ctx, processingRequest)
-			
+			tierResult, err := h.embeddingCoordinator.ProcessSingleFileWithEmbeddings(ctx, tenantID, fileID, options)
+
 			// Update file status based on results - create a fresh tenant service and repository
 			backgroundTenantService := h.db.NewTenantService()
 			backgroundTenantRepo, repoErr := backgroundTenantService.GetTenantRepository(ctx, tenantID)
@@ -808,19 +817,122 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 				if err != nil {
 					// Processing failed - mark as error
 					updatedFile.MarkAsError("Failed to process file: " + err.Error())
-				} else if result != nil {
+				} else if tierResult != nil && tierResult.ProcessingResult != nil {
 					// Processing succeeded - mark as processed with chunk count
+					updatedFile.MarkAsProcessed(tierResult.ChunksCreated, req.ChunkingStrategy)
+					now := time.Now()
+					updatedFile.ProcessedAt = &now
+
+					// Log embedding results
+					fmt.Printf("INFO: File %s processed with %d chunks and %d embeddings created.\n",
+						fileID.String(), tierResult.ChunksCreated, tierResult.EmbeddingsCreated)
+
+					// Trigger automatic ML analysis if chunks were created and service is available
+					if tierResult.ChunksCreated > 0 && h.mlAnalysisService != nil {
+						go func() {
+							analysisCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+							defer cancel()
+
+							analysisResult, analysisErr := h.mlAnalysisService.AnalyzeDocument(analysisCtx, tenantID, fileID)
+							if analysisErr != nil {
+								fmt.Printf("WARNING: ML analysis failed for file %s: %v\n", fileID.String(), analysisErr)
+							} else {
+								fmt.Printf("INFO: ML analysis completed for file %s: %d items processed\n", fileID.String(), analysisResult.Completed)
+							}
+						}()
+					} else if tierResult.ChunksCreated == 0 {
+						fmt.Printf("WARNING: File %s processed but no chunks created. ML analysis skipped.\n", fileID.String())
+					}
+				}
+				backgroundTenantRepo.DB().Save(&updatedFile)
+
+				// Publish processing complete/failed event to Kafka for cross-service sync
+				if h.eventProducer != nil {
+					var eventData events.ProcessingCompleteData
+					if err == nil && tierResult != nil && tierResult.ProcessingResult != nil {
+						// Success case - now includes actual embedding count
+						eventData = events.ProcessingCompleteData{
+							FileID:              fileID.String(), // AudiModal file UUID for cross-service lookup
+							URL:                 updatedFile.URL,
+							TotalProcessingTime: tierResult.ProcessingTime,
+							ChunksCreated:       tierResult.ChunksCreated,
+							EmbeddingsCreated:   tierResult.EmbeddingsCreated, // Actual embedding count from tier processor
+							DLPViolationsFound:  0,
+							FinalDataClass:      "internal",
+							StorageLocation:     updatedFile.Path,
+							Success:             true,
+						}
+					} else {
+						// Failure case - still publish event so downstream services know processing failed
+						var processingTime time.Duration
+						if tierResult != nil && tierResult.ProcessingResult != nil {
+							processingTime = tierResult.ProcessingTime
+						}
+						eventData = events.ProcessingCompleteData{
+							FileID:              fileID.String(),
+							URL:                 updatedFile.URL,
+							TotalProcessingTime: processingTime,
+							ChunksCreated:       0,
+							EmbeddingsCreated:   0,
+							DLPViolationsFound:  0,
+							FinalDataClass:      "",
+							StorageLocation:     updatedFile.Path,
+							Success:             false, // Mark as failed
+						}
+						fmt.Printf("INFO: Publishing processing FAILED event for file %s\n", fileID.String())
+					}
+					event := events.NewProcessingCompleteEvent("audimodal", tenantID.String(), eventData)
+					if pubErr := h.eventProducer.PublishEvent(ctx, event); pubErr != nil {
+						fmt.Printf("WARNING: Failed to publish processing event for file %s: %v\n", fileID.String(), pubErr)
+					} else {
+						fmt.Printf("INFO: Published processing %s event for file %s to Kafka (embeddings: %d)\n",
+							map[bool]string{true: "complete", false: "failed"}[eventData.Success], fileID.String(), eventData.EmbeddingsCreated)
+					}
+				}
+			} else {
+				fmt.Printf("ERROR: Failed to reload file %s for status update: %v\n", fileID.String(), dbErr)
+			}
+		}()
+	} else if h.pipeline != nil {
+		// Fallback to basic pipeline (no embeddings) if embedding coordinator is not available
+		fmt.Printf("WARNING: Embedding coordinator not available for file %s, using basic pipeline (no embeddings will be created)\n", fileID.String())
+		go func() {
+			// Create processing request
+			processingRequest := &processors.ProcessingRequest{
+				TenantID:       tenantID,
+				FileID:         fileID,
+				FilePath:       file.Path,
+				StrategyType:   req.ChunkingStrategy,
+				Priority:       req.Priority,
+				DLPScanEnabled: req.DLPScanEnabled,
+			}
+
+			// Process the file through the basic pipeline (use background context to avoid cancellation)
+			ctx := context.Background()
+			result, err := h.pipeline.ProcessFile(ctx, processingRequest)
+
+			// Update file status based on results
+			backgroundTenantService := h.db.NewTenantService()
+			backgroundTenantRepo, repoErr := backgroundTenantService.GetTenantRepository(ctx, tenantID)
+			if repoErr != nil {
+				fmt.Printf("ERROR: Failed to get tenant repository for status update: %v\n", repoErr)
+				return
+			}
+
+			var updatedFile models.File
+			if dbErr := backgroundTenantRepo.DB().Where("id = ?", fileID).First(&updatedFile).Error; dbErr == nil {
+				if err != nil {
+					updatedFile.MarkAsError("Failed to process file: " + err.Error())
+				} else if result != nil {
 					updatedFile.MarkAsProcessed(result.ChunksCreated, req.ChunkingStrategy)
 					now := time.Now()
 					updatedFile.ProcessedAt = &now
 				}
 				backgroundTenantRepo.DB().Save(&updatedFile)
-			} else {
-				fmt.Printf("ERROR: Failed to reload file %s for status update: %v\n", fileID.String(), dbErr)
 			}
 		}()
 	} else {
-		// Fallback: mark as processing but warn about lack of pipeline
+		// No processing pipeline available at all
 		fmt.Printf("WARNING: No processing pipeline available for file %s\n", fileID.String())
 	}
 
@@ -1053,13 +1165,13 @@ func (h *FileHandler) SearchSimilarDocuments(w http.ResponseWriter, r *http.Requ
 // handleSearchError categorizes search errors and returns appropriate HTTP responses
 func (h *FileHandler) handleSearchError(w http.ResponseWriter, r *http.Request, err error, query string) {
 	requestID := getRequestID(r)
-	
+
 	// Check if it's an EmbeddingError with specific types
 	if embErr, ok := err.(*embeddings.EmbeddingError); ok {
 		switch embErr.Type {
 		case "dataset_not_found":
 			// Dataset doesn't exist - return 404
-			response.WriteNotFound(w, requestID, "Dataset not found: " + embErr.Message)
+			response.WriteNotFound(w, requestID, "Dataset not found: "+embErr.Message)
 			return
 		case "dimension_mismatch":
 			// Client sent wrong dimensions - return 400
@@ -1080,8 +1192,8 @@ func (h *FileHandler) handleSearchError(w http.ResponseWriter, r *http.Request, 
 			return
 		case "search_error":
 			// General search errors that might be recoverable
-			if strings.Contains(strings.ToLower(embErr.Message), "no results") || 
-			   strings.Contains(strings.ToLower(embErr.Message), "empty") {
+			if strings.Contains(strings.ToLower(embErr.Message), "no results") ||
+				strings.Contains(strings.ToLower(embErr.Message), "empty") {
 				// Return empty results for "no results" scenarios
 				emptyResults := &embeddings.SearchResponse{
 					Results:    []*embeddings.SimilarityResult{},
@@ -1107,11 +1219,11 @@ func (h *FileHandler) handleSearchError(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 	}
-	
+
 	// For non-EmbeddingError types, check the error message for common patterns
 	errMsg := strings.ToLower(err.Error())
 	if strings.Contains(errMsg, "not found") {
-		response.WriteNotFound(w, requestID, "Resource not found: " + err.Error())
+		response.WriteNotFound(w, requestID, "Resource not found: "+err.Error())
 	} else if strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "bad request") {
 		response.WriteBadRequest(w, requestID, "Invalid request", err.Error())
 	} else {

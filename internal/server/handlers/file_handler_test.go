@@ -207,7 +207,7 @@ func TestFileHandler_CreateFile_JSONValidation(t *testing.T) {
 	tenantID := uuid.New()
 	dataSourceID := uuid.New()
 	handler := &FileHandler{}
-	tests := []struct{
+	tests := []struct {
 		name           string
 		body           interface{}
 		expectedStatus int
@@ -282,8 +282,8 @@ func TestFileHandler_CreateFile_JSONValidation(t *testing.T) {
 			expectedError:  "Unsupported URL scheme",
 		},
 		{
-			name: "invalid_json_syntax",
-			body: "{invalid json}",
+			name:           "invalid_json_syntax",
+			body:           "{invalid json}",
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Invalid JSON",
 		},
@@ -329,7 +329,7 @@ func TestFileHandler_FileSizeThresholdValidation(t *testing.T) {
 	t.Run("exactly_10MB_allowed_multipart", func(t *testing.T) {
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		
+
 		part, _ := writer.CreateFormFile("file", "10mb.pdf")
 		// Write header but not full content
 		part.Write([]byte("PDF header"))
@@ -357,7 +357,7 @@ func TestFileHandler_FileSizeThresholdValidation(t *testing.T) {
 	t.Run("over_10MB_rejected_multipart", func(t *testing.T) {
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		
+
 		writer.CreateFormFile("file", "11mb.pdf")
 		writer.WriteField("datasource_id", dataSourceID.String())
 		writer.Close()
@@ -421,7 +421,7 @@ func TestFileHandler_RequestSizeValidation(t *testing.T) {
 		// Test that ParseMultipartForm respects memory limits
 		var buf bytes.Buffer
 		writer := multipart.NewWriter(&buf)
-		
+
 		// Create multiple fields to test memory usage
 		for i := 0; i < 100; i++ {
 			writer.WriteField(fmt.Sprintf("field_%d", i), strings.Repeat("x", 1024))

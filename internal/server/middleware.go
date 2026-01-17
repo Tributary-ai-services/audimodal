@@ -152,7 +152,7 @@ func AuthenticationMiddleware(config *Config, db *database.Database) Middleware 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Debug logging
 			// TODO: Add proper logger to context
-			
+
 			if !config.AuthEnabled {
 				next.ServeHTTP(w, r)
 				return
@@ -196,10 +196,10 @@ func TenantMiddleware(db *database.Database) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// TODO: Add proper logger to context
-			
+
 			// Extract tenant ID from path or header
 			tenantID := extractTenantID(r)
-			
+
 			if tenantID == "" {
 				http.Error(w, "Tenant ID required", http.StatusBadRequest)
 				return

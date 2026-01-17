@@ -370,6 +370,73 @@ func (ed *EncodingDetector) ValidateUTF8(data []byte) bool {
 	return utf8.Valid(data)
 }
 
+// SanitizeUTF8String sanitizes a string by replacing invalid UTF-8 sequences
+// with the Unicode replacement character (U+FFFD). This ensures the string
+// can be safely stored in PostgreSQL or any UTF-8 database.
+func (ed *EncodingDetector) SanitizeUTF8String(s string) string {
+	return SanitizeUTF8String(s)
+}
+
+// SanitizeUTF8Bytes sanitizes a byte slice by replacing invalid UTF-8 sequences
+// with the Unicode replacement character (U+FFFD).
+func (ed *EncodingDetector) SanitizeUTF8Bytes(data []byte) []byte {
+	return SanitizeUTF8Bytes(data)
+}
+
+// SanitizeUTF8String is a standalone function that sanitizes a string by replacing
+// invalid UTF-8 sequences with the Unicode replacement character (U+FFFD).
+// This is useful for text extracted from PDFs or other sources that may contain
+// malformed UTF-8 sequences.
+func SanitizeUTF8String(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+
+	// Build a new string with invalid sequences replaced
+	var builder strings.Builder
+	builder.Grow(len(s))
+
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 {
+			// Invalid byte sequence - write replacement character
+			builder.WriteRune(utf8.RuneError)
+			i++
+		} else {
+			builder.WriteRune(r)
+			i += size
+		}
+	}
+
+	return builder.String()
+}
+
+// SanitizeUTF8Bytes is a standalone function that sanitizes a byte slice by replacing
+// invalid UTF-8 sequences with the Unicode replacement character (U+FFFD).
+func SanitizeUTF8Bytes(data []byte) []byte {
+	if utf8.Valid(data) {
+		return data
+	}
+
+	// Build a new byte slice with invalid sequences replaced
+	var buffer bytes.Buffer
+	buffer.Grow(len(data))
+
+	for i := 0; i < len(data); {
+		r, size := utf8.DecodeRune(data[i:])
+		if r == utf8.RuneError && size == 1 {
+			// Invalid byte sequence - write replacement character
+			buffer.WriteRune(utf8.RuneError)
+			i++
+		} else {
+			buffer.WriteRune(r)
+			i += size
+		}
+	}
+
+	return buffer.Bytes()
+}
+
 // AutoDetectAndConvert automatically detects encoding and converts to UTF-8
 func (ed *EncodingDetector) AutoDetectAndConvert(filePath string) (string, *EncodingInfo, error) {
 	// Detect encoding

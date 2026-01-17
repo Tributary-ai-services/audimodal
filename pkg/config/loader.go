@@ -83,9 +83,10 @@ func (l *Loader) loadFromEnvRecursive(value reflect.Value, prefix string) error 
 				continue
 			}
 
-			// Get env tag or use field name
+			// Get env tag - explicit env tags are used as-is, without prefix
 			envTag := fieldType.Tag.Get("env")
-			if envTag == "" {
+			hasExplicitEnvTag := envTag != ""
+			if !hasExplicitEnvTag {
 				envTag = fieldType.Tag.Get("yaml")
 				if envTag == "" {
 					envTag = strings.ToUpper(fieldType.Name)
@@ -93,8 +94,12 @@ func (l *Loader) loadFromEnvRecursive(value reflect.Value, prefix string) error 
 			}
 
 			// Build full environment variable name
+			// Explicit env tags are used as-is, without prefix
 			var envName string
-			if prefix == "" {
+			if hasExplicitEnvTag {
+				// Explicit env tag - use as-is without prefix
+				envName = l.buildEnvName(envTag)
+			} else if prefix == "" {
 				envName = l.buildEnvName(envTag)
 			} else {
 				envName = l.buildEnvName(prefix + "_" + envTag)

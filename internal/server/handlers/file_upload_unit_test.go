@@ -149,7 +149,7 @@ func TestValidateFileUploadRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateFileUploadRequest(&tt.request)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -163,11 +163,11 @@ func TestValidateFileUploadRequest(t *testing.T) {
 // TestFileSizeThresholdLogic tests the file size threshold logic
 func TestFileSizeThresholdLogic(t *testing.T) {
 	tests := []struct {
-		name                string
-		fileSize            int64
-		contentLength       int64
-		expectMultipartOK   bool
-		expectThresholdMsg  string
+		name               string
+		fileSize           int64
+		contentLength      int64
+		expectMultipartOK  bool
+		expectThresholdMsg string
 	}{
 		{
 			name:              "small_file",
@@ -182,17 +182,17 @@ func TestFileSizeThresholdLogic(t *testing.T) {
 			expectMultipartOK: true,
 		},
 		{
-			name:              "over_10MB",
-			fileSize:          MaxMultipartFileSize + 1, // 10MB + 1
-			contentLength:     MaxMultipartFileSize + 1,
-			expectMultipartOK: false,
+			name:               "over_10MB",
+			fileSize:           MaxMultipartFileSize + 1, // 10MB + 1
+			contentLength:      MaxMultipartFileSize + 1,
+			expectMultipartOK:  false,
 			expectThresholdMsg: "File too large for multipart upload",
 		},
 		{
-			name:              "large_file_50MB",
-			fileSize:          50 * 1024 * 1024, // 50MB
-			contentLength:     50 * 1024 * 1024,
-			expectMultipartOK: false,
+			name:               "large_file_50MB",
+			fileSize:           50 * 1024 * 1024, // 50MB
+			contentLength:      50 * 1024 * 1024,
+			expectMultipartOK:  false,
 			expectThresholdMsg: "File too large for multipart upload",
 		},
 	}
@@ -202,7 +202,7 @@ func TestFileSizeThresholdLogic(t *testing.T) {
 			// Test size check
 			exceedsThreshold := tt.contentLength > MaxMultipartFileSize
 			assert.Equal(t, !tt.expectMultipartOK, exceedsThreshold)
-			
+
 			if !tt.expectMultipartOK {
 				// Size exceeds threshold, should recommend JSON upload
 				assert.Contains(t, tt.expectThresholdMsg, "File too large for multipart upload")
@@ -214,13 +214,13 @@ func TestFileSizeThresholdLogic(t *testing.T) {
 // TestMultipartFormParsing tests multipart form field extraction
 func TestMultipartFormParsing(t *testing.T) {
 	dataSourceID := uuid.New().String()
-	
+
 	tests := []struct {
-		name           string
-		setupForm      func(*multipart.Writer) error
-		expectError    bool
-		errorMsg       string
-		expectFields   map[string]string
+		name         string
+		setupForm    func(*multipart.Writer) error
+		expectError  bool
+		errorMsg     string
+		expectFields map[string]string
 	}{
 		{
 			name: "complete_form",
@@ -231,7 +231,7 @@ func TestMultipartFormParsing(t *testing.T) {
 					return err
 				}
 				part.Write([]byte("test content"))
-				
+
 				// Add fields
 				w.WriteField("datasource_id", dataSourceID)
 				w.WriteField("metadata", `{"key": "value"}`)
@@ -284,7 +284,7 @@ func TestMultipartFormParsing(t *testing.T) {
 					return err
 				}
 				part.Write([]byte("test content"))
-				
+
 				w.WriteField("datasource_id", dataSourceID)
 				w.WriteField("metadata", "invalid{json")
 				return nil
@@ -298,17 +298,17 @@ func TestMultipartFormParsing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			writer := multipart.NewWriter(&buf)
-			
+
 			err := tt.setupForm(writer)
 			require.NoError(t, err)
-			
+
 			err = writer.Close()
 			require.NoError(t, err)
 
 			// This tests the logic that would be used in the handler
 			// We can't test the actual parsing without the full HTTP request setup
 			// But we can validate the form structure
-			
+
 			if tt.expectError {
 				// In a real scenario, the parsing would fail
 				t.Logf("Expected error: %s", tt.errorMsg)
@@ -391,7 +391,7 @@ func TestJSONRequestParsing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var req FileUploadRequest
 			err := json.Unmarshal([]byte(tt.jsonInput), &req)
-			
+
 			if tt.expectError {
 				if err == nil {
 					// JSON parsing succeeded, but validation should fail
@@ -420,23 +420,23 @@ func validateFileUploadRequest(req *FileUploadRequest) error {
 	if req.URL == "" || req.Filename == "" || req.DataSourceID == "" || req.Size == 0 {
 		return &ValidationError{Message: "Missing required fields"}
 	}
-	
+
 	// Check file size
 	if req.Size < 0 {
 		return &ValidationError{Message: "File size must be greater than 0"}
 	}
-	
+
 	// Validate URL format
 	parsedURL, err := url.Parse(req.URL)
 	if err != nil {
 		return &ValidationError{Message: "Invalid URL format"}
 	}
-	
+
 	// Special case for "not-a-url" - url.Parse doesn't always fail on invalid URLs
 	if parsedURL.Scheme == "" {
 		return &ValidationError{Message: "Invalid URL format"}
 	}
-	
+
 	// Check supported schemes
 	supportedSchemes := map[string]bool{
 		"s3":    true,
@@ -445,11 +445,11 @@ func validateFileUploadRequest(req *FileUploadRequest) error {
 		"https": true,
 		"http":  true,
 	}
-	
+
 	if !supportedSchemes[parsedURL.Scheme] {
 		return &ValidationError{Message: "Unsupported URL scheme: " + parsedURL.Scheme}
 	}
-	
+
 	return nil
 }
 

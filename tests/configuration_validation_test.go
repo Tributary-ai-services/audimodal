@@ -62,7 +62,7 @@ func TestAudiModalConfigurationValidation(t *testing.T) {
 func TestContainerEnvironmentConfiguration(t *testing.T) {
 	t.Run("AudiModal service is accessible", func(t *testing.T) {
 		audimodalURL := getEnvOrDefault("AUDIMODAL_URL", "http://audimodal:8080")
-		
+
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Get(fmt.Sprintf("%s/health", audimodalURL))
 		require.NoError(t, err)
@@ -74,7 +74,7 @@ func TestContainerEnvironmentConfiguration(t *testing.T) {
 
 	t.Run("DeepLake service is accessible", func(t *testing.T) {
 		deeplakeURL := getEnvOrDefault("DEEPLAKE_API_URL", "http://deeplake-api:8000")
-		
+
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Get(fmt.Sprintf("%s/api/v1/health", deeplakeURL))
 		require.NoError(t, err)
@@ -97,20 +97,20 @@ func TestAuthenticationIntegration(t *testing.T) {
 
 		// Test that this key works with DeepLake
 		deeplakeURL := getEnvOrDefault("DEEPLAKE_API_URL", "http://deeplake-api:8000")
-		
+
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/health", deeplakeURL), nil)
 		require.NoError(t, err)
-		
+
 		req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", audimodalAPIKey))
-		
+
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusOK, resp.StatusCode, 
+		assert.Equal(t, http.StatusOK, resp.StatusCode,
 			"AudiModal's configured API key should work with DeepLake service")
-		
+
 		t.Log("✅ Authentication configuration is properly synchronized between services")
 	})
 

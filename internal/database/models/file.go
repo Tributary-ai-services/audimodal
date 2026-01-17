@@ -45,8 +45,6 @@ func (j JSONBMap) Value() (driver.Value, error) {
 	return json.Marshal(j)
 }
 
-
-
 // File represents a file in the system
 type File struct {
 	ID                  uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
@@ -75,10 +73,10 @@ type File struct {
 	ProcessingDuration *int64     `json:"processing_duration,omitempty"` // Duration in milliseconds
 
 	// Content analysis
-	Language         string   `json:"language,omitempty"`
-	LanguageConf     float64  `gorm:"column:language_confidence" json:"language_confidence,omitempty"`
-	ContentCategory  string   `json:"content_category,omitempty"`
-	SensitivityLevel string   `json:"sensitivity_level,omitempty"`
+	Language         string          `json:"language,omitempty"`
+	LanguageConf     float64         `gorm:"column:language_confidence" json:"language_confidence,omitempty"`
+	ContentCategory  string          `json:"content_category,omitempty"`
+	SensitivityLevel string          `json:"sensitivity_level,omitempty"`
 	Classifications  Classifications `gorm:"type:jsonb" json:"classifications,omitempty"`
 
 	// Schema and structure information
@@ -89,9 +87,9 @@ type File struct {
 	ChunkingStrategy string `json:"chunking_strategy,omitempty"`
 
 	// Compliance and security
-	PIIDetected      bool     `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
+	PIIDetected      bool            `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
 	ComplianceFlags  ComplianceFlags `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
-	EncryptionStatus string   `gorm:"default:'none'" json:"encryption_status"`
+	EncryptionStatus string          `gorm:"default:'none'" json:"encryption_status"`
 
 	// Metadata and custom fields
 	Metadata     JSONBMap `gorm:"type:jsonb" json:"metadata,omitempty"`

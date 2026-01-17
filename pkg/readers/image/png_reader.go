@@ -6,9 +6,12 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jscharber/audimodal/pkg/core"
@@ -217,9 +220,8 @@ func (r *PNGReader) checkOCRDependencies() []string {
 
 // commandExists checks if a command is available in PATH
 func (r *PNGReader) commandExists(cmd string) bool {
-	// This is a simplified check - in a real implementation,
-	// you would use exec.LookPath(cmd) to verify the command exists
-	return true // Assume dependencies are available for now
+	_, err := exec.LookPath(cmd)
+	return err == nil
 }
 
 // GetType returns the connector type
@@ -464,40 +466,36 @@ func (r *PNGReader) getColorModelName(cm color.Model) string {
 	}
 }
 
-// performOCR performs OCR on the PNG image
+// performOCR performs OCR on the PNG image using tesseract
 func (r *PNGReader) performOCR(sourcePath string, config map[string]any) (string, float64, []TextRegion, error) {
-	// In a real implementation, this would:
-	// 1. Preprocess the image if configured
-	// 2. Run tesseract OCR
-	// 3. Parse the results and confidence scores
-	// 4. Optionally extract text regions with coordinates
-
-	// Mock OCR results
-	ocrText := fmt.Sprintf("This is sample OCR text extracted from the PNG image. " +
-		"In a production implementation, this would be the actual text recognized by Tesseract OCR " +
-		"from the image content.")
-
-	confidence := 0.85 // Mock confidence score
-
-	// Mock text regions
-	regions := []TextRegion{
-		{
-			Text:       "Sample text region 1",
-			X:          100,
-			Y:          50,
-			Width:      200,
-			Height:     30,
-			Confidence: 0.90,
-		},
-		{
-			Text:       "Sample text region 2",
-			X:          100,
-			Y:          100,
-			Width:      250,
-			Height:     25,
-			Confidence: 0.80,
-		},
+	// Get language from config
+	lang := "eng"
+	if l, ok := config["ocr_language"].(string); ok {
+		lang = l
 	}
+
+	// Check if tesseract is available
+	if !r.commandExists("tesseract") {
+		return "", 0, nil, fmt.Errorf("tesseract not found in PATH")
+	}
+
+	// Run tesseract OCR with TSV output for confidence and regions
+	cmd := exec.Command("tesseract", sourcePath, "stdout", "-l", lang, "tsv")
+	tsvOutput, err := cmd.Output()
+	if err != nil {
+		log.Printf("Tesseract TSV output failed: %v, falling back to plain text", err)
+		// Fallback to plain text output
+		cmd = exec.Command("tesseract", sourcePath, "stdout", "-l", lang)
+		plainOutput, plainErr := cmd.Output()
+		if plainErr != nil {
+			return "", 0, nil, fmt.Errorf("tesseract failed: %w", plainErr)
+		}
+		text := strings.TrimSpace(string(plainOutput))
+		return text, 0.0, nil, nil
+	}
+
+	// Parse TSV output to extract text, confidence, and regions
+	text, confidence, regions := r.parseTesseractTSV(string(tsvOutput))
 
 	// Apply minimum confidence filter
 	if minConf, ok := config["min_confidence"]; ok {
@@ -508,7 +506,68 @@ func (r *PNGReader) performOCR(sourcePath string, config map[string]any) (string
 		}
 	}
 
-	return ocrText, confidence, regions, nil
+	return text, confidence, regions, nil
+}
+
+// parseTesseractTSV parses tesseract TSV output to extract text, confidence, and regions
+func (r *PNGReader) parseTesseractTSV(tsvOutput string) (string, float64, []TextRegion) {
+	lines := strings.Split(tsvOutput, "\n")
+	var textParts []string
+	var regions []TextRegion
+	var totalConf float64
+	var confCount int
+
+	// TSV columns: level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text
+	for i, line := range lines {
+		if i == 0 {
+			continue // Skip header
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 12 {
+			continue
+		}
+
+		text := fields[11]
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+
+		// Parse confidence
+		conf, err := strconv.ParseFloat(fields[10], 64)
+		if err != nil || conf < 0 {
+			continue
+		}
+
+		// Normalize confidence to 0-1 range (tesseract outputs 0-100)
+		normalizedConf := conf / 100.0
+
+		textParts = append(textParts, text)
+		totalConf += normalizedConf
+		confCount++
+
+		// Parse coordinates for text regions
+		left, _ := strconv.Atoi(fields[6])
+		top, _ := strconv.Atoi(fields[7])
+		width, _ := strconv.Atoi(fields[8])
+		height, _ := strconv.Atoi(fields[9])
+
+		regions = append(regions, TextRegion{
+			Text:       text,
+			X:          left,
+			Y:          top,
+			Width:      width,
+			Height:     height,
+			Confidence: normalizedConf,
+		})
+	}
+
+	// Calculate average confidence
+	avgConfidence := 0.0
+	if confCount > 0 {
+		avgConfidence = totalConf / float64(confCount)
+	}
+
+	return strings.Join(textParts, " "), avgConfidence, regions
 }
 
 // PNGIterator implements ChunkIterator for PNG files

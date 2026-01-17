@@ -3,9 +3,12 @@ package image
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jscharber/audimodal/pkg/core"
@@ -224,9 +227,8 @@ func (r *TIFFReader) checkOCRDependencies() []string {
 
 // commandExists checks if a command is available in PATH
 func (r *TIFFReader) commandExists(cmd string) bool {
-	// This is a simplified check - in a real implementation,
-	// you would use exec.LookPath(cmd) to verify the command exists
-	return true // Assume dependencies are available for now
+	_, err := exec.LookPath(cmd)
+	return err == nil
 }
 
 // GetType returns the connector type
@@ -485,41 +487,68 @@ func (r *TIFFReader) extractTIFFInfo(sourcePath string) (TIFFInfo, error) {
 	return info, nil
 }
 
-// performOCR performs OCR on a specific page of the TIFF
+// performOCR performs OCR on a specific page of the TIFF using tesseract
 func (r *TIFFReader) performOCR(sourcePath string, pageNum int, config map[string]any) (string, float64, []TextRegion, error) {
-	// In a real implementation, this would:
-	// 1. Extract the specific page from the TIFF
-	// 2. Preprocess the image if configured
-	// 3. Run tesseract OCR
-	// 4. Parse the results and confidence scores
-	// 5. Optionally extract text regions with coordinates
-
-	// Mock OCR results
-	ocrText := fmt.Sprintf("This is sample OCR text extracted from page %d of the TIFF image. "+
-		"In a production implementation, this would be the actual text recognized by Tesseract OCR "+
-		"from the image content.", pageNum)
-
-	confidence := 0.85 // Mock confidence score
-
-	// Mock text regions
-	regions := []TextRegion{
-		{
-			Text:       "Sample text region 1",
-			X:          100,
-			Y:          50,
-			Width:      200,
-			Height:     30,
-			Confidence: 0.90,
-		},
-		{
-			Text:       "Sample text region 2",
-			X:          100,
-			Y:          100,
-			Width:      250,
-			Height:     25,
-			Confidence: 0.80,
-		},
+	// Get language from config
+	lang := "eng"
+	if l, ok := config["ocr_language"].(string); ok {
+		lang = l
 	}
+
+	// Check if tesseract is available
+	if !r.commandExists("tesseract") {
+		return "", 0, nil, fmt.Errorf("tesseract not found in PATH")
+	}
+
+	// For multi-page TIFFs, we need to extract the specific page first
+	// Use imagemagick to extract page to temp PNG file
+	var ocrSource string
+	var tempFile string
+
+	if pageNum > 1 || r.isMultiPageTIFF(sourcePath) {
+		// Extract specific page using imagemagick convert
+		if !r.commandExists("convert") {
+			return "", 0, nil, fmt.Errorf("imagemagick 'convert' not found - required for multi-page TIFF")
+		}
+
+		// Create temp file for extracted page
+		tmpFile, err := os.CreateTemp("", "tiff-page-*.png")
+		if err != nil {
+			return "", 0, nil, fmt.Errorf("failed to create temp file: %w", err)
+		}
+		tempFile = tmpFile.Name()
+		tmpFile.Close()
+		defer os.Remove(tempFile)
+
+		// Extract page (imagemagick uses 0-based indexing)
+		pageIndex := pageNum - 1
+		cmd := exec.Command("convert", fmt.Sprintf("%s[%d]", sourcePath, pageIndex), "-density", "300", tempFile)
+		if err := cmd.Run(); err != nil {
+			return "", 0, nil, fmt.Errorf("failed to extract page %d: %w", pageNum, err)
+		}
+		ocrSource = tempFile
+	} else {
+		// Single page TIFF can be processed directly
+		ocrSource = sourcePath
+	}
+
+	// Run tesseract OCR with TSV output for confidence and regions
+	cmd := exec.Command("tesseract", ocrSource, "stdout", "-l", lang, "tsv")
+	tsvOutput, err := cmd.Output()
+	if err != nil {
+		log.Printf("Tesseract TSV output failed for page %d: %v, falling back to plain text", pageNum, err)
+		// Fallback to plain text output
+		cmd = exec.Command("tesseract", ocrSource, "stdout", "-l", lang)
+		plainOutput, plainErr := cmd.Output()
+		if plainErr != nil {
+			return "", 0, nil, fmt.Errorf("tesseract failed: %w", plainErr)
+		}
+		text := strings.TrimSpace(string(plainOutput))
+		return text, 0.0, nil, nil
+	}
+
+	// Parse TSV output to extract text, confidence, and regions
+	text, confidence, regions := r.parseTesseractTSV(string(tsvOutput))
 
 	// Apply minimum confidence filter
 	if minConf, ok := config["min_confidence"]; ok {
@@ -530,7 +559,91 @@ func (r *TIFFReader) performOCR(sourcePath string, pageNum int, config map[strin
 		}
 	}
 
-	return ocrText, confidence, regions, nil
+	return text, confidence, regions, nil
+}
+
+// isMultiPageTIFF checks if the TIFF file has multiple pages
+func (r *TIFFReader) isMultiPageTIFF(sourcePath string) bool {
+	// Use identify command from imagemagick to check page count
+	if !r.commandExists("identify") {
+		return false // Can't determine, assume single page
+	}
+
+	cmd := exec.Command("identify", "-format", "%n\n", sourcePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) > 0 {
+		count, err := strconv.Atoi(strings.TrimSpace(lines[0]))
+		if err == nil && count > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// parseTesseractTSV parses tesseract TSV output to extract text, confidence, and regions
+func (r *TIFFReader) parseTesseractTSV(tsvOutput string) (string, float64, []TextRegion) {
+	lines := strings.Split(tsvOutput, "\n")
+	var textParts []string
+	var regions []TextRegion
+	var totalConf float64
+	var confCount int
+
+	// TSV columns: level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text
+	for i, line := range lines {
+		if i == 0 {
+			continue // Skip header
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 12 {
+			continue
+		}
+
+		text := fields[11]
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+
+		// Parse confidence
+		conf, err := strconv.ParseFloat(fields[10], 64)
+		if err != nil || conf < 0 {
+			continue
+		}
+
+		// Normalize confidence to 0-1 range (tesseract outputs 0-100)
+		normalizedConf := conf / 100.0
+
+		textParts = append(textParts, text)
+		totalConf += normalizedConf
+		confCount++
+
+		// Parse coordinates for text regions
+		left, _ := strconv.Atoi(fields[6])
+		top, _ := strconv.Atoi(fields[7])
+		width, _ := strconv.Atoi(fields[8])
+		height, _ := strconv.Atoi(fields[9])
+
+		regions = append(regions, TextRegion{
+			Text:       text,
+			X:          left,
+			Y:          top,
+			Width:      width,
+			Height:     height,
+			Confidence: normalizedConf,
+		})
+	}
+
+	// Calculate average confidence
+	avgConfidence := 0.0
+	if confCount > 0 {
+		avgConfidence = totalConf / float64(confCount)
+	}
+
+	return strings.Join(textParts, " "), avgConfidence, regions
 }
 
 // TIFFIterator implements ChunkIterator for TIFF files

@@ -651,7 +651,7 @@ func parseTimeString(timeStr string) time.Time {
 	if timeStr == "" {
 		return time.Time{}
 	}
-	
+
 	// Try common timestamp formats
 	formats := []string{
 		time.RFC3339,
@@ -659,13 +659,13 @@ func parseTimeString(timeStr string) time.Time {
 		"2006-01-02T15:04:05",
 		time.RFC3339Nano,
 	}
-	
+
 	for _, format := range formats {
 		if t, err := time.Parse(format, timeStr); err == nil {
 			return t
 		}
 	}
-	
+
 	// If parsing fails, return zero time
 	return time.Time{}
 }

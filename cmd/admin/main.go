@@ -19,11 +19,11 @@ const (
 func main() {
 	// Parse command line flags
 	var (
-		jwtSecret      = flag.String("jwt-secret", "", "JWT secret for signing tokens (required)")
-		expiryYears    = flag.Int("expiry-years", 5, "API key expiry in years (default: 5)")
-		scopes         = flag.String("scopes", "data:read,data:write,data:process,api:read,api:write", "Comma-separated list of scopes")
-		issuer         = flag.String("issuer", "audimodal", "JWT issuer (default: audimodal)")
-		showHelp       = flag.Bool("help", false, "Show help message")
+		jwtSecret   = flag.String("jwt-secret", "", "JWT secret for signing tokens (required)")
+		expiryYears = flag.Int("expiry-years", 5, "API key expiry in years (default: 5)")
+		scopes      = flag.String("scopes", "data:read,data:write,data:process,api:read,api:write", "Comma-separated list of scopes")
+		issuer      = flag.String("issuer", "audimodal", "JWT issuer (default: audimodal)")
+		showHelp    = flag.Bool("help", false, "Show help message")
 	)
 
 	flag.Parse()

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/jscharber/audimodal/internal/database"
 	"github.com/jscharber/audimodal/internal/database/models"
 	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/preprocessing"
 	"github.com/jscharber/audimodal/pkg/readers"
 	"github.com/jscharber/audimodal/pkg/registry"
 	"github.com/jscharber/audimodal/pkg/strategies"
@@ -33,7 +35,7 @@ type Pipeline struct {
 func RegisterBasicPlugins() {
 	// Register readers
 	readers.RegisterBasicReaders()
-	// Register strategies  
+	// Register strategies
 	strategies.RegisterBasicStrategies()
 }
 
@@ -115,9 +117,9 @@ func NewPipeline(db *database.Database, config *PipelineConfig) *Pipeline {
 // GetDefaultPipelineConfig returns default pipeline configuration
 func GetDefaultPipelineConfig() *PipelineConfig {
 	return &PipelineConfig{
-		MaxConcurrentFiles:  5,
+		MaxConcurrentFiles:  2, // Reduced from 5 to limit peak memory (60% reduction)
 		MaxConcurrentChunks: 20,
-		ChunkBatchSize:      100,
+		ChunkBatchSize:      5, // Reduced from 10 for faster GC cycles and lower peak memory
 		ProcessingTimeout:   30 * time.Minute,
 		RetryAttempts:       3,
 		RetryDelay:          5 * time.Second,
@@ -274,6 +276,10 @@ func (p *Pipeline) executeProcessingPipeline(ctx context.Context, request *Proce
 		return fmt.Errorf("failed to configure reader: %w", err)
 	}
 
+	// Add tenant/file context for map-reduce processing
+	configuredReaderConfig["tenant_id"] = request.TenantID.String()
+	configuredReaderConfig["file_id"] = request.FileID.String()
+
 	// Step 7: Create iterator
 	iterator, err := reader.CreateIterator(ctx, request.FilePath, configuredReaderConfig)
 	if err != nil {
@@ -301,6 +307,7 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 	// Process chunks in batches
 	chunkBatch := make([]*models.Chunk, 0, p.config.ChunkBatchSize)
 
+	iteratorCallCount := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -309,13 +316,17 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 		}
 
 		// Get next chunk from iterator
+		iteratorCallCount++
+		log.Printf("[PIPELINE] Calling iterator.Next() #%d, current chunks=%d", iteratorCallCount, chunkNumber)
 		rawChunk, err := iterator.Next(ctx)
 		if err != nil {
 			if err == core.ErrIteratorExhausted {
+				log.Printf("[PIPELINE] Iterator exhausted after %d calls, total chunks=%d", iteratorCallCount, chunkNumber)
 				break
 			}
 			return fmt.Errorf("iterator error: %w", err)
 		}
+		log.Printf("[PIPELINE] iterator.Next() #%d returned chunk with %d bytes", iteratorCallCount, len(fmt.Sprintf("%v", rawChunk.Data)))
 
 		// Create chunk metadata
 		metadata := core.ChunkMetadata{
@@ -326,21 +337,23 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 		}
 
 		// DEBUG: Log raw chunk data before strategy processing
-		log.Printf("[DEBUG] Raw iterator chunk data (length=%d): %.200s...", 
-			len(fmt.Sprintf("%v", rawChunk.Data)), 
+		log.Printf("[DEBUG] Raw iterator chunk data (length=%d): %.200s...",
+			len(fmt.Sprintf("%v", rawChunk.Data)),
 			fmt.Sprintf("%v", rawChunk.Data))
 
 		// Apply chunking strategy
+		log.Printf("[PIPELINE] Calling strategy.ProcessChunk() for iterator #%d", iteratorCallCount)
 		processedChunks, err := strategy.ProcessChunk(ctx, rawChunk.Data, metadata)
 		if err != nil {
 			return fmt.Errorf("strategy processing failed: %w", err)
 		}
+		log.Printf("[PIPELINE] strategy.ProcessChunk() returned %d chunks", len(processedChunks))
 
 		// Convert to database models and apply quality filter
 		for _, processedChunk := range processedChunks {
 			// DEBUG: Log input chunk data before conversion
-			log.Printf("[DEBUG] Raw chunk data (length=%d): %.200s...", 
-				len(fmt.Sprintf("%v", processedChunk.Data)), 
+			log.Printf("[DEBUG] Raw chunk data (length=%d): %.200s...",
+				len(fmt.Sprintf("%v", processedChunk.Data)),
 				fmt.Sprintf("%v", processedChunk.Data))
 
 			dbChunk := p.convertToDBChunk(processedChunk, request)
@@ -363,11 +376,16 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 
 			// Process batch if full
 			if len(chunkBatch) >= p.config.ChunkBatchSize {
+				batchNum := result.ChunksCreated/p.config.ChunkBatchSize + 1
+				log.Printf("[PIPELINE] Saving batch #%d with %d chunks (total so far: %d)", batchNum, len(chunkBatch), result.ChunksCreated)
 				if err := p.saveBatch(ctx, tenantRepo, chunkBatch); err != nil {
 					return fmt.Errorf("failed to save chunk batch: %w", err)
 				}
 				result.ChunksCreated += len(chunkBatch)
+				log.Printf("[PIPELINE] Batch #%d saved successfully, total chunks: %d", batchNum, result.ChunksCreated)
 				chunkBatch = chunkBatch[:0] // Reset batch
+				runtime.GC()                // Force GC to release memory between batches
+				log.Printf("[PIPELINE] GC complete, continuing to next iterator chunk")
 			}
 		}
 	}
@@ -401,13 +419,18 @@ func (p *Pipeline) saveBatch(ctx context.Context, tenantRepo *database.TenantRep
 
 // convertToDBChunk converts a core.Chunk to a database models.Chunk
 func (p *Pipeline) convertToDBChunk(chunk core.Chunk, request *ProcessingRequest) *models.Chunk {
+	// Convert chunk data to string and sanitize UTF-8 to prevent PostgreSQL encoding errors
+	// This handles PDFs and other documents that may contain malformed UTF-8 sequences
+	content := fmt.Sprintf("%v", chunk.Data)
+	sanitizedContent := preprocessing.SanitizeUTF8String(content)
+
 	dbChunk := &models.Chunk{
 		TenantID:        request.TenantID,
 		FileID:          request.FileID,
 		ChunkID:         chunk.Metadata.ChunkID,
 		ChunkType:       chunk.Metadata.ChunkType,
 		ChunkNumber:     p.extractChunkNumber(chunk.Metadata.ChunkID),
-		Content:         fmt.Sprintf("%v", chunk.Data),
+		Content:         sanitizedContent,
 		ContentHash:     p.calculateContentHash(chunk.Data),
 		SizeBytes:       chunk.Metadata.SizeBytes,
 		StartPosition:   chunk.Metadata.StartPosition,

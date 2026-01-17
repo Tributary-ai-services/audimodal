@@ -154,6 +154,13 @@ security-scan: ## Run Nancy vulnerability scanner (known issues documented in SE
 build: generate fmt vet ## Build manager binary
 	go build -o bin/server cmd/server/main.go
 	go build -o bin/migrate cmd/migrate/main.go
+	go build -o bin/pdfworker cmd/pdfworker/main.go
+
+.PHONY: build-pdfworker
+build-pdfworker: ## Build pdfworker binary for map-reduce PDF processing
+	@echo "Building pdfworker binary..."
+	go build -o bin/pdfworker cmd/pdfworker/main.go
+	@echo "pdfworker built at bin/pdfworker"
 
 .PHONY: docker-build
 docker-build: ## Build docker images

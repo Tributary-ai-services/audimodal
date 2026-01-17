@@ -801,7 +801,7 @@ func TestDeepLakeAPIClient_DeepLakeErrorHandling(t *testing.T) {
 	// Test server that returns DeepLake-style errors (HTTP 200 with success: false)
 	deepLakeErrorServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		
+
 		switch r.URL.Path {
 		case "/api/v1/datasets/", "/api/v1/datasets":
 			// Handle both GET (ListDatasets) and POST (CreateDataset)
@@ -905,7 +905,7 @@ func TestDeepLakeAPIClient_DeepLakeErrorHandling(t *testing.T) {
 	t.Run("SearchUnavailableError", func(t *testing.T) {
 		queryVector := []float32{0.1, 0.2, 0.3}
 		options := &embeddings.SearchOptions{TopK: 5}
-		
+
 		_, err := client.SearchSimilar(ctx, "test-dataset", queryVector, options)
 		assert.Error(t, err)
 
@@ -925,7 +925,7 @@ func TestDeepLakeAPIClient_DeepLakeErrorHandling(t *testing.T) {
 				Content:    "Test content",
 			},
 		}
-		
+
 		err := client.InsertVectors(ctx, "test-dataset", vectors)
 		assert.Error(t, err)
 

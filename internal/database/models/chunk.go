@@ -30,7 +30,7 @@ type Chunk struct {
 	LineNumber    *int   `json:"line_number,omitempty"`
 
 	// Relationships to other chunks
-	ParentChunkID *uuid.UUID       `gorm:"type:uuid;index" json:"parent_chunk_id,omitempty"`
+	ParentChunkID *uuid.UUID         `gorm:"type:uuid;index" json:"parent_chunk_id,omitempty"`
 	Relationships ChunkRelationships `gorm:"type:jsonb" json:"relationships,omitempty"`
 
 	// Processing metadata
@@ -56,10 +56,10 @@ type Chunk struct {
 	EmbeddedAt      *time.Time      `json:"embedded_at,omitempty"`
 
 	// Compliance and security
-	PIIDetected     bool                  `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
+	PIIDetected     bool                 `gorm:"column:pii_detected;default:false;index" json:"pii_detected"`
 	ComplianceFlags ChunkComplianceFlags `gorm:"type:jsonb" json:"compliance_flags,omitempty"`
-	DLPScanStatus   string                `gorm:"default:'pending'" json:"dlp_scan_status"`
-	DLPScanResult   string                `json:"dlp_scan_result,omitempty"` 
+	DLPScanStatus   string               `gorm:"default:'pending'" json:"dlp_scan_status"`
+	DLPScanResult   string               `json:"dlp_scan_result,omitempty"`
 
 	// Context information
 	Context ChunkContext `gorm:"type:jsonb" json:"context,omitempty"`

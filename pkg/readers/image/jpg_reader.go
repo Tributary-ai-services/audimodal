@@ -6,9 +6,12 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jscharber/audimodal/pkg/core"
@@ -239,9 +242,8 @@ func (r *JPGReader) checkOCRDependencies() []string {
 
 // commandExists checks if a command is available in PATH
 func (r *JPGReader) commandExists(cmd string) bool {
-	// This is a simplified check - in a real implementation,
-	// you would use exec.LookPath(cmd) to verify the command exists
-	return true // Assume dependencies are available for now
+	_, err := exec.LookPath(cmd)
+	return err == nil
 }
 
 // GetType returns the connector type
@@ -494,41 +496,40 @@ func (r *JPGReader) getColorModelName(cm color.Model) string {
 	}
 }
 
-// performOCR performs OCR on the JPEG image
+// performOCR performs OCR on the JPEG image using tesseract
 func (r *JPGReader) performOCR(sourcePath string, config map[string]any) (string, float64, []TextRegion, error) {
-	// In a real implementation, this would:
-	// 1. Check and correct orientation from EXIF
-	// 2. Preprocess the image if configured
-	// 3. Run tesseract OCR
-	// 4. Parse the results and confidence scores
-	// 5. Optionally extract text regions with coordinates
-
-	// Mock OCR results
-	ocrText := fmt.Sprintf("This is sample OCR text extracted from the JPEG image. " +
-		"In a production implementation, this would be the actual text recognized by Tesseract OCR " +
-		"from the image content. JPEG images often contain photos with embedded text, signs, documents, etc.")
-
-	confidence := 0.82 // Mock confidence score
-
-	// Mock text regions
-	regions := []TextRegion{
-		{
-			Text:       "Sample text region 1",
-			X:          150,
-			Y:          75,
-			Width:      300,
-			Height:     40,
-			Confidence: 0.88,
-		},
-		{
-			Text:       "Sample text region 2",
-			X:          150,
-			Y:          130,
-			Width:      280,
-			Height:     35,
-			Confidence: 0.76,
-		},
+	// Get OCR language from config
+	lang := "eng"
+	if l, ok := config["ocr_language"].(string); ok {
+		lang = l
 	}
+
+	// Get whether to include coordinates
+	includeCoords := false
+	if inc, ok := config["include_coordinates"].(bool); ok {
+		includeCoords = inc
+	}
+
+	log.Printf("[DEBUG] Running tesseract OCR on %s (lang=%s)", filepath.Base(sourcePath), lang)
+
+	// Run tesseract OCR with TSV output for confidence and regions
+	cmd := exec.Command("tesseract", sourcePath, "stdout", "-l", lang, "tsv")
+	tsvOutput, err := cmd.Output()
+	if err != nil {
+		// Fall back to plain text output
+		log.Printf("[WARN] Tesseract TSV failed, trying plain text: %v", err)
+		cmd = exec.Command("tesseract", sourcePath, "stdout", "-l", lang)
+		textOutput, err := cmd.Output()
+		if err != nil {
+			return "", 0, nil, fmt.Errorf("tesseract failed: %w", err)
+		}
+		text := strings.TrimSpace(string(textOutput))
+		log.Printf("[INFO] OCR extracted %d chars from %s (plain text mode)", len(text), filepath.Base(sourcePath))
+		return text, 0.8, nil, nil // Default confidence for plain text mode
+	}
+
+	// Parse TSV output for text, confidence, and regions
+	text, confidence, regions := r.parseTesseractTSV(string(tsvOutput), includeCoords)
 
 	// Apply minimum confidence filter
 	if minConf, ok := config["min_confidence"]; ok {
@@ -539,7 +540,74 @@ func (r *JPGReader) performOCR(sourcePath string, config map[string]any) (string
 		}
 	}
 
-	return ocrText, confidence, regions, nil
+	log.Printf("[INFO] OCR extracted %d chars from %s (confidence=%.2f, regions=%d)",
+		len(text), filepath.Base(sourcePath), confidence, len(regions))
+
+	return text, confidence, regions, nil
+}
+
+// parseTesseractTSV parses tesseract TSV output to extract text, confidence, and regions
+func (r *JPGReader) parseTesseractTSV(tsvOutput string, includeRegions bool) (string, float64, []TextRegion) {
+	lines := strings.Split(tsvOutput, "\n")
+	var words []string
+	var regions []TextRegion
+	var totalConf float64
+	var confCount int
+
+	// TSV columns: level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text
+	for i, line := range lines {
+		if i == 0 { // Skip header
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 12 {
+			continue
+		}
+
+		conf, err := strconv.ParseFloat(fields[10], 64)
+		if err != nil || conf < 0 {
+			continue
+		}
+
+		text := fields[11]
+		if text == "" || text == " " {
+			continue
+		}
+
+		words = append(words, text)
+		if conf > 0 {
+			totalConf += conf
+			confCount++
+		}
+
+		// Extract regions if requested
+		if includeRegions && conf > 0 {
+			left, _ := strconv.Atoi(fields[6])
+			top, _ := strconv.Atoi(fields[7])
+			width, _ := strconv.Atoi(fields[8])
+			height, _ := strconv.Atoi(fields[9])
+
+			regions = append(regions, TextRegion{
+				Text:       text,
+				X:          left,
+				Y:          top,
+				Width:      width,
+				Height:     height,
+				Confidence: conf / 100.0, // Normalize to 0-1
+			})
+		}
+	}
+
+	avgConf := 0.8 // Default
+	if confCount > 0 {
+		avgConf = totalConf / float64(confCount) / 100.0 // Normalize to 0-1
+	}
+
+	// Reconstruct text
+	finalText := strings.Join(words, " ")
+	finalText = strings.TrimSpace(finalText)
+
+	return finalText, avgConf, regions
 }
 
 // JPGIterator implements ChunkIterator for JPEG files
