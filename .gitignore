@@ -32,6 +32,9 @@ go.work.sum
 /server
 /pdfworker
 
+# Data directory
+/data/
+
 # Editor/IDE
 # .idea/
 # .vscode/
