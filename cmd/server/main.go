@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof" // Enable pprof profiling endpoints
 	"os"
 	"strconv"
 	"time"
@@ -197,6 +199,17 @@ func main() {
 
 	// Set as default logger
 	logger.SetDefault(appLogger)
+
+	// Start pprof debug server on port 6060 for memory profiling
+	// Access at: http://localhost:6060/debug/pprof/
+	// Heap profile: curl http://localhost:6060/debug/pprof/heap > heap.prof
+	go func() {
+		pprofAddr := "0.0.0.0:6060"
+		appLogger.Info("Starting pprof debug server", "address", pprofAddr)
+		if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+			appLogger.Error("pprof server failed", "error", err)
+		}
+	}()
 
 	// Validate JWT secret for production
 	if serverConfig.AuthEnabled && serverConfig.JWTSecret == "" {

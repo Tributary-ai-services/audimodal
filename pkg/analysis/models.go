@@ -10,6 +10,34 @@ import (
 	"unicode"
 )
 
+// Pre-compiled regex patterns for thread-safe concurrent access
+// These are compiled once at package initialization to avoid
+// repeated compilation during analysis operations
+var (
+	// General patterns
+	regexNonWord           = regexp.MustCompile(`[^\w]`)
+	regexWhitespace        = regexp.MustCompile(`\s+`)
+	regexDigits            = regexp.MustCompile(`\d+`)
+	regexCapitalizedWord   = regexp.MustCompile(`[A-Z][a-z]+`)
+	regexStartsWithCapital = regexp.MustCompile(`^[A-Z]`)
+	regexProperName        = regexp.MustCompile(`^[A-Z][a-z]+ [A-Z][a-z]+$`)
+
+	// Sentence splitting patterns
+	regexSentenceEndSpace = regexp.MustCompile(`[.!?]+\s+`)
+	regexSentenceEnd      = regexp.MustCompile(`[.!?]+`)
+	regexEndsPunctuation  = regexp.MustCompile(`[.!?]$`)
+	regexHasPunctuation   = regexp.MustCompile(`[.!?]`)
+
+	// Entity patterns (pre-compiled for performance)
+	regexEmail  = regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+	regexPhone  = regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b|\(\d{3}\)\s?\d{3}[-.]?\d{4}`)
+	regexURL    = regexp.MustCompile(`https?://[^\s]+`)
+	regexPerson = regexp.MustCompile(`\b[A-Z][a-z]+\s+[A-Z][a-z]+\b`)
+	regexOrg    = regexp.MustCompile(`\b[A-Z][a-zA-Z]*\s+(Inc|Corp|LLC|Ltd|Company|Corporation)\b`)
+	regexMoney  = regexp.MustCompile(`\$\d+(?:,\d{3})*(?:\.\d{2})?`)
+	regexDate   = regexp.MustCompile(`\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b`)
+)
+
 // Heuristic implementations of ML models for content analysis
 // These provide baseline functionality that can be enhanced with actual ML models
 
@@ -42,7 +70,7 @@ func (m *HeuristicSentimentModel) AnalyzeSentiment(ctx context.Context, text str
 
 	for _, word := range words {
 		// Clean word
-		cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
+		cleaned := regexNonWord.ReplaceAllString(word, "")
 		if len(cleaned) < 2 {
 			continue
 		}
@@ -123,7 +151,7 @@ func (m *HeuristicTopicModel) ExtractTopics(ctx context.Context, text string, ma
 
 	// Create word set for faster lookup
 	for _, word := range words {
-		cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
+		cleaned := regexNonWord.ReplaceAllString(word, "")
 		if len(cleaned) > 2 {
 			wordSet[cleaned] = true
 		}
@@ -247,7 +275,7 @@ func (m *HeuristicEntityModel) calculateEntityConfidence(entityType, text string
 		confidence = 0.9
 	case "PERSON":
 		// Higher confidence for common name patterns
-		if regexp.MustCompile(`^[A-Z][a-z]+ [A-Z][a-z]+$`).MatchString(text) {
+		if regexProperName.MatchString(text) {
 			confidence = 0.8
 		} else {
 			confidence = 0.6
@@ -322,7 +350,7 @@ func (m *HeuristicSummaryModel) GenerateSummary(ctx context.Context, text string
 
 func (m *HeuristicSummaryModel) splitIntoSentences(text string) []string {
 	// Simple sentence splitting
-	sentences := regexp.MustCompile(`[.!?]+\s+`).Split(text, -1)
+	sentences := regexSentenceEndSpace.Split(text, -1)
 	var result []string
 
 	for _, sentence := range sentences {
@@ -342,7 +370,7 @@ func (m *HeuristicSummaryModel) scoreSentences(sentences []string, fullText stri
 	wordFreq := make(map[string]int)
 	words := strings.Fields(strings.ToLower(fullText))
 	for _, word := range words {
-		cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
+		cleaned := regexNonWord.ReplaceAllString(word, "")
 		if len(cleaned) > 2 {
 			wordFreq[cleaned]++
 		}
@@ -354,7 +382,7 @@ func (m *HeuristicSummaryModel) scoreSentences(sentences []string, fullText stri
 		score := 0.0
 
 		for _, word := range sentenceWords {
-			cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
+			cleaned := regexNonWord.ReplaceAllString(word, "")
 			if freq, exists := wordFreq[cleaned]; exists && len(cleaned) > 2 {
 				score += float64(freq)
 			}
@@ -420,7 +448,7 @@ func (m *HeuristicSummaryModel) createAbstractiveSummary(sentences []string) str
 	summary := strings.Join(sentences, " ")
 
 	// Basic simplification rules
-	summary = regexp.MustCompile(`\s+`).ReplaceAllString(summary, " ")
+	summary = regexWhitespace.ReplaceAllString(summary, " ")
 	summary = strings.TrimSpace(summary)
 
 	// Ensure it doesn't exceed a reasonable length
@@ -456,7 +484,7 @@ func (m *HeuristicQualityModel) AssessQuality(ctx context.Context, text string) 
 		return QualityMetrics{}, nil
 	}
 
-	sentences := regexp.MustCompile(`[.!?]+`).Split(text, -1)
+	sentences := regexSentenceEnd.Split(text, -1)
 	words := strings.Fields(text)
 
 	// Calculate various quality metrics
@@ -562,10 +590,10 @@ func (m *HeuristicQualityModel) assessCompleteness(text string) float64 {
 	if strings.Contains(text, ".") {
 		score += 0.2
 	}
-	if regexp.MustCompile(`\d+`).MatchString(text) {
+	if regexDigits.MatchString(text) {
 		score += 0.1
 	}
-	if regexp.MustCompile(`[A-Z][a-z]+`).MatchString(text) {
+	if regexCapitalizedWord.MatchString(text) {
 		score += 0.2
 	}
 
@@ -580,7 +608,7 @@ func (m *HeuristicQualityModel) assessInformativeness(words []string) float64 {
 	// Assess based on vocabulary diversity
 	uniqueWords := make(map[string]bool)
 	for _, word := range words {
-		cleaned := strings.ToLower(regexp.MustCompile(`[^\w]`).ReplaceAllString(word, ""))
+		cleaned := strings.ToLower(regexNonWord.ReplaceAllString(word, ""))
 		if len(cleaned) > 2 {
 			uniqueWords[cleaned] = true
 		}
@@ -595,19 +623,47 @@ func (m *HeuristicQualityModel) assessRedundancy(sentences []string) float64 {
 		return 0.0
 	}
 
-	// Simple redundancy detection based on sentence similarity
+	// MEMORY OPTIMIZATION: Cap sentences at 10 to avoid O(n²) explosion
+	// For 30 sentences: 435 pairs × 2 strings.Fields = 870 allocations per chunk
+	// For 10 sentences: 45 pairs × 2 strings.Fields = 90 allocations per chunk (90% reduction)
+	maxSentences := 10
+	if len(sentences) > maxSentences {
+		sentences = sentences[:maxSentences]
+	}
+
+	// Pre-compute word sets once per sentence to avoid repeated strings.Fields calls
+	// This eliminates O(n²) strings.Fields calls in the inner loop
+	wordSets := make([]map[string]bool, len(sentences))
+	validSentences := make([]bool, len(sentences))
+
+	for i, sentence := range sentences {
+		if len(sentence) > 10 {
+			words := strings.Fields(strings.ToLower(sentence))
+			wordSets[i] = make(map[string]bool, len(words))
+			for _, word := range words {
+				wordSets[i][word] = true
+			}
+			validSentences[i] = true
+		}
+	}
+
+	// Simple redundancy detection based on sentence similarity using pre-computed sets
 	redundantPairs := 0
 	totalPairs := 0
 
 	for i := 0; i < len(sentences); i++ {
+		if !validSentences[i] {
+			continue
+		}
 		for j := i + 1; j < len(sentences); j++ {
-			if len(sentences[i]) > 10 && len(sentences[j]) > 10 {
-				similarity := m.calculateSimilarity(sentences[i], sentences[j])
-				if similarity > 0.8 {
-					redundantPairs++
-				}
-				totalPairs++
+			if !validSentences[j] {
+				continue
 			}
+			similarity := m.calculateSimilarityFromSets(wordSets[i], wordSets[j])
+			if similarity > 0.8 {
+				redundantPairs++
+			}
+			totalPairs++
 		}
 	}
 
@@ -622,12 +678,12 @@ func (m *HeuristicQualityModel) assessStructuralQuality(text string) float64 {
 	score := 0.0
 
 	// Check for proper capitalization
-	if regexp.MustCompile(`^[A-Z]`).MatchString(text) {
+	if regexStartsWithCapital.MatchString(text) {
 		score += 0.2
 	}
 
 	// Check for proper punctuation
-	if regexp.MustCompile(`[.!?]$`).MatchString(strings.TrimSpace(text)) {
+	if regexEndsPunctuation.MatchString(strings.TrimSpace(text)) {
 		score += 0.2
 	}
 
@@ -637,7 +693,7 @@ func (m *HeuristicQualityModel) assessStructuralQuality(text string) float64 {
 	}
 
 	// Check for reasonable sentence length distribution
-	sentences := regexp.MustCompile(`[.!?]+`).Split(text, -1)
+	sentences := regexSentenceEnd.Split(text, -1)
 	reasonableLengths := 0
 	for _, sentence := range sentences {
 		words := len(strings.Fields(sentence))
@@ -668,7 +724,7 @@ func (m *HeuristicQualityModel) identifyIssues(text string, words []string, sent
 	// Check for excessive repetition
 	wordCount := make(map[string]int)
 	for _, word := range words {
-		cleaned := strings.ToLower(regexp.MustCompile(`[^\w]`).ReplaceAllString(word, ""))
+		cleaned := strings.ToLower(regexNonWord.ReplaceAllString(word, ""))
 		if len(cleaned) > 3 {
 			wordCount[cleaned]++
 		}
@@ -681,7 +737,7 @@ func (m *HeuristicQualityModel) identifyIssues(text string, words []string, sent
 	}
 
 	// Check for missing punctuation
-	if !regexp.MustCompile(`[.!?]`).MatchString(text) {
+	if !regexHasPunctuation.MatchString(text) {
 		issues = append(issues, "Missing punctuation")
 	}
 
@@ -702,6 +758,24 @@ func (m *HeuristicQualityModel) calculateSimilarity(s1, s2 string) float64 {
 		set2[word] = true
 	}
 
+	intersection := 0
+	for word := range set1 {
+		if set2[word] {
+			intersection++
+		}
+	}
+
+	union := len(set1) + len(set2) - intersection
+	if union == 0 {
+		return 0.0
+	}
+
+	return float64(intersection) / float64(union)
+}
+
+// calculateSimilarityFromSets computes Jaccard similarity from pre-computed word sets
+// This avoids repeated strings.Fields allocations in O(n²) loops
+func (m *HeuristicQualityModel) calculateSimilarityFromSets(set1, set2 map[string]bool) float64 {
 	intersection := 0
 	for word := range set1 {
 		if set2[word] {
@@ -916,7 +990,7 @@ func (m *HeuristicEmotionModel) AnalyzeEmotion(ctx context.Context, text string)
 
 	// Score each word
 	for _, word := range words {
-		cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
+		cleaned := regexNonWord.ReplaceAllString(word, "")
 		if len(cleaned) < 2 {
 			continue
 		}
@@ -1028,19 +1102,22 @@ func getTopicKeywords() map[string][]string {
 		"legal":      {"law", "legal", "court", "judge", "attorney", "contract", "regulation", "compliance", "policy", "rights"},
 		"science":    {"research", "study", "experiment", "analysis", "scientific", "theory", "hypothesis", "data", "method", "result"},
 		"politics":   {"government", "political", "policy", "election", "vote", "democracy", "parliament", "senator", "congress", "legislation"},
+		"security":   {"security", "threat", "attack", "vulnerability", "risk", "protection", "breach", "cyber", "malware", "encryption", "firewall", "authentication", "access", "hacker", "phishing"},
+		"ai":         {"artificial", "intelligence", "machine", "learning", "neural", "network", "model", "algorithm", "training", "prediction", "automation", "cognitive", "nlp", "deep"},
 	}
 }
 
 // Entity recognition patterns
 func getEntityPatterns() map[string]*regexp.Regexp {
+	// Use pre-compiled package-level regex patterns for thread-safe concurrent access
 	return map[string]*regexp.Regexp{
-		"EMAIL":  regexp.MustCompile(`[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`),
-		"PHONE":  regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b|\(\d{3}\)\s?\d{3}[-.]?\d{4}`),
-		"URL":    regexp.MustCompile(`https?://[^\s]+`),
-		"PERSON": regexp.MustCompile(`\b[A-Z][a-z]+\s+[A-Z][a-z]+\b`),
-		"ORG":    regexp.MustCompile(`\b[A-Z][a-zA-Z]*\s+(Inc|Corp|LLC|Ltd|Company|Corporation)\b`),
-		"MONEY":  regexp.MustCompile(`\$\d+(?:,\d{3})*(?:\.\d{2})?`),
-		"DATE":   regexp.MustCompile(`\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b`),
+		"EMAIL":  regexEmail,
+		"PHONE":  regexPhone,
+		"URL":    regexURL,
+		"PERSON": regexPerson,
+		"ORG":    regexOrg,
+		"MONEY":  regexMoney,
+		"DATE":   regexDate,
 	}
 }
 

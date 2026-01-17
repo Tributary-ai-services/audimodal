@@ -37,7 +37,41 @@ This script will install:
 - Linting and formatting tools (golangci-lint)
 - Additional utilities (jq, yq, docker-compose)
 
-#### 3. Initialize Project
+#### 3. Install PDF Processing Tools
+
+For PDF processing and OCR capabilities, install the required tools:
+
+```bash
+# Run the PDF tools installation script
+chmod +x scripts/install-pdf-tools.sh
+./scripts/install-pdf-tools.sh
+```
+
+Or install manually:
+
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-eng
+
+# macOS
+brew install poppler tesseract
+
+# RHEL/CentOS/Fedora
+sudo dnf install -y poppler-utils tesseract tesseract-langpack-eng
+```
+
+**Required tools:**
+| Tool | Package | Purpose |
+|------|---------|---------|
+| `pdftotext` | poppler-utils | Extract text from PDF pages |
+| `pdfinfo` | poppler-utils | Get PDF metadata and page count |
+| `pdffonts` | poppler-utils | Detect embedded fonts (text vs scanned) |
+| `pdfimages` | poppler-utils | Extract/detect images in PDF |
+| `pdftoppm` | poppler-utils | Convert PDF pages to images for OCR |
+| `tesseract` | tesseract-ocr | OCR engine for scanned documents |
+
+#### 4. Initialize Project
 
 ```bash
 # Download Go dependencies
@@ -124,6 +158,34 @@ make test-integration
 
 # Run all tests with coverage
 ./scripts/run-tests.sh
+```
+
+### PDF Processing Tests
+
+The mapreduce PDF processing pipeline requires test data and specific environment setup:
+
+```bash
+# Set the test PDF path (use TAS test data repo)
+export TEST_PDF_PATH=/home/jscharber/eng/TAS/tas-test-data/pdf/TAS_Data_Models_Consolidated.pdf
+
+# Run PDF mapreduce tests
+go test -v ./pkg/readers/pdf/mapreduce/...
+
+# Run with race detection
+go test -race ./pkg/readers/pdf/mapreduce/...
+
+# Run benchmarks
+go test -bench=. ./pkg/readers/pdf/mapreduce/...
+```
+
+**Test Data Location:**
+- PDF test files: `/home/jscharber/eng/TAS/tas-test-data/pdf/`
+- Set `TEST_PDF_PATH` environment variable for integration tests
+
+**Adding to shell profile:**
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export TEST_PDF_PATH=/home/jscharber/eng/TAS/tas-test-data/pdf/TAS_Data_Models_Consolidated.pdf
 ```
 
 ### Code Quality
@@ -314,6 +376,7 @@ Located in the `scripts/` directory:
 
 - `install-go.sh`: Install latest Go version
 - `setup-dev.sh`: Setup complete development environment
+- `install-pdf-tools.sh`: Install PDF processing tools (poppler, tesseract)
 - `run-tests.sh`: Run comprehensive test suite
 - `generate-crds.sh`: Generate and validate CRDs
 - `build-images.sh`: Build and optionally push Docker images
@@ -327,6 +390,9 @@ chmod +x scripts/*.sh
 
 # Setup development environment
 ./scripts/setup-dev.sh
+
+# Install PDF processing tools
+./scripts/install-pdf-tools.sh
 
 # Run all tests with coverage
 ./scripts/run-tests.sh

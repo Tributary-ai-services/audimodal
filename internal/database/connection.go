@@ -122,6 +122,7 @@ func (c *Connection) AutoMigrate() error {
 		&models.DLPViolation{},
 		&models.File{},
 		&models.Chunk{},
+		&models.PageResult{},
 	)
 }
 

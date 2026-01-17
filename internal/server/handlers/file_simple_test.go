@@ -39,7 +39,7 @@ func TestFileHandler_TenantContextValidation(t *testing.T) {
 
 		// Should return 400 for missing tenant context
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		
+
 		// Should contain error about tenant context
 		body := recorder.Body.String()
 		assert.Contains(t, body, "Tenant context required")
@@ -86,7 +86,7 @@ func TestFileHandler_RouteNotFound(t *testing.T) {
 
 			// Should return 404 for routes that don't contain "files"
 			assert.Equal(t, http.StatusNotFound, recorder.Code, tt.description)
-			
+
 			// Should contain "File endpoint not found" message
 			body := recorder.Body.String()
 			assert.Contains(t, body, "File endpoint not found")
@@ -105,7 +105,7 @@ func TestFileHandler_InvalidFileUUID(t *testing.T) {
 	tenantID := uuid.New()
 	invalidUUIDs := []string{
 		"invalid-uuid",
-		"not-a-uuid-at-all", 
+		"not-a-uuid-at-all",
 		"123-456-789",
 		"too-short",
 	}
@@ -120,7 +120,7 @@ func TestFileHandler_InvalidFileUUID(t *testing.T) {
 
 			// Should return 400 for invalid UUID format
 			assert.Equal(t, http.StatusBadRequest, recorder.Code)
-			
+
 			// Should contain error about invalid file ID format
 			body := recorder.Body.String()
 			assert.Contains(t, body, "Invalid file ID format")
@@ -196,13 +196,13 @@ func TestFileHandler_MethodNotAllowed(t *testing.T) {
 	}
 
 	tenantID := uuid.New()
-	
+
 	// Test only methods that should return method not allowed before hitting database
 	tests := []struct {
-		name           string
-		method         string
-		url            string
-		description    string
+		name        string
+		method      string
+		url         string
+		description string
 	}{
 		{
 			name:        "files_list_patch",
@@ -227,12 +227,12 @@ func TestFileHandler_MethodNotAllowed(t *testing.T) {
 
 			// Should return method not allowed
 			assert.Equal(t, http.StatusMethodNotAllowed, recorder.Code, tt.description)
-			
+
 			body := recorder.Body.String()
 			assert.Contains(t, body, "Method not allowed")
 		})
 	}
-	
+
 	// Note: GET and POST on /files route to ListFiles/CreateFile which require database access
 }
 

@@ -11,6 +11,32 @@ import (
 	"time"
 )
 
+// Pre-compiled regex patterns to avoid repeated compilation in hot loops
+var (
+	mlRegexNonWord     = regexp.MustCompile(`[^\w]`)
+	mlRegexDigits      = regexp.MustCompile(`\d+`)
+	mlRegexCapitals    = regexp.MustCompile(`[A-Z]`)
+	mlRegexSentenceEnd = regexp.MustCompile(`[.!?]+`)
+	mlRegexLetters     = regexp.MustCompile(`[a-zA-Z]`)
+	mlRegexNonLower    = regexp.MustCompile(`[^a-z]`)
+	mlRegexVowels      = regexp.MustCompile(`[aeiouy]`)
+	mlRegexStartCap    = regexp.MustCompile(`^[A-Z]`)
+	mlRegexSuffixes    = regexp.MustCompile(`(tion|sion|ness|ment|ity)$`)
+	mlRegexAllCaps     = regexp.MustCompile(`^[A-Z]{2,}$`)
+)
+
+// MEMORY FIX: Package-level stop words map to avoid recreation per call
+// This saves ~1KB allocation per extractKeyPhrases call (7+ calls per document)
+var mlStopWords = map[string]bool{
+	"the": true, "a": true, "an": true, "and": true, "or": true, "but": true,
+	"in": true, "on": true, "at": true, "to": true, "for": true, "of": true,
+	"with": true, "by": true, "is": true, "are": true, "was": true, "were": true,
+	"be": true, "been": true, "have": true, "has": true, "had": true, "do": true,
+	"does": true, "did": true, "will": true, "would": true, "could": true, "should": true,
+	"this": true, "that": true, "these": true, "those": true, "i": true, "you": true,
+	"he": true, "she": true, "it": true, "we": true, "they": true, "them": true,
+}
+
 // MLAnalysisResult represents the result of ML-based content analysis
 type MLAnalysisResult struct {
 	DocumentID        string              `json:"document_id"`
@@ -260,7 +286,7 @@ func DefaultMLAnalysisConfig() *MLAnalysisConfig {
 		ModelTimeout:       30 * time.Second,
 		CacheEnabled:       true,
 		CacheTTL:           1 * time.Hour,
-		ParallelProcessing: true,
+		ParallelProcessing: false, // TODO: Re-enable if not the cause of OOM - disabled to test memory fix
 		BatchSize:          10,
 	}
 }
@@ -441,44 +467,32 @@ func (a *MLAnalyzer) extractKeyPhrases(text string) []KeyPhraseResult {
 		return []KeyPhraseResult{}
 	}
 
-	// Remove common stop words
-	stopWords := map[string]bool{
-		"the": true, "a": true, "an": true, "and": true, "or": true, "but": true,
-		"in": true, "on": true, "at": true, "to": true, "for": true, "of": true,
-		"with": true, "by": true, "is": true, "are": true, "was": true, "were": true,
-		"be": true, "been": true, "have": true, "has": true, "had": true, "do": true,
-		"does": true, "did": true, "will": true, "would": true, "could": true, "should": true,
-		"this": true, "that": true, "these": true, "those": true, "i": true, "you": true,
-		"he": true, "she": true, "it": true, "we": true, "they": true, "them": true,
-	}
+	// MEMORY FIX: Use package-level mlStopWords instead of creating new map
+	// This saves ~1KB allocation per call
 
-	// Count word frequencies
-	wordFreq := make(map[string]int)
+	// Count word frequencies and add bigrams to same map
+	// MEMORY FIX: Combined wordFreq and phrases into single map (was creating duplicate)
+	phrases := make(map[string]int, len(words)/2) // Pre-allocate with estimated capacity
 	for _, word := range words {
-		cleaned := regexp.MustCompile(`[^\w]`).ReplaceAllString(word, "")
-		if len(cleaned) > 2 && !stopWords[cleaned] {
-			wordFreq[cleaned]++
+		cleaned := mlRegexNonWord.ReplaceAllString(word, "")
+		if len(cleaned) > 2 && !mlStopWords[cleaned] {
+			phrases[cleaned]++
 		}
 	}
 
-	// Extract n-grams (bigrams and trigrams)
-	phrases := make(map[string]int)
-	for phrase := range wordFreq {
-		phrases[phrase] = wordFreq[phrase]
-	}
-
-	// Add bigrams
+	// Add bigrams directly to phrases map (no separate copy)
 	for i := 0; i < len(words)-1; i++ {
-		word1 := regexp.MustCompile(`[^\w]`).ReplaceAllString(words[i], "")
-		word2 := regexp.MustCompile(`[^\w]`).ReplaceAllString(words[i+1], "")
-		if len(word1) > 2 && len(word2) > 2 && !stopWords[word1] && !stopWords[word2] {
+		word1 := mlRegexNonWord.ReplaceAllString(words[i], "")
+		word2 := mlRegexNonWord.ReplaceAllString(words[i+1], "")
+		if len(word1) > 2 && len(word2) > 2 && !mlStopWords[word1] && !mlStopWords[word2] {
 			bigram := word1 + " " + word2
 			phrases[bigram]++
 		}
 	}
 
 	// Convert to results and sort by score
-	var results []KeyPhraseResult
+	// MEMORY FIX: Pre-allocate results slice with estimated capacity
+	results := make([]KeyPhraseResult, 0, min(len(phrases), 20))
 	for phrase, freq := range phrases {
 		if freq < 2 {
 			continue // Filter low-frequency phrases
@@ -510,15 +524,29 @@ func (a *MLAnalyzer) extractKeyPhrases(text string) []KeyPhraseResult {
 // computeReadabilityScore computes various readability metrics
 func (a *MLAnalyzer) computeReadabilityScore(text string) ReadabilityScore {
 	sentences := a.countSentences(text)
-	words := a.countWords(text)
-	syllables := a.countSyllables(text)
 
-	if sentences == 0 || words == 0 {
+	// MEMORY OPTIMIZATION: Parse text ONCE and reuse tokenized words
+	// Previously: countWords, countSyllables, countComplexWords each called strings.Fields
+	// Now: Single strings.Fields call, compute all metrics in one pass
+	words := strings.Fields(strings.ToLower(text))
+	wordCount := len(words)
+
+	if sentences == 0 || wordCount == 0 {
 		return ReadabilityScore{}
 	}
 
-	avgWordsPerSentence := float64(words) / float64(sentences)
-	avgSyllablesPerWord := float64(syllables) / float64(words)
+	// Single-pass computation of syllables and complex words
+	var syllables, complexWords int
+	for _, word := range words {
+		syllableCount := a.countSyllablesInWord(word)
+		syllables += syllableCount
+		if syllableCount >= 3 {
+			complexWords++
+		}
+	}
+
+	avgWordsPerSentence := float64(wordCount) / float64(sentences)
+	avgSyllablesPerWord := float64(syllables) / float64(wordCount)
 
 	// Flesch-Kincaid Grade Level
 	fleschKincaid := 0.39*avgWordsPerSentence + 11.8*avgSyllablesPerWord - 15.59
@@ -527,19 +555,18 @@ func (a *MLAnalyzer) computeReadabilityScore(text string) ReadabilityScore {
 	fleschReading := 206.835 - 1.015*avgWordsPerSentence - 84.6*avgSyllablesPerWord
 
 	// Gunning Fog Index
-	complexWords := a.countComplexWords(text)
-	gunningFog := 0.4 * (avgWordsPerSentence + 100*float64(complexWords)/float64(words))
+	gunningFog := 0.4 * (avgWordsPerSentence + 100*float64(complexWords)/float64(wordCount))
 
 	// SMOG Index
 	smog := 1.043*math.Sqrt(float64(complexWords)*30/float64(sentences)) + 3.1291
 
 	// Coleman-Liau Index
-	avgLettersPerWord := float64(a.countLetters(text)) / float64(words)
-	colemanLiau := 0.0588*avgLettersPerWord*100/avgWordsPerSentence - 0.296*float64(sentences)*100/float64(words) - 15.8
+	avgLettersPerWord := float64(a.countLetters(text)) / float64(wordCount)
+	colemanLiau := 0.0588*avgLettersPerWord*100/avgWordsPerSentence - 0.296*float64(sentences)*100/float64(wordCount) - 15.8
 
 	// Estimated reading time (words per minute)
 	wordsPerMinute := 200.0
-	readingTime := int(float64(words) / wordsPerMinute * 60)
+	readingTime := int(float64(wordCount) / wordsPerMinute * 60)
 
 	return ReadabilityScore{
 		FleschKincaid: math.Round(fleschKincaid*100) / 100,
@@ -556,12 +583,23 @@ func (a *MLAnalyzer) computeReadabilityScore(text string) ReadabilityScore {
 func (a *MLAnalyzer) classifyContentType(text string) ContentTypeResult {
 	features := make(map[string]float64)
 
-	// Extract features
-	features["avg_sentence_length"] = float64(a.countWords(text)) / float64(a.countSentences(text))
-	features["question_ratio"] = float64(strings.Count(text, "?")) / float64(len(text))
-	features["exclamation_ratio"] = float64(strings.Count(text, "!")) / float64(len(text))
-	features["number_ratio"] = float64(len(regexp.MustCompile(`\d+`).FindAllString(text, -1))) / float64(a.countWords(text))
-	features["capital_ratio"] = float64(len(regexp.MustCompile(`[A-Z]`).FindAllString(text, -1))) / float64(len(text))
+	// MEMORY OPTIMIZATION: Count words once instead of twice
+	wordCount := len(strings.Fields(text))
+	sentenceCount := a.countSentences(text)
+	textLen := len(text)
+
+	// Extract features using pre-computed counts
+	if sentenceCount > 0 {
+		features["avg_sentence_length"] = float64(wordCount) / float64(sentenceCount)
+	}
+	if textLen > 0 {
+		features["question_ratio"] = float64(strings.Count(text, "?")) / float64(textLen)
+		features["exclamation_ratio"] = float64(strings.Count(text, "!")) / float64(textLen)
+		features["capital_ratio"] = float64(len(mlRegexCapitals.FindAllString(text, -1))) / float64(textLen)
+	}
+	if wordCount > 0 {
+		features["number_ratio"] = float64(len(mlRegexDigits.FindAllString(text, -1))) / float64(wordCount)
+	}
 
 	// Simple rule-based classification
 	primaryType := "general"
@@ -616,7 +654,7 @@ func (a *MLAnalyzer) computeOverallConfidence(result *MLAnalysisResult) float64 
 
 // Helper functions for text analysis
 func (a *MLAnalyzer) countSentences(text string) int {
-	count := len(regexp.MustCompile(`[.!?]+`).FindAllString(text, -1))
+	count := len(mlRegexSentenceEnd.FindAllString(text, -1))
 	if count == 0 {
 		return 1
 	}
@@ -628,7 +666,7 @@ func (a *MLAnalyzer) countWords(text string) int {
 }
 
 func (a *MLAnalyzer) countLetters(text string) int {
-	return len(regexp.MustCompile(`[a-zA-Z]`).FindAllString(text, -1))
+	return len(mlRegexLetters.FindAllString(text, -1))
 }
 
 func (a *MLAnalyzer) countSyllables(text string) int {
@@ -643,13 +681,12 @@ func (a *MLAnalyzer) countSyllables(text string) int {
 }
 
 func (a *MLAnalyzer) countSyllablesInWord(word string) int {
-	word = regexp.MustCompile(`[^a-z]`).ReplaceAllString(word, "")
+	word = mlRegexNonLower.ReplaceAllString(word, "")
 	if len(word) == 0 {
 		return 0
 	}
 
-	vowels := regexp.MustCompile(`[aeiouy]`)
-	matches := vowels.FindAllString(word, -1)
+	matches := mlRegexVowels.FindAllString(word, -1)
 	syllables := len(matches)
 
 	// Adjust for silent e
@@ -679,12 +716,12 @@ func (a *MLAnalyzer) countComplexWords(text string) int {
 
 func (a *MLAnalyzer) isLikelyNoun(phrase string) bool {
 	// Simple heuristic: check if phrase starts with capital letter or contains common noun patterns
-	return regexp.MustCompile(`^[A-Z]`).MatchString(phrase) ||
-		regexp.MustCompile(`(tion|sion|ness|ment|ity)$`).MatchString(phrase)
+	return mlRegexStartCap.MatchString(phrase) ||
+		mlRegexSuffixes.MatchString(phrase)
 }
 
 func (a *MLAnalyzer) isAcronym(phrase string) bool {
-	return regexp.MustCompile(`^[A-Z]{2,}$`).MatchString(phrase)
+	return mlRegexAllCaps.MatchString(phrase)
 }
 
 // ToJSON converts the analysis result to JSON

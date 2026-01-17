@@ -74,6 +74,16 @@ type Config struct {
 
 	// DeepLake API configuration
 	DeepLakeAPI *DeepLakeAPIConfig `yaml:"deeplake_api"`
+
+	// Kafka configuration for event publishing
+	Kafka *KafkaConfig `yaml:"kafka"`
+}
+
+// KafkaConfig represents Kafka configuration for event publishing
+type KafkaConfig struct {
+	Enabled          bool   `yaml:"enabled" env:"KAFKA_ENABLED" default:"false"`
+	BootstrapServers string `yaml:"bootstrap_servers" env:"KAFKA_BROKERS" default:"localhost:9092"`
+	ClientID         string `yaml:"client_id" env:"KAFKA_CLIENT_ID" default:"audimodal-producer"`
 }
 
 // DeepLakeAPIConfig represents the DeepLake API configuration
@@ -150,6 +160,16 @@ func GetDefaultConfig() *Config {
 		MaxPageSize:        100,
 		Database:           database.GetDefaultConfig(),
 		DeepLakeAPI:        GetDefaultDeepLakeAPIConfig(),
+		Kafka:              GetDefaultKafkaConfig(),
+	}
+}
+
+// GetDefaultKafkaConfig returns a default Kafka configuration
+func GetDefaultKafkaConfig() *KafkaConfig {
+	return &KafkaConfig{
+		Enabled:          false,
+		BootstrapServers: "localhost:9092",
+		ClientID:         "audimodal-producer",
 	}
 }
 

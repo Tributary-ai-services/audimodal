@@ -327,7 +327,7 @@ func (h *MLAnalysisHandler) GetAnalysisStats(w http.ResponseWriter, r *http.Requ
 	response.WriteSuccess(w, getRequestID(r), stats, nil)
 }
 
-// GenerateInsights handles POST /api/v1/ml/insights/generate  
+// GenerateInsights handles POST /api/v1/ml/insights/generate
 func (h *MLAnalysisHandler) GenerateInsights(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	if r.Method != http.MethodPost {
 		response.WriteError(w, getRequestID(r), http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed", nil)
@@ -372,7 +372,7 @@ func (h *MLAnalysisHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Parse path to determine action
 	path := r.URL.Path
-	
+
 	// Handle insights endpoints
 	if strings.Contains(path, "/ml/insights") {
 		switch {
@@ -493,14 +493,14 @@ func (h *MLAnalysisHandler) calculateAnalysisStats(tenantRepo *database.TenantRe
 func (h *MLAnalysisHandler) generateTenantInsights(tenantID uuid.UUID, timeRange string) map[string]interface{} {
 	// Generate comprehensive insights for the tenant
 	insights := map[string]interface{}{
-		"tenant_id":   tenantID,
-		"time_range":  timeRange,
+		"tenant_id":    tenantID,
+		"time_range":   timeRange,
 		"generated_at": time.Now().UTC().Format("2006-01-02T15:04:05Z"),
 		"summary": map[string]interface{}{
-			"total_files_analyzed":    1,
-			"avg_processing_time_ms":  850,
-			"confidence_score":        0.92,
-			"anomalies_detected":      0,
+			"total_files_analyzed":   1,
+			"avg_processing_time_ms": 850,
+			"confidence_score":       0.92,
+			"anomalies_detected":     0,
 		},
 		"content_insights": map[string]interface{}{
 			"dominant_language": "English",
@@ -513,9 +513,9 @@ func (h *MLAnalysisHandler) generateTenantInsights(tenantID uuid.UUID, timeRange
 			"key_topics": []string{"document", "analysis", "upload"},
 		},
 		"quality_metrics": map[string]interface{}{
-			"coherence_score":     0.88,
-			"completeness_score":  0.95,
-			"relevance_score":     0.91,
+			"coherence_score":    0.88,
+			"completeness_score": 0.95,
+			"relevance_score":    0.91,
 		},
 		"recommendations": []string{
 			"Document successfully uploaded and analyzed",

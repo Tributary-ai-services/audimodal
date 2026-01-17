@@ -104,11 +104,11 @@ func TestSearchErrorHandling(t *testing.T) {
 		json.NewDecoder(resp.Body).Decode(&result)
 
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-		
+
 		if success, exists := result["success"]; exists && success != nil {
 			assert.False(t, success.(bool))
 		}
-		
+
 		if errorInfo, ok := result["error"].(map[string]interface{}); ok {
 			if code, exists := errorInfo["code"]; exists && code != nil {
 				assert.Equal(t, "BAD_REQUEST", code.(string))
@@ -136,11 +136,11 @@ func TestSearchErrorHandling(t *testing.T) {
 		json.NewDecoder(resp.Body).Decode(&result)
 
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-		
+
 		if success, exists := result["success"]; exists && success != nil {
 			assert.False(t, success.(bool))
 		}
-		
+
 		if errorInfo, ok := result["error"].(map[string]interface{}); ok {
 			if code, exists := errorInfo["code"]; exists && code != nil {
 				assert.Equal(t, "BAD_REQUEST", code.(string))
@@ -176,12 +176,12 @@ func TestSearchErrorHandling(t *testing.T) {
 		json.NewDecoder(resp.Body).Decode(&result)
 
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-		
+
 		// Check if response has expected structure
 		if success, exists := result["success"]; exists && success != nil {
 			assert.False(t, success.(bool))
 		}
-		
+
 		if errorInfo, ok := result["error"].(map[string]interface{}); ok {
 			if code, exists := errorInfo["code"]; exists && code != nil {
 				assert.Equal(t, "NOT_FOUND", code.(string))
@@ -262,10 +262,10 @@ func TestSearchStatusCodeMapping(t *testing.T) {
 	// Use shared baseURL and testTenantID from test_helpers.go
 
 	tests := []struct {
-		name           string
-		searchData     map[string]interface{}
-		expectedCodes  []int // Multiple acceptable codes due to different system states
-		validateError  func(t *testing.T, result map[string]interface{})
+		name          string
+		searchData    map[string]interface{}
+		expectedCodes []int // Multiple acceptable codes due to different system states
+		validateError func(t *testing.T, result map[string]interface{})
 	}{
 		{
 			name: "Valid search query",
@@ -339,7 +339,7 @@ func TestSearchStatusCodeMapping(t *testing.T) {
 			}
 
 			if !validStatus {
-				t.Errorf("Expected status codes %v, got %d. Response: %+v", 
+				t.Errorf("Expected status codes %v, got %d. Response: %+v",
 					tt.expectedCodes, resp.StatusCode, result)
 			}
 

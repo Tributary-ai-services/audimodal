@@ -16,7 +16,7 @@ type MLAnalysisResult struct {
 	AnalysisType   string     `gorm:"type:varchar(50);not null" json:"analysis_type"`
 	ResultData     string     `gorm:"type:jsonb;not null" json:"result_data"`
 	Confidence     float64    `gorm:"type:decimal(5,4);default:0.0" json:"confidence"`
-	ProcessingTime int64      `gorm:"type:bigint;default:0" json:"processing_time_ms"`
+	ProcessingTime int64      `gorm:"column:processing_time_ms;type:bigint;default:0" json:"processing_time_ms"`
 	ModelVersions  string     `gorm:"type:jsonb" json:"model_versions"`
 	Status         string     `gorm:"type:varchar(20);not null;default:'pending'" json:"status"`
 	Error          string     `gorm:"type:text" json:"error,omitempty"`

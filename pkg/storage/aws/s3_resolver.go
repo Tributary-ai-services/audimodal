@@ -379,7 +379,7 @@ func (r *S3Resolver) createS3Client(ctx context.Context, region string, creds *s
 			creds.SessionToken,
 		)
 		configOptions = append(configOptions, config.WithCredentialsProvider(credProvider))
-		
+
 		// Override region if provided in credentials
 		if creds.Region != "" {
 			configOptions = append(configOptions, config.WithRegion(creds.Region))
@@ -408,7 +408,7 @@ func (r *S3Resolver) createS3Client(ctx context.Context, region string, creds *s
 
 	// Create S3 service configuration
 	s3Options := []func(*s3.Options){}
-	
+
 	if customEndpoint != "" {
 		s3Options = append(s3Options, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(customEndpoint)

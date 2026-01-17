@@ -7,8 +7,9 @@ import (
 
 // Common test constants with K8s service discovery defaults
 // For local testing, set environment variables:
-//   DEEPLAKE_API_URL=http://localhost:8000
-//   AUDIMODAL_URL=http://localhost:8080
+//
+//	DEEPLAKE_API_URL=http://localhost:8000
+//	AUDIMODAL_URL=http://localhost:8080
 var (
 	deeplakeAPIURL  = getEnvOrDefault("DEEPLAKE_API_URL", "http://deeplake-api:8000")
 	audimodalAPIURL = getEnvOrDefault("AUDIMODAL_URL", "http://audimodal:8080")
@@ -18,8 +19,8 @@ var (
 
 const (
 	testDatasetName  = "test_audimodal_dataset"
-	testTenantID     = "ba305c7d-cf52-475f-991b-0dea63109d25" // UUID of test_tenant created in K8s
-	testDataSourceID = "2e887333-712f-4c4b-b79e-d4a61e28cda5" // UUID of test_datasource created in K8s
+	testTenantID     = "ba305c7d-cf52-475f-991b-0dea63109d25"          // UUID of test_tenant created in K8s
+	testDataSourceID = "2e887333-712f-4c4b-b79e-d4a61e28cda5"          // UUID of test_datasource created in K8s
 	testAPIKey       = "test-api-key-for-integration-testing-12345678" // Must be at least 32 chars
 )
 

@@ -170,17 +170,17 @@ func TestEmbeddingGeneration(t *testing.T) {
 		validateFunc   func(t *testing.T, embeddings []map[string]interface{})
 	}{
 		{
-			name:       "Generate embeddings for short text",
-			documentID: uuid.New().String(),
-			content:    "Artificial intelligence is transforming healthcare.",
-			chunkSize:  1000,
+			name:           "Generate embeddings for short text",
+			documentID:     uuid.New().String(),
+			content:        "Artificial intelligence is transforming healthcare.",
+			chunkSize:      1000,
 			expectedChunks: 1,
 		},
 		{
-			name:       "Generate embeddings with chunking",
-			documentID: uuid.New().String(),
-			content:    generateLargeContent(5000), // Content that will be chunked
-			chunkSize:  1000,
+			name:           "Generate embeddings with chunking",
+			documentID:     uuid.New().String(),
+			content:        generateLargeContent(5000), // Content that will be chunked
+			chunkSize:      1000,
 			expectedChunks: 5,
 		},
 		{
@@ -189,7 +189,7 @@ func TestEmbeddingGeneration(t *testing.T) {
 			content: `Machine learning algorithms analyze medical images with remarkable accuracy.
                      Natural language processing helps doctors analyze patient records quickly.
                      Deep learning models can predict disease progression and treatment outcomes.`,
-			chunkSize:  500,
+			chunkSize:      500,
 			expectedChunks: 1,
 		},
 	}
@@ -420,9 +420,9 @@ func TestEndToEndWorkflow(t *testing.T) {
 // TestErrorHandling validates error scenarios
 func TestErrorHandling(t *testing.T) {
 	tests := []struct {
-		name           string
-		testFunc       func(t *testing.T)
-		expectedError  string
+		name          string
+		testFunc      func(t *testing.T)
+		expectedError string
 	}{
 		{
 			name: "Upload with invalid tenant ID",
@@ -558,14 +558,14 @@ func TestDataPersistence(t *testing.T) {
 
 	// Generate embeddings
 	generateEmbeddingsForFile(t, fileID, "Data persistence test content")
-	
+
 	// Search immediately
 	results1 := performSearch(t, "data persistence", 10)
-	
+
 	// Wait and search again
 	time.Sleep(5 * time.Second)
 	results2 := performSearch(t, "data persistence", 10)
-	
+
 	// Results should be consistent
 	assert.Equal(t, len(results1), len(results2))
 }
