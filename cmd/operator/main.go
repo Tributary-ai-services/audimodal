@@ -1,9 +1,11 @@
+//go:build ignore
+// +build ignore
+
 package main
 
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -21,9 +23,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	// Import AudiModal APIs and controllers
-	audimodalv1 "github.com/jscharber/eAIIngest/api/v1"
-	"github.com/jscharber/eAIIngest/pkg/controllers"
-	"github.com/jscharber/eAIIngest/pkg/tracing"
+	audimodalv1 "github.com/jscharber/audimodal/api/v1"
+	"github.com/jscharber/audimodal/pkg/controllers"
+	"github.com/jscharber/audimodal/pkg/tracing"
 )
 
 var (
@@ -78,14 +80,14 @@ func main() {
 	var tracingService *tracing.TracingService
 	if enableTracing {
 		tracingConfig := &tracing.TracingConfig{
-			ServiceName:     "audimodal-operator",
-			ServiceVersion:  "1.0.0",
-			Environment:     getEnv("ENVIRONMENT", "development"),
-			Enabled:         true,
-			SampleRate:      1.0,
-			ExportType:      "jaeger",
-			ExportEndpoint:  tracingEndpoint,
-			ExportTimeout:   30 * time.Second,
+			ServiceName:    "audimodal-operator",
+			ServiceVersion: "1.0.0",
+			Environment:    getEnv("ENVIRONMENT", "development"),
+			Enabled:        true,
+			SampleRate:     1.0,
+			ExportType:     "jaeger",
+			ExportEndpoint: tracingEndpoint,
+			ExportTimeout:  30 * time.Second,
 		}
 
 		var err error

@@ -658,17 +658,17 @@ func (jm *SyncJobManager) Shutdown(ctx context.Context) error {
 
 // FileOperation represents a file operation within a sync job
 type FileOperation struct {
-	FilePath          string                 `json:"file_path"`
-	FileSize          *int64                 `json:"file_size,omitempty"`
-	Operation         string                 `json:"operation"` // created, updated, deleted, skipped, failed
-	Status            string                 `json:"status"`    // pending, in_progress, completed, failed
-	ErrorMessage      string                 `json:"error_message,omitempty"`
-	StartTime         time.Time              `json:"start_time"`
-	EndTime           *time.Time             `json:"end_time,omitempty"`
-	Duration          time.Duration          `json:"duration"`
-	BytesTransferred  int64                  `json:"bytes_transferred"`
-	Checksum          string                 `json:"checksum,omitempty"`
-	Metadata          map[string]interface{} `json:"metadata,omitempty"`
+	FilePath         string                 `json:"file_path"`
+	FileSize         *int64                 `json:"file_size,omitempty"`
+	Operation        string                 `json:"operation"` // created, updated, deleted, skipped, failed
+	Status           string                 `json:"status"`    // pending, in_progress, completed, failed
+	ErrorMessage     string                 `json:"error_message,omitempty"`
+	StartTime        time.Time              `json:"start_time"`
+	EndTime          *time.Time             `json:"end_time,omitempty"`
+	Duration         time.Duration          `json:"duration"`
+	BytesTransferred int64                  `json:"bytes_transferred"`
+	Checksum         string                 `json:"checksum,omitempty"`
+	Metadata         map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // FileOperationFilters contains filters for querying file operations

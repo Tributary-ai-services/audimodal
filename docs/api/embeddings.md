@@ -594,18 +594,91 @@ Content-Type: application/json
 
 ## Error Responses
 
+### Missing Query Parameter
+
+```http
+HTTP/1.1 400 Bad Request
+
+{
+  "success": false,
+  "error": {
+    "code": "MISSING_QUERY",
+    "message": "Search query is required",
+    "details": "The 'query' parameter must be provided and non-empty"
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Dataset Not Found
+
+```http
+HTTP/1.1 404 Not Found
+
+{
+  "success": false,
+  "error": {
+    "code": "DATASET_NOT_FOUND",
+    "message": "Dataset 'default' not found",
+    "details": "The embedding dataset does not exist. Create it first or check dataset name."
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Search Service Unavailable
+
+**Note**: When embeddings/search is temporarily unavailable, returns empty results instead of error.
+
+```http
+HTTP/1.1 200 OK
+
+{
+  "success": true,
+  "data": {
+    "results": [],
+    "total_found": 0,
+    "query": "your search query",
+    "dataset": "default",
+    "processing_time_ms": 0
+  },
+  "request_id": "req_123456"
+}
+```
+
 ### Vector Dimension Mismatch
 
 ```http
 HTTP/1.1 400 Bad Request
 
 {
+  "success": false,
   "error": {
-    "code": "VECTOR_DIMENSION_MISMATCH",
-    "message": "Vector dimension mismatch",
-    "expected_dimensions": 1536,
-    "provided_dimensions": 512
-  }
+    "code": "DIMENSION_MISMATCH",
+    "message": "Vector dimension mismatch: expected 1536, got 512",
+    "details": {
+      "expected_dimensions": 1536,
+      "provided_dimensions": 512,
+      "embedding_model": "text-embedding-ada-002"
+    }
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Authentication Failed
+
+```http
+HTTP/1.1 401 Unauthorized
+
+{
+  "success": false,
+  "error": {
+    "code": "AUTHENTICATION_FAILED",
+    "message": "Invalid API key",
+    "details": "OpenAI API key authentication failed. Check your credentials."
+  },
+  "request_id": "req_123456"
 }
 ```
 
@@ -615,16 +688,20 @@ HTTP/1.1 400 Bad Request
 HTTP/1.1 400 Bad Request
 
 {
+  "success": false,
   "error": {
     "code": "MODEL_NOT_AVAILABLE",
     "message": "Embedding model not available",
-    "model": "invalid-model",
-    "available_models": [
-      "openai-text-embedding-ada-002",
-      "openai-text-embedding-3-small",
-      "openai-text-embedding-3-large"
-    ]
-  }
+    "details": {
+      "model": "invalid-model",
+      "available_models": [
+        "text-embedding-ada-002",
+        "text-embedding-3-small",
+        "text-embedding-3-large"
+      ]
+    }
+  },
+  "request_id": "req_123456"
 }
 ```
 
@@ -634,11 +711,34 @@ HTTP/1.1 400 Bad Request
 HTTP/1.1 408 Request Timeout
 
 {
+  "success": false,
   "error": {
     "code": "SEARCH_TIMEOUT",
     "message": "Search request timed out",
-    "timeout_ms": 5000,
-    "suggestion": "Try reducing top_k or using approximate search"
-  }
+    "details": {
+      "timeout_ms": 5000,
+      "suggestion": "Try reducing top_k or using approximate search"
+    }
+  },
+  "request_id": "req_123456"
+}
+```
+
+### Rate Limit Exceeded
+
+```http
+HTTP/1.1 429 Too Many Requests
+
+{
+  "success": false,
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "API rate limit exceeded",
+    "details": {
+      "retry_after_seconds": 60,
+      "limit": "1000 requests per hour"
+    }
+  },
+  "request_id": "req_123456"
 }
 ```

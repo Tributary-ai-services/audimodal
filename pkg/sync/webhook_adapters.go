@@ -69,8 +69,8 @@ func (a *GoogleDriveWebhookAdapter) AdaptWebhookEvent(rawEvent []byte, headers m
 		Resource:      resource,
 		Metadata: map[string]interface{}{
 			"google_drive": map[string]interface{}{
-				"kind":      driveEvent.Kind,
-				"change_id": driveEvent.ID,
+				"kind":          driveEvent.Kind,
+				"change_id":     driveEvent.ID,
 				"team_drive_id": driveEvent.TeamDriveID,
 			},
 		},
@@ -142,10 +142,10 @@ func (a *OneDriveWebhookAdapter) AdaptWebhookEvent(rawEvent []byte, headers map[
 		Resource:      resource,
 		Metadata: map[string]interface{}{
 			"microsoft_graph": map[string]interface{}{
-				"subscription_id":     notification.SubscriptionID,
+				"subscription_id":         notification.SubscriptionID,
 				"subscription_expiration": notification.SubscriptionExpirationDateTime,
-				"tenant_id":          notification.TenantID,
-				"client_state":       notification.ClientState,
+				"tenant_id":               notification.TenantID,
+				"client_state":            notification.ClientState,
 			},
 		},
 		OriginalEvent: rawEvent,
@@ -201,7 +201,7 @@ func (a *BoxWebhookAdapter) AdaptWebhookEvent(rawEvent []byte, headers map[strin
 		resource.ID = boxEvent.Source.ID
 		resource.Name = boxEvent.Source.Name
 		resource.Path = "/" + boxEvent.Source.Name // Simplified path
-		
+
 		// Convert timestamps
 		if boxEvent.Source.CreatedAt != "" {
 			createdTime, _ := time.Parse(time.RFC3339, boxEvent.Source.CreatedAt)
@@ -239,9 +239,9 @@ func (a *BoxWebhookAdapter) AdaptWebhookEvent(rawEvent []byte, headers map[strin
 		Actor:         actor,
 		Metadata: map[string]interface{}{
 			"box": map[string]interface{}{
-				"trigger":     boxEvent.Trigger,
-				"webhook_id":  boxEvent.WebhookID,
-				"enterprise":  boxEvent.Enterprise,
+				"trigger":    boxEvent.Trigger,
+				"webhook_id": boxEvent.WebhookID,
+				"enterprise": boxEvent.Enterprise,
 			},
 		},
 		OriginalEvent: rawEvent,
@@ -255,10 +255,10 @@ func (a *BoxWebhookAdapter) VerifyWebhookSignature(payload []byte, signature str
 	expectedMAC := hmac.New(sha256.New, []byte(secret))
 	expectedMAC.Write(payload)
 	expectedSignature := hex.EncodeToString(expectedMAC.Sum(nil))
-	
+
 	// Remove "sha256=" prefix if present
 	signature = strings.TrimPrefix(signature, "sha256=")
-	
+
 	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }
 
@@ -305,7 +305,7 @@ func (a *DropboxWebhookAdapter) VerifyWebhookSignature(payload []byte, signature
 	expectedMAC := hmac.New(sha256.New, []byte(secret))
 	expectedMAC.Write(payload)
 	expectedSignature := hex.EncodeToString(expectedMAC.Sum(nil))
-	
+
 	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }
 
@@ -383,11 +383,11 @@ func (a *SlackWebhookAdapter) AdaptWebhookEvent(rawEvent []byte, headers map[str
 		Actor:         actor,
 		Metadata: map[string]interface{}{
 			"slack": map[string]interface{}{
-				"team_id":     slackEvent.TeamID,
-				"api_app_id":  slackEvent.APIAppID,
-				"event_type":  slackEvent.Event.Type,
+				"team_id":       slackEvent.TeamID,
+				"api_app_id":    slackEvent.APIAppID,
+				"event_type":    slackEvent.Event.Type,
 				"event_subtype": slackEvent.Event.Subtype,
-				"channel":     slackEvent.Event.Channel,
+				"channel":       slackEvent.Event.Channel,
 			},
 		},
 		OriginalEvent: rawEvent,
@@ -400,11 +400,11 @@ func (a *SlackWebhookAdapter) VerifyWebhookSignature(payload []byte, signature s
 	// Slack uses a specific signature verification method
 	timestamp := time.Now().Unix() // Would get from headers in real implementation
 	basestring := fmt.Sprintf("v0:%d:%s", timestamp, payload)
-	
+
 	expectedMAC := hmac.New(sha256.New, []byte(secret))
 	expectedMAC.Write([]byte(basestring))
 	expectedSignature := "v0=" + hex.EncodeToString(expectedMAC.Sum(nil))
-	
+
 	return hmac.Equal([]byte(signature), []byte(expectedSignature))
 }
 
@@ -432,12 +432,12 @@ func (a *NotionWebhookAdapter) GetConnectorType() string {
 // Webhook event structures for different services
 
 type GoogleDriveWebhookEvent struct {
-	Kind         string             `json:"kind"`
-	ID           string             `json:"id"`
-	Type         string             `json:"type"`
-	Removed      bool               `json:"removed"`
-	File         *GoogleDriveFile   `json:"file,omitempty"`
-	TeamDriveID  string             `json:"teamDriveId,omitempty"`
+	Kind        string           `json:"kind"`
+	ID          string           `json:"id"`
+	Type        string           `json:"type"`
+	Removed     bool             `json:"removed"`
+	File        *GoogleDriveFile `json:"file,omitempty"`
+	TeamDriveID string           `json:"teamDriveId,omitempty"`
 }
 
 type GoogleDriveFile struct {
@@ -455,35 +455,35 @@ type MicrosoftGraphNotification struct {
 }
 
 type MicrosoftGraphNotificationItem struct {
-	ID                             string    `json:"id"`
-	SubscriptionID                 string    `json:"subscriptionId"`
-	SubscriptionExpirationDateTime time.Time `json:"subscriptionExpirationDateTime"`
-	EventTime                      time.Time `json:"eventTime"`
-	Resource                       string    `json:"resource"`
+	ID                             string                 `json:"id"`
+	SubscriptionID                 string                 `json:"subscriptionId"`
+	SubscriptionExpirationDateTime time.Time              `json:"subscriptionExpirationDateTime"`
+	EventTime                      time.Time              `json:"eventTime"`
+	Resource                       string                 `json:"resource"`
 	ResourceData                   map[string]interface{} `json:"resourceData"`
-	ChangeType                     string    `json:"changeType"`
-	TenantID                       string    `json:"tenantId"`
-	ClientState                    string    `json:"clientState,omitempty"`
+	ChangeType                     string                 `json:"changeType"`
+	TenantID                       string                 `json:"tenantId"`
+	ClientState                    string                 `json:"clientState,omitempty"`
 }
 
 type BoxWebhookEvent struct {
-	Type       string    `json:"type"`
-	WebhookID  string    `json:"webhook_id"`
-	Timestamp  time.Time `json:"timestamp"`
-	Trigger    string    `json:"trigger"`
-	Source     BoxItem   `json:"source"`
-	CreatedBy  BoxUser   `json:"created_by"`
-	CreatedAt  time.Time `json:"created_at"`
+	Type       string        `json:"type"`
+	WebhookID  string        `json:"webhook_id"`
+	Timestamp  time.Time     `json:"timestamp"`
+	Trigger    string        `json:"trigger"`
+	Source     BoxItem       `json:"source"`
+	CreatedBy  BoxUser       `json:"created_by"`
+	CreatedAt  time.Time     `json:"created_at"`
 	Enterprise BoxEnterprise `json:"enterprise,omitempty"`
 }
 
 type BoxItem struct {
-	Type       string `json:"type"`
-	ID         string `json:"id"`
-	Name       string `json:"name"`
-	Size       int64  `json:"size,omitempty"`
-	CreatedAt  string `json:"created_at"`
-	ModifiedAt string `json:"modified_at"`
+	Type        string `json:"type"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Size        int64  `json:"size,omitempty"`
+	CreatedAt   string `json:"created_at"`
+	ModifiedAt  string `json:"modified_at"`
 	Description string `json:"description,omitempty"`
 }
 
@@ -515,44 +515,44 @@ type DropboxDelta struct {
 }
 
 type SlackWebhookEvent struct {
-	Token       string           `json:"token"`
-	TeamID      string           `json:"team_id"`
-	APIAppID    string           `json:"api_app_id"`
-	Event       SlackEvent       `json:"event"`
-	Type        string           `json:"type"`
-	EventID     string           `json:"event_id"`
-	EventTime   int64            `json:"event_time"`
-	Challenge   string           `json:"challenge,omitempty"`
+	Token     string     `json:"token"`
+	TeamID    string     `json:"team_id"`
+	APIAppID  string     `json:"api_app_id"`
+	Event     SlackEvent `json:"event"`
+	Type      string     `json:"type"`
+	EventID   string     `json:"event_id"`
+	EventTime int64      `json:"event_time"`
+	Challenge string     `json:"challenge,omitempty"`
 }
 
 type SlackEvent struct {
-	Type        string    `json:"type"`
-	Subtype     string    `json:"subtype,omitempty"`
-	Channel     string    `json:"channel,omitempty"`
-	User        string    `json:"user,omitempty"`
-	Text        string    `json:"text,omitempty"`
-	Timestamp   string    `json:"ts,omitempty"`
-	File        SlackFile `json:"file,omitempty"`
+	Type      string    `json:"type"`
+	Subtype   string    `json:"subtype,omitempty"`
+	Channel   string    `json:"channel,omitempty"`
+	User      string    `json:"user,omitempty"`
+	Text      string    `json:"text,omitempty"`
+	Timestamp string    `json:"ts,omitempty"`
+	File      SlackFile `json:"file,omitempty"`
 }
 
 type SlackFile struct {
-	ID          string `json:"id"`
-	Created     int64  `json:"created"`
-	Timestamp   int64  `json:"timestamp"`
-	Name        string `json:"name"`
-	Title       string `json:"title"`
-	Mimetype    string `json:"mimetype"`
-	FileType    string `json:"filetype"`
-	PrettyType  string `json:"pretty_type"`
-	User        string `json:"user"`
-	Size        int64  `json:"size"`
-	Mode        string `json:"mode"`
-	IsExternal  bool   `json:"is_external"`
-	ExternalType string `json:"external_type"`
-	IsPublic    bool   `json:"is_public"`
-	PublicURLShared bool `json:"public_url_shared"`
-	URLPrivate  string `json:"url_private"`
+	ID                 string `json:"id"`
+	Created            int64  `json:"created"`
+	Timestamp          int64  `json:"timestamp"`
+	Name               string `json:"name"`
+	Title              string `json:"title"`
+	Mimetype           string `json:"mimetype"`
+	FileType           string `json:"filetype"`
+	PrettyType         string `json:"pretty_type"`
+	User               string `json:"user"`
+	Size               int64  `json:"size"`
+	Mode               string `json:"mode"`
+	IsExternal         bool   `json:"is_external"`
+	ExternalType       string `json:"external_type"`
+	IsPublic           bool   `json:"is_public"`
+	PublicURLShared    bool   `json:"public_url_shared"`
+	URLPrivate         string `json:"url_private"`
 	URLPrivateDownload string `json:"url_private_download"`
-	Permalink   string `json:"permalink"`
-	PermalinkPublic string `json:"permalink_public"`
+	Permalink          string `json:"permalink"`
+	PermalinkPublic    string `json:"permalink_public"`
 }

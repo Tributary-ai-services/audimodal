@@ -7,15 +7,16 @@
 make test-client
 ```
 - **Location**: `pkg/embeddings/client/deeplake_client_test.go`
-- **Status**: ✅ **ALL TESTS PASSING**
-- **Coverage**: 
+- **Status**: ✅ **ALL TESTS PASSING** (Fixed v1.8.0)
+- **Coverage**: 85.4% statement coverage
   - Client configuration and validation
   - Dataset CRUD operations
   - Vector CRUD operations
   - Search operations (vector and text)
-  - Error handling and timeouts
-  - Retry logic
+  - **Enhanced Error handling** - improved categorization of DeepLake responses
+  - Retry logic and timeout handling
   - Helper functions
+  - **NEW**: DeepLake HTTP 200 + success:false error handling
 
 ### Configuration Tests
 ```bash
@@ -28,18 +29,32 @@ go test -v ./internal/server/ -run "TestConfig_"
   - Configuration validation
   - DeepLake API settings
 
+### API Handler Tests
+```bash
+go test -v ./internal/server/handlers/ -run TestFileHandler
+```
+- **Location**: `internal/server/handlers/file_simple_test.go`
+- **Status**: ✅ **ALL TESTS PASSING** (Added v1.8.0)
+- **Coverage**: 1.5% statement coverage (focused on critical validation logic)
+  - **Tenant context validation** - ensures proper 400 errors for missing context
+  - **Route recognition** - validates file endpoint routing logic
+  - **UUID validation** - tests invalid file ID handling (400 errors)
+  - **HTTP method validation** - verifies 405 errors for unsupported methods
+  - **Search endpoint routing** - confirms search routes are properly recognized
+  - **RESTful error responses** - validates proper HTTP status codes
+
 ### Core Package Tests
 ```bash
 make test-unit
 ```
 - **Status**: ✅ **ALL TESTS PASSING**
 - **Packages**:
-  - `pkg/core` - Core functionality
-  - `pkg/readers` - File readers
+  - `pkg/core` - Core functionality (50.0% coverage)
+  - `pkg/readers` - File readers (70.0% coverage)
   - `pkg/readers/csv` - CSV reader
   - `pkg/readers/json` - JSON reader
   - `pkg/registry` - Reader registry
-  - `pkg/strategies` - Processing strategies
+  - `pkg/strategies` - Processing strategies (88.4% coverage)
 
 ## 🛠️ Available Test Commands
 

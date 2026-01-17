@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // LocalResolver implements StorageResolver for local file system
 type LocalResolver struct {
-	name       string
-	version    string
-	basePath   string // Base path for security (optional)
+	name        string
+	version     string
+	basePath    string   // Base path for security (optional)
 	allowedDirs []string // Allowed directories for security
 }
 

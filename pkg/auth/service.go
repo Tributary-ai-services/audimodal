@@ -19,30 +19,30 @@ type Service struct {
 	tenantStore  TenantStore
 	config       *ServiceConfig
 	metrics      *AuthMetrics
-	
+
 	// Rate limiting and security
 	loginAttempts map[string]*LoginAttempt
 	mu            sync.RWMutex
-	
+
 	// Password validation
 	passwordPolicy *PasswordPolicy
 }
 
 // ServiceConfig contains service configuration
 type ServiceConfig struct {
-	DefaultTokenTTL       time.Duration `yaml:"default_token_ttl"`
-	MaxLoginAttempts      int           `yaml:"max_login_attempts"`
-	LockoutDuration       time.Duration `yaml:"lockout_duration"`
-	PasswordCost          int           `yaml:"password_cost"`
-	RequireEmailVerification bool       `yaml:"require_email_verification"`
-	EnableMFA             bool          `yaml:"enable_mfa"`
-	SessionTimeout        time.Duration `yaml:"session_timeout"`
-	CleanupInterval       time.Duration `yaml:"cleanup_interval"`
+	DefaultTokenTTL          time.Duration `yaml:"default_token_ttl"`
+	MaxLoginAttempts         int           `yaml:"max_login_attempts"`
+	LockoutDuration          time.Duration `yaml:"lockout_duration"`
+	PasswordCost             int           `yaml:"password_cost"`
+	RequireEmailVerification bool          `yaml:"require_email_verification"`
+	EnableMFA                bool          `yaml:"enable_mfa"`
+	SessionTimeout           time.Duration `yaml:"session_timeout"`
+	CleanupInterval          time.Duration `yaml:"cleanup_interval"`
 }
 
 // LoginAttempt tracks login attempts for rate limiting
 type LoginAttempt struct {
-	Count     int
+	Count       int
 	LastAttempt time.Time
 	LockedUntil *time.Time
 }
@@ -52,12 +52,12 @@ func DefaultServiceConfig() *ServiceConfig {
 	return &ServiceConfig{
 		DefaultTokenTTL:          24 * time.Hour,
 		MaxLoginAttempts:         5,
-		LockoutDuration:         15 * time.Minute,
-		PasswordCost:            12,
+		LockoutDuration:          15 * time.Minute,
+		PasswordCost:             12,
 		RequireEmailVerification: false,
-		EnableMFA:               false,
-		SessionTimeout:          24 * time.Hour,
-		CleanupInterval:         1 * time.Hour,
+		EnableMFA:                false,
+		SessionTimeout:           24 * time.Hour,
+		CleanupInterval:          1 * time.Hour,
 	}
 }
 
@@ -66,27 +66,27 @@ func NewService(tokenManager TokenManager, userStore UserStore, tenantStore Tena
 	if config == nil {
 		config = DefaultServiceConfig()
 	}
-	
+
 	service := &Service{
-		tokenManager:   tokenManager,
-		userStore:      userStore,
-		tenantStore:    tenantStore,
-		config:         config,
-		metrics:        &AuthMetrics{
+		tokenManager: tokenManager,
+		userStore:    userStore,
+		tenantStore:  tenantStore,
+		config:       config,
+		metrics: &AuthMetrics{
 			LoginsByHour:   make(map[int]int64),
 			FailureReasons: make(map[string]int64),
 			LastUpdated:    time.Now(),
 		},
-		loginAttempts:  make(map[string]*LoginAttempt),
+		loginAttempts: make(map[string]*LoginAttempt),
 		passwordPolicy: func() *PasswordPolicy {
 			settings := DefaultTenantSettings()
 			return &settings.PasswordPolicy
 		}(),
 	}
-	
+
 	// Start cleanup goroutine
 	go service.startCleanup()
-	
+
 	return service
 }
 
@@ -112,48 +112,48 @@ func (s *Service) authenticatePassword(ctx context.Context, req *AuthRequest) (*
 	if identifier == "" {
 		identifier = req.Email
 	}
-	
+
 	if identifier == "" || req.Password == "" {
 		s.recordFailure("missing_credentials")
 		return nil, ErrInvalidCredentials
 	}
-	
+
 	// Check rate limiting
 	if err := s.checkRateLimit(identifier); err != nil {
 		s.recordFailure("rate_limited")
 		return nil, err
 	}
-	
+
 	// Get user
 	var user *User
 	var err error
-	
+
 	if strings.Contains(identifier, "@") {
 		user, err = s.userStore.GetUserByEmail(ctx, identifier)
 	} else {
 		user, err = s.userStore.GetUserByUsername(ctx, identifier)
 	}
-	
+
 	if err != nil {
 		s.recordLoginAttempt(identifier, false)
 		s.recordFailure("user_not_found")
 		return nil, ErrInvalidCredentials // Don't reveal if user exists
 	}
-	
+
 	// Check user status
 	if err := s.checkUserStatus(user); err != nil {
 		s.recordLoginAttempt(identifier, false)
 		s.recordFailure("user_inactive")
 		return nil, err
 	}
-	
+
 	// Verify password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		s.recordLoginAttempt(identifier, false)
 		s.recordFailure("invalid_password")
 		return nil, ErrInvalidCredentials
 	}
-	
+
 	// Get tenant if specified
 	var tenant *Tenant
 	tenantID := req.TenantID
@@ -164,7 +164,7 @@ func (s *Service) authenticatePassword(ctx context.Context, req *AuthRequest) (*
 			tenantID = userTenants[0].TenantID
 		}
 	}
-	
+
 	if tenantID != uuid.Nil {
 		tenant, err = s.tenantStore.GetTenant(ctx, tenantID)
 		if err != nil {
@@ -172,14 +172,14 @@ func (s *Service) authenticatePassword(ctx context.Context, req *AuthRequest) (*
 			s.recordFailure("tenant_not_found")
 			return nil, ErrTenantNotFound
 		}
-		
+
 		if err := s.checkTenantStatus(tenant); err != nil {
 			s.recordLoginAttempt(identifier, false)
 			s.recordFailure("tenant_inactive")
 			return nil, err
 		}
 	}
-	
+
 	// Get user's role in tenant
 	var tenantRole TenantRole
 	if tenant != nil {
@@ -193,7 +193,7 @@ func (s *Service) authenticatePassword(ctx context.Context, req *AuthRequest) (*
 			}
 		}
 	}
-	
+
 	// Generate tokens
 	accessToken, refreshToken, err := s.tokenManager.(*JWTManager).CreateTokenPair(
 		user.ID, user.Username, user.Email, tenantID, user.Roles, tenantRole, req.Scopes,
@@ -203,22 +203,22 @@ func (s *Service) authenticatePassword(ctx context.Context, req *AuthRequest) (*
 		s.recordFailure("token_generation_failed")
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
-	
+
 	// Update user's last login
 	now := time.Now()
 	user.LastLoginAt = &now
 	s.userStore.UpdateUser(ctx, user)
-	
+
 	// Record successful login
 	s.recordLoginAttempt(identifier, true)
 	s.recordSuccess()
-	
+
 	// Determine expiration
 	expiresIn := s.config.DefaultTokenTTL
 	if req.ExpiresIn != nil {
 		expiresIn = *req.ExpiresIn
 	}
-	
+
 	return &AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -237,33 +237,33 @@ func (s *Service) authenticateAPIKey(ctx context.Context, req *AuthRequest) (*Au
 		s.recordFailure("missing_api_key")
 		return nil, fmt.Errorf("API key is required")
 	}
-	
+
 	// Validate API key token
 	jwtManager, ok := s.tokenManager.(*JWTManager)
 	if !ok {
 		s.recordFailure("invalid_token_manager")
 		return nil, fmt.Errorf("invalid token manager for API key authentication")
 	}
-	
+
 	claims, err := jwtManager.ValidateAPIKey(req.APIKey)
 	if err != nil {
 		s.recordFailure("invalid_api_key")
 		return nil, fmt.Errorf("invalid API key: %w", err)
 	}
-	
+
 	// Get user
 	user, err := s.userStore.GetUser(ctx, claims.UserID)
 	if err != nil {
 		s.recordFailure("user_not_found")
 		return nil, ErrUserNotFound
 	}
-	
+
 	// Check user status
 	if err := s.checkUserStatus(user); err != nil {
 		s.recordFailure("user_inactive")
 		return nil, err
 	}
-	
+
 	// Get tenant if specified
 	var tenant *Tenant
 	if claims.TenantID != uuid.Nil {
@@ -272,20 +272,20 @@ func (s *Service) authenticateAPIKey(ctx context.Context, req *AuthRequest) (*Au
 			s.recordFailure("tenant_not_found")
 			return nil, ErrTenantNotFound
 		}
-		
+
 		if err := s.checkTenantStatus(tenant); err != nil {
 			s.recordFailure("tenant_inactive")
 			return nil, err
 		}
 	}
-	
+
 	s.recordSuccess()
-	
+
 	return &AuthResponse{
 		AccessToken: req.APIKey,
 		TokenType:   "Bearer",
-		ExpiresIn:   int64(claims.ExpiresAt.Sub(time.Now()).Seconds()),
-		ExpiresAt:   claims.ExpiresAt.Time,
+		ExpiresIn:   int64(claims.RegisteredClaims.ExpiresAt.Sub(time.Now()).Seconds()),
+		ExpiresAt:   claims.RegisteredClaims.ExpiresAt.Time,
 		User:        user,
 		Tenant:      tenant,
 		Scopes:      claims.Scopes,
@@ -298,27 +298,27 @@ func (s *Service) authenticateToken(ctx context.Context, req *AuthRequest) (*Aut
 		s.recordFailure("missing_token")
 		return nil, fmt.Errorf("token is required")
 	}
-	
+
 	// Validate token
 	claims, err := s.tokenManager.ValidateToken(req.Token)
 	if err != nil {
 		s.recordFailure("invalid_token")
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
-	
+
 	// Get user
 	user, err := s.userStore.GetUser(ctx, claims.UserID)
 	if err != nil {
 		s.recordFailure("user_not_found")
 		return nil, ErrUserNotFound
 	}
-	
+
 	// Check user status
 	if err := s.checkUserStatus(user); err != nil {
 		s.recordFailure("user_inactive")
 		return nil, err
 	}
-	
+
 	// Get tenant if specified
 	var tenant *Tenant
 	if claims.TenantID != uuid.Nil {
@@ -327,20 +327,20 @@ func (s *Service) authenticateToken(ctx context.Context, req *AuthRequest) (*Aut
 			s.recordFailure("tenant_not_found")
 			return nil, ErrTenantNotFound
 		}
-		
+
 		if err := s.checkTenantStatus(tenant); err != nil {
 			s.recordFailure("tenant_inactive")
 			return nil, err
 		}
 	}
-	
+
 	s.recordSuccess()
-	
+
 	return &AuthResponse{
 		AccessToken: req.Token,
 		TokenType:   "Bearer",
-		ExpiresIn:   int64(claims.ExpiresAt.Sub(time.Now()).Seconds()),
-		ExpiresAt:   claims.ExpiresAt.Time,
+		ExpiresIn:   int64(claims.RegisteredClaims.ExpiresAt.Sub(time.Now()).Seconds()),
+		ExpiresAt:   claims.RegisteredClaims.ExpiresAt.Time,
 		User:        user,
 		Tenant:      tenant,
 		Scopes:      claims.Scopes,
@@ -355,21 +355,21 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*AuthR
 		s.recordFailure("refresh_failed")
 		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
-	
+
 	// Extract claims from new access token
 	claims, err := s.tokenManager.ExtractClaims(accessToken)
 	if err != nil {
 		s.recordFailure("invalid_refreshed_token")
 		return nil, fmt.Errorf("invalid refreshed token: %w", err)
 	}
-	
+
 	// Get user
 	user, err := s.userStore.GetUser(ctx, claims.UserID)
 	if err != nil {
 		s.recordFailure("user_not_found")
 		return nil, ErrUserNotFound
 	}
-	
+
 	// Get tenant if specified
 	var tenant *Tenant
 	if claims.TenantID != uuid.Nil {
@@ -378,15 +378,15 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*AuthR
 			// Don't fail if tenant not found during refresh
 		}
 	}
-	
+
 	s.recordSuccess()
-	
+
 	return &AuthResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken, // Keep the same refresh token
 		TokenType:    "Bearer",
-		ExpiresIn:    int64(claims.ExpiresAt.Sub(time.Now()).Seconds()),
-		ExpiresAt:    claims.ExpiresAt.Time,
+		ExpiresIn:    int64(claims.RegisteredClaims.ExpiresAt.Sub(time.Now()).Seconds()),
+		ExpiresAt:    claims.RegisteredClaims.ExpiresAt.Time,
 		User:         user,
 		Tenant:       tenant,
 		Scopes:       claims.Scopes,
@@ -425,22 +425,22 @@ func (s *Service) CreateUser(ctx context.Context, req *CreateUserRequest) (*User
 	if err := s.validateCreateUserRequest(req); err != nil {
 		return nil, err
 	}
-	
+
 	// Check if user already exists
 	if existingUser, _ := s.userStore.GetUserByEmail(ctx, req.Email); existingUser != nil {
 		return nil, ErrUserAlreadyExists
 	}
-	
+
 	if existingUser, _ := s.userStore.GetUserByUsername(ctx, req.Username); existingUser != nil {
 		return nil, ErrUserAlreadyExists
 	}
-	
+
 	// Hash password
 	passwordHash, err := s.hashPassword(req.Password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
-	
+
 	// Create user
 	user := &User{
 		ID:           uuid.New(),
@@ -457,30 +457,30 @@ func (s *Service) CreateUser(ctx context.Context, req *CreateUserRequest) (*User
 		UpdatedAt:    time.Now(),
 		ExpiresAt:    req.ExpiresAt,
 	}
-	
+
 	if user.Metadata == nil {
 		user.Metadata = make(map[string]string)
 	}
-	
+
 	// Calculate permissions from roles
 	for _, role := range user.Roles {
 		user.Permissions = append(user.Permissions, GetRolePermissions(role)...)
 	}
-	
+
 	// Store user
 	if err := s.userStore.CreateUser(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
-	
+
 	// Add user to tenant if specified
 	if req.TenantID != nil && req.TenantRole != nil {
 		if err := s.tenantStore.AddUserToTenant(ctx, user.ID, *req.TenantID, *req.TenantRole); err != nil {
 			// Log error but don't fail user creation
 		}
 	}
-	
+
 	s.updateMetrics()
-	
+
 	return user, nil
 }
 
@@ -500,7 +500,7 @@ func (s *Service) UpdateUser(ctx context.Context, userID uuid.UUID, req *UpdateU
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
-	
+
 	// Update fields
 	if req.Username != nil {
 		user.Username = *req.Username
@@ -523,14 +523,14 @@ func (s *Service) UpdateUser(ctx context.Context, userID uuid.UUID, req *UpdateU
 	if req.ExpiresAt != nil {
 		user.ExpiresAt = req.ExpiresAt
 	}
-	
+
 	user.UpdatedAt = time.Now()
-	
+
 	// Store updated user
 	if err := s.userStore.UpdateUser(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to update user: %w", err)
 	}
-	
+
 	return user, nil
 }
 
@@ -545,22 +545,22 @@ func (s *Service) AssignRole(ctx context.Context, userID uuid.UUID, role Role) e
 	if err != nil {
 		return ErrUserNotFound
 	}
-	
+
 	// Check if role already assigned
 	for _, existingRole := range user.Roles {
 		if existingRole == role {
 			return nil // Already has role
 		}
 	}
-	
+
 	// Add role
 	user.Roles = append(user.Roles, role)
-	
+
 	// Update permissions
 	user.Permissions = append(user.Permissions, GetRolePermissions(role)...)
-	
+
 	user.UpdatedAt = time.Now()
-	
+
 	return s.userStore.UpdateUser(ctx, user)
 }
 
@@ -570,7 +570,7 @@ func (s *Service) RevokeRole(ctx context.Context, userID uuid.UUID, role Role) e
 	if err != nil {
 		return ErrUserNotFound
 	}
-	
+
 	// Remove role
 	var newRoles []Role
 	for _, existingRole := range user.Roles {
@@ -579,16 +579,16 @@ func (s *Service) RevokeRole(ctx context.Context, userID uuid.UUID, role Role) e
 		}
 	}
 	user.Roles = newRoles
-	
+
 	// Recalculate permissions
 	var newPermissions []Permission
 	for _, userRole := range user.Roles {
 		newPermissions = append(newPermissions, GetRolePermissions(userRole)...)
 	}
 	user.Permissions = newPermissions
-	
+
 	user.UpdatedAt = time.Now()
-	
+
 	return s.userStore.UpdateUser(ctx, user)
 }
 
@@ -598,14 +598,14 @@ func (s *Service) CheckPermission(ctx context.Context, userID uuid.UUID, permiss
 	if err != nil {
 		return false, ErrUserNotFound
 	}
-	
+
 	// Check direct permissions
 	for _, userPerm := range user.Permissions {
 		if userPerm == permission {
 			return true, nil
 		}
 	}
-	
+
 	// Check role-based permissions
 	for _, role := range user.Roles {
 		rolePermissions := GetRolePermissions(role)
@@ -615,7 +615,7 @@ func (s *Service) CheckPermission(ctx context.Context, userID uuid.UUID, permiss
 			}
 		}
 	}
-	
+
 	return false, nil
 }
 
@@ -625,10 +625,10 @@ func (s *Service) CreateTenant(ctx context.Context, req *CreateTenantRequest) (*
 	if req.Name == "" {
 		return nil, fmt.Errorf("tenant name is required")
 	}
-	
+
 	// Check if tenant already exists
 	// Note: This would need to be implemented in the tenant store
-	
+
 	// Create tenant
 	tenant := &Tenant{
 		ID:          uuid.New(),
@@ -641,33 +641,33 @@ func (s *Service) CreateTenant(ctx context.Context, req *CreateTenantRequest) (*
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	
+
 	if req.Settings != nil {
 		tenant.Settings = *req.Settings
 	}
-	
+
 	if tenant.Metadata == nil {
 		tenant.Metadata = make(map[string]string)
 	}
-	
+
 	// Store tenant
 	if err := s.tenantStore.CreateTenant(ctx, tenant); err != nil {
 		return nil, fmt.Errorf("failed to create tenant: %w", err)
 	}
-	
+
 	// Create admin user if specified
 	if req.AdminUser != nil {
 		req.AdminUser.TenantID = &tenant.ID
 		adminRole := TenantRoleOwner
 		req.AdminUser.TenantRole = &adminRole
 		req.AdminUser.Roles = []Role{RoleAdmin}
-		
+
 		_, err := s.CreateUser(ctx, req.AdminUser)
 		if err != nil {
 			// Log error but don't fail tenant creation
 		}
 	}
-	
+
 	return tenant, nil
 }
 
@@ -697,17 +697,17 @@ func (s *Service) HealthCheck(ctx context.Context) error {
 		UserID:    uuid.New(),
 		TokenType: TokenTypeAccess,
 	}
-	
+
 	token, err := s.tokenManager.GenerateToken(testClaims)
 	if err != nil {
 		return fmt.Errorf("token generation failed: %w", err)
 	}
-	
+
 	_, err = s.tokenManager.ValidateToken(token)
 	if err != nil {
 		return fmt.Errorf("token validation failed: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -715,10 +715,10 @@ func (s *Service) HealthCheck(ctx context.Context) error {
 func (s *Service) GetMetrics(ctx context.Context) (*AuthMetrics, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	// Update metrics
 	s.metrics.LastUpdated = time.Now()
-	
+
 	// Copy metrics to avoid race conditions
 	metrics := &AuthMetrics{
 		TotalUsers:           s.metrics.TotalUsers,
@@ -735,15 +735,15 @@ func (s *Service) GetMetrics(ctx context.Context) (*AuthMetrics, error) {
 		FailureReasons:       make(map[string]int64),
 		LastUpdated:          s.metrics.LastUpdated,
 	}
-	
+
 	for k, v := range s.metrics.LoginsByHour {
 		metrics.LoginsByHour[k] = v
 	}
-	
+
 	for k, v := range s.metrics.FailureReasons {
 		metrics.FailureReasons[k] = v
 	}
-	
+
 	return metrics, nil
 }
 
@@ -754,23 +754,23 @@ func (s *Service) validateCreateUserRequest(req *CreateUserRequest) error {
 	if req.Username == "" {
 		return fmt.Errorf("username is required")
 	}
-	
+
 	if req.Email == "" {
 		return fmt.Errorf("email is required")
 	}
-	
+
 	if !s.isValidEmail(req.Email) {
 		return fmt.Errorf("invalid email format")
 	}
-	
+
 	if req.Password == "" {
 		return fmt.Errorf("password is required")
 	}
-	
+
 	if err := s.validatePassword(req.Password); err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -783,27 +783,27 @@ func (s *Service) isValidEmail(email string) bool {
 // validatePassword validates password against policy
 func (s *Service) validatePassword(password string) error {
 	policy := s.passwordPolicy
-	
+
 	if len(password) < policy.MinLength {
 		return ErrWeakPassword
 	}
-	
+
 	if policy.RequireUppercase && !regexp.MustCompile(`[A-Z]`).MatchString(password) {
 		return ErrWeakPassword
 	}
-	
+
 	if policy.RequireLowercase && !regexp.MustCompile(`[a-z]`).MatchString(password) {
 		return ErrWeakPassword
 	}
-	
+
 	if policy.RequireNumbers && !regexp.MustCompile(`[0-9]`).MatchString(password) {
 		return ErrWeakPassword
 	}
-	
+
 	if policy.RequireSymbols && !regexp.MustCompile(`[^a-zA-Z0-9]`).MatchString(password) {
 		return ErrWeakPassword
 	}
-	
+
 	return nil
 }
 
@@ -828,12 +828,12 @@ func (s *Service) checkUserStatus(user *User) error {
 	case UserStatusPending:
 		return fmt.Errorf("user account is pending activation")
 	}
-	
+
 	// Check expiration
 	if user.ExpiresAt != nil && time.Now().After(*user.ExpiresAt) {
 		return ErrUserExpired
 	}
-	
+
 	return nil
 }
 
@@ -847,12 +847,12 @@ func (s *Service) checkTenantStatus(tenant *Tenant) error {
 	case TenantStatusExpired:
 		return fmt.Errorf("tenant has expired")
 	}
-	
+
 	// Check expiration
 	if tenant.ExpiresAt != nil && time.Now().After(*tenant.ExpiresAt) {
 		return fmt.Errorf("tenant has expired")
 	}
-	
+
 	return nil
 }
 
@@ -860,22 +860,22 @@ func (s *Service) checkTenantStatus(tenant *Tenant) error {
 func (s *Service) checkRateLimit(identifier string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	attempt, exists := s.loginAttempts[identifier]
 	if !exists {
 		return nil
 	}
-	
+
 	// Check if locked
 	if attempt.LockedUntil != nil && time.Now().Before(*attempt.LockedUntil) {
 		return ErrTooManyAttempts
 	}
-	
+
 	// Reset if lockout expired
 	if attempt.LockedUntil != nil && time.Now().After(*attempt.LockedUntil) {
 		delete(s.loginAttempts, identifier)
 	}
-	
+
 	return nil
 }
 
@@ -883,23 +883,23 @@ func (s *Service) checkRateLimit(identifier string) error {
 func (s *Service) recordLoginAttempt(identifier string, success bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if success {
 		// Remove from failed attempts on success
 		delete(s.loginAttempts, identifier)
 		return
 	}
-	
+
 	// Record failed attempt
 	attempt, exists := s.loginAttempts[identifier]
 	if !exists {
 		attempt = &LoginAttempt{}
 		s.loginAttempts[identifier] = attempt
 	}
-	
+
 	attempt.Count++
 	attempt.LastAttempt = time.Now()
-	
+
 	// Lock if too many attempts
 	if attempt.Count >= s.config.MaxLoginAttempts {
 		lockUntil := time.Now().Add(s.config.LockoutDuration)
@@ -911,7 +911,7 @@ func (s *Service) recordLoginAttempt(identifier string, success bool) {
 func (s *Service) recordSuccess() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.metrics.TotalLogins++
 	hour := time.Now().Hour()
 	s.metrics.LoginsByHour[hour]++
@@ -921,7 +921,7 @@ func (s *Service) recordSuccess() {
 func (s *Service) recordFailure(reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.metrics.FailedLogins++
 	s.metrics.FailureReasons[reason]++
 }
@@ -930,7 +930,7 @@ func (s *Service) recordFailure(reason string) {
 func (s *Service) updateMetrics() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// This would be implemented to update user/tenant counts
 	// from the stores
 }
@@ -939,7 +939,7 @@ func (s *Service) updateMetrics() {
 func (s *Service) startCleanup() {
 	ticker := time.NewTicker(s.config.CleanupInterval)
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		s.cleanup()
 	}
@@ -949,9 +949,9 @@ func (s *Service) startCleanup() {
 func (s *Service) cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	now := time.Now()
-	
+
 	// Clean up expired login attempts
 	for identifier, attempt := range s.loginAttempts {
 		if attempt.LockedUntil != nil && now.After(*attempt.LockedUntil) {

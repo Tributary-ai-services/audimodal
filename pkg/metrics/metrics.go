@@ -46,14 +46,14 @@ type Gauge struct {
 
 // Histogram represents a metric with buckets for distribution
 type Histogram struct {
-	name        string
-	help        string
-	buckets     []float64
-	counts      []int64
-	sum         int64
-	totalCount  int64
-	labels      map[string]string
-	mu          sync.RWMutex
+	name       string
+	help       string
+	buckets    []float64
+	counts     []int64
+	sum        int64
+	totalCount int64
+	labels     map[string]string
+	mu         sync.RWMutex
 }
 
 // Timer measures duration
@@ -402,7 +402,7 @@ func (t *Timer) Record(duration time.Duration) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.durations = append(t.durations, duration)
-	
+
 	// Keep only last 1000 measurements to avoid memory issues
 	if len(t.durations) > 1000 {
 		t.durations = t.durations[len(t.durations)-1000:]
@@ -472,25 +472,25 @@ func (t *Timer) GetLabels() map[string]string {
 // SystemMetrics represents system-level metrics
 type SystemMetrics struct {
 	registry *MetricsRegistry
-	
+
 	// Runtime metrics
-	goroutines    *Gauge
-	gcPauseTotal  *Counter
-	gcPauseLast   *Gauge
-	memAlloc      *Gauge
-	memSys        *Gauge
-	heapAlloc     *Gauge
-	heapSys       *Gauge
-	heapInuse     *Gauge
-	stackInuse    *Gauge
-	
+	goroutines   *Gauge
+	gcPauseTotal *Counter
+	gcPauseLast  *Gauge
+	memAlloc     *Gauge
+	memSys       *Gauge
+	heapAlloc    *Gauge
+	heapSys      *Gauge
+	heapInuse    *Gauge
+	stackInuse   *Gauge
+
 	// Process metrics
-	openFDs       *Gauge
-	maxFDs        *Gauge
-	
-	stopCh        chan struct{}
-	running       bool
-	mu            sync.Mutex
+	openFDs *Gauge
+	maxFDs  *Gauge
+
+	stopCh  chan struct{}
+	running bool
+	mu      sync.Mutex
 }
 
 // NewSystemMetrics creates a new system metrics collector
@@ -500,17 +500,17 @@ func NewSystemMetrics(registry *MetricsRegistry) *SystemMetrics {
 	}
 
 	return &SystemMetrics{
-		registry:      registry,
-		goroutines:    registry.NewGauge("go_goroutines", "Number of goroutines", nil),
-		gcPauseTotal:  registry.NewCounter("go_gc_pause_total_ns", "Total GC pause time in nanoseconds", nil),
-		gcPauseLast:   registry.NewGauge("go_gc_pause_last_ns", "Last GC pause time in nanoseconds", nil),
-		memAlloc:      registry.NewGauge("go_memstats_alloc_bytes", "Number of bytes allocated and still in use", nil),
-		memSys:        registry.NewGauge("go_memstats_sys_bytes", "Number of bytes obtained from system", nil),
-		heapAlloc:     registry.NewGauge("go_memstats_heap_alloc_bytes", "Number of heap bytes allocated and still in use", nil),
-		heapSys:       registry.NewGauge("go_memstats_heap_sys_bytes", "Number of heap bytes obtained from system", nil),
-		heapInuse:     registry.NewGauge("go_memstats_heap_inuse_bytes", "Number of heap bytes that are in use", nil),
-		stackInuse:    registry.NewGauge("go_memstats_stack_inuse_bytes", "Number of stack bytes that are in use", nil),
-		stopCh:        make(chan struct{}),
+		registry:     registry,
+		goroutines:   registry.NewGauge("go_goroutines", "Number of goroutines", nil),
+		gcPauseTotal: registry.NewCounter("go_gc_pause_total_ns", "Total GC pause time in nanoseconds", nil),
+		gcPauseLast:  registry.NewGauge("go_gc_pause_last_ns", "Last GC pause time in nanoseconds", nil),
+		memAlloc:     registry.NewGauge("go_memstats_alloc_bytes", "Number of bytes allocated and still in use", nil),
+		memSys:       registry.NewGauge("go_memstats_sys_bytes", "Number of bytes obtained from system", nil),
+		heapAlloc:    registry.NewGauge("go_memstats_heap_alloc_bytes", "Number of heap bytes allocated and still in use", nil),
+		heapSys:      registry.NewGauge("go_memstats_heap_sys_bytes", "Number of heap bytes obtained from system", nil),
+		heapInuse:    registry.NewGauge("go_memstats_heap_inuse_bytes", "Number of heap bytes that are in use", nil),
+		stackInuse:   registry.NewGauge("go_memstats_stack_inuse_bytes", "Number of stack bytes that are in use", nil),
+		stopCh:       make(chan struct{}),
 	}
 }
 
@@ -543,7 +543,7 @@ func (sm *SystemMetrics) Start(ctx context.Context, interval time.Duration) {
 func (sm *SystemMetrics) Stop() {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
-	
+
 	if sm.running {
 		close(sm.stopCh)
 		sm.running = false
@@ -561,7 +561,7 @@ func (sm *SystemMetrics) collect() {
 	if len(m.PauseNs) > 0 {
 		sm.gcPauseLast.Set(int64(m.PauseNs[(m.NumGC+255)%256]))
 	}
-	
+
 	// Memory metrics
 	sm.memAlloc.Set(int64(m.Alloc))
 	sm.memSys.Set(int64(m.Sys))
@@ -586,7 +586,7 @@ func HTTPMetricsHandler(registry *MetricsRegistry) http.HandlerFunc {
 		}
 
 		metrics := registry.GetMetrics()
-		
+
 		// Build metrics response
 		response := map[string]interface{}{
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
@@ -605,7 +605,7 @@ func HTTPMetricsHandler(registry *MetricsRegistry) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		
+
 		encoder := json.NewEncoder(w)
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(response); err != nil {

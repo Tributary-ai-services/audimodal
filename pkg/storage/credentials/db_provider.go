@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // DatabaseCredentialProvider implements CredentialProvider using database storage
@@ -221,14 +221,14 @@ func (p *DatabaseCredentialProvider) StoreCredentials(ctx context.Context, tenan
 
 	// Create new credential record
 	credRecord := &CloudCredential{
-		TenantID:       tenantID,
-		Provider:       string(credentials.Provider),
-		Name:           fmt.Sprintf("%s-credentials", credentials.Provider),
-		EncryptedData:  encryptedData,
-		Region:         credentials.Region,
-		Project:        credentials.Project,
-		Status:         "active",
-		ExpiresAt:      credentials.ExpiresAt,
+		TenantID:      tenantID,
+		Provider:      string(credentials.Provider),
+		Name:          fmt.Sprintf("%s-credentials", credentials.Provider),
+		EncryptedData: encryptedData,
+		Region:        credentials.Region,
+		Project:       credentials.Project,
+		Status:        "active",
+		ExpiresAt:     credentials.ExpiresAt,
 	}
 
 	if err := tenantRepo.ValidateAndCreate(credRecord); err != nil {
@@ -408,13 +408,13 @@ type CloudCredential struct {
 
 // CredentialInfo represents credential metadata without sensitive data
 type CredentialInfo struct {
-	ID        uuid.UUID               `json:"id"`
-	Provider  storage.CloudProvider   `json:"provider"`
-	Name      string                  `json:"name"`
-	Region    string                  `json:"region,omitempty"`
-	Project   string                  `json:"project,omitempty"`
-	Status    string                  `json:"status"`
-	ExpiresAt *time.Time              `json:"expires_at,omitempty"`
-	CreatedAt time.Time               `json:"created_at"`
-	UpdatedAt time.Time               `json:"updated_at"`
+	ID        uuid.UUID             `json:"id"`
+	Provider  storage.CloudProvider `json:"provider"`
+	Name      string                `json:"name"`
+	Region    string                `json:"region,omitempty"`
+	Project   string                `json:"project,omitempty"`
+	Status    string                `json:"status"`
+	ExpiresAt *time.Time            `json:"expires_at,omitempty"`
+	CreatedAt time.Time             `json:"created_at"`
+	UpdatedAt time.Time             `json:"updated_at"`
 }

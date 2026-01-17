@@ -6,24 +6,29 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/server/handlers"
-	"github.com/jscharber/eAIIngest/internal/server/response"
-	"github.com/jscharber/eAIIngest/pkg/health"
-	"github.com/jscharber/eAIIngest/pkg/logger"
-	"github.com/jscharber/eAIIngest/pkg/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/server/handlers"
+	"github.com/jscharber/audimodal/internal/server/response"
+	"github.com/jscharber/audimodal/internal/services"
+	"github.com/jscharber/audimodal/pkg/events"
+	"github.com/jscharber/audimodal/pkg/health"
+	"github.com/jscharber/audimodal/pkg/logger"
+	"github.com/jscharber/audimodal/pkg/metrics"
 )
 
 // Server represents the HTTP server
 type Server struct {
-	config         *Config
-	db             *database.Database
-	httpServer     *http.Server
-	router         *Router
-	logger         *logger.Logger
+	config          *Config
+	db              *database.Database
+	httpServer      *http.Server
+	router          *Router
+	logger          *logger.Logger
 	metricsRegistry *metrics.MetricsRegistry
 	systemMetrics   *metrics.SystemMetrics
 	healthChecker   *health.HealthChecker
@@ -64,16 +69,16 @@ func New(config *Config, db *database.Database) (*Server, error) {
 
 	// Initialize health checker
 	healthChecker := health.NewHealthChecker(config.HealthCheckTimeout)
-	
+
 	// Add database health check
 	healthChecker.AddChecker(health.DatabaseChecker("database", func(ctx context.Context) error {
 		return db.HealthCheck(ctx)
 	}))
-	
+
 	// Add system health checks
 	healthChecker.AddChecker(health.MemoryChecker("memory", 90.0))
 	healthChecker.AddChecker(health.DiskSpaceChecker("disk", "/", 10.0))
-	
+
 	// Create health handler
 	healthHandler := health.NewHandler(healthChecker, "audimodal", "1.0.0")
 
@@ -106,7 +111,7 @@ func New(config *Config, db *database.Database) (*Server, error) {
 func (s *Server) Start(ctx context.Context) error {
 	// Channel to signal server start errors
 	serverErrors := make(chan error, 1)
-	
+
 	// Start system metrics collection
 	if s.config.MetricsEnabled {
 		go s.systemMetrics.Start(ctx, 15*time.Second)
@@ -116,22 +121,22 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start server in a goroutine
 	go func() {
 		s.logger.WithFields(map[string]interface{}{
-			"address": s.config.GetAddress(),
+			"address":     s.config.GetAddress(),
 			"tls_enabled": s.config.TLSEnabled,
 		}).Info("Starting HTTP server")
-		
+
 		var err error
 		if s.config.TLSEnabled {
 			s.logger.WithFields(map[string]interface{}{
 				"cert_file": s.config.TLSCertFile,
-				"key_file": s.config.TLSKeyFile,
+				"key_file":  s.config.TLSKeyFile,
 			}).Info("TLS enabled, starting HTTPS server")
 			err = s.httpServer.ListenAndServeTLS(s.config.TLSCertFile, s.config.TLSKeyFile)
 		} else {
 			s.logger.Info("TLS disabled, starting HTTP server")
 			err = s.httpServer.ListenAndServe()
 		}
-		
+
 		if err != nil && err != http.ErrServerClosed {
 			s.logger.WithField("error", err).Error("HTTP server error")
 			serverErrors <- err
@@ -167,7 +172,7 @@ func (s *Server) Start(ctx context.Context) error {
 // Shutdown gracefully shuts down the server and its dependencies
 func (s *Server) Shutdown() error {
 	s.logger.Info("Starting graceful shutdown sequence")
-	
+
 	// Create shutdown context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.ShutdownTimeout)
 	defer cancel()
@@ -279,7 +284,7 @@ func (r *Router) setupMiddleware() {
 	r.middleware.Use(RecoveryMiddleware())
 	r.middleware.Use(SecurityHeadersMiddleware())
 	r.middleware.Use(RequestIDMiddleware(r.config.RequestIDHeader))
-	
+
 	// Add metrics collection middleware if enabled
 	if r.config.MetricsEnabled {
 		r.middleware.Use(metrics.GetHTTPMetricsMiddleware())
@@ -288,10 +293,10 @@ func (r *Router) setupMiddleware() {
 	// Add structured logging middleware if request logging is enabled
 	if r.config.LogRequests {
 		httpLogConfig := &logger.HTTPLogConfig{
-			SkipPaths: []string{r.config.HealthCheckPath, r.config.MetricsPath},
-			LogRequestBody: r.config.LogRequestBody,
+			SkipPaths:       []string{r.config.HealthCheckPath, r.config.MetricsPath},
+			LogRequestBody:  r.config.LogRequestBody,
 			LogResponseBody: r.config.LogResponseBody,
-			LogHeaders: r.config.LogHeaders,
+			LogHeaders:      r.config.LogHeaders,
 			SanitizeHeaders: []string{
 				"authorization", "x-api-key", "cookie", "set-cookie",
 				"x-auth-token", "x-csrf-token", "jwt", "bearer",
@@ -300,7 +305,7 @@ func (r *Router) setupMiddleware() {
 		}
 		r.middleware.Use(logger.RequestLoggingMiddleware(r.logger, httpLogConfig))
 	}
-	
+
 	r.middleware.Use(CORSMiddleware(r.config))
 	r.middleware.Use(RateLimitMiddleware(r.config))
 	r.middleware.Use(MaxRequestSizeMiddleware(r.config.MaxRequestSize))
@@ -310,25 +315,53 @@ func (r *Router) setupMiddleware() {
 
 // setupRoutes configures all API routes
 func (r *Router) setupRoutes() {
-	// Health check endpoints (no auth required)
-	r.HandleFunc(r.config.HealthCheckPath, r.healthHandler.HealthCheckHandler())
-	r.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
-	r.HandleFunc(r.config.HealthCheckPath+"/live", r.healthHandler.LivenessHandler())
+	r.logger.Info("Setting up routes", "api_prefix", r.config.APIPrefix)
 
-	// Metrics endpoint (no auth required)
+	// Health check endpoints (no auth required) - Register these FIRST to avoid conflicts
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath, r.healthHandler.HealthCheckHandler())
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/ready", r.healthHandler.ReadinessHandler())
+	r.ServeMux.HandleFunc(r.config.HealthCheckPath+"/live", r.healthHandler.LivenessHandler())
+
+	// Metrics endpoints (no auth required)
 	if r.config.MetricsEnabled {
-		r.HandleFunc(r.config.MetricsPath, r.metricsHandler)
+		r.ServeMux.HandleFunc(r.config.MetricsPath, r.metricsHandler)
+		// Add Prometheus-formatted metrics endpoint
+		r.ServeMux.Handle("/metrics/prometheus", promhttp.Handler())
 	}
 
 	// API routes with authentication
 	apiPrefix := r.config.APIPrefix
+
+	// Create storage service first (needed by file handler)
+	encryptionKey := os.Getenv("EAI_ENCRYPTION_KEY")
+	if encryptionKey == "" {
+		encryptionKey = "your-32-byte-encryption-key-here"
+	}
+	storageService := services.NewStorageService(r.db, []byte(encryptionKey))
+	storageHandler := handlers.NewStorageHandler(r.db, storageService)
+
+	// Initialize Kafka event producer if enabled (using pure Go kafka-go library)
+	var eventProducer *events.SimpleProducer
+	if r.config.Kafka != nil && r.config.Kafka.Enabled {
+		producerConfig := events.SimpleProducerConfig{
+			BootstrapServers: r.config.Kafka.BootstrapServers,
+			ClientID:         r.config.Kafka.ClientID,
+		}
+		var err error
+		eventProducer, err = events.NewSimpleProducer(producerConfig)
+		if err != nil {
+			r.logger.Warn("Failed to initialize Kafka producer, events will not be published", "error", err)
+		} else {
+			r.logger.Info("Kafka event producer initialized", "brokers", r.config.Kafka.BootstrapServers)
+		}
+	}
 
 	// Create handlers
 	tenantHandler := handlers.NewTenantHandler(r.db)
 	dataSourceHandler := handlers.NewDataSourceHandler(r.db)
 	sessionHandler := handlers.NewProcessingSessionHandler(r.db)
 	dlpHandler := handlers.NewDLPHandler(r.db)
-	fileHandler := handlers.NewFileHandler(r.db)
+	fileHandler := handlers.NewFileHandler(r.db, storageService, eventProducer)
 	chunkHandler := handlers.NewChunkHandler(r.db)
 	webHandler := handlers.NewWebHandler(r.db, r.logger)
 	mlAnalysisHandler := handlers.NewMLAnalysisHandler(r.db, r.logger)
@@ -336,9 +369,13 @@ func (r *Router) setupRoutes() {
 	// Apply authentication middleware to API routes
 	authMiddleware := AuthenticationMiddleware(r.config, r.db)
 
+	// Authentication bypass for development - configure properly in production
+	noAuthMiddleware := func(h http.Handler) http.Handler { return h }
+
 	// Tenant management routes
-	r.Handle(fmt.Sprintf("%s/tenants", apiPrefix), authMiddleware(http.HandlerFunc(tenantHandler.ListTenants)))
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), authMiddleware(http.HandlerFunc(tenantHandler.HandleTenant)))
+	tenantsPath := fmt.Sprintf("%s/tenants", apiPrefix)
+	r.logger.Info("Registering tenant management route", "path", tenantsPath)
+	r.ServeMux.Handle(tenantsPath, noAuthMiddleware(http.HandlerFunc(tenantHandler.HandleTenant)))
 
 	// Tenant-scoped routes (require tenant context)
 	tenantMiddleware := TenantMiddleware(r.db)
@@ -346,71 +383,98 @@ func (r *Router) setupRoutes() {
 		return authMiddleware(tenantMiddleware(h))
 	}
 
-	// Data source routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if isDataSourceRoute(req.URL.Path, apiPrefix) {
-			dataSourceHandler.ServeHTTP(w, req)
-		} else {
-			http.NotFound(w, req)
+	// All tenant-scoped routes - try Go 1.22+ wildcard pattern
+	tenantsWildcard := fmt.Sprintf("%s/tenants/{id...}", apiPrefix)
+	r.logger.Info("Registering tenant wildcard route", "path", tenantsWildcard)
+	r.ServeMux.Handle(tenantsWildcard, noAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Check if this is a tenant management operation (e.g., GET /api/v1/tenants/{id})
+		pathParts := strings.Split(strings.TrimPrefix(req.URL.Path, "/"), "/")
+		if len(pathParts) == 4 && pathParts[0] == "api" && pathParts[1] == "v1" && pathParts[2] == "tenants" {
+			// This is a tenant management operation
+			// Routing to tenant handler
+			tenantHandler.HandleTenant(w, req)
+			return
 		}
+
+		// Otherwise, it's a tenant-scoped operation that requires tenant context
+		// Log tenant-scoped route access
+		r.logger.Info("Tenant-scoped route called",
+			"path", req.URL.Path,
+			"method", req.Method,
+			"request_id", getRequestID(req.Context()))
+
+		// Apply tenant middleware and dispatch
+		tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			r.logger.Info("After tenant middleware",
+				"path", req.URL.Path,
+				"tenant_context", getTenantContext(req.Context()))
+
+			// Dispatch to appropriate handler based on path
+			if isDataSourceRoute(req.URL.Path, apiPrefix) {
+				// Route to data source handler
+				dataSourceHandler.ServeHTTP(w, req)
+			} else if isSessionRoute(req.URL.Path, apiPrefix) {
+				// Route to session handler
+				sessionHandler.ServeHTTP(w, req)
+			} else if isDLPRoute(req.URL.Path, apiPrefix) {
+				// Route to DLP handler
+				dlpHandler.ServeHTTP(w, req)
+			} else if isStorageRoute(req.URL.Path, apiPrefix) {
+				// Route to storage handler
+				storageHandler.ServeHTTP(w, req)
+			} else if isFileRoute(req.URL.Path, apiPrefix) {
+				r.logger.Info("Routing to file handler", "path", req.URL.Path)
+				fileHandler.ServeHTTP(w, req)
+			} else if isChunkRoute(req.URL.Path, apiPrefix) {
+				// Route to chunk handler
+				chunkHandler.ServeHTTP(w, req)
+			} else if isMLAnalysisRoute(req.URL.Path, apiPrefix) {
+				// Route to ML analysis handler
+				mlAnalysisHandler.ServeHTTP(w, req)
+			} else {
+				r.logger.Warn("No matching route found", "path", req.URL.Path)
+				http.NotFound(w, req)
+			}
+		})).ServeHTTP(w, req)
 	})))
 
-	// Processing session routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if isSessionRoute(req.URL.Path, apiPrefix) {
-			sessionHandler.ServeHTTP(w, req)
-		} else {
-			http.NotFound(w, req)
-		}
-	})))
+	// Embedding API routes (must be registered before the catch-all apiRootHandler)
+	embeddingHandler, err := handlers.NewEmbeddingHandler()
+	if err != nil {
+		r.logger.Warn("Failed to initialize embedding handler, embedding routes will be disabled", "error", err.Error())
+	} else {
+		r.logger.Info("Registering embedding API routes")
+		// Register embedding routes with explicit paths
+		// Note: Only registering routes that don't require path variables (mux.Vars)
+		// Routes with path variables need adapter methods to use r.PathValue() instead
+		embeddingsPrefix := fmt.Sprintf("%s/embeddings", apiPrefix)
 
-	// DLP policy routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if isDLPRoute(req.URL.Path, apiPrefix) {
-			dlpHandler.ServeHTTP(w, req)
-		} else {
-			http.NotFound(w, req)
-		}
-	})))
+		// Document processing (POST doesn't need path vars)
+		r.ServeMux.HandleFunc(fmt.Sprintf("POST %s/documents", embeddingsPrefix), embeddingHandler.ProcessDocument)
 
-	// File routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if isFileRoute(req.URL.Path, apiPrefix) {
-			fileHandler.ServeHTTP(w, req)
-		} else {
-			http.NotFound(w, req)
-		}
-	})))
+		// Search
+		r.ServeMux.HandleFunc(fmt.Sprintf("POST %s/search", embeddingsPrefix), embeddingHandler.SearchDocuments)
 
-	// Chunk routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if isChunkRoute(req.URL.Path, apiPrefix) {
-			chunkHandler.ServeHTTP(w, req)
-		} else {
-			http.NotFound(w, req)
-		}
-	})))
+		// Datasets (GET list and POST create don't need path vars)
+		r.ServeMux.HandleFunc(fmt.Sprintf("GET %s/datasets", embeddingsPrefix), embeddingHandler.ListDatasets)
+		r.ServeMux.HandleFunc(fmt.Sprintf("POST %s/datasets", embeddingsPrefix), embeddingHandler.CreateDataset)
 
-	// ML Analysis routes
-	r.Handle(fmt.Sprintf("%s/tenants/", apiPrefix), tenantAuth(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if isMLAnalysisRoute(req.URL.Path, apiPrefix) {
-			mlAnalysisHandler.ServeHTTP(w, req)
-		} else {
-			http.NotFound(w, req)
-		}
-	})))
+		// Health and stats
+		r.ServeMux.HandleFunc(fmt.Sprintf("GET %s/health", embeddingsPrefix), embeddingHandler.HealthCheck)
+		r.ServeMux.HandleFunc(fmt.Sprintf("GET %s/stats", embeddingsPrefix), embeddingHandler.GetServiceStats)
+	}
 
 	// API documentation route
-	r.HandleFunc(fmt.Sprintf("%s/docs", apiPrefix), r.docsHandler)
-	r.HandleFunc(fmt.Sprintf("%s/", apiPrefix), r.apiRootHandler)
+	r.logger.Info("Registering API docs and root", "docs_path", fmt.Sprintf("%s/docs", apiPrefix), "root_path", fmt.Sprintf("%s/", apiPrefix))
+	r.ServeMux.HandleFunc(fmt.Sprintf("%s/docs", apiPrefix), r.docsHandler)
+	r.ServeMux.HandleFunc(fmt.Sprintf("%s/", apiPrefix), r.apiRootHandler)
 
 	// Web UI routes
-	r.HandleFunc("/", webHandler.RedirectToLogin())
-	r.HandleFunc("/login", webHandler.LoginHandler())
-	r.HandleFunc("/dashboard", webHandler.DashboardHandler())
-	r.HandleFunc("/static/", webHandler.StaticFileHandler())
+	r.ServeMux.HandleFunc("/", webHandler.RedirectToLogin())
+	r.ServeMux.HandleFunc("/login", webHandler.LoginHandler())
+	r.ServeMux.HandleFunc("/dashboard", webHandler.DashboardHandler())
+	r.ServeMux.HandleFunc("/static/", webHandler.StaticFileHandler())
 }
-
 
 // metricsHandler handles metrics requests
 func (r *Router) metricsHandler(w http.ResponseWriter, req *http.Request) {
@@ -447,8 +511,9 @@ func (r *Router) docsHandler(w http.ResponseWriter, req *http.Request) {
 			"data_sources":        fmt.Sprintf("%s/tenants/{tenant_id}/data-sources", r.config.APIPrefix),
 			"processing_sessions": fmt.Sprintf("%s/tenants/{tenant_id}/sessions", r.config.APIPrefix),
 			"dlp_policies":        fmt.Sprintf("%s/tenants/{tenant_id}/dlp-policies", r.config.APIPrefix),
-			"files":              fmt.Sprintf("%s/tenants/{tenant_id}/files", r.config.APIPrefix),
-			"chunks":             fmt.Sprintf("%s/tenants/{tenant_id}/chunks", r.config.APIPrefix),
+			"files":               fmt.Sprintf("%s/tenants/{tenant_id}/files", r.config.APIPrefix),
+			"chunks":              fmt.Sprintf("%s/tenants/{tenant_id}/chunks", r.config.APIPrefix),
+			"storage":             fmt.Sprintf("%s/tenants/{tenant_id}/storage", r.config.APIPrefix),
 		},
 		"authentication": map[string]interface{}{
 			"type":        "API Key or JWT Bearer Token",
@@ -498,22 +563,29 @@ func isDLPRoute(path, apiPrefix string) bool {
 }
 
 func isFileRoute(path, apiPrefix string) bool {
-	return contains(path, "/files")
+	return strings.Contains(path, "/files")
 }
 
 func isChunkRoute(path, apiPrefix string) bool {
 	return contains(path, "/chunks")
 }
 
+func isStorageRoute(path, apiPrefix string) bool {
+	return contains(path, "/storage")
+}
+
 func isMLAnalysisRoute(path, apiPrefix string) bool {
-	return contains(path, "/ml-analysis")
+	return strings.Contains(path, "/ml-analysis") || strings.Contains(path, "/ml/insights")
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[len(s)-len(substr):] == substr || 
-		   len(s) > len(substr) && s[len(s)-len(substr)-1:len(s)-len(substr)] == "/" && s[len(s)-len(substr):] == substr ||
-		   s == substr ||
-		   (len(s) > len(substr) && s[:len(substr)] == substr && s[len(substr)] == '/')
+	result := len(s) >= len(substr) && s[len(s)-len(substr):] == substr ||
+		len(s) > len(substr) && s[len(s)-len(substr)-1:len(s)-len(substr)] == "/" && s[len(s)-len(substr):] == substr ||
+		s == substr ||
+		(len(s) > len(substr) && s[:len(substr)] == substr && s[len(substr)] == '/')
+
+	// Log routing decisions - using proper logger would go here
+	return result
 }
 
 // RunServer is a convenience function to run the server

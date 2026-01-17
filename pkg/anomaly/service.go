@@ -22,7 +22,7 @@ type Service struct {
 	notifier   *NotificationService
 	tracer     trace.Tracer
 	mutex      sync.RWMutex
-	
+
 	// Background processing
 	processingQueue chan *DetectionRequest
 	stopChan        chan struct{}
@@ -31,34 +31,34 @@ type Service struct {
 
 // DetectionRequest represents a request for anomaly detection
 type DetectionRequest struct {
-	ID           uuid.UUID        `json:"id"`
-	Input        *DetectionInput  `json:"input"`
-	Context      context.Context  `json:"-"`
-	Timestamp    time.Time        `json:"timestamp"`
-	Priority     int              `json:"priority"`
-	CallbackURL  string           `json:"callback_url,omitempty"`
-	ResultChan   chan *DetectionResult `json:"-"`
+	ID          uuid.UUID             `json:"id"`
+	Input       *DetectionInput       `json:"input"`
+	Context     context.Context       `json:"-"`
+	Timestamp   time.Time             `json:"timestamp"`
+	Priority    int                   `json:"priority"`
+	CallbackURL string                `json:"callback_url,omitempty"`
+	ResultChan  chan *DetectionResult `json:"-"`
 }
 
 // DetectionResult represents the result of anomaly detection
 type DetectionResult struct {
-	RequestID    uuid.UUID   `json:"request_id"`
-	Anomalies    []*Anomaly  `json:"anomalies"`
-	ProcessedAt  time.Time   `json:"processed_at"`
-	ProcessingTime time.Duration `json:"processing_time"`
+	RequestID       uuid.UUID                  `json:"request_id"`
+	Anomalies       []*Anomaly                 `json:"anomalies"`
+	ProcessedAt     time.Time                  `json:"processed_at"`
+	ProcessingTime  time.Duration              `json:"processing_time"`
 	DetectorResults map[string]*DetectorResult `json:"detector_results"`
-	Error        string      `json:"error,omitempty"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	Error           string                     `json:"error,omitempty"`
+	Metadata        map[string]interface{}     `json:"metadata,omitempty"`
 }
 
 // DetectorResult represents results from a specific detector
 type DetectorResult struct {
-	DetectorName   string      `json:"detector_name"`
-	DetectorVersion string     `json:"detector_version"`
-	Anomalies      []*Anomaly  `json:"anomalies"`
-	ProcessingTime time.Duration `json:"processing_time"`
-	Error          string      `json:"error,omitempty"`
-	Enabled        bool        `json:"enabled"`
+	DetectorName    string        `json:"detector_name"`
+	DetectorVersion string        `json:"detector_version"`
+	Anomalies       []*Anomaly    `json:"anomalies"`
+	ProcessingTime  time.Duration `json:"processing_time"`
+	Error           string        `json:"error,omitempty"`
+	Enabled         bool          `json:"enabled"`
 }
 
 // DetectionWorker processes detection requests
@@ -87,14 +87,14 @@ func NewService(config *AnomalyDetectionConfig, repository AnomalyRepository) *S
 	if config == nil {
 		config = &AnomalyDetectionConfig{
 			Enabled:                true,
-			DefaultSeverity:       SeverityMedium,
-			MinConfidence:         0.5,
-			MaxAnomaliesToKeep:    10000,
+			DefaultSeverity:        SeverityMedium,
+			MinConfidence:          0.5,
+			MaxAnomaliesToKeep:     10000,
 			BaselineUpdateInterval: 24 * time.Hour,
-			BatchSize:             10,
-			ProcessingTimeout:     30 * time.Second,
+			BatchSize:              10,
+			ProcessingTimeout:      30 * time.Second,
 			MaxConcurrentDetectors: 5,
-			RetentionPeriod:       30 * 24 * time.Hour,
+			RetentionPeriod:        30 * 24 * time.Hour,
 		}
 	}
 
@@ -130,7 +130,7 @@ func (s *Service) RegisterDetector(detector AnomalyDetector) error {
 
 	s.detectors[name] = detector
 	log.Printf("Registered anomaly detector: %s (version: %s)", name, detector.GetVersion())
-	
+
 	return nil
 }
 
@@ -145,7 +145,7 @@ func (s *Service) UnregisterDetector(name string) error {
 
 	delete(s.detectors, name)
 	log.Printf("Unregistered anomaly detector: %s", name)
-	
+
 	return nil
 }
 
@@ -204,7 +204,7 @@ func (s *Service) DetectAnomalies(ctx context.Context, input *DetectionInput) (*
 	}
 
 	result.ProcessingTime = time.Since(startTime)
-	
+
 	span.SetAttributes(
 		attribute.Int("anomalies_detected", len(filteredAnomalies)),
 		attribute.Int64("processing_time_ms", result.ProcessingTime.Milliseconds()),
@@ -323,10 +323,10 @@ func (s *Service) runDetectors(ctx context.Context, input *DetectionInput) map[s
 
 	// Run detectors concurrently
 	semaphore := make(chan struct{}, s.config.MaxConcurrentDetectors)
-	
+
 	for name, detector := range detectors {
 		go func(detectorName string, det AnomalyDetector) {
-			semaphore <- struct{}{} // Acquire semaphore
+			semaphore <- struct{}{}        // Acquire semaphore
 			defer func() { <-semaphore }() // Release semaphore
 
 			result := s.runSingleDetector(ctx, detectorName, det, input)
@@ -345,7 +345,7 @@ func (s *Service) runDetectors(ctx context.Context, input *DetectionInput) map[s
 
 func (s *Service) runSingleDetector(ctx context.Context, name string, detector AnomalyDetector, input *DetectionInput) *DetectorResult {
 	startTime := time.Now()
-	
+
 	ctx, span := s.tracer.Start(ctx, fmt.Sprintf("detector.%s", name))
 	defer span.End()
 
@@ -371,7 +371,7 @@ func (s *Service) runSingleDetector(ctx context.Context, name string, detector A
 	}
 
 	result.ProcessingTime = time.Since(startTime)
-	
+
 	span.SetAttributes(
 		attribute.String("detector_name", name),
 		attribute.String("detector_version", detector.GetVersion()),
@@ -462,7 +462,7 @@ func (s *Service) startWorkerPool() {
 	}
 
 	s.workerPool = make([]*DetectionWorker, workerCount)
-	
+
 	for i := 0; i < workerCount; i++ {
 		worker := &DetectionWorker{
 			id:       i,
@@ -486,7 +486,7 @@ func (s *Service) Shutdown(ctx context.Context) error {
 
 	// Close processing queue
 	close(s.stopChan)
-	
+
 	// Wait for workers to finish (with timeout)
 	time.Sleep(5 * time.Second)
 
@@ -498,7 +498,7 @@ func (s *Service) Shutdown(ctx context.Context) error {
 
 func (w *DetectionWorker) start() {
 	log.Printf("Starting anomaly detection worker %d", w.id)
-	
+
 	for {
 		select {
 		case <-w.stopChan:
@@ -512,7 +512,7 @@ func (w *DetectionWorker) start() {
 
 func (w *DetectionWorker) processRequest(request *DetectionRequest) {
 	startTime := time.Now()
-	
+
 	result, err := w.service.DetectAnomalies(request.Context, request.Input)
 	if err != nil {
 		result = &DetectionResult{
@@ -524,7 +524,7 @@ func (w *DetectionWorker) processRequest(request *DetectionRequest) {
 
 	result.RequestID = request.ID
 	result.ProcessingTime = time.Since(startTime)
-	
+
 	// Send result back
 	select {
 	case request.ResultChan <- result:

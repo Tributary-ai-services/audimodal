@@ -15,12 +15,12 @@ const (
 	TenantStatusActive    = "active"
 	TenantStatusSuspended = "suspended"
 	TenantStatusDeleted   = "deleted"
-	
+
 	// Status values for data sources
 	DataSourceStatusActive   = "active"
 	DataSourceStatusInactive = "inactive"
 	DataSourceStatusError    = "error"
-	
+
 	// Status values for processing sessions
 	SessionStatusPending             = "pending"
 	SessionStatusRunning             = "running"
@@ -28,7 +28,7 @@ const (
 	SessionStatusFailed              = "failed"
 	SessionStatusCancelled           = "cancelled"
 	SessionStatusCompletedWithErrors = "completed_with_errors"
-	
+
 	// Status values for files
 	FileStatusDiscovered = "discovered"
 	FileStatusProcessing = "processing"
@@ -36,50 +36,50 @@ const (
 	FileStatusCompleted  = "completed"
 	FileStatusError      = "error"
 	FileStatusFailed     = "failed"
-	
+
 	// Processing tiers
 	ProcessingTier1 = "tier1" // < 10MB
 	ProcessingTier2 = "tier2" // 10MB - 1GB
 	ProcessingTier3 = "tier3" // > 1GB
-	
+
 	// Chunk types
 	ChunkTypeText  = "text"
 	ChunkTypeTable = "table"
 	ChunkTypeImage = "image"
 	ChunkTypeCode  = "code"
 	ChunkTypeOther = "other"
-	
+
 	// Embedding status
 	EmbeddingStatusPending    = "pending"
 	EmbeddingStatusProcessing = "processing"
 	EmbeddingStatusCompleted  = "completed"
 	EmbeddingStatusFailed     = "failed"
 	EmbeddingStatusSkipped    = "skipped"
-	
+
 	// DLP scan status
 	DLPScanStatusPending    = "pending"
 	DLPScanStatusProcessing = "processing"
 	DLPScanStatusCompleted  = "completed"
 	DLPScanStatusFailed     = "failed"
 	DLPScanStatusSkipped    = "skipped"
-	
+
 	// Sensitivity levels
 	SensitivityLevelUnknown  = "unknown"
 	SensitivityLevelLow      = "low"
 	SensitivityLevelMedium   = "medium"
 	SensitivityLevelHigh     = "high"
 	SensitivityLevelCritical = "critical"
-	
+
 	// DLP violation severity
 	ViolationSeverityLow      = "low"
 	ViolationSeverityMedium   = "medium"
 	ViolationSeverityHigh     = "high"
 	ViolationSeverityCritical = "critical"
-	
+
 	// File formats
-	FormatStructured      = "structured"
-	FormatUnstructured    = "unstructured"
-	FormatSemiStructured  = "semi_structured"
+	FormatStructured     = "structured"
+	FormatUnstructured   = "unstructured"
+	FormatSemiStructured = "semi_structured"
 )
 
 // JSONMap is a helper type for JSONB fields
@@ -91,12 +91,12 @@ func (j *JSONMap) Scan(value interface{}) error {
 		*j = make(JSONMap)
 		return nil
 	}
-	
+
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("cannot scan %T into JSONMap", value)
 	}
-	
+
 	return json.Unmarshal(bytes, j)
 }
 
@@ -117,12 +117,12 @@ func (s *StringSlice) Scan(value interface{}) error {
 		*s = make(StringSlice, 0)
 		return nil
 	}
-	
+
 	bytes, ok := value.([]byte)
 	if !ok {
 		return fmt.Errorf("cannot scan %T into StringSlice", value)
 	}
-	
+
 	return json.Unmarshal(bytes, s)
 }
 

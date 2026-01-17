@@ -3,10 +3,11 @@ package text
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"unicode"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // FixedSizeStrategy implements ChunkingStrategy for fixed-size text chunks
@@ -130,9 +131,9 @@ func (s *FixedSizeStrategy) TestConnection(ctx context.Context, config map[strin
 		Success: true,
 		Message: "Fixed-size text strategy configuration is valid",
 		Details: map[string]any{
-			"chunk_size":    config["chunk_size"],
-			"overlap_size":  config["overlap_size"],
-			"split_method":  "fixed_size",
+			"chunk_size":   config["chunk_size"],
+			"overlap_size": config["overlap_size"],
+			"split_method": "fixed_size",
 		},
 	}
 }
@@ -165,18 +166,21 @@ func (s *FixedSizeStrategy) ConfigureReader(readerConfig map[string]any) (map[st
 	for k, v := range readerConfig {
 		configured[k] = v
 	}
-	
+
 	configured["skip_empty_lines"] = false
 	return configured, nil
 }
 
 // ProcessChunk processes raw data into chunks using fixed-size strategy
 func (s *FixedSizeStrategy) ProcessChunk(ctx context.Context, rawData any, metadata core.ChunkMetadata) ([]core.Chunk, error) {
+	log.Printf("[STRATEGY] ProcessChunk called with %d bytes", len(fmt.Sprintf("%v", rawData)))
+
 	// Extract text content
 	text, ok := rawData.(string)
 	if !ok {
 		return nil, fmt.Errorf("fixed-size strategy expects string input, got %T", rawData)
 	}
+	log.Printf("[STRATEGY] Text extracted, length=%d", len(text))
 
 	// Get configuration
 	config := s.getDefaultConfig()
@@ -205,7 +209,9 @@ func (s *FixedSizeStrategy) ProcessChunk(ctx context.Context, rawData any, metad
 	}
 
 	// Process text into chunks
+	log.Printf("[STRATEGY] Calling chunkText with text length=%d", len(text))
 	chunks := s.chunkText(text, config, metadata)
+	log.Printf("[STRATEGY] chunkText returned %d chunks", len(chunks))
 	return chunks, nil
 }
 
@@ -215,7 +221,7 @@ func (s *FixedSizeStrategy) GetOptimalChunkSize(sourceSchema core.SchemaInfo) in
 	if sourceSchema.Format == "unstructured" {
 		return 1000
 	}
-	
+
 	// For other formats, use smaller chunks
 	return 500
 }
@@ -247,22 +253,25 @@ func (s *FixedSizeStrategy) getDefaultConfig() chunkConfig {
 
 func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata core.ChunkMetadata) []core.Chunk {
 	var chunks []core.Chunk
-	
+
+	log.Printf("[STRATEGY] chunkText: calling normalizeText on %d bytes", len(text))
 	// Remove excessive whitespace but preserve paragraph breaks
 	text = normalizeText(text)
-	
+	log.Printf("[STRATEGY] chunkText: normalizeText returned %d bytes", len(text))
+
 	if len(text) <= config.ChunkSize {
 		// Text is smaller than chunk size, return as single chunk
+		// MEMORY FIX: Clone to avoid holding reference to potentially larger string
 		chunk := core.Chunk{
-			Data: text,
+			Data: strings.Clone(text),
 			Metadata: core.ChunkMetadata{
-				SourcePath:    metadata.SourcePath,
-				ChunkID:       fmt.Sprintf("%s:chunk:1", metadata.ChunkID),
-				ChunkType:     "text",
-				SizeBytes:     int64(len(text)),
-				ProcessedAt:   metadata.ProcessedAt,
-				ProcessedBy:   s.name,
-				Quality:       s.calculateQuality(text),
+				SourcePath:  metadata.SourcePath,
+				ChunkID:     fmt.Sprintf("%s:chunk:1", metadata.ChunkID),
+				ChunkType:   "text",
+				SizeBytes:   int64(len(text)),
+				ProcessedAt: metadata.ProcessedAt,
+				ProcessedBy: s.name,
+				Quality:     s.calculateQuality(text),
 				Context: map[string]string{
 					"chunk_strategy": "fixed_size",
 					"chunk_number":   "1",
@@ -277,30 +286,41 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 	// Split text into chunks
 	chunkNumber := 1
 	start := 0
-	
+	loopCount := 0
+	maxLoops := 10000 // Safety limit to prevent infinite loops
+
 	for start < len(text) {
+		loopCount++
+		if loopCount > maxLoops {
+			log.Printf("[STRATEGY] ERROR: Exceeded max loop count %d, breaking to prevent hang", maxLoops)
+			break
+		}
+		if loopCount%100 == 0 {
+			log.Printf("[STRATEGY] chunkText loop iteration %d, start=%d, textLen=%d", loopCount, start, len(text))
+		}
+
 		end := start + config.ChunkSize
-		
+
 		// Don't go beyond text length
 		if end > len(text) {
 			end = len(text)
 		}
-		
+
 		// Try to find better break point if requested
 		if config.SplitOnSentences && end < len(text) {
 			betterEnd := s.findSentenceBreak(text, start, end)
-			if betterEnd > start + config.MinChunkSize {
+			if betterEnd > start+config.MinChunkSize {
 				end = betterEnd
 			}
 		}
-		
+
 		if config.PreserveParagraphs && end < len(text) {
 			betterEnd := s.findParagraphBreak(text, start, end)
-			if betterEnd > start + config.MinChunkSize {
+			if betterEnd > start+config.MinChunkSize {
 				end = betterEnd
 			}
 		}
-		
+
 		// Safety check for slice bounds
 		if start < 0 {
 			start = 0
@@ -311,10 +331,12 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 		if start >= end {
 			break
 		}
-		
-		chunkText := text[start:end]
-		chunkText = strings.TrimSpace(chunkText)
-		
+
+		// MEMORY FIX: Use strings.Clone() to copy the substring
+		// String slicing in Go creates a reference to the original string's backing array
+		// Without cloning, the entire original text stays in memory
+		chunkText := strings.Clone(strings.TrimSpace(text[start:end]))
+
 		// Only create chunk if it meets minimum size
 		if len(chunkText) >= config.MinChunkSize {
 			chunk := core.Chunk{
@@ -340,25 +362,34 @@ func (s *FixedSizeStrategy) chunkText(text string, config chunkConfig, metadata 
 			chunks = append(chunks, chunk)
 			chunkNumber++
 		}
-		
+
 		// Move to next chunk with overlap
+		oldStart := start
 		if config.OverlapSize > 0 && end < len(text) {
 			start = end - config.OverlapSize
 		} else {
 			start = end
 		}
-		
+
+		// CRITICAL FIX: Ensure start always advances to prevent infinite loop
+		// This can happen when findSentenceBreak returns end close to start + OverlapSize
+		// When stuck, skip overlap entirely and advance to end position
+		if start <= oldStart {
+			start = end // Skip overlap, advance to end position
+			log.Printf("[STRATEGY] WARNING: overlap caused no progress, skipping to end=%d (was %d)", start, oldStart)
+		}
+
 		// Avoid infinite loop
 		if start >= len(text) {
 			break
 		}
 	}
-	
+
 	// Update total chunks in context
 	for i := range chunks {
 		chunks[i].Metadata.Context["total_chunks"] = fmt.Sprintf("%d", len(chunks))
 	}
-	
+
 	return chunks
 }
 
@@ -373,23 +404,36 @@ func (s *FixedSizeStrategy) findSentenceBreak(text string, start, end int) int {
 	if start >= end {
 		return end
 	}
-	
-	// Look for sentence-ending punctuation
-	sentenceEnders := []rune{'.', '!', '?'}
-	
-	// Search backwards from end position
-	for i := end - 1; i > start; i-- {
-		char := rune(text[i])
-		for _, ender := range sentenceEnders {
-			if char == ender {
-				// Check if next character is whitespace or end of text
-				if i+1 >= len(text) || unicode.IsSpace(rune(text[i+1])) {
-					return i + 1
-				}
-			}
+
+	// PERFORMANCE FIX: Use strings.LastIndexAny instead of char-by-char iteration
+	// Search backwards from end position for sentence-ending punctuation
+	searchText := text[start:end]
+
+	// Limit iterations to prevent slow processing on text with many non-sentence periods
+	maxIterations := 50
+
+	// Find the last occurrence of any sentence ender
+	for i := 0; i < maxIterations; i++ {
+		idx := strings.LastIndexAny(searchText, ".!?")
+		if idx == -1 {
+			break
 		}
+
+		// Calculate absolute position
+		absPos := start + idx
+
+		// Check if next character is whitespace or end of text
+		if absPos+1 >= len(text) || unicode.IsSpace(rune(text[absPos+1])) {
+			return absPos + 1
+		}
+
+		// Not a valid sentence break (e.g., decimal point), search earlier
+		if idx == 0 {
+			break
+		}
+		searchText = searchText[:idx]
 	}
-	
+
 	return end
 }
 
@@ -404,14 +448,14 @@ func (s *FixedSizeStrategy) findParagraphBreak(text string, start, end int) int 
 	if start >= end {
 		return end
 	}
-	
+
 	// Look for double newlines (paragraph breaks)
 	for i := end - 1; i > start+1; i-- {
 		if text[i] == '\n' && text[i-1] == '\n' {
 			return i + 1
 		}
 	}
-	
+
 	return end
 }
 
@@ -423,38 +467,68 @@ func (s *FixedSizeStrategy) calculateQuality(text string) *core.QualityMetrics {
 			Readability:  0.0,
 		}
 	}
-	
-	// Simple quality metrics
-	words := strings.Fields(text)
-	sentences := strings.FieldsFunc(text, func(r rune) bool {
-		return r == '.' || r == '!' || r == '?'
-	})
-	
+
+	// PERFORMANCE FIX: Single-pass counting instead of multiple allocating operations
+	// Count words and sentences in one pass without allocating arrays
+	wordCount := 0
+	sentenceCount := 0
+	inWord := false
+	textLen := len(text)
+
+	for i := 0; i < textLen; i++ {
+		c := text[i]
+
+		// Count words (transitions from whitespace to non-whitespace)
+		isSpace := c == ' ' || c == '\t' || c == '\n' || c == '\r'
+		if !isSpace {
+			if !inWord {
+				wordCount++
+				inWord = true
+			}
+		} else {
+			inWord = false
+		}
+
+		// Count sentences
+		if c == '.' || c == '!' || c == '?' {
+			sentenceCount++
+		}
+	}
+
 	// Completeness: based on sentence completeness
 	completeness := 1.0
-	if len(text) > 0 && !strings.HasSuffix(strings.TrimSpace(text), ".") &&
-		!strings.HasSuffix(strings.TrimSpace(text), "!") &&
-		!strings.HasSuffix(strings.TrimSpace(text), "?") {
-		completeness = 0.8 // Incomplete sentence
+	if textLen > 0 {
+		// Check last non-whitespace character
+		lastChar := byte(0)
+		for i := textLen - 1; i >= 0; i-- {
+			c := text[i]
+			if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+				lastChar = c
+				break
+			}
+		}
+		if lastChar != '.' && lastChar != '!' && lastChar != '?' {
+			completeness = 0.8 // Incomplete sentence
+		}
 	}
-	
+
 	// Coherence: based on word-to-sentence ratio
 	coherence := 0.5 // Default
-	if len(sentences) > 0 {
-		avgWordsPerSentence := float64(len(words)) / float64(len(sentences))
+	if sentenceCount > 0 {
+		avgWordsPerSentence := float64(wordCount) / float64(sentenceCount)
 		if avgWordsPerSentence >= 10 && avgWordsPerSentence <= 25 {
 			coherence = 0.9 // Good sentence structure
 		} else if avgWordsPerSentence >= 5 && avgWordsPerSentence <= 35 {
 			coherence = 0.7 // Acceptable
 		}
 	}
-	
+
 	// Readability: simple approximation based on word and sentence length
 	readability := 0.5 // Default
-	if len(words) > 0 && len(sentences) > 0 {
-		avgWordLength := float64(len(text)) / float64(len(words))
-		avgSentenceLength := float64(len(words)) / float64(len(sentences))
-		
+	if wordCount > 0 && sentenceCount > 0 {
+		avgWordLength := float64(textLen) / float64(wordCount)
+		avgSentenceLength := float64(wordCount) / float64(sentenceCount)
+
 		// Flesch-like approximation
 		if avgWordLength < 6 && avgSentenceLength < 20 {
 			readability = 0.8
@@ -462,7 +536,7 @@ func (s *FixedSizeStrategy) calculateQuality(text string) *core.QualityMetrics {
 			readability = 0.6
 		}
 	}
-	
+
 	return &core.QualityMetrics{
 		Completeness: completeness,
 		Coherence:    coherence,
@@ -475,14 +549,57 @@ func (s *FixedSizeStrategy) calculateQuality(text string) *core.QualityMetrics {
 // Helper functions
 
 func normalizeText(text string) string {
-	// Replace multiple spaces with single space
-	words := strings.Fields(text)
-	result := strings.Join(words, " ")
-	
-	// Preserve paragraph breaks
-	result = strings.ReplaceAll(result, " \n ", "\n\n")
-	
-	return result
+	// PERFORMANCE FIX: Use streaming approach instead of strings.Fields
+	// which allocates a slice of all words.
+	// This is critical for large documents (500+ pages)
+
+	if len(text) == 0 {
+		return text
+	}
+
+	// Pre-allocate result buffer with estimated size
+	var result strings.Builder
+	result.Grow(len(text))
+
+	inWhitespace := false
+	pendingNewline := false
+
+	for i := 0; i < len(text); i++ {
+		c := text[i]
+
+		if c == ' ' || c == '\t' || c == '\r' {
+			// Regular whitespace - collapse to single space
+			if !inWhitespace {
+				result.WriteByte(' ')
+				inWhitespace = true
+			}
+			pendingNewline = false
+		} else if c == '\n' {
+			// Newline handling - preserve paragraph breaks (double newlines)
+			if pendingNewline {
+				// Second newline - this is a paragraph break
+				// We already wrote a space for the first newline, overwrite it
+				// by writing \n\n (the space will be trimmed or absorbed)
+				result.WriteString("\n\n")
+				inWhitespace = true
+				pendingNewline = false
+			} else {
+				// First newline - write a space and mark as pending
+				if !inWhitespace {
+					result.WriteByte(' ')
+					inWhitespace = true
+				}
+				pendingNewline = true
+			}
+		} else {
+			// Regular character
+			result.WriteByte(c)
+			inWhitespace = false
+			pendingNewline = false
+		}
+	}
+
+	return strings.TrimSpace(result.String())
 }
 
 func parseInt(s string) (int, error) {

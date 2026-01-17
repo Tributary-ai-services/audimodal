@@ -1,16 +1,16 @@
 package strategies
 
 import (
-	"github.com/jscharber/eAIIngest/pkg/core"
-	"github.com/jscharber/eAIIngest/pkg/registry"
-	"github.com/jscharber/eAIIngest/pkg/strategies/hybrid"
-	"github.com/jscharber/eAIIngest/pkg/strategies/structured"
-	"github.com/jscharber/eAIIngest/pkg/strategies/text"
+	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/registry"
+	"github.com/jscharber/audimodal/pkg/strategies/hybrid"
+	"github.com/jscharber/audimodal/pkg/strategies/structured"
+	"github.com/jscharber/audimodal/pkg/strategies/text"
 )
 
 // RegisterBasicStrategies registers all basic chunking strategies with the global registry
 func RegisterBasicStrategies() {
-	// Register text strategies
+	// Register text strategies with full names
 	registry.GlobalRegistry.RegisterStrategy("fixed_size_text", func() core.ChunkingStrategy {
 		return text.NewFixedSizeStrategy()
 	})
@@ -26,6 +26,28 @@ func RegisterBasicStrategies() {
 
 	// Register hybrid strategies
 	registry.GlobalRegistry.RegisterStrategy("adaptive_hybrid", func() core.ChunkingStrategy {
+		return hybrid.NewAdaptiveStrategy()
+	})
+
+	// Register convenient aliases for common usage
+	registry.GlobalRegistry.RegisterStrategy("fixed", func() core.ChunkingStrategy {
+		return text.NewFixedSizeStrategy()
+	})
+
+	registry.GlobalRegistry.RegisterStrategy("semantic", func() core.ChunkingStrategy {
+		return text.NewSemanticStrategy()
+	})
+
+	registry.GlobalRegistry.RegisterStrategy("row_based", func() core.ChunkingStrategy {
+		return structured.NewRowBasedStrategy()
+	})
+
+	registry.GlobalRegistry.RegisterStrategy("adaptive", func() core.ChunkingStrategy {
+		return hybrid.NewAdaptiveStrategy()
+	})
+
+	// Register default strategy alias
+	registry.GlobalRegistry.RegisterStrategy("default", func() core.ChunkingStrategy {
 		return hybrid.NewAdaptiveStrategy()
 	})
 }
@@ -96,13 +118,13 @@ func GetRecommendedStrategies(contentType string, size int64, complexity string)
 
 // StrategyCapabilities describes what each strategy is good for
 type StrategyCapabilities struct {
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	BestFor      []string `json:"best_for"`
-	DataTypes    []string `json:"data_types"`
-	Complexity   string   `json:"complexity"`
-	Performance  string   `json:"performance"`
-	MemoryUsage  string   `json:"memory_usage"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	BestFor     []string `json:"best_for"`
+	DataTypes   []string `json:"data_types"`
+	Complexity  string   `json:"complexity"`
+	Performance string   `json:"performance"`
+	MemoryUsage string   `json:"memory_usage"`
 }
 
 // GetStrategyCapabilities returns detailed information about all registered strategies
@@ -150,13 +172,13 @@ func GetStrategyCapabilities() []StrategyCapabilities {
 // ValidateBasicStrategies validates all registered basic strategies
 func ValidateBasicStrategies() error {
 	strategies := []string{"fixed_size_text", "semantic_text", "row_based_structured", "adaptive_hybrid"}
-	
+
 	for _, name := range strategies {
 		if err := registry.GlobalRegistry.ValidatePlugin("strategy", name); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -209,12 +231,12 @@ func GetOptimalStrategyConfig(strategyName string, contentSize int64, dataType s
 
 // StrategyPerformanceHints provides performance optimization hints for strategies
 type StrategyPerformanceHints struct {
-	StrategyName     string            `json:"strategy_name"`
-	ParallelSafe     bool              `json:"parallel_safe"`
-	MemoryEfficient  bool              `json:"memory_efficient"`
-	RecommendedBatch int               `json:"recommended_batch_size"`
-	OptimalConfig    map[string]any    `json:"optimal_config"`
-	Warnings         []string          `json:"warnings"`
+	StrategyName     string         `json:"strategy_name"`
+	ParallelSafe     bool           `json:"parallel_safe"`
+	MemoryEfficient  bool           `json:"memory_efficient"`
+	RecommendedBatch int            `json:"recommended_batch_size"`
+	OptimalConfig    map[string]any `json:"optimal_config"`
+	Warnings         []string       `json:"warnings"`
 }
 
 // GetPerformanceHints returns performance optimization hints for each strategy
@@ -250,9 +272,9 @@ func GetPerformanceHints() []StrategyPerformanceHints {
 			MemoryEfficient:  true,
 			RecommendedBatch: 2000,
 			OptimalConfig: map[string]any{
-				"rows_per_chunk":   100,
-				"include_headers":  true,
-				"output_format":    "records",
+				"rows_per_chunk":  100,
+				"include_headers": true,
+				"output_format":   "records",
 			},
 			Warnings: []string{"Assumes consistent row structure", "May create large chunks with wide tables"},
 		},

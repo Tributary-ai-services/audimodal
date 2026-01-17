@@ -5,36 +5,38 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof" // Enable pprof profiling endpoints
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/internal/server"
-	"github.com/jscharber/eAIIngest/pkg/config"
-	"github.com/jscharber/eAIIngest/pkg/logger"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/internal/server"
+	"github.com/jscharber/audimodal/pkg/config"
+	"github.com/jscharber/audimodal/pkg/logger"
 )
 
 func main() {
 	// Parse command line flags
 	var (
-		configFile       = flag.String("config", "", "Path to configuration file")
-		generateConfig   = flag.String("generate-config", "", "Generate example configuration file at specified path")
-		validateConfig   = flag.Bool("validate-config", false, "Validate configuration and exit")
-		host            = flag.String("host", "0.0.0.0", "Server host")
-		port            = flag.Int("port", 8080, "Server port")
-		tlsEnabled      = flag.Bool("tls", false, "Enable TLS/HTTPS")
-		tlsCertFile     = flag.String("tls-cert", "", "TLS certificate file")
-		tlsKeyFile      = flag.String("tls-key", "", "TLS private key file")
-		dbHost          = flag.String("db-host", "localhost", "Database host")
-		dbPort          = flag.Int("db-port", 5432, "Database port")
-		dbUsername      = flag.String("db-username", "postgres", "Database username")
-		dbPassword      = flag.String("db-password", "", "Database password")
-		dbName          = flag.String("db-name", "audimodal", "Database name")
-		dbSSLMode       = flag.String("db-ssl-mode", "disable", "Database SSL mode")
-		jwtSecret       = flag.String("jwt-secret", "", "JWT secret for authentication")
-		logLevel        = flag.String("log-level", "info", "Log level")
-		version         = flag.Bool("version", false, "Show version information")
+		configFile     = flag.String("config", "", "Path to configuration file")
+		generateConfig = flag.String("generate-config", "", "Generate example configuration file at specified path")
+		validateConfig = flag.Bool("validate-config", false, "Validate configuration and exit")
+		host           = flag.String("host", "0.0.0.0", "Server host")
+		port           = flag.Int("port", 8080, "Server port")
+		tlsEnabled     = flag.Bool("tls", false, "Enable TLS/HTTPS")
+		tlsCertFile    = flag.String("tls-cert", "", "TLS certificate file")
+		tlsKeyFile     = flag.String("tls-key", "", "TLS private key file")
+		dbHost         = flag.String("db-host", "localhost", "Database host")
+		dbPort         = flag.Int("db-port", 5432, "Database port")
+		dbUsername     = flag.String("db-username", "postgres", "Database username")
+		dbPassword     = flag.String("db-password", "", "Database password")
+		dbName         = flag.String("db-name", "audimodal", "Database name")
+		dbSSLMode      = flag.String("db-ssl-mode", "disable", "Database SSL mode")
+		jwtSecret      = flag.String("jwt-secret", "", "JWT secret for authentication")
+		logLevel       = flag.String("log-level", "info", "Log level")
+		version        = flag.Bool("version", false, "Show version information")
 	)
 	flag.Parse()
 
@@ -198,6 +200,17 @@ func main() {
 	// Set as default logger
 	logger.SetDefault(appLogger)
 
+	// Start pprof debug server on port 6060 for memory profiling
+	// Access at: http://localhost:6060/debug/pprof/
+	// Heap profile: curl http://localhost:6060/debug/pprof/heap > heap.prof
+	go func() {
+		pprofAddr := "0.0.0.0:6060"
+		appLogger.Info("Starting pprof debug server", "address", pprofAddr)
+		if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+			appLogger.Error("pprof server failed", "error", err)
+		}
+	}()
+
 	// Validate JWT secret for production
 	if serverConfig.AuthEnabled && serverConfig.JWTSecret == "" {
 		appLogger.Fatal("JWT secret is required when authentication is enabled. Set JWT_SECRET environment variable or use --jwt-secret flag.")
@@ -244,8 +257,8 @@ func main() {
 
 	// Initialize server
 	appLogger.WithFields(map[string]interface{}{
-		"host": serverConfig.Host,
-		"port": serverConfig.Port,
+		"host":        serverConfig.Host,
+		"port":        serverConfig.Port,
 		"tls_enabled": serverConfig.TLSEnabled,
 	}).Info("Initializing server")
 	srv, err := server.New(serverConfig, db)

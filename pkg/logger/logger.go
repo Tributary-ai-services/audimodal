@@ -75,24 +75,24 @@ const (
 
 // Logger represents a structured logger
 type Logger struct {
-	level      LogLevel
-	format     LogFormat
-	output     io.Writer
-	fields     map[string]interface{}
-	service    string
-	version    string
+	level        LogLevel
+	format       LogFormat
+	output       io.Writer
+	fields       map[string]interface{}
+	service      string
+	version      string
 	enableCaller bool
 }
 
 // Config represents logger configuration
 type Config struct {
-	Level        LogLevel                `yaml:"level" json:"level"`
-	Format       LogFormat               `yaml:"format" json:"format"`
-	Output       io.Writer               `yaml:"-" json:"-"`
-	Service      string                  `yaml:"service" json:"service"`
-	Version      string                  `yaml:"version" json:"version"`
-	EnableCaller bool                    `yaml:"enable_caller" json:"enable_caller"`
-	Fields       map[string]interface{}  `yaml:"fields" json:"fields"`
+	Level        LogLevel               `yaml:"level" json:"level"`
+	Format       LogFormat              `yaml:"format" json:"format"`
+	Output       io.Writer              `yaml:"-" json:"-"`
+	Service      string                 `yaml:"service" json:"service"`
+	Version      string                 `yaml:"version" json:"version"`
+	EnableCaller bool                   `yaml:"enable_caller" json:"enable_caller"`
+	Fields       map[string]interface{} `yaml:"fields" json:"fields"`
 }
 
 // LogEntry represents a single log entry

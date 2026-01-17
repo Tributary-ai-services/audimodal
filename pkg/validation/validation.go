@@ -34,7 +34,7 @@ func (e ValidationErrors) Error() string {
 	if len(e) == 0 {
 		return "no validation errors"
 	}
-	
+
 	var messages []string
 	for _, err := range e {
 		messages = append(messages, err.Error())
@@ -162,7 +162,7 @@ func (v *Validator) Pattern(field, value, pattern, message string) *Validator {
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	matched, err := regexp.MatchString(pattern, value)
 	if err != nil || !matched {
 		if message == "" {
@@ -178,13 +178,13 @@ func (v *Validator) OneOf(field, value string, allowed []string, message string)
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	for _, allowedValue := range allowed {
 		if value == allowedValue {
 			return v
 		}
 	}
-	
+
 	if message == "" {
 		message = fmt.Sprintf("must be one of: %s", strings.Join(allowed, ", "))
 	}
@@ -197,7 +197,7 @@ func (v *Validator) URL(field, value, message string) *Validator {
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	_, err := url.Parse(value)
 	if err != nil {
 		if message == "" {
@@ -213,7 +213,7 @@ func (v *Validator) Email(field, value, message string) *Validator {
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	emailPattern := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
 	return v.Pattern(field, value, emailPattern, message)
 }
@@ -223,7 +223,7 @@ func (v *Validator) IP(field, value, message string) *Validator {
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	if net.ParseIP(value) == nil {
 		if message == "" {
 			message = "must be a valid IP address"
@@ -243,7 +243,7 @@ func (v *Validator) Duration(field, value, message string) *Validator {
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	_, err := time.ParseDuration(value)
 	if err != nil {
 		if message == "" {
@@ -259,7 +259,7 @@ func (v *Validator) FileExists(field, value, message string) *Validator {
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	if _, err := os.Stat(value); os.IsNotExist(err) {
 		if message == "" {
 			message = "file does not exist"
@@ -274,7 +274,7 @@ func (v *Validator) DirectoryExists(field, value, message string) *Validator {
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	stat, err := os.Stat(value)
 	if os.IsNotExist(err) {
 		if message == "" {
@@ -295,14 +295,14 @@ func (v *Validator) FileExtension(field, value string, allowed []string, message
 	if value == "" {
 		return v // Skip validation for empty values
 	}
-	
+
 	ext := strings.ToLower(filepath.Ext(value))
 	for _, allowedExt := range allowed {
 		if ext == strings.ToLower(allowedExt) {
 			return v
 		}
 	}
-	
+
 	if message == "" {
 		message = fmt.Sprintf("file extension must be one of: %s", strings.Join(allowed, ", "))
 	}
@@ -346,28 +346,28 @@ func (v *Validator) ValidateStruct(s interface{}) *Validator {
 	if val.Kind() == reflect.Ptr {
 		val = val.Elem()
 	}
-	
+
 	if val.Kind() != reflect.Struct {
 		return v
 	}
-	
+
 	typ := val.Type()
 	for i := 0; i < val.NumField(); i++ {
 		field := val.Field(i)
 		fieldType := typ.Field(i)
-		
+
 		// Skip unexported fields
 		if !field.CanInterface() {
 			continue
 		}
-		
+
 		fieldName := fieldType.Name
 		validateTag := fieldType.Tag.Get("validate")
-		
+
 		if validateTag != "" {
 			v.validateField(fieldName, field, validateTag)
 		}
-		
+
 		// Recursively validate nested structs
 		if field.Kind() == reflect.Struct {
 			v.ValidateStruct(field.Interface())
@@ -375,7 +375,7 @@ func (v *Validator) ValidateStruct(s interface{}) *Validator {
 			v.ValidateStruct(field.Interface())
 		}
 	}
-	
+
 	return v
 }
 
@@ -396,7 +396,7 @@ func (v *Validator) validateField(fieldName string, field reflect.Value, rules s
 	default:
 		value = fmt.Sprintf("%v", field.Interface())
 	}
-	
+
 	// Parse validation rules
 	ruleList := strings.Split(rules, ",")
 	for _, rule := range ruleList {
@@ -413,7 +413,7 @@ func (v *Validator) applyRule(fieldName, value string, field reflect.Value, rule
 	if len(parts) > 1 {
 		ruleValue = parts[1]
 	}
-	
+
 	switch ruleName {
 	case "required":
 		v.Required(fieldName, value, "")

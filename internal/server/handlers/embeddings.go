@@ -2,16 +2,17 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/google/uuid"
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/providers"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
+	"github.com/gorilla/mux"
+	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings/client"
+	"github.com/jscharber/audimodal/pkg/embeddings/providers"
 )
 
 // EmbeddingHandler handles embedding-related HTTP requests
@@ -23,8 +24,10 @@ type EmbeddingHandler struct {
 // NewEmbeddingHandler creates a new embedding handler
 func NewEmbeddingHandler() (*EmbeddingHandler, error) {
 	// Initialize OpenAI provider
+	apiKey := getEnvOrDefault("OPENAI_API_KEY", "")
+	fmt.Printf("DEBUG: OpenAI API Key length: %d\n", len(apiKey))
 	openaiConfig := &providers.OpenAIConfig{
-		APIKey:     getEnvOrDefault("OPENAI_API_KEY", ""),
+		APIKey:     apiKey,
 		Model:      getEnvOrDefault("OPENAI_MODEL", "text-embedding-3-small"),
 		BaseURL:    getEnvOrDefault("OPENAI_BASE_URL", ""),
 		MaxRetries: 3,
@@ -37,7 +40,7 @@ func NewEmbeddingHandler() (*EmbeddingHandler, error) {
 
 	// Initialize DeepLake API client
 	apiConfig := &client.DeepLakeAPIConfig{
-		BaseURL:   getEnvOrDefault("DEEPLAKE_API_URL", "http://localhost:8000"),
+		BaseURL:   getEnvOrDefault("DEEPLAKE_API_URL", "http://deeplake-api_deeplake-service_1:8000"),
 		APIKey:    getEnvOrDefault("DEEPLAKE_API_KEY", "dev-key-12345"),
 		TenantID:  getEnvOrDefault("DEEPLAKE_TENANT_ID", ""),
 		Timeout:   30 * time.Second,
@@ -75,18 +78,18 @@ func NewEmbeddingHandler() (*EmbeddingHandler, error) {
 // RegisterRoutes registers embedding routes
 func (h *EmbeddingHandler) RegisterRoutes(router *mux.Router) {
 	api := router.PathPrefix("/api/v1/embeddings").Subrouter()
-	
+
 	// Document processing
 	api.HandleFunc("/documents", h.ProcessDocument).Methods("POST")
 	api.HandleFunc("/documents/{documentId}", h.GetDocumentVectors).Methods("GET")
 	api.HandleFunc("/documents/{documentId}", h.DeleteDocument).Methods("DELETE")
-	
+
 	// Chunk processing
 	api.HandleFunc("/chunks", h.ProcessChunks).Methods("POST")
-	
+
 	// Search
 	api.HandleFunc("/search", h.SearchDocuments).Methods("POST")
-	
+
 	// Datasets
 	api.HandleFunc("/datasets", h.ListDatasets).Methods("GET")
 	api.HandleFunc("/datasets", h.CreateDataset).Methods("POST")
@@ -94,8 +97,8 @@ func (h *EmbeddingHandler) RegisterRoutes(router *mux.Router) {
 	api.HandleFunc("/datasets/{datasetName}", h.UpdateDataset).Methods("PUT")
 	api.HandleFunc("/datasets/{datasetName}", h.DeleteDataset).Methods("DELETE")
 	api.HandleFunc("/datasets/{datasetName}/stats", h.GetDatasetStats).Methods("GET")
-	
-	// Vector operations  
+
+	// Vector operations
 	api.HandleFunc("/datasets/{datasetName}/vectors", h.InsertVector).Methods("POST")
 	api.HandleFunc("/datasets/{datasetName}/vectors", h.ListVectors).Methods("GET")
 	api.HandleFunc("/datasets/{datasetName}/vectors/batch", h.InsertVectorsBatch).Methods("POST")
@@ -103,15 +106,15 @@ func (h *EmbeddingHandler) RegisterRoutes(router *mux.Router) {
 	api.HandleFunc("/datasets/{datasetName}/vectors/{vectorId}", h.GetVector).Methods("GET")
 	api.HandleFunc("/datasets/{datasetName}/vectors/{vectorId}", h.UpdateVector).Methods("PUT")
 	api.HandleFunc("/datasets/{datasetName}/vectors/{vectorId}", h.DeleteVector).Methods("DELETE")
-	
+
 	// Advanced search operations
 	api.HandleFunc("/datasets/{datasetName}/search/text", h.SearchByText).Methods("POST")
 	api.HandleFunc("/datasets/{datasetName}/search/hybrid", h.HybridSearch).Methods("POST")
 	api.HandleFunc("/search/multi-dataset", h.MultiDatasetSearch).Methods("POST")
-	
+
 	// Service stats
 	api.HandleFunc("/stats", h.GetServiceStats).Methods("GET")
-	
+
 	// Health check
 	api.HandleFunc("/health", h.HealthCheck).Methods("GET")
 }
@@ -361,7 +364,7 @@ func (h *EmbeddingHandler) handleError(w http.ResponseWriter, err error) {
 	// Handle embedding-specific errors
 	if embeddingErr, ok := err.(*embeddings.EmbeddingError); ok {
 		statusCode := http.StatusInternalServerError
-		
+
 		switch embeddingErr.Type {
 		case "invalid_input", "invalid_configuration":
 			statusCode = http.StatusBadRequest
@@ -482,10 +485,10 @@ func (h *EmbeddingHandler) ListVectors(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":    "vector listing not yet implemented",
-		"dataset":    datasetName,
-		"limit":      limit,
-		"offset":     offset,
+		"message": "vector listing not yet implemented",
+		"dataset": datasetName,
+		"limit":   limit,
+		"offset":  offset,
 	})
 }
 
@@ -679,12 +682,12 @@ func (h *EmbeddingHandler) SetupMiddleware(router *mux.Router) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Tenant-ID")
-			
+
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
-			
+
 			next.ServeHTTP(w, r)
 		})
 	})
@@ -714,10 +717,10 @@ type ProcessDocumentRequest struct {
 }
 
 type SearchRequest struct {
-	Query    string                 `json:"query" example:"find documents about machine learning"`
-	Dataset  string                 `json:"dataset,omitempty" example:"documents"`
-	Options  *SearchOptions         `json:"options,omitempty"`
-	Filters  map[string]interface{} `json:"filters,omitempty"`
+	Query   string                 `json:"query" example:"find documents about machine learning"`
+	Dataset string                 `json:"dataset,omitempty" example:"documents"`
+	Options *SearchOptions         `json:"options,omitempty"`
+	Filters map[string]interface{} `json:"filters,omitempty"`
 }
 
 type SearchOptions struct {

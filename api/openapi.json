@@ -443,12 +443,21 @@
         }
       }
     },
-    "/files": {
+    "/tenants/{tenantId}/files": {
       "get": {
         "tags": ["Files"],
         "summary": "List files",
         "description": "Retrieve a list of files with optional filtering and search",
         "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           {
             "name": "search",
             "in": "query",
@@ -531,43 +540,110 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad request - missing tenant context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantContextRequiredError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Dataset not found for search",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetNotFoundError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
       "post": {
         "tags": ["Files"],
-        "summary": "Upload file",
-        "description": "Upload a new file for processing",
+        "summary": "Create file record",
+        "description": "Create a new file record for processing",
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
-            "multipart/form-data": {
+            "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "file": {
+                  "url": {
                     "type": "string",
-                    "format": "binary",
-                    "description": "The file to upload"
+                    "description": "URL of the file"
                   },
-                  "datasource_id": {
+                  "path": {
+                    "type": "string",
+                    "description": "File path"
+                  },
+                  "filename": {
+                    "type": "string",
+                    "description": "Name of the file"
+                  },
+                  "extension": {
+                    "type": "string",
+                    "description": "File extension"
+                  },
+                  "content_type": {
+                    "type": "string",
+                    "description": "MIME type of the file"
+                  },
+                  "size": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "File size in bytes"
+                  },
+                  "checksum": {
+                    "type": "string",
+                    "description": "File checksum"
+                  },
+                  "checksum_type": {
+                    "type": "string",
+                    "description": "Type of checksum (e.g., sha256)"
+                  },
+                  "data_source_id": {
                     "type": "string",
                     "format": "uuid",
-                    "description": "ID of the data source to associate with this file"
+                    "description": "ID of the data source"
+                  },
+                  "processing_session_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID of the processing session"
                   },
                   "metadata": {
-                    "type": "string",
-                    "description": "JSON string containing additional metadata"
-                  },
-                  "tags": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Tags to associate with the file"
+                    "type": "object",
+                    "description": "Additional metadata"
                   }
                 },
-                "required": ["file"]
+                "required": ["filename", "extension", "content_type", "size"]
               }
             }
           }
@@ -582,11 +658,58 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad request - missing tenant context or invalid file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TenantContextRequiredError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Error"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "File too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported file type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
     },
-    "/files/{fileId}": {
+    "/tenants/{tenantId}/files/{fileId}": {
       "get": {
         "tags": ["Files"],
         "summary": "Get file",
@@ -609,6 +732,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - invalid file ID format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidFileIdError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "File not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileNotFoundError"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MethodNotAllowedError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -725,11 +888,46 @@
         },
         "responses": {
           "200": {
-            "description": "Search results",
+            "description": "Search results or empty results when search unavailable",
+            "content": {
+              "application/json": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SearchResponse"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SearchUnavailableResponse"
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing query parameter",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SearchResponse"
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Dataset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetNotFoundError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -1288,11 +1486,56 @@
         },
         "responses": {
           "200": {
-            "description": "Semantic search results",
+            "description": "Semantic search results or empty results when search unavailable",
+            "content": {
+              "application/json": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/SemanticSearchResponse"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SearchUnavailableResponse"
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing query parameter",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SemanticSearchResponse"
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Dataset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetNotFoundError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -4233,28 +4476,164 @@
       "Error": {
         "type": "object",
         "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
           "error": {
             "type": "object",
             "properties": {
               "code": {
-                "type": "string"
+                "type": "string",
+                "description": "Error code for programmatic handling",
+                "example": "FILE_NOT_FOUND"
               },
               "message": {
-                "type": "string"
+                "type": "string",
+                "description": "Human-readable error message",
+                "example": "File not found"
               },
               "details": {
-                "type": "object"
-              },
-              "request_id": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "timestamp": {
-                "type": "string",
-                "format": "date-time"
+                "oneOf": [
+                  {"type": "string"},
+                  {"type": "object"}
+                ],
+                "description": "Additional error details or context"
               }
             },
             "required": ["code", "message"]
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Unique request identifier for tracking",
+            "example": "req_123456"
+          }
+        },
+        "required": ["success", "error", "request_id"]
+      },
+      "FileNotFoundError": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Error"},
+          {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {"enum": ["FILE_NOT_FOUND"]},
+                  "message": {"example": "File not found"},
+                  "file_id": {"type": "string", "format": "uuid"}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "InvalidFileIdError": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Error"},
+          {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {"enum": ["INVALID_FILE_ID"]},
+                  "message": {"example": "Invalid file ID format"},
+                  "details": {"example": "File ID must be a valid UUID"}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "TenantContextRequiredError": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Error"},
+          {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {"enum": ["TENANT_CONTEXT_REQUIRED"]},
+                  "message": {"example": "Tenant context required"},
+                  "details": {"example": "All file operations require valid tenant context"}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "DatasetNotFoundError": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Error"},
+          {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {"enum": ["DATASET_NOT_FOUND"]},
+                  "message": {"example": "Dataset 'default' not found"},
+                  "details": {"example": "The embedding dataset does not exist. Create it first or check dataset name."}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MethodNotAllowedError": {
+        "allOf": [
+          {"$ref": "#/components/schemas/Error"},
+          {
+            "type": "object",
+            "properties": {
+              "error": {
+                "type": "object",
+                "properties": {
+                  "code": {"enum": ["METHOD_NOT_ALLOWED"]},
+                  "message": {"example": "Method not allowed"},
+                  "allowed_methods": {"type": "array", "items": {"type": "string"}, "example": ["GET", "POST"]}
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SearchUnavailableResponse": {
+        "type": "object",
+        "description": "Response when search is temporarily unavailable - returns empty results instead of error",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "results": {
+                "type": "array",
+                "items": {},
+                "example": []
+              },
+              "total_found": {
+                "type": "integer",
+                "example": 0
+              },
+              "query": {
+                "type": "string",
+                "example": "your search query"
+              },
+              "dataset": {
+                "type": "string",
+                "example": "default"
+              }
+            }
+          },
+          "request_id": {
+            "type": "string",
+            "example": "req_123456"
           }
         }
       }

@@ -87,7 +87,7 @@ func (hm *HTTPMetrics) Middleware() func(next http.Handler) http.Handler {
 			}
 
 			start := time.Now()
-			
+
 			// Increment active connections
 			hm.activeConnections.Inc()
 			defer hm.activeConnections.Dec()
@@ -103,7 +103,7 @@ func (hm *HTTPMetrics) Middleware() func(next http.Handler) http.Handler {
 
 			// Calculate metrics
 			duration := time.Since(start)
-			
+
 			// Extract labels
 			method := r.Method
 			path := normalizePath(r.URL.Path)
@@ -166,7 +166,7 @@ func normalizePath(path string) string {
 	}
 
 	normalized := strings.Join(parts, "/")
-	
+
 	// Limit path length to avoid cardinality explosion
 	if len(normalized) > 100 {
 		normalized = normalized[:100] + "..."
@@ -180,12 +180,12 @@ func isUUID(s string) bool {
 	if len(s) != 36 {
 		return false
 	}
-	
+
 	// Check UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 	if s[8] != '-' || s[13] != '-' || s[18] != '-' || s[23] != '-' {
 		return false
 	}
-	
+
 	// Check if all other characters are hex digits
 	for i, c := range s {
 		if i == 8 || i == 13 || i == 18 || i == 23 {
@@ -195,7 +195,7 @@ func isUUID(s string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -204,13 +204,13 @@ func isNumericID(s string) bool {
 	if len(s) == 0 || len(s) > 20 {
 		return false
 	}
-	
+
 	for _, c := range s {
 		if c < '0' || c > '9' {
 			return false
 		}
 	}
-	
+
 	return true
 }
 

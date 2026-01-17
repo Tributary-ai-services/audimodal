@@ -18,9 +18,9 @@ type BasicEntityExtractor struct {
 // NewBasicEntityExtractor creates a new basic entity extractor
 func NewBasicEntityExtractor() *BasicEntityExtractor {
 	extractor := &BasicEntityExtractor{
-		name:               "basic-entity-extractor",
-		version:            "1.0.0",
-		supportedTypes:     []EntityType{
+		name:    "basic-entity-extractor",
+		version: "1.0.0",
+		supportedTypes: []EntityType{
 			EntityTypePerson, EntityTypeOrganization, EntityTypeLocation,
 			EntityTypeDate, EntityTypeMoney, EntityTypePercentage,
 			EntityTypePhone, EntityTypeEmail, EntityTypeURL,
@@ -29,7 +29,7 @@ func NewBasicEntityExtractor() *BasicEntityExtractor {
 		patterns:           make(map[EntityType][]*regexp.Regexp),
 		contextualPatterns: make(map[EntityType][]string),
 	}
-	
+
 	extractor.initializePatterns()
 	return extractor
 }
@@ -39,18 +39,18 @@ func (e *BasicEntityExtractor) ExtractEntities(ctx context.Context, text string)
 	if len(text) == 0 {
 		return []Entity{}, nil
 	}
-	
+
 	entities := []Entity{}
-	
+
 	// Extract entities for each supported type
 	for _, entityType := range e.supportedTypes {
 		typeEntities := e.extractEntitiesOfType(text, entityType)
 		entities = append(entities, typeEntities...)
 	}
-	
+
 	// Remove duplicates and overlapping entities
 	entities = e.removeDuplicates(entities)
-	
+
 	// Sort by position
 	for i := range entities {
 		for j := i + 1; j < len(entities); j++ {
@@ -61,7 +61,7 @@ func (e *BasicEntityExtractor) ExtractEntities(ctx context.Context, text string)
 			}
 		}
 	}
-	
+
 	return entities, nil
 }
 
@@ -73,26 +73,26 @@ func (e *BasicEntityExtractor) GetSupportedEntityTypes() []EntityType {
 // extractEntitiesOfType extracts entities of a specific type
 func (e *BasicEntityExtractor) extractEntitiesOfType(text string, entityType EntityType) []Entity {
 	entities := []Entity{}
-	
+
 	patterns, exists := e.patterns[entityType]
 	if !exists {
 		return entities
 	}
-	
+
 	for _, pattern := range patterns {
 		matches := pattern.FindAllStringSubmatch(text, -1)
 		matchIndices := pattern.FindAllStringSubmatchIndex(text, -1)
-		
+
 		for i, match := range matches {
 			if len(match) > 0 {
 				entityText := match[0]
 				if len(match) > 1 && match[1] != "" {
 					entityText = match[1] // Use capture group if available
 				}
-				
+
 				// Calculate confidence based on pattern match and context
 				confidence := e.calculateEntityConfidence(entityText, entityType, text)
-				
+
 				if confidence > 0.5 { // Only include entities with reasonable confidence
 					entity := Entity{
 						Text:       entityText,
@@ -101,7 +101,7 @@ func (e *BasicEntityExtractor) extractEntitiesOfType(text string, entityType Ent
 						Positions:  []EntityPosition{},
 						Metadata:   make(map[string]string),
 					}
-					
+
 					// Add position information
 					if i < len(matchIndices) {
 						indices := matchIndices[i]
@@ -112,23 +112,23 @@ func (e *BasicEntityExtractor) extractEntitiesOfType(text string, entityType Ent
 							})
 						}
 					}
-					
+
 					// Add entity-specific metadata
 					e.addEntityMetadata(&entity, text)
-					
+
 					entities = append(entities, entity)
 				}
 			}
 		}
 	}
-	
+
 	return entities
 }
 
 // calculateEntityConfidence calculates confidence for an entity
 func (e *BasicEntityExtractor) calculateEntityConfidence(entityText string, entityType EntityType, fullText string) float64 {
 	baseConfidence := 0.7 // Base confidence for pattern matches
-	
+
 	// Adjust confidence based on entity type and characteristics
 	switch entityType {
 	case EntityTypeEmail:
@@ -161,7 +161,7 @@ func (e *BasicEntityExtractor) calculateEntityConfidence(entityText string, enti
 			baseConfidence = 0.9
 		}
 	}
-	
+
 	// Check for contextual clues
 	contextualPatterns, exists := e.contextualPatterns[entityType]
 	if exists {
@@ -173,7 +173,7 @@ func (e *BasicEntityExtractor) calculateEntityConfidence(entityText string, enti
 			}
 		}
 	}
-	
+
 	// Clamp confidence to [0, 1]
 	if baseConfidence > 1.0 {
 		baseConfidence = 1.0
@@ -181,7 +181,7 @@ func (e *BasicEntityExtractor) calculateEntityConfidence(entityText string, enti
 	if baseConfidence < 0.0 {
 		baseConfidence = 0.0
 	}
-	
+
 	return baseConfidence
 }
 
@@ -212,11 +212,11 @@ func (e *BasicEntityExtractor) removeDuplicates(entities []Entity) []Entity {
 	if len(entities) <= 1 {
 		return entities
 	}
-	
+
 	// Create a map to track seen entities
 	seen := make(map[string]bool)
 	result := []Entity{}
-	
+
 	for _, entity := range entities {
 		key := entity.Text + ":" + string(entity.Type)
 		if !seen[key] {
@@ -224,7 +224,7 @@ func (e *BasicEntityExtractor) removeDuplicates(entities []Entity) []Entity {
 			result = append(result, entity)
 		}
 	}
-	
+
 	return result
 }
 
@@ -232,37 +232,37 @@ func (e *BasicEntityExtractor) removeDuplicates(entities []Entity) []Entity {
 func (e *BasicEntityExtractor) isValidCreditCard(cardNumber string) bool {
 	// Remove spaces and hyphens
 	cardNumber = strings.ReplaceAll(strings.ReplaceAll(cardNumber, " ", ""), "-", "")
-	
+
 	// Check if all characters are digits
 	for _, r := range cardNumber {
 		if r < '0' || r > '9' {
 			return false
 		}
 	}
-	
+
 	// Check length
 	if len(cardNumber) < 13 || len(cardNumber) > 19 {
 		return false
 	}
-	
+
 	// Luhn algorithm
 	sum := 0
 	alternate := false
-	
+
 	for i := len(cardNumber) - 1; i >= 0; i-- {
 		digit := int(cardNumber[i] - '0')
-		
+
 		if alternate {
 			digit *= 2
 			if digit > 9 {
 				digit = (digit % 10) + 1
 			}
 		}
-		
+
 		sum += digit
 		alternate = !alternate
 	}
-	
+
 	return sum%10 == 0
 }
 
@@ -275,7 +275,7 @@ func (e *BasicEntityExtractor) formatPhoneNumber(phone string) string {
 			digits += string(r)
 		}
 	}
-	
+
 	// Format based on length
 	switch len(digits) {
 	case 10:
@@ -306,7 +306,7 @@ func (e *BasicEntityExtractor) extractDomain(url string) string {
 	url = strings.TrimPrefix(url, "http://")
 	url = strings.TrimPrefix(url, "ftp://")
 	url = strings.TrimPrefix(url, "www.")
-	
+
 	// Extract domain part
 	parts := strings.Split(url, "/")
 	if len(parts) > 0 {
@@ -318,7 +318,7 @@ func (e *BasicEntityExtractor) extractDomain(url string) string {
 // getCreditCardType determines credit card type
 func (e *BasicEntityExtractor) getCreditCardType(cardNumber string) string {
 	cardNumber = strings.ReplaceAll(strings.ReplaceAll(cardNumber, " ", ""), "-", "")
-	
+
 	if strings.HasPrefix(cardNumber, "4") {
 		return "Visa"
 	} else if strings.HasPrefix(cardNumber, "5") || strings.HasPrefix(cardNumber, "2") {
@@ -355,39 +355,39 @@ func (e *BasicEntityExtractor) initializePatterns() {
 	e.patterns[EntityTypeEmail] = []*regexp.Regexp{
 		regexp.MustCompile(`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b`),
 	}
-	
+
 	// URL patterns
 	e.patterns[EntityTypeURL] = []*regexp.Regexp{
 		regexp.MustCompile(`https?://[^\s<>"{}|\\^` + "`" + `\[\]]+`),
 		regexp.MustCompile(`www\.[^\s<>"{}|\\^` + "`" + `\[\]]+`),
 		regexp.MustCompile(`ftp://[^\s<>"{}|\\^` + "`" + `\[\]]+`),
 	}
-	
+
 	// Phone patterns
 	e.patterns[EntityTypePhone] = []*regexp.Regexp{
 		regexp.MustCompile(`\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
 		regexp.MustCompile(`\b\(\d{3}\)\s?\d{3}[-.]?\d{4}\b`),
 		regexp.MustCompile(`\b\+?1[-.]?\d{3}[-.]?\d{3}[-.]?\d{4}\b`),
 	}
-	
+
 	// Credit card patterns
 	e.patterns[EntityTypeCreditCard] = []*regexp.Regexp{
-		regexp.MustCompile(`\b4\d{3}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`), // Visa
+		regexp.MustCompile(`\b4\d{3}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`),      // Visa
 		regexp.MustCompile(`\b5[1-5]\d{2}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`), // MasterCard
-		regexp.MustCompile(`\b3[47]\d{2}[-\s]?\d{6}[-\s]?\d{5}\b`), // American Express
-		regexp.MustCompile(`\b6011[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`), // Discover
+		regexp.MustCompile(`\b3[47]\d{2}[-\s]?\d{6}[-\s]?\d{5}\b`),             // American Express
+		regexp.MustCompile(`\b6011[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b`),        // Discover
 	}
-	
+
 	// SSN patterns
 	e.patterns[EntityTypeSSN] = []*regexp.Regexp{
 		regexp.MustCompile(`\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b`),
 	}
-	
+
 	// IP Address patterns
 	e.patterns[EntityTypeIPAddress] = []*regexp.Regexp{
 		regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`),
 	}
-	
+
 	// Date patterns
 	e.patterns[EntityTypeDate] = []*regexp.Regexp{
 		regexp.MustCompile(`\b\d{1,2}\/\d{1,2}\/\d{2,4}\b`),
@@ -395,56 +395,56 @@ func (e *BasicEntityExtractor) initializePatterns() {
 		regexp.MustCompile(`\b\d{4}-\d{1,2}-\d{1,2}\b`),
 		regexp.MustCompile(`\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b`),
 	}
-	
+
 	// Money patterns
 	e.patterns[EntityTypeMoney] = []*regexp.Regexp{
 		regexp.MustCompile(`\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?\b`),
 		regexp.MustCompile(`\b\d{1,3}(?:,\d{3})*(?:\.\d{2})?\s*(?:USD|usd|dollars?)\b`),
 		regexp.MustCompile(`\b(?:USD|usd|\$)\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})?\b`),
 	}
-	
+
 	// Percentage patterns
 	e.patterns[EntityTypePercentage] = []*regexp.Regexp{
 		regexp.MustCompile(`\b\d{1,3}(?:\.\d{1,2})?%\b`),
 		regexp.MustCompile(`\b\d{1,3}(?:\.\d{1,2})?\s*percent\b`),
 	}
-	
+
 	// Person patterns (basic - names starting with capital letters)
 	e.patterns[EntityTypePerson] = []*regexp.Regexp{
 		regexp.MustCompile(`\b[A-Z][a-z]+\s+[A-Z][a-z]+\b`),
 		regexp.MustCompile(`\b(?:Mr|Mrs|Ms|Dr|Prof)\.?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b`),
 	}
-	
+
 	// Organization patterns
 	e.patterns[EntityTypeOrganization] = []*regexp.Regexp{
 		regexp.MustCompile(`\b[A-Z][a-z]*(?:\s+[A-Z][a-z]*)*\s+(?:Inc|Corp|LLC|Ltd|Co|Company|Corporation|Group|Enterprises?)\.?\b`),
 		regexp.MustCompile(`\b[A-Z][a-z]*(?:\s+[A-Z][a-z]*)*\s+(?:University|College|Institute|School|Hospital|Bank|Insurance)\b`),
 	}
-	
+
 	// Location patterns
 	e.patterns[EntityTypeLocation] = []*regexp.Regexp{
-		regexp.MustCompile(`\b[A-Z][a-z]+,\s*[A-Z]{2}\b`), // City, State
+		regexp.MustCompile(`\b[A-Z][a-z]+,\s*[A-Z]{2}\b`),               // City, State
 		regexp.MustCompile(`\b[A-Z][a-z]+\s+[A-Z][a-z]+,\s*[A-Z]{2}\b`), // City Name, State
-		regexp.MustCompile(`\b\d{5}(?:-\d{4})?\b`), // ZIP codes
+		regexp.MustCompile(`\b\d{5}(?:-\d{4})?\b`),                      // ZIP codes
 	}
-	
+
 	// Initialize contextual patterns
 	e.contextualPatterns[EntityTypePhone] = []string{
 		"phone", "telephone", "mobile", "cell", "contact", "call", "number",
 	}
-	
+
 	e.contextualPatterns[EntityTypeEmail] = []string{
 		"email", "e-mail", "contact", "reach", "send", "mail",
 	}
-	
+
 	e.contextualPatterns[EntityTypeCreditCard] = []string{
 		"credit card", "payment", "card number", "billing", "charge",
 	}
-	
+
 	e.contextualPatterns[EntityTypeSSN] = []string{
 		"ssn", "social security", "social security number", "social",
 	}
-	
+
 	e.contextualPatterns[EntityTypePerson] = []string{
 		"mr", "mrs", "ms", "dr", "prof", "person", "individual", "name",
 	}

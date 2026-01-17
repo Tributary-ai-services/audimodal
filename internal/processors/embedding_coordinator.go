@@ -3,14 +3,15 @@ package processors
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 
-	"github.com/jscharber/eAIIngest/internal/database"
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/client"
-	"github.com/jscharber/eAIIngest/pkg/embeddings/providers"
+	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings/client"
+	"github.com/jscharber/audimodal/pkg/embeddings/providers"
 )
 
 // EmbeddingCoordinator orchestrates the complete file processing and embedding pipeline
@@ -18,27 +19,27 @@ type EmbeddingCoordinator struct {
 	coordinator      *Coordinator
 	tierProcessor    *TierProcessor
 	embeddingService embeddings.EmbeddingService
-	config          *EmbeddingCoordinatorConfig
+	config           *EmbeddingCoordinatorConfig
 }
 
 // EmbeddingCoordinatorConfig contains configuration for the embedding coordinator
 type EmbeddingCoordinatorConfig struct {
 	// DeepLake configuration
 	DeepLakeConfig *client.DeepLakeAPIConfig `json:"deeplake_config"`
-	
+
 	// OpenAI configuration
 	OpenAIConfig *providers.OpenAIConfig `json:"openai_config"`
-	
+
 	// Processing configuration
-	DefaultDataset      string `json:"default_dataset"`
-	AutoCreateDatasets  bool   `json:"auto_create_datasets"`
-	EmbeddingBatchSize  int    `json:"embedding_batch_size"`
-	
+	DefaultDataset     string `json:"default_dataset"`
+	AutoCreateDatasets bool   `json:"auto_create_datasets"`
+	EmbeddingBatchSize int    `json:"embedding_batch_size"`
+
 	// Quality and filtering
 	MinQualityThreshold float64 `json:"min_quality_threshold"`
 	MaxChunkSize        int     `json:"max_chunk_size"`
 	ChunkOverlap        int     `json:"chunk_overlap"`
-	
+
 	// Performance tuning
 	MaxConcurrentEmbeddings int           `json:"max_concurrent_embeddings"`
 	EmbeddingTimeout        time.Duration `json:"embedding_timeout"`
@@ -48,11 +49,11 @@ type EmbeddingCoordinatorConfig struct {
 // ProcessingJobWithEmbeddings extends ProcessingJob with embedding information
 type ProcessingJobWithEmbeddings struct {
 	*ProcessingJob
-	EmbeddingDataset    string    `json:"embedding_dataset"`
-	EmbeddingsCreated   int       `json:"embeddings_created"`
+	EmbeddingDataset    string        `json:"embedding_dataset"`
+	EmbeddingsCreated   int           `json:"embeddings_created"`
 	EmbeddingTime       time.Duration `json:"embedding_time"`
-	VectorSearchEnabled bool      `json:"vector_search_enabled"`
-	EmbeddingErrors     []string  `json:"embedding_errors,omitempty"`
+	VectorSearchEnabled bool          `json:"vector_search_enabled"`
+	EmbeddingErrors     []string      `json:"embedding_errors,omitempty"`
 }
 
 // NewEmbeddingCoordinator creates a new embedding coordinator
@@ -91,12 +92,14 @@ func NewEmbeddingCoordinator(db *database.Database, config *EmbeddingCoordinator
 func GetDefaultEmbeddingCoordinatorConfig() *EmbeddingCoordinatorConfig {
 	return &EmbeddingCoordinatorConfig{
 		DeepLakeConfig: &client.DeepLakeAPIConfig{
-			BaseURL: "https://api.deeplake.ai",
+			BaseURL: getEnvOrDefault("DEEPLAKE_API_URL", "http://deeplake-api_deeplake-service_1:8000"),
+			APIKey:  getEnvOrDefault("DEEPLAKE_API_KEY", "UimqLp7vXA3x53H1tPKveeRPFxwLIOypHSCjlddlBe8"), // Generated API key for v1.0.1+
 			Timeout: 30 * time.Second,
 			Retries: 3,
 		},
 		OpenAIConfig: &providers.OpenAIConfig{
-			Model:      "text-embedding-3-small",
+			APIKey:     getEnvOrDefault("OPENAI_API_KEY", ""),
+			Model:      getEnvOrDefault("OPENAI_MODEL", "text-embedding-3-small"),
 			Timeout:    30 * time.Second,
 			MaxRetries: 3,
 		},
@@ -128,17 +131,17 @@ func createEmbeddingService(config *EmbeddingCoordinatorConfig) (embeddings.Embe
 
 	// Create service configuration
 	serviceConfig := &embeddings.ServiceConfig{
-		DefaultDataset:  config.DefaultDataset,
-		ChunkSize:       config.MaxChunkSize,
-		ChunkOverlap:    config.ChunkOverlap,
-		BatchSize:       config.EmbeddingBatchSize,
-		MaxConcurrency:  config.MaxConcurrentEmbeddings,
-		CacheEnabled:    true,
-		CacheTTL:        24 * time.Hour,
-		MetricsEnabled:  true,
-		DefaultTopK:     10,
+		DefaultDataset:   config.DefaultDataset,
+		ChunkSize:        config.MaxChunkSize,
+		ChunkOverlap:     config.ChunkOverlap,
+		BatchSize:        config.EmbeddingBatchSize,
+		MaxConcurrency:   config.MaxConcurrentEmbeddings,
+		CacheEnabled:     true,
+		CacheTTL:         24 * time.Hour,
+		MetricsEnabled:   true,
+		DefaultTopK:      10,
 		DefaultThreshold: 0.7,
-		DefaultMetric:   "cosine",
+		DefaultMetric:    "cosine",
 	}
 
 	return embeddings.NewEmbeddingService(openaiProvider, deeplakeClient, serviceConfig), nil
@@ -269,11 +272,11 @@ func (ec *EmbeddingCoordinator) GetEmbeddingStats(ctx context.Context, tenantID 
 	tierMetrics := ec.tierProcessor.GetTierMetrics()
 
 	return &EmbeddingStats{
-		TenantID:           tenantID,
-		ServiceStats:       serviceStats,
-		ProcessingMetrics:  processingMetrics,
-		TierMetrics:        tierMetrics,
-		LastUpdated:        time.Now(),
+		TenantID:          tenantID,
+		ServiceStats:      serviceStats,
+		ProcessingMetrics: processingMetrics,
+		TierMetrics:       tierMetrics,
+		LastUpdated:       time.Now(),
 	}, nil
 }
 
@@ -298,15 +301,15 @@ func (ec *EmbeddingCoordinator) GetJobStatusWithEmbeddings(jobID uuid.UUID) (*Pr
 func (ec *EmbeddingCoordinator) ValidateEmbeddingConfiguration(ctx context.Context) error {
 	// Test embedding service with a simple document processing
 	testRequest := &embeddings.ProcessDocumentRequest{
-		DocumentID:  "test-validation",
-		TenantID:    uuid.New(),
-		Content:     "This is a test for embedding validation.",
-		ContentType: "text/plain",
-		Dataset:     ec.config.DefaultDataset,
-		ChunkSize:   100,
+		DocumentID:   "test-validation",
+		TenantID:     uuid.New(),
+		Content:      "This is a test for embedding validation.",
+		ContentType:  "text/plain",
+		Dataset:      ec.config.DefaultDataset,
+		ChunkSize:    100,
 		SkipExisting: true,
 	}
-	
+
 	_, err := ec.embeddingService.ProcessDocument(ctx, testRequest)
 	if err != nil {
 		return fmt.Errorf("embedding service validation failed: %w", err)
@@ -329,11 +332,11 @@ func (ec *EmbeddingCoordinator) ValidateEmbeddingConfiguration(ctx context.Conte
 
 // EmbeddingStats contains comprehensive embedding statistics
 type EmbeddingStats struct {
-	TenantID          uuid.UUID                         `json:"tenant_id"`
-	ServiceStats      *embeddings.ServiceStats          `json:"service_stats"`
-	ProcessingMetrics *PipelineMetrics                  `json:"processing_metrics"`
-	TierMetrics       map[ProcessingTier]*TierMetrics   `json:"tier_metrics"`
-	LastUpdated       time.Time                         `json:"last_updated"`
+	TenantID          uuid.UUID                       `json:"tenant_id"`
+	ServiceStats      *embeddings.ServiceStats        `json:"service_stats"`
+	ProcessingMetrics *PipelineMetrics                `json:"processing_metrics"`
+	TierMetrics       map[ProcessingTier]*TierMetrics `json:"tier_metrics"`
+	LastUpdated       time.Time                       `json:"last_updated"`
 }
 
 // RecommendEmbeddingOptions recommends embedding configuration for a file
@@ -359,11 +362,19 @@ func (ec *EmbeddingCoordinator) RecommendEmbeddingOptions(ctx context.Context, t
 		if file.Size > 100*1024*1024 { // > 100MB
 			baseOptions["embedding_batch_size"] = ec.config.EmbeddingBatchSize / 2 // Smaller batches for large files
 		}
-		
+
 		if file.ContentType == "application/pdf" {
 			baseOptions["min_quality_threshold"] = 0.4 // Lower threshold for PDFs
 		}
 	}
 
 	return baseOptions, nil
+}
+
+// getEnvOrDefault gets an environment variable or returns a default value
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

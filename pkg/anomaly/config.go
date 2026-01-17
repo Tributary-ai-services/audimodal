@@ -13,16 +13,16 @@ import (
 
 // ConfigurationManager manages anomaly detection configuration
 type ConfigurationManager struct {
-	config           *GlobalConfig
-	detectorConfigs  map[string]*DetectorConfig
-	tenantConfigs    map[uuid.UUID]*TenantConfig
-	ruleConfigs      map[uuid.UUID]*AlertRule
-	repository       ConfigRepository
-	validator        *ConfigValidator
-	hotReload        bool
-	watchers         []ConfigWatcher
-	mutex            sync.RWMutex
-	lastUpdate       time.Time
+	config          *GlobalConfig
+	detectorConfigs map[string]*DetectorConfig
+	tenantConfigs   map[uuid.UUID]*TenantConfig
+	ruleConfigs     map[uuid.UUID]*AlertRule
+	repository      ConfigRepository
+	validator       *ConfigValidator
+	hotReload       bool
+	watchers        []ConfigWatcher
+	mutex           sync.RWMutex
+	lastUpdate      time.Time
 }
 
 // ConfigRepository defines the interface for configuration persistence
@@ -30,27 +30,27 @@ type ConfigRepository interface {
 	// Global configuration
 	SaveGlobalConfig(ctx context.Context, config *GlobalConfig) error
 	LoadGlobalConfig(ctx context.Context) (*GlobalConfig, error)
-	
+
 	// Detector configurations
 	SaveDetectorConfig(ctx context.Context, detectorName string, config *DetectorConfig) error
 	LoadDetectorConfig(ctx context.Context, detectorName string) (*DetectorConfig, error)
 	LoadAllDetectorConfigs(ctx context.Context) (map[string]*DetectorConfig, error)
-	
+
 	// Tenant configurations
 	SaveTenantConfig(ctx context.Context, tenantID uuid.UUID, config *TenantConfig) error
 	LoadTenantConfig(ctx context.Context, tenantID uuid.UUID) (*TenantConfig, error)
 	LoadAllTenantConfigs(ctx context.Context) (map[uuid.UUID]*TenantConfig, error)
-	
+
 	// Alert rule configurations
 	SaveAlertRule(ctx context.Context, rule *AlertRule) error
 	LoadAlertRule(ctx context.Context, ruleID uuid.UUID) (*AlertRule, error)
 	LoadAlertRulesByTenant(ctx context.Context, tenantID uuid.UUID) ([]*AlertRule, error)
 	DeleteAlertRule(ctx context.Context, ruleID uuid.UUID) error
-	
+
 	// Configuration versioning
 	SaveConfigVersion(ctx context.Context, version *ConfigVersion) error
 	GetConfigHistory(ctx context.Context, configType string, entityID string) ([]*ConfigVersion, error)
-	
+
 	// Bulk operations
 	ExportConfiguration(ctx context.Context) (*ConfigurationExport, error)
 	ImportConfiguration(ctx context.Context, export *ConfigurationExport) error
@@ -58,80 +58,80 @@ type ConfigRepository interface {
 
 // GlobalConfig contains global anomaly detection configuration
 type GlobalConfig struct {
-	Version              string                       `json:"version"`
-	LastUpdated          time.Time                    `json:"last_updated"`
-	UpdatedBy            uuid.UUID                    `json:"updated_by"`
-	
+	Version     string    `json:"version"`
+	LastUpdated time.Time `json:"last_updated"`
+	UpdatedBy   uuid.UUID `json:"updated_by"`
+
 	// Detection settings
-	DetectionEnabled     bool                         `json:"detection_enabled"`
-	DefaultSeverity      AnomalySeverity             `json:"default_severity"`
-	MinConfidence        float64                      `json:"min_confidence"`
-	ProcessingTimeout    time.Duration                `json:"processing_timeout"`
-	MaxConcurrentJobs    int                          `json:"max_concurrent_jobs"`
-	
+	DetectionEnabled  bool            `json:"detection_enabled"`
+	DefaultSeverity   AnomalySeverity `json:"default_severity"`
+	MinConfidence     float64         `json:"min_confidence"`
+	ProcessingTimeout time.Duration   `json:"processing_timeout"`
+	MaxConcurrentJobs int             `json:"max_concurrent_jobs"`
+
 	// Storage settings
-	RetentionPolicy      *RetentionPolicy             `json:"retention_policy"`
-	StorageQuotas        map[string]int64             `json:"storage_quotas"`
-	
+	RetentionPolicy *RetentionPolicy `json:"retention_policy"`
+	StorageQuotas   map[string]int64 `json:"storage_quotas"`
+
 	// Alerting settings
-	AlertingEnabled      bool                         `json:"alerting_enabled"`
-	DefaultAlertChannels []string                     `json:"default_alert_channels"`
-	AlertThrottling      *AlertThrottlingConfig       `json:"alert_throttling"`
-	
+	AlertingEnabled      bool                   `json:"alerting_enabled"`
+	DefaultAlertChannels []string               `json:"default_alert_channels"`
+	AlertThrottling      *AlertThrottlingConfig `json:"alert_throttling"`
+
 	// Security settings
-	SecurityEnabled      bool                         `json:"security_enabled"`
-	EncryptionEnabled    bool                         `json:"encryption_enabled"`
-	AuditLogging         bool                         `json:"audit_logging"`
-	
+	SecurityEnabled   bool `json:"security_enabled"`
+	EncryptionEnabled bool `json:"encryption_enabled"`
+	AuditLogging      bool `json:"audit_logging"`
+
 	// Performance settings
-	CacheEnabled         bool                         `json:"cache_enabled"`
-	CacheTTL             time.Duration                `json:"cache_ttl"`
-	BatchSize            int                          `json:"batch_size"`
-	
+	CacheEnabled bool          `json:"cache_enabled"`
+	CacheTTL     time.Duration `json:"cache_ttl"`
+	BatchSize    int           `json:"batch_size"`
+
 	// Feature flags
-	FeatureFlags         map[string]bool              `json:"feature_flags"`
-	
+	FeatureFlags map[string]bool `json:"feature_flags"`
+
 	// External integrations
-	Integrations         map[string]IntegrationConfig `json:"integrations"`
+	Integrations map[string]IntegrationConfig `json:"integrations"`
 }
 
 // TenantConfig contains tenant-specific configuration
 type TenantConfig struct {
-	TenantID             uuid.UUID                   `json:"tenant_id"`
-	TenantName           string                      `json:"tenant_name"`
-	Version              string                      `json:"version"`
-	LastUpdated          time.Time                   `json:"last_updated"`
-	UpdatedBy            uuid.UUID                   `json:"updated_by"`
-	
+	TenantID    uuid.UUID `json:"tenant_id"`
+	TenantName  string    `json:"tenant_name"`
+	Version     string    `json:"version"`
+	LastUpdated time.Time `json:"last_updated"`
+	UpdatedBy   uuid.UUID `json:"updated_by"`
+
 	// Detection overrides
-	DetectionEnabled     *bool                       `json:"detection_enabled,omitempty"`
-	MinConfidence        *float64                    `json:"min_confidence,omitempty"`
-	EnabledDetectors     []string                    `json:"enabled_detectors,omitempty"`
-	DisabledDetectors    []string                    `json:"disabled_detectors,omitempty"`
-	
+	DetectionEnabled  *bool    `json:"detection_enabled,omitempty"`
+	MinConfidence     *float64 `json:"min_confidence,omitempty"`
+	EnabledDetectors  []string `json:"enabled_detectors,omitempty"`
+	DisabledDetectors []string `json:"disabled_detectors,omitempty"`
+
 	// Thresholds
-	TypeThresholds       map[AnomalyType]float64     `json:"type_thresholds,omitempty"`
-	SeverityThresholds   map[AnomalySeverity]float64 `json:"severity_thresholds,omitempty"`
-	
+	TypeThresholds     map[AnomalyType]float64     `json:"type_thresholds,omitempty"`
+	SeverityThresholds map[AnomalySeverity]float64 `json:"severity_thresholds,omitempty"`
+
 	// Alerting configuration
-	AlertingEnabled      *bool                       `json:"alerting_enabled,omitempty"`
-	AlertChannels        []string                    `json:"alert_channels,omitempty"`
-	NotificationRules    []*NotificationRule         `json:"notification_rules,omitempty"`
-	
+	AlertingEnabled   *bool               `json:"alerting_enabled,omitempty"`
+	AlertChannels     []string            `json:"alert_channels,omitempty"`
+	NotificationRules []*NotificationRule `json:"notification_rules,omitempty"`
+
 	// Custom settings
-	CustomThresholds     map[string]float64          `json:"custom_thresholds,omitempty"`
-	CustomSettings       map[string]interface{}      `json:"custom_settings,omitempty"`
-	
+	CustomThresholds map[string]float64     `json:"custom_thresholds,omitempty"`
+	CustomSettings   map[string]interface{} `json:"custom_settings,omitempty"`
+
 	// Business rules
-	BusinessHours        *BusinessHours              `json:"business_hours,omitempty"`
-	Timezone             string                      `json:"timezone,omitempty"`
-	
+	BusinessHours *BusinessHours `json:"business_hours,omitempty"`
+	Timezone      string         `json:"timezone,omitempty"`
+
 	// Compliance settings
-	ComplianceMode       string                      `json:"compliance_mode,omitempty"`
-	DataRetentionDays    *int                        `json:"data_retention_days,omitempty"`
-	
+	ComplianceMode    string `json:"compliance_mode,omitempty"`
+	DataRetentionDays *int   `json:"data_retention_days,omitempty"`
+
 	// Resource limits
-	ResourceLimits       *TenantResourceLimits       `json:"resource_limits,omitempty"`
+	ResourceLimits *TenantResourceLimits `json:"resource_limits,omitempty"`
 }
 
 // RetentionPolicy defines data retention policies
@@ -145,34 +145,34 @@ type RetentionPolicy struct {
 
 // AlertThrottlingConfig defines alert throttling configuration
 type AlertThrottlingConfig struct {
-	MaxAlertsPerMinute   int           `json:"max_alerts_per_minute"`
-	MaxAlertsPerHour     int           `json:"max_alerts_per_hour"`
-	DeduplicationWindow  time.Duration `json:"deduplication_window"`
-	CooldownPeriod       time.Duration `json:"cooldown_period"`
+	MaxAlertsPerMinute  int           `json:"max_alerts_per_minute"`
+	MaxAlertsPerHour    int           `json:"max_alerts_per_hour"`
+	DeduplicationWindow time.Duration `json:"deduplication_window"`
+	CooldownPeriod      time.Duration `json:"cooldown_period"`
 }
 
 // IntegrationConfig defines external integration configuration
 type IntegrationConfig struct {
-	Enabled     bool                   `json:"enabled"`
-	Endpoint    string                 `json:"endpoint"`
-	APIKey      string                 `json:"api_key,omitempty"`
-	Timeout     time.Duration          `json:"timeout"`
-	RetryCount  int                    `json:"retry_count"`
-	Parameters  map[string]interface{} `json:"parameters,omitempty"`
+	Enabled    bool                   `json:"enabled"`
+	Endpoint   string                 `json:"endpoint"`
+	APIKey     string                 `json:"api_key,omitempty"`
+	Timeout    time.Duration          `json:"timeout"`
+	RetryCount int                    `json:"retry_count"`
+	Parameters map[string]interface{} `json:"parameters,omitempty"`
 }
 
 // NotificationRule defines when and how to send notifications
 type NotificationRule struct {
-	ID                   uuid.UUID               `json:"id"`
-	Name                 string                  `json:"name"`
-	Enabled              bool                    `json:"enabled"`
-	Conditions           []NotificationCondition `json:"conditions"`
-	Channels             []string                `json:"channels"`
-	Recipients           []AlertRecipient        `json:"recipients"`
-	Template             string                  `json:"template,omitempty"`
-	Priority             int                     `json:"priority"`
-	Frequency            string                  `json:"frequency"` // immediate, batch, digest
-	Schedule             *NotificationSchedule   `json:"schedule,omitempty"`
+	ID         uuid.UUID               `json:"id"`
+	Name       string                  `json:"name"`
+	Enabled    bool                    `json:"enabled"`
+	Conditions []NotificationCondition `json:"conditions"`
+	Channels   []string                `json:"channels"`
+	Recipients []AlertRecipient        `json:"recipients"`
+	Template   string                  `json:"template,omitempty"`
+	Priority   int                     `json:"priority"`
+	Frequency  string                  `json:"frequency"` // immediate, batch, digest
+	Schedule   *NotificationSchedule   `json:"schedule,omitempty"`
 }
 
 // NotificationCondition defines conditions for triggering notifications
@@ -184,9 +184,9 @@ type NotificationCondition struct {
 
 // NotificationSchedule defines when notifications can be sent
 type NotificationSchedule struct {
-	ActiveHours []int     `json:"active_hours"`
-	ActiveDays  []int     `json:"active_days"`
-	Timezone    string    `json:"timezone"`
+	ActiveHours []int      `json:"active_hours"`
+	ActiveDays  []int      `json:"active_days"`
+	Timezone    string     `json:"timezone"`
 	StartDate   *time.Time `json:"start_date,omitempty"`
 	EndDate     *time.Time `json:"end_date,omitempty"`
 }
@@ -241,15 +241,15 @@ type ConfigVersion struct {
 
 // ConfigurationExport represents an exported configuration
 type ConfigurationExport struct {
-	ExportID        uuid.UUID                      `json:"export_id"`
-	ExportedAt      time.Time                      `json:"exported_at"`
-	ExportedBy      uuid.UUID                      `json:"exported_by"`
-	Version         string                         `json:"version"`
-	GlobalConfig    *GlobalConfig                  `json:"global_config"`
-	DetectorConfigs map[string]*DetectorConfig     `json:"detector_configs"`
-	TenantConfigs   map[string]*TenantConfig       `json:"tenant_configs"`
-	AlertRules      map[string]*AlertRule          `json:"alert_rules"`
-	Metadata        map[string]interface{}         `json:"metadata"`
+	ExportID        uuid.UUID                  `json:"export_id"`
+	ExportedAt      time.Time                  `json:"exported_at"`
+	ExportedBy      uuid.UUID                  `json:"exported_by"`
+	Version         string                     `json:"version"`
+	GlobalConfig    *GlobalConfig              `json:"global_config"`
+	DetectorConfigs map[string]*DetectorConfig `json:"detector_configs"`
+	TenantConfigs   map[string]*TenantConfig   `json:"tenant_configs"`
+	AlertRules      map[string]*AlertRule      `json:"alert_rules"`
+	Metadata        map[string]interface{}     `json:"metadata"`
 }
 
 // ConfigWatcher defines the interface for configuration change watchers
@@ -260,13 +260,13 @@ type ConfigWatcher interface {
 
 // ConfigChange represents a configuration change event
 type ConfigChange struct {
-	Type        string                 `json:"type"`
-	EntityID    string                 `json:"entity_id"`
-	OldConfig   interface{}            `json:"old_config"`
-	NewConfig   interface{}            `json:"new_config"`
-	Changes     map[string]interface{} `json:"changes"`
-	Timestamp   time.Time              `json:"timestamp"`
-	ChangedBy   uuid.UUID              `json:"changed_by"`
+	Type      string                 `json:"type"`
+	EntityID  string                 `json:"entity_id"`
+	OldConfig interface{}            `json:"old_config"`
+	NewConfig interface{}            `json:"new_config"`
+	Changes   map[string]interface{} `json:"changes"`
+	Timestamp time.Time              `json:"timestamp"`
+	ChangedBy uuid.UUID              `json:"changed_by"`
 }
 
 // ConfigValidator validates configuration objects
@@ -276,20 +276,20 @@ type ConfigValidator struct {
 
 // ValidationRule defines a validation rule
 type ValidationRule struct {
-	Field       string                 `json:"field"`
-	Required    bool                   `json:"required"`
-	Type        string                 `json:"type"`
-	MinValue    *float64               `json:"min_value,omitempty"`
-	MaxValue    *float64               `json:"max_value,omitempty"`
-	AllowedValues []interface{}        `json:"allowed_values,omitempty"`
-	Pattern     string                 `json:"pattern,omitempty"`
+	Field           string                  `json:"field"`
+	Required        bool                    `json:"required"`
+	Type            string                  `json:"type"`
+	MinValue        *float64                `json:"min_value,omitempty"`
+	MaxValue        *float64                `json:"max_value,omitempty"`
+	AllowedValues   []interface{}           `json:"allowed_values,omitempty"`
+	Pattern         string                  `json:"pattern,omitempty"`
 	CustomValidator func(interface{}) error `json:"-"`
 }
 
 // ValidationError represents a configuration validation error
 type ValidationError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
+	Field   string      `json:"field"`
+	Message string      `json:"message"`
 	Value   interface{} `json:"value,omitempty"`
 }
 
@@ -596,14 +596,14 @@ func (cm *ConfigurationManager) getDefaultGlobalConfig() *GlobalConfig {
 
 func (cm *ConfigurationManager) getDefaultDetectorConfig(detectorName string) *DetectorConfig {
 	return &DetectorConfig{
-		Name:                detectorName,
-		Enabled:             true,
-		Priority:            50,
-		Sensitivity:         0.5,
-		Thresholds:          make(map[string]float64),
-		Parameters:          make(map[string]interface{}),
-		UpdateInterval:      24 * time.Hour,
-		RequiredSampleSize:  100,
+		Name:               detectorName,
+		Enabled:            true,
+		Priority:           50,
+		Sensitivity:        0.5,
+		Thresholds:         make(map[string]float64),
+		Parameters:         make(map[string]interface{}),
+		UpdateInterval:     24 * time.Hour,
+		RequiredSampleSize: 100,
 	}
 }
 
@@ -712,7 +712,7 @@ func (cv *ConfigValidator) validateConfig(configType string, config interface{})
 	// Apply validation rules
 	for _, rule := range rules {
 		value, exists := configMap[rule.Field]
-		
+
 		// Check required fields
 		if rule.Required && !exists {
 			validationErrors = append(validationErrors, ValidationError{
@@ -811,15 +811,15 @@ func (cm *ConfigurationManager) GetConfigurationSummary(ctx context.Context) map
 	defer cm.mutex.RUnlock()
 
 	return map[string]interface{}{
-		"global_config_version":    cm.config.Version,
-		"last_updated":            cm.lastUpdate,
-		"detector_configs_count":  len(cm.detectorConfigs),
-		"tenant_configs_count":    len(cm.tenantConfigs),
-		"alert_rules_count":       len(cm.ruleConfigs),
-		"hot_reload_enabled":      cm.hotReload,
-		"watchers_count":          len(cm.watchers),
-		"detection_enabled":       cm.config.DetectionEnabled,
-		"alerting_enabled":        cm.config.AlertingEnabled,
-		"security_enabled":        cm.config.SecurityEnabled,
+		"global_config_version":  cm.config.Version,
+		"last_updated":           cm.lastUpdate,
+		"detector_configs_count": len(cm.detectorConfigs),
+		"tenant_configs_count":   len(cm.tenantConfigs),
+		"alert_rules_count":      len(cm.ruleConfigs),
+		"hot_reload_enabled":     cm.hotReload,
+		"watchers_count":         len(cm.watchers),
+		"detection_enabled":      cm.config.DetectionEnabled,
+		"alerting_enabled":       cm.config.AlertingEnabled,
+		"security_enabled":       cm.config.SecurityEnabled,
 	}
 }

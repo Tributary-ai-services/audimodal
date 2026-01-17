@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
-	"github.com/jscharber/eAIIngest/pkg/storage"
+	"github.com/jscharber/audimodal/pkg/storage"
 )
 
 // S3Resolver implements StorageResolver for AWS S3
@@ -366,6 +367,10 @@ func (r *S3Resolver) createS3Client(ctx context.Context, region string, creds *s
 	var cfg aws.Config
 	var err error
 
+	configOptions := []func(*config.LoadOptions) error{
+		config.WithRegion(r.getRegion(region, "")),
+	}
+
 	if creds != nil {
 		// Use provided credentials
 		credProvider := credentials.NewStaticCredentialsProvider(
@@ -373,18 +378,15 @@ func (r *S3Resolver) createS3Client(ctx context.Context, region string, creds *s
 			creds.SecretAccessKey,
 			creds.SessionToken,
 		)
+		configOptions = append(configOptions, config.WithCredentialsProvider(credProvider))
 
-		cfg, err = config.LoadDefaultConfig(ctx,
-			config.WithCredentialsProvider(credProvider),
-			config.WithRegion(r.getRegion(region, creds.Region)),
-		)
-	} else {
-		// Use default credential chain
-		cfg, err = config.LoadDefaultConfig(ctx,
-			config.WithRegion(r.getRegion(region, "")),
-		)
+		// Override region if provided in credentials
+		if creds.Region != "" {
+			configOptions = append(configOptions, config.WithRegion(creds.Region))
+		}
 	}
 
+	cfg, err = config.LoadDefaultConfig(ctx, configOptions...)
 	if err != nil {
 		return nil, storage.NewStorageError(
 			storage.ErrorCodeAuthenticationFailed,
@@ -395,7 +397,34 @@ func (r *S3Resolver) createS3Client(ctx context.Context, region string, creds *s
 		)
 	}
 
-	return s3.NewFromConfig(cfg), nil
+	// Check for custom endpoint (for MinIO compatibility)
+	customEndpoint := os.Getenv("AWS_ENDPOINT_URL")
+	if customEndpoint == "" && creds != nil {
+		// Check for endpoint in credentials extra field
+		if endpoint, ok := creds.Extra["endpoint_url"]; ok {
+			customEndpoint = endpoint
+		}
+	}
+
+	// Create S3 service configuration
+	s3Options := []func(*s3.Options){}
+
+	if customEndpoint != "" {
+		s3Options = append(s3Options, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(customEndpoint)
+			// Enable path-style addressing for MinIO/S3-compatible services
+			o.UsePathStyle = true
+		})
+	}
+
+	// Force path-style addressing if specified in environment
+	if os.Getenv("AWS_S3_FORCE_PATH_STYLE") == "true" {
+		s3Options = append(s3Options, func(o *s3.Options) {
+			o.UsePathStyle = true
+		})
+	}
+
+	return s3.NewFromConfig(cfg, s3Options...), nil
 }
 
 func (r *S3Resolver) getRegion(urlRegion, credRegion string) string {

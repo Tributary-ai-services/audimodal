@@ -11,13 +11,13 @@ import (
 
 // BasicKeywordExtractor provides basic keyword extraction using TF-IDF
 type BasicKeywordExtractor struct {
-	name           string
-	version        string
-	algorithm      string
-	stopWords      map[string]bool
-	minWordLength  int
-	maxWordLength  int
-	minFrequency   int
+	name          string
+	version       string
+	algorithm     string
+	stopWords     map[string]bool
+	minWordLength int
+	maxWordLength int
+	minFrequency  int
 }
 
 // NewBasicKeywordExtractor creates a new basic keyword extractor
@@ -31,7 +31,7 @@ func NewBasicKeywordExtractor() *BasicKeywordExtractor {
 		maxWordLength: 50,
 		minFrequency:  1,
 	}
-	
+
 	extractor.initializeStopWords()
 	return extractor
 }
@@ -41,35 +41,35 @@ func (e *BasicKeywordExtractor) ExtractKeywords(ctx context.Context, text string
 	if len(text) == 0 {
 		return []Keyword{}, nil
 	}
-	
+
 	// Preprocess text
 	cleanText := e.preprocessText(text)
-	
+
 	// Extract candidate words
 	words := e.extractCandidateWords(cleanText)
-	
+
 	// Calculate word frequencies
 	wordFreq := e.calculateWordFrequency(words)
-	
+
 	// Calculate TF-IDF scores
 	keywords := e.calculateTFIDF(text, wordFreq, words)
-	
+
 	// Filter and sort keywords
 	keywords = e.filterKeywords(keywords)
-	
+
 	// Sort by relevance (TF-IDF score)
 	sort.Slice(keywords, func(i, j int) bool {
 		return keywords[i].TfIdf > keywords[j].TfIdf
 	})
-	
+
 	// Limit to maxKeywords
 	if maxKeywords > 0 && len(keywords) > maxKeywords {
 		keywords = keywords[:maxKeywords]
 	}
-	
+
 	// Update relevance scores to be between 0 and 1
 	e.normalizeRelevanceScores(keywords)
-	
+
 	return keywords, nil
 }
 
@@ -82,7 +82,7 @@ func (e *BasicKeywordExtractor) GetAlgorithm() string {
 func (e *BasicKeywordExtractor) preprocessText(text string) string {
 	// Convert to lowercase
 	text = strings.ToLower(text)
-	
+
 	// Remove punctuation and special characters, keep only letters and spaces
 	var result strings.Builder
 	for _, r := range text {
@@ -92,11 +92,11 @@ func (e *BasicKeywordExtractor) preprocessText(text string) string {
 			result.WriteRune(' ')
 		}
 	}
-	
+
 	// Normalize whitespace
 	text = regexp.MustCompile(`\s+`).ReplaceAllString(result.String(), " ")
 	text = strings.TrimSpace(text)
-	
+
 	return text
 }
 
@@ -104,18 +104,18 @@ func (e *BasicKeywordExtractor) preprocessText(text string) string {
 func (e *BasicKeywordExtractor) extractCandidateWords(text string) []string {
 	words := strings.Fields(text)
 	candidates := []string{}
-	
+
 	for _, word := range words {
 		// Check word length
 		if len(word) < e.minWordLength || len(word) > e.maxWordLength {
 			continue
 		}
-		
+
 		// Check if it's a stop word
 		if e.stopWords[word] {
 			continue
 		}
-		
+
 		// Check if it's all letters
 		isValid := true
 		for _, r := range word {
@@ -124,23 +124,23 @@ func (e *BasicKeywordExtractor) extractCandidateWords(text string) []string {
 				break
 			}
 		}
-		
+
 		if isValid {
 			candidates = append(candidates, word)
 		}
 	}
-	
+
 	return candidates
 }
 
 // calculateWordFrequency calculates word frequencies
 func (e *BasicKeywordExtractor) calculateWordFrequency(words []string) map[string]int {
 	freq := make(map[string]int)
-	
+
 	for _, word := range words {
 		freq[word]++
 	}
-	
+
 	return freq
 }
 
@@ -148,26 +148,26 @@ func (e *BasicKeywordExtractor) calculateWordFrequency(words []string) map[strin
 func (e *BasicKeywordExtractor) calculateTFIDF(originalText string, wordFreq map[string]int, words []string) []Keyword {
 	keywords := []Keyword{}
 	totalWords := len(words)
-	
+
 	// Calculate TF-IDF for each unique word
 	for word, freq := range wordFreq {
 		if freq < e.minFrequency {
 			continue
 		}
-		
+
 		// Calculate TF (Term Frequency)
 		tf := float64(freq) / float64(totalWords)
-		
+
 		// Calculate IDF (Inverse Document Frequency)
 		// For single document, we use a simple heuristic based on word commonality
 		idf := e.calculateIDF(word, originalText)
-		
+
 		// Calculate TF-IDF
 		tfIdf := tf * idf
-		
+
 		// Find positions of the word in the original text
 		positions := e.findWordPositions(strings.ToLower(originalText), word)
-		
+
 		keyword := Keyword{
 			Text:      word,
 			Relevance: tfIdf,
@@ -175,10 +175,10 @@ func (e *BasicKeywordExtractor) calculateTFIDF(originalText string, wordFreq map
 			TfIdf:     tfIdf,
 			Position:  positions,
 		}
-		
+
 		keywords = append(keywords, keyword)
 	}
-	
+
 	return keywords
 }
 
@@ -186,9 +186,9 @@ func (e *BasicKeywordExtractor) calculateTFIDF(originalText string, wordFreq map
 func (e *BasicKeywordExtractor) calculateIDF(word string, text string) float64 {
 	// Simple IDF calculation for single document
 	// We estimate rarity based on word characteristics
-	
+
 	baseIDF := 1.0
-	
+
 	// Longer words are generally more specific
 	if len(word) > 8 {
 		baseIDF += 0.5
@@ -197,27 +197,27 @@ func (e *BasicKeywordExtractor) calculateIDF(word string, text string) float64 {
 	} else if len(word) > 4 {
 		baseIDF += 0.1
 	}
-	
+
 	// Words that appear in titles or headings are more important
 	if e.appearsInTitle(word, text) {
 		baseIDF += 0.3
 	}
-	
+
 	// Words that appear at the beginning or end of sentences are more important
 	if e.appearsAtSentenceBoundary(word, text) {
 		baseIDF += 0.2
 	}
-	
+
 	// Common English words get lower IDF
 	if e.isCommonWord(word) {
 		baseIDF -= 0.3
 	}
-	
+
 	// Ensure IDF is positive
 	if baseIDF < 0.1 {
 		baseIDF = 0.1
 	}
-	
+
 	return math.Log(baseIDF + 1)
 }
 
@@ -266,7 +266,7 @@ func (e *BasicKeywordExtractor) isCommonWord(word string) bool {
 		"may": true, "part": true, "over": true, "new": true, "sound": true,
 		"take": true, "only": true, "little": true, "work": true,
 	}
-	
+
 	return commonWords[word]
 }
 
@@ -274,7 +274,7 @@ func (e *BasicKeywordExtractor) isCommonWord(word string) bool {
 func (e *BasicKeywordExtractor) findWordPositions(text string, word string) []int {
 	positions := []int{}
 	wordLen := len(word)
-	
+
 	for i := 0; i <= len(text)-wordLen; i++ {
 		if text[i:i+wordLen] == word {
 			// Check if it's a complete word (not part of another word)
@@ -284,40 +284,40 @@ func (e *BasicKeywordExtractor) findWordPositions(text string, word string) []in
 			}
 		}
 	}
-	
+
 	return positions
 }
 
 // filterKeywords filters keywords based on various criteria
 func (e *BasicKeywordExtractor) filterKeywords(keywords []Keyword) []Keyword {
 	filtered := []Keyword{}
-	
+
 	for _, keyword := range keywords {
 		// Filter out very low scoring keywords
 		if keyword.TfIdf < 0.01 {
 			continue
 		}
-		
+
 		// Filter out keywords that are too short after preprocessing
 		if len(keyword.Text) < e.minWordLength {
 			continue
 		}
-		
+
 		// Filter out keywords that look like noise
 		if e.isNoiseWord(keyword.Text) {
 			continue
 		}
-		
+
 		filtered = append(filtered, keyword)
 	}
-	
+
 	return filtered
 }
 
 // isNoiseWord checks if a word is likely to be noise
 func (e *BasicKeywordExtractor) isNoiseWord(word string) bool {
 	// Check for patterns that indicate noise
-	
+
 	// Words with repeating characters (like "aaa", "xxx")
 	if len(word) >= 3 {
 		allSame := true
@@ -331,7 +331,7 @@ func (e *BasicKeywordExtractor) isNoiseWord(word string) bool {
 			return true
 		}
 	}
-	
+
 	// Words that are mostly numbers or special characters
 	letterCount := 0
 	for _, r := range word {
@@ -339,16 +339,16 @@ func (e *BasicKeywordExtractor) isNoiseWord(word string) bool {
 			letterCount++
 		}
 	}
-	
+
 	if float64(letterCount)/float64(len(word)) < 0.5 {
 		return true
 	}
-	
+
 	// Very short words that slipped through
 	if len(word) < 2 {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -357,7 +357,7 @@ func (e *BasicKeywordExtractor) normalizeRelevanceScores(keywords []Keyword) {
 	if len(keywords) == 0 {
 		return
 	}
-	
+
 	// Find max TF-IDF score
 	maxScore := 0.0
 	for _, keyword := range keywords {
@@ -365,7 +365,7 @@ func (e *BasicKeywordExtractor) normalizeRelevanceScores(keywords []Keyword) {
 			maxScore = keyword.TfIdf
 		}
 	}
-	
+
 	// Normalize relevance scores
 	if maxScore > 0 {
 		for i := range keywords {
@@ -491,7 +491,7 @@ func (e *BasicKeywordExtractor) initializeStopWords() {
 		"speech", "nature", "range", "steam", "motion", "path", "liquid", "log",
 		"meant", "quotient", "teeth", "shell", "neck",
 	}
-	
+
 	for _, word := range stopWordsList {
 		e.stopWords[word] = true
 	}

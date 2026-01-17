@@ -15,123 +15,123 @@ import (
 
 // MetricsCollector collects and exposes anomaly detection metrics
 type MetricsCollector struct {
-	config     *MetricsConfig
-	tracer     trace.Tracer
-	meter      metric.Meter
-	mutex      sync.RWMutex
-	
+	config *MetricsConfig
+	tracer trace.Tracer
+	meter  metric.Meter
+	mutex  sync.RWMutex
+
 	// Metric instruments
-	anomaliesDetected      metric.Int64Counter
-	anomaliesByType        metric.Int64Counter
-	anomaliesBySeverity    metric.Int64Counter
-	anomaliesByStatus      metric.Int64Counter
-	anomaliesByDetector    metric.Int64Counter
-	detectionLatency       metric.Float64Histogram
-	detectorLatency        metric.Float64Histogram
-	falsePositiveRate      metric.Float64Gauge
-	detectionAccuracy      metric.Float64Gauge
-	baselineUpdates        metric.Int64Counter
-	alertsGenerated        metric.Int64Counter
-	alertsDelivered        metric.Int64Counter
-	alertDeliveryLatency   metric.Float64Histogram
-	
+	anomaliesDetected    metric.Int64Counter
+	anomaliesByType      metric.Int64Counter
+	anomaliesBySeverity  metric.Int64Counter
+	anomaliesByStatus    metric.Int64Counter
+	anomaliesByDetector  metric.Int64Counter
+	detectionLatency     metric.Float64Histogram
+	detectorLatency      metric.Float64Histogram
+	falsePositiveRate    metric.Float64Gauge
+	detectionAccuracy    metric.Float64Gauge
+	baselineUpdates      metric.Int64Counter
+	alertsGenerated      metric.Int64Counter
+	alertsDelivered      metric.Int64Counter
+	alertDeliveryLatency metric.Float64Histogram
+
 	// Aggregated metrics
-	statistics             map[string]*DetectionStatistics
-	detectorMetrics        map[string]*DetectorMetrics
-	tenantMetrics          map[uuid.UUID]*TenantMetrics
-	
+	statistics      map[string]*DetectionStatistics
+	detectorMetrics map[string]*DetectorMetrics
+	tenantMetrics   map[uuid.UUID]*TenantMetrics
+
 	// Real-time metrics
-	activeDetections       int64
-	queueDepth            int64
-	lastUpdateTime        time.Time
+	activeDetections int64
+	queueDepth       int64
+	lastUpdateTime   time.Time
 }
 
 // MetricsConfig contains configuration for metrics collection
 type MetricsConfig struct {
-	Enabled              bool          `json:"enabled"`
-	CollectionInterval   time.Duration `json:"collection_interval"`
-	RetentionPeriod      time.Duration `json:"retention_period"`
-	EnableHistograms     bool          `json:"enable_histograms"`
-	EnableDetailedMetrics bool          `json:"enable_detailed_metrics"`
-	ExportToPrometheus   bool          `json:"export_to_prometheus"`
-	ExportToOpenTelemetry bool          `json:"export_to_opentelemetry"`
-	CustomLabels         map[string]string `json:"custom_labels"`
-	MetricPrefix         string        `json:"metric_prefix"`
+	Enabled               bool              `json:"enabled"`
+	CollectionInterval    time.Duration     `json:"collection_interval"`
+	RetentionPeriod       time.Duration     `json:"retention_period"`
+	EnableHistograms      bool              `json:"enable_histograms"`
+	EnableDetailedMetrics bool              `json:"enable_detailed_metrics"`
+	ExportToPrometheus    bool              `json:"export_to_prometheus"`
+	ExportToOpenTelemetry bool              `json:"export_to_opentelemetry"`
+	CustomLabels          map[string]string `json:"custom_labels"`
+	MetricPrefix          string            `json:"metric_prefix"`
 }
 
 // DetectionStatistics contains aggregated detection statistics
 type DetectionStatistics struct {
-	TotalDetections       int64                           `json:"total_detections"`
-	DetectionsByType      map[AnomalyType]int64           `json:"detections_by_type"`
-	DetectionsBySeverity  map[AnomalySeverity]int64       `json:"detections_by_severity"`
-	DetectionsByStatus    map[AnomalyStatus]int64         `json:"detections_by_status"`
-	DetectionsByDetector  map[string]int64                `json:"detections_by_detector"`
-	AverageScore          float64                         `json:"average_score"`
-	AverageConfidence     float64                         `json:"average_confidence"`
-	AverageLatency        time.Duration                   `json:"average_latency"`
-	FalsePositiveRate     float64                         `json:"false_positive_rate"`
-	TruePositiveRate      float64                         `json:"true_positive_rate"`
-	Precision             float64                         `json:"precision"`
-	Recall                float64                         `json:"recall"`
-	F1Score               float64                         `json:"f1_score"`
-	LastUpdated           time.Time                       `json:"last_updated"`
+	TotalDetections      int64                     `json:"total_detections"`
+	DetectionsByType     map[AnomalyType]int64     `json:"detections_by_type"`
+	DetectionsBySeverity map[AnomalySeverity]int64 `json:"detections_by_severity"`
+	DetectionsByStatus   map[AnomalyStatus]int64   `json:"detections_by_status"`
+	DetectionsByDetector map[string]int64          `json:"detections_by_detector"`
+	AverageScore         float64                   `json:"average_score"`
+	AverageConfidence    float64                   `json:"average_confidence"`
+	AverageLatency       time.Duration             `json:"average_latency"`
+	FalsePositiveRate    float64                   `json:"false_positive_rate"`
+	TruePositiveRate     float64                   `json:"true_positive_rate"`
+	Precision            float64                   `json:"precision"`
+	Recall               float64                   `json:"recall"`
+	F1Score              float64                   `json:"f1_score"`
+	LastUpdated          time.Time                 `json:"last_updated"`
 }
 
 // DetectorMetrics contains metrics for individual detectors
 type DetectorMetrics struct {
-	DetectorName          string        `json:"detector_name"`
-	DetectorVersion       string        `json:"detector_version"`
-	TotalInvocations      int64         `json:"total_invocations"`
-	SuccessfulDetections  int64         `json:"successful_detections"`
-	FailedDetections      int64         `json:"failed_detections"`
-	AverageLatency        time.Duration `json:"average_latency"`
-	MedianLatency         time.Duration `json:"median_latency"`
-	P95Latency            time.Duration `json:"p95_latency"`
-	P99Latency            time.Duration `json:"p99_latency"`
-	ErrorRate             float64       `json:"error_rate"`
-	AverageScore          float64       `json:"average_score"`
-	AverageConfidence     float64       `json:"average_confidence"`
-	BaselineUpdates       int64         `json:"baseline_updates"`
-	LastInvocation        time.Time     `json:"last_invocation"`
-	IsEnabled             bool          `json:"is_enabled"`
-	ConfigurationHash     string        `json:"configuration_hash"`
+	DetectorName         string        `json:"detector_name"`
+	DetectorVersion      string        `json:"detector_version"`
+	TotalInvocations     int64         `json:"total_invocations"`
+	SuccessfulDetections int64         `json:"successful_detections"`
+	FailedDetections     int64         `json:"failed_detections"`
+	AverageLatency       time.Duration `json:"average_latency"`
+	MedianLatency        time.Duration `json:"median_latency"`
+	P95Latency           time.Duration `json:"p95_latency"`
+	P99Latency           time.Duration `json:"p99_latency"`
+	ErrorRate            float64       `json:"error_rate"`
+	AverageScore         float64       `json:"average_score"`
+	AverageConfidence    float64       `json:"average_confidence"`
+	BaselineUpdates      int64         `json:"baseline_updates"`
+	LastInvocation       time.Time     `json:"last_invocation"`
+	IsEnabled            bool          `json:"is_enabled"`
+	ConfigurationHash    string        `json:"configuration_hash"`
 }
 
 // TenantMetrics contains metrics for individual tenants
 type TenantMetrics struct {
-	TenantID              uuid.UUID                     `json:"tenant_id"`
-	TotalAnomalies        int64                         `json:"total_anomalies"`
-	AnomaliesByType       map[AnomalyType]int64         `json:"anomalies_by_type"`
-	AnomaliesBySeverity   map[AnomalySeverity]int64     `json:"anomalies_by_severity"`
-	ResolvedAnomalies     int64                         `json:"resolved_anomalies"`
-	FalsePositives        int64                         `json:"false_positives"`
-	AverageResolutionTime time.Duration                 `json:"average_resolution_time"`
-	AlertsGenerated       int64                         `json:"alerts_generated"`
-	AlertsDelivered       int64                         `json:"alerts_delivered"`
-	DataSources           int                           `json:"data_sources"`
-	ActiveUsers           int                           `json:"active_users"`
-	StorageUsage          int64                         `json:"storage_usage_bytes"`
-	LastActivity          time.Time                     `json:"last_activity"`
+	TenantID              uuid.UUID                 `json:"tenant_id"`
+	TotalAnomalies        int64                     `json:"total_anomalies"`
+	AnomaliesByType       map[AnomalyType]int64     `json:"anomalies_by_type"`
+	AnomaliesBySeverity   map[AnomalySeverity]int64 `json:"anomalies_by_severity"`
+	ResolvedAnomalies     int64                     `json:"resolved_anomalies"`
+	FalsePositives        int64                     `json:"false_positives"`
+	AverageResolutionTime time.Duration             `json:"average_resolution_time"`
+	AlertsGenerated       int64                     `json:"alerts_generated"`
+	AlertsDelivered       int64                     `json:"alerts_delivered"`
+	DataSources           int                       `json:"data_sources"`
+	ActiveUsers           int                       `json:"active_users"`
+	StorageUsage          int64                     `json:"storage_usage_bytes"`
+	LastActivity          time.Time                 `json:"last_activity"`
 }
 
 // MetricPoint represents a single metric data point
 type MetricPoint struct {
-	Name      string                 `json:"name"`
-	Value     float64                `json:"value"`
-	Timestamp time.Time              `json:"timestamp"`
-	Labels    map[string]string      `json:"labels"`
-	Unit      string                 `json:"unit"`
-	Type      string                 `json:"type"` // counter, gauge, histogram
+	Name      string            `json:"name"`
+	Value     float64           `json:"value"`
+	Timestamp time.Time         `json:"timestamp"`
+	Labels    map[string]string `json:"labels"`
+	Unit      string            `json:"unit"`
+	Type      string            `json:"type"` // counter, gauge, histogram
 }
 
 // MetricSeries represents a time series of metric points
 type MetricSeries struct {
-	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
-	Unit        string                 `json:"unit"`
-	Type        string                 `json:"type"`
-	Labels      map[string]string      `json:"labels"`
-	Points      []MetricPoint          `json:"points"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Unit        string            `json:"unit"`
+	Type        string            `json:"type"`
+	Labels      map[string]string `json:"labels"`
+	Points      []MetricPoint     `json:"points"`
 }
 
 // NewMetricsCollector creates a new metrics collector
@@ -169,7 +169,7 @@ func NewMetricsCollector(config *MetricsConfig) *MetricsCollector {
 // initializeMetrics initializes OpenTelemetry metric instruments
 func (mc *MetricsCollector) initializeMetrics() error {
 	var err error
-	
+
 	// Counters
 	mc.anomaliesDetected, err = mc.meter.Int64Counter(
 		mc.config.MetricPrefix+"_anomalies_detected_total",
@@ -450,9 +450,9 @@ func (mc *MetricsCollector) GetAllMetrics(ctx context.Context) map[string]interf
 		"detector_metrics":     mc.detectorMetrics,
 		"tenant_metrics":       mc.tenantMetrics,
 		"collection_info": map[string]interface{}{
-			"last_updated":     mc.lastUpdateTime,
+			"last_updated":      mc.lastUpdateTime,
 			"active_detections": mc.activeDetections,
-			"queue_depth":      mc.queueDepth,
+			"queue_depth":       mc.queueDepth,
 		},
 	}
 }
@@ -662,14 +662,14 @@ func (mc *MetricsCollector) updateTenantAlertMetrics(tenantID uuid.UUID, generat
 	defer mc.mutex.Unlock()
 
 	metrics := mc.getOrCreateTenantMetrics(tenantID)
-	
+
 	if generated {
 		metrics.AlertsGenerated++
 	}
 	if delivered {
 		metrics.AlertsDelivered++
 	}
-	
+
 	metrics.LastActivity = time.Now()
 }
 
@@ -695,9 +695,9 @@ func (mc *MetricsCollector) getOrCreateDetectorMetrics(detectorName string) *Det
 	}
 
 	metrics := &DetectorMetrics{
-		DetectorName:    detectorName,
-		LastInvocation:  time.Now(),
-		IsEnabled:       true,
+		DetectorName:   detectorName,
+		LastInvocation: time.Now(),
+		IsEnabled:      true,
 	}
 	mc.detectorMetrics[detectorName] = metrics
 	return metrics

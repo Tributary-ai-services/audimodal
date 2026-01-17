@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // Loader handles loading configuration from various sources
@@ -83,9 +83,10 @@ func (l *Loader) loadFromEnvRecursive(value reflect.Value, prefix string) error 
 				continue
 			}
 
-			// Get env tag or use field name
+			// Get env tag - explicit env tags are used as-is, without prefix
 			envTag := fieldType.Tag.Get("env")
-			if envTag == "" {
+			hasExplicitEnvTag := envTag != ""
+			if !hasExplicitEnvTag {
 				envTag = fieldType.Tag.Get("yaml")
 				if envTag == "" {
 					envTag = strings.ToUpper(fieldType.Name)
@@ -93,8 +94,12 @@ func (l *Loader) loadFromEnvRecursive(value reflect.Value, prefix string) error 
 			}
 
 			// Build full environment variable name
+			// Explicit env tags are used as-is, without prefix
 			var envName string
-			if prefix == "" {
+			if hasExplicitEnvTag {
+				// Explicit env tag - use as-is without prefix
+				envName = l.buildEnvName(envTag)
+			} else if prefix == "" {
 				envName = l.buildEnvName(envTag)
 			} else {
 				envName = l.buildEnvName(prefix + "_" + envTag)
@@ -226,7 +231,7 @@ func (l *Loader) Load(configPath string, config interface{}) error {
 // WriteExample writes an example configuration file
 func (l *Loader) WriteExample(configPath string, config interface{}) error {
 	ext := strings.ToLower(filepath.Ext(configPath))
-	
+
 	var data []byte
 	var err error
 

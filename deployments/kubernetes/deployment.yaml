@@ -26,7 +26,7 @@ spec:
         app.kubernetes.io/version: "1.0.0"
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        prometheus.io/port: "9093"
         prometheus.io/path: "/metrics"
     spec:
       serviceAccountName: eaiingest-serviceaccount
@@ -44,7 +44,7 @@ spec:
           containerPort: 8080
           protocol: TCP
         - name: metrics
-          containerPort: 9090
+          containerPort: 9093
           protocol: TCP
         env:
         - name: EAI_ENV
@@ -103,6 +103,11 @@ spec:
             secretKeyRef:
               name: eaiingest-secrets
               key: encryption-key
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: eaiingest-secrets
+              key: openai-api-key
         - name: EAI_AWS_REGION
           valueFrom:
             secretKeyRef:

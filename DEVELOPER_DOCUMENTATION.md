@@ -1008,7 +1008,7 @@ ml_ai:
 
 monitoring:
   enabled: true
-  metrics_port: 9090
+  metrics_port: 9093
   health_check_interval: "30s"
   tracing:
     enabled: true
@@ -1062,7 +1062,7 @@ KNOWLEDGE_GRAPH_MAX_NODES=100000
 
 # Monitoring
 METRICS_ENABLED=true
-METRICS_PORT=9090
+METRICS_PORT=9093
 TRACING_ENABLED=true
 TRACING_ENDPOINT=http://jaeger:14268/api/traces
 
@@ -1598,7 +1598,7 @@ COPY --from=builder /app/main .
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/web ./web
 
-EXPOSE 8080 9090
+EXPOSE 8080 9093
 
 CMD ["./main"]
 ```
@@ -1612,7 +1612,7 @@ services:
     build: .
     ports:
       - "8080:8080"
-      - "9090:9090"
+      - "9093:9093"
     environment:
       - AUDIMODAL_ENV=production
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/audimodal
@@ -1691,7 +1691,7 @@ spec:
         image: audimodal/api:1.8.0
         ports:
         - containerPort: 8080
-        - containerPort: 9090
+        - containerPort: 9093
         env:
         - name: AUDIMODAL_ENV
           value: "production"
@@ -1744,8 +1744,8 @@ spec:
     port: 80
     targetPort: 8080
   - name: metrics
-    port: 9090
-    targetPort: 9090
+    port: 9093
+    targetPort: 9093
   type: ClusterIP
 ```
 
@@ -1788,13 +1788,13 @@ global:
 scrape_configs:
   - job_name: 'audimodal-api'
     static_configs:
-      - targets: ['audimodal-api-service:9090']
+      - targets: ['audimodal-api-service:9093']
     metrics_path: /metrics
     scrape_interval: 30s
 
   - job_name: 'audimodal-ml'
     static_configs:
-      - targets: ['audimodal-api-service:9090']
+      - targets: ['audimodal-api-service:9093']
     metrics_path: /ml/metrics
     scrape_interval: 60s
 ```

@@ -36,7 +36,7 @@
   "max_page_size": 100,
   "database": {
     "host": "localhost",
-    "port": 5432,
+    "port": 5433,
     "username": "postgres",
     "password": "",
     "database": "eaiingest",

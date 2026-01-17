@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 
-	"github.com/jscharber/eAIIngest/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/embeddings"
 )
 
 // DeepLakeAPIClient implements the VectorStore interface using the DeepLake API
@@ -23,12 +24,12 @@ type DeepLakeAPIClient struct {
 
 // DeepLakeAPIConfig holds configuration for the DeepLake API client
 type DeepLakeAPIConfig struct {
-	BaseURL    string        `json:"base_url"`
-	APIKey     string        `json:"api_key"`
-	TenantID   string        `json:"tenant_id,omitempty"`
-	Timeout    time.Duration `json:"timeout"`
-	Retries    int           `json:"retries"`
-	UserAgent  string        `json:"user_agent,omitempty"`
+	BaseURL   string        `json:"base_url"`
+	APIKey    string        `json:"api_key"`
+	TenantID  string        `json:"tenant_id,omitempty"`
+	Timeout   time.Duration `json:"timeout"`
+	Retries   int           `json:"retries"`
+	UserAgent string        `json:"user_agent,omitempty"`
 }
 
 // NewDeepLakeAPIClient creates a new DeepLake API client
@@ -107,8 +108,8 @@ type DatasetResponse struct {
 	StorageLocation string                 `json:"storage_location"`
 	VectorCount     int                    `json:"vector_count"`
 	StorageSize     int64                  `json:"storage_size"`
-	CreatedAt       time.Time              `json:"created_at"`
-	UpdatedAt       time.Time              `json:"updated_at"`
+	CreatedAt       string                 `json:"created_at"`
+	UpdatedAt       string                 `json:"updated_at"`
 	TenantID        string                 `json:"tenant_id,omitempty"`
 }
 
@@ -130,10 +131,10 @@ type VectorCreateRequest struct {
 
 // VectorBatchInsertRequest represents a batch vector insertion request
 type VectorBatchInsertRequest struct {
-	Vectors       []VectorCreateRequest `json:"vectors"`
-	SkipExisting  bool                  `json:"skip_existing,omitempty"`
-	Overwrite     bool                  `json:"overwrite,omitempty"`
-	BatchSize     *int                  `json:"batch_size,omitempty"`
+	Vectors      []VectorCreateRequest `json:"vectors"`
+	SkipExisting bool                  `json:"skip_existing,omitempty"`
+	Overwrite    bool                  `json:"overwrite,omitempty"`
+	BatchSize    *int                  `json:"batch_size,omitempty"`
 }
 
 // VectorResponse represents a vector response
@@ -152,8 +153,8 @@ type VectorResponse struct {
 	ChunkCount  *int                   `json:"chunk_count,omitempty"`
 	Model       string                 `json:"model,omitempty"`
 	Dimensions  int                    `json:"dimensions"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at"`
 	TenantID    string                 `json:"tenant_id,omitempty"`
 }
 
@@ -188,21 +189,21 @@ type SearchOptions struct {
 
 // SearchResponse represents a search response
 type SearchResponse struct {
-	Results          []SearchResultItem `json:"results"`
-	TotalFound       int                `json:"total_found"`
-	HasMore          bool               `json:"has_more"`
-	QueryTimeMs      float64            `json:"query_time_ms"`
-	EmbeddingTimeMs  float64            `json:"embedding_time_ms"`
-	Stats            SearchStats        `json:"stats"`
+	Results         []SearchResultItem `json:"results"`
+	TotalFound      int                `json:"total_found"`
+	HasMore         bool               `json:"has_more"`
+	QueryTimeMs     float64            `json:"query_time_ms"`
+	EmbeddingTimeMs float64            `json:"embedding_time_ms"`
+	Stats           SearchStats        `json:"stats"`
 }
 
 // SearchResultItem represents a single search result
 type SearchResultItem struct {
-	Vector      VectorResponse         `json:"vector"`
-	Score       float32                `json:"score"`
-	Distance    float32                `json:"distance"`
-	Rank        int                    `json:"rank"`
-	Explanation map[string]string      `json:"explanation,omitempty"`
+	Vector      VectorResponse    `json:"vector"`
+	Score       float32           `json:"score"`
+	Distance    float32           `json:"distance"`
+	Rank        int               `json:"rank"`
+	Explanation map[string]string `json:"explanation,omitempty"`
 }
 
 // SearchStats represents search statistics
@@ -217,11 +218,11 @@ type SearchStats struct {
 
 // DatasetStats represents dataset statistics
 type DatasetStats struct {
-	Dataset       DatasetResponse            `json:"dataset"`
-	VectorCount   int                        `json:"vector_count"`
-	StorageSize   int64                      `json:"storage_size"`
-	MetadataStats map[string]int             `json:"metadata_stats"`
-	IndexStats    map[string]interface{}     `json:"index_stats,omitempty"`
+	Dataset       DatasetResponse        `json:"dataset"`
+	VectorCount   int                    `json:"vector_count"`
+	StorageSize   int64                  `json:"storage_size"`
+	MetadataStats map[string]int         `json:"metadata_stats"`
+	IndexStats    map[string]interface{} `json:"index_stats,omitempty"`
 }
 
 // VectorBatchResponse represents a batch operation response
@@ -432,16 +433,16 @@ func (c *DeepLakeAPIClient) GetDatasetStats(ctx context.Context, datasetName str
 
 	// Convert to map format expected by the interface
 	stats := map[string]interface{}{
-		"name":          response.Dataset.Name,
-		"vector_count":  response.VectorCount,
-		"dimensions":    response.Dataset.Dimensions,
-		"storage_size":  response.StorageSize,
-		"metric_type":   response.Dataset.MetricType,
-		"index_type":    response.Dataset.IndexType,
-		"created_at":    response.Dataset.CreatedAt,
-		"updated_at":    response.Dataset.UpdatedAt,
+		"name":           response.Dataset.Name,
+		"vector_count":   response.VectorCount,
+		"dimensions":     response.Dataset.Dimensions,
+		"storage_size":   response.StorageSize,
+		"metric_type":    response.Dataset.MetricType,
+		"index_type":     response.Dataset.IndexType,
+		"created_at":     response.Dataset.CreatedAt,
+		"updated_at":     response.Dataset.UpdatedAt,
 		"metadata_stats": response.MetadataStats,
-		"index_stats":   response.IndexStats,
+		"index_stats":    response.IndexStats,
 	}
 
 	return stats, nil
@@ -457,16 +458,24 @@ func (c *DeepLakeAPIClient) Close() error {
 
 // getDatasetIDByName retrieves dataset ID by name
 func (c *DeepLakeAPIClient) getDatasetIDByName(ctx context.Context, name string) (string, error) {
+	// First try listing datasets
 	var datasets []DatasetResponse
 	err := c.makeRequest(ctx, "GET", "/api/v1/datasets/", nil, &datasets)
-	if err != nil {
-		return "", err
+	if err == nil {
+		for _, dataset := range datasets {
+			if dataset.Name == name {
+				return dataset.ID, nil
+			}
+		}
 	}
 
-	for _, dataset := range datasets {
-		if dataset.Name == name {
-			return dataset.ID, nil
-		}
+	// If not found in list or list failed, try direct access
+	// This handles cases where the list endpoint has issues but the dataset exists
+	var dataset DatasetResponse
+	endpoint := fmt.Sprintf("/api/v1/datasets/%s", name)
+	err = c.makeRequest(ctx, "GET", endpoint, nil, &dataset)
+	if err == nil && dataset.Name == name {
+		return dataset.ID, nil
 	}
 
 	return "", &embeddings.EmbeddingError{
@@ -503,7 +512,7 @@ func (c *DeepLakeAPIClient) makeRequest(ctx context.Context, method, endpoint st
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("ApiKey %s", c.config.APIKey))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
 	req.Header.Set("User-Agent", c.config.UserAgent)
 
 	if c.config.TenantID != "" {
@@ -536,6 +545,19 @@ func (c *DeepLakeAPIClient) makeRequest(ctx context.Context, method, endpoint st
 	// Check status code
 	if resp.StatusCode >= 400 {
 		return c.handleErrorResponse(resp.StatusCode, respBody)
+	}
+
+	// Check for DeepLake's success/failure format in HTTP 200 responses
+	if resp.StatusCode == 200 {
+		var statusCheck map[string]interface{}
+		if err := json.Unmarshal(respBody, &statusCheck); err == nil {
+			if success, exists := statusCheck["success"]; exists {
+				if successBool, ok := success.(bool); ok && !successBool {
+					// Handle HTTP 200 responses with "success": false
+					return c.handleDeepLakeError(respBody)
+				}
+			}
+		}
 	}
 
 	// Parse response
@@ -576,13 +598,83 @@ func (c *DeepLakeAPIClient) handleErrorResponse(statusCode int, body []byte) err
 	}
 }
 
+// handleDeepLakeError handles DeepLake's HTTP 200 responses with "success": false
+func (c *DeepLakeAPIClient) handleDeepLakeError(body []byte) error {
+	var errorResp map[string]interface{}
+	if err := json.Unmarshal(body, &errorResp); err != nil {
+		return &embeddings.EmbeddingError{
+			Type:    "deeplake_error",
+			Message: "Failed to parse DeepLake error response",
+			Code:    "PARSE_ERROR",
+		}
+	}
+
+	// Extract message
+	message := "Unknown DeepLake error"
+	if msg, ok := errorResp["message"].(string); ok {
+		message = msg
+	}
+
+	// Categorize error types based on message content
+	errorType := "deeplake_error"
+	code := "DEEPLAKE_ERROR"
+
+	// Categorize common DeepLake error patterns
+	if strings.Contains(strings.ToLower(message), "not found") {
+		errorType = "dataset_not_found"
+		code = "DATASET_NOT_FOUND"
+	} else if strings.Contains(strings.ToLower(message), "dimensions mismatch") {
+		errorType = "dimension_mismatch"
+		code = "DIMENSION_MISMATCH"
+	} else if strings.Contains(strings.ToLower(message), "search") || strings.Contains(strings.ToLower(message), "vector") {
+		// Check if it's a search-related error that should return empty results instead
+		if strings.Contains(strings.ToLower(message), "no attribute 'search'") {
+			errorType = "search_unavailable"
+			code = "SEARCH_UNAVAILABLE"
+		} else {
+			errorType = "search_error"
+			code = "SEARCH_ERROR"
+		}
+	}
+
+	return &embeddings.EmbeddingError{
+		Type:    errorType,
+		Message: message,
+		Code:    code,
+		Details: errorResp,
+	}
+}
+
 // Conversion helper methods
+
+func parseTimeString(timeStr string) time.Time {
+	if timeStr == "" {
+		return time.Time{}
+	}
+
+	// Try common timestamp formats
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05.999999",
+		"2006-01-02T15:04:05",
+		time.RFC3339Nano,
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, timeStr); err == nil {
+			return t
+		}
+	}
+
+	// If parsing fails, return zero time
+	return time.Time{}
+}
 
 func convertMetadata(metadata map[string]interface{}) map[string]string {
 	if metadata == nil {
 		return nil
 	}
-	
+
 	result := make(map[string]string)
 	for k, v := range metadata {
 		result[k] = fmt.Sprintf("%v", v)
@@ -637,8 +729,8 @@ func (c *DeepLakeAPIClient) convertVectorResponse(response *VectorResponse) *emb
 		Language:    response.Language,
 		ChunkIndex:  getIntValue(response.ChunkIndex),
 		ChunkCount:  getIntValue(response.ChunkCount),
-		CreatedAt:   response.CreatedAt,
-		UpdatedAt:   response.UpdatedAt,
+		CreatedAt:   parseTimeString(response.CreatedAt),
+		UpdatedAt:   parseTimeString(response.UpdatedAt),
 	}
 }
 
@@ -651,9 +743,9 @@ func (c *DeepLakeAPIClient) convertDatasetResponse(response *DatasetResponse) *e
 		MetricType:     response.MetricType,
 		IndexType:      response.IndexType,
 		StorageSize:    response.StorageSize,
-		CreatedAt:      response.CreatedAt,
-		UpdatedAt:      response.UpdatedAt,
-		LastAccessedAt: response.UpdatedAt, // Use UpdatedAt as approximation
+		CreatedAt:      parseTimeString(response.CreatedAt),
+		UpdatedAt:      parseTimeString(response.UpdatedAt),
+		LastAccessedAt: parseTimeString(response.UpdatedAt), // Use UpdatedAt as approximation
 		Metadata:       response.Metadata,
 	}
 }

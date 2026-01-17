@@ -8,7 +8,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/jscharber/eAIIngest/pkg/core"
+	"github.com/jscharber/audimodal/pkg/core"
 )
 
 // Registry manages the registration and retrieval of plugin components.
