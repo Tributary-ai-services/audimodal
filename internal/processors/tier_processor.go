@@ -278,6 +278,19 @@ func (tp *TierProcessor) generateEmbeddings(ctx context.Context, request *Proces
 		return 0, fmt.Errorf("failed to get tenant repository: %w", err)
 	}
 
+	// Get the file to check for Neo4j Document ID for cross-service consistency
+	var file models.File
+	if err := tenantRepo.DB().Where("id = ?", request.FileID).First(&file).Error; err != nil {
+		return 0, fmt.Errorf("failed to get file: %w", err)
+	}
+
+	// Use Neo4j Document ID if available, otherwise fall back to AudiModal file ID
+	// This ensures embeddings in DeepLake use the same document ID as Neo4j (Aether-BE)
+	documentID := request.FileID.String()
+	if file.Neo4jDocumentID != nil && *file.Neo4jDocumentID != "" {
+		documentID = *file.Neo4jDocumentID
+	}
+
 	var chunks []models.Chunk
 	if err := tenantRepo.DB().Where("file_id = ?", request.FileID).Find(&chunks).Error; err != nil {
 		return 0, fmt.Errorf("failed to get chunks: %w", err)
@@ -304,17 +317,18 @@ func (tp *TierProcessor) generateEmbeddings(ctx context.Context, request *Proces
 		for j, chunk := range batch {
 			chunkInputs[j] = &embeddings.ChunkInput{
 				ID:          chunk.ChunkID,
-				DocumentID:  chunk.FileID.String(),
+				DocumentID:  documentID, // Use Neo4j Document ID for cross-service consistency
 				Content:     chunk.Content,
 				ChunkIndex:  chunk.ChunkNumber,
 				ContentType: chunk.ChunkType,
 				Metadata: map[string]interface{}{
-					"file_id":       chunk.FileID.String(),
-					"chunk_number":  chunk.ChunkNumber,
-					"size_bytes":    chunk.SizeBytes,
-					"processed_at":  chunk.ProcessedAt,
-					"language":      chunk.Language,
-					"quality_score": chunk.Quality.Completeness,
+					"file_id":           chunk.FileID.String(), // Keep AudiModal file ID in metadata for reference
+					"neo4j_document_id": documentID,            // Explicit Neo4j Document ID for cross-service queries
+					"chunk_number":      chunk.ChunkNumber,
+					"size_bytes":        chunk.SizeBytes,
+					"processed_at":      chunk.ProcessedAt,
+					"language":          chunk.Language,
+					"quality_score":     chunk.Quality.Completeness,
 				},
 			}
 		}

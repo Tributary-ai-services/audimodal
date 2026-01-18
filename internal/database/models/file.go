@@ -52,6 +52,11 @@ type File struct {
 	DataSourceID        *uuid.UUID `gorm:"type:uuid;index" json:"data_source_id,omitempty"`
 	ProcessingSessionID *uuid.UUID `gorm:"type:uuid;index" json:"processing_session_id,omitempty"`
 
+	// Cross-service document ID from Neo4j (Aether-BE)
+	// This enables cross-service data integrity by storing the Document.id from Neo4j
+	// when files are created via Aether-BE document upload flow
+	Neo4jDocumentID *string `gorm:"type:varchar(36);index" json:"neo4j_document_id,omitempty"`
+
 	// File identification
 	URL         string `gorm:"not null;index" json:"url"`
 	Path        string `gorm:"not null;index" json:"path"`

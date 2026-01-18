@@ -226,7 +226,8 @@ func (e *ProcessingCompleteEvent) GetBase() BaseEvent {
 }
 
 type ProcessingCompleteData struct {
-	FileID              string        `json:"file_id"` // AudiModal file UUID
+	FileID              string        `json:"file_id"`                        // AudiModal file UUID
+	DocumentID          string        `json:"document_id,omitempty"`          // Neo4j Document.id from Aether-BE for cross-service consistency
 	URL                 string        `json:"url"`
 	TotalProcessingTime time.Duration `json:"total_processing_time"`
 	ChunksCreated       int           `json:"chunks_created"`

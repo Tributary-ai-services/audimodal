@@ -76,6 +76,7 @@ type FileResponse struct {
 	TenantID            uuid.UUID              `json:"tenant_id"`
 	DataSourceID        *uuid.UUID             `json:"data_source_id,omitempty"`
 	ProcessingSessionID *uuid.UUID             `json:"processing_session_id,omitempty"`
+	Neo4jDocumentID     *string                `json:"document_id,omitempty"` // Neo4j Document.id for cross-service consistency
 	URL                 string                 `json:"url"`
 	Path                string                 `json:"path"`
 	Filename            string                 `json:"filename"`
@@ -347,6 +348,12 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		}
 	}
 
+	// Get optional document_id for cross-service consistency (Neo4j Document.id from Aether-BE)
+	var neo4jDocumentID *string
+	if documentID := r.FormValue("document_id"); documentID != "" {
+		neo4jDocumentID = &documentID
+	}
+
 	// Extract file information
 	filename := fileHeader.Filename
 	extension := filepath.Ext(filename)
@@ -431,6 +438,7 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 	fileRecord := &models.File{
 		TenantID:         tenantID,
 		DataSourceID:     &dataSourceID,
+		Neo4jDocumentID:  neo4jDocumentID,
 		URL:              fileURL,
 		Path:             storagePath,
 		Filename:         filename,
@@ -471,6 +479,7 @@ func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Reques
 		ChecksumType        string                 `json:"checksum_type,omitempty"`
 		DataSourceID        *uuid.UUID             `json:"data_source_id,omitempty"`
 		ProcessingSessionID *uuid.UUID             `json:"processing_session_id,omitempty"`
+		DocumentID          string                 `json:"document_id,omitempty"`  // Neo4j Document.id from Aether-BE for cross-service consistency
 		Metadata            map[string]interface{} `json:"metadata,omitempty"`
 		ValidateAccess      bool                   `json:"validate_access,omitempty"` // Whether to validate S3 access
 	}
@@ -559,10 +568,16 @@ func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Reques
 		}
 	} else {
 		// Handle local file URLs or manual metadata-only records
+		var neo4jDocID *string
+		if req.DocumentID != "" {
+			neo4jDocID = &req.DocumentID
+		}
+
 		fileRecord = &models.File{
 			TenantID:            tenantID,
 			DataSourceID:        req.DataSourceID,
 			ProcessingSessionID: req.ProcessingSessionID,
+			Neo4jDocumentID:     neo4jDocID,
 			URL:                 req.URL,
 			Path:                req.Path,
 			Filename:            req.Filename,
@@ -849,10 +864,18 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 				// Publish processing complete/failed event to Kafka for cross-service sync
 				if h.eventProducer != nil {
 					var eventData events.ProcessingCompleteData
+
+					// Get the Neo4j Document ID for cross-service consistency
+					var documentID string
+					if updatedFile.Neo4jDocumentID != nil {
+						documentID = *updatedFile.Neo4jDocumentID
+					}
+
 					if err == nil && tierResult != nil && tierResult.ProcessingResult != nil {
 						// Success case - now includes actual embedding count
 						eventData = events.ProcessingCompleteData{
 							FileID:              fileID.String(), // AudiModal file UUID for cross-service lookup
+							DocumentID:          documentID,      // Neo4j Document.id for cross-service consistency
 							URL:                 updatedFile.URL,
 							TotalProcessingTime: tierResult.ProcessingTime,
 							ChunksCreated:       tierResult.ChunksCreated,
@@ -870,6 +893,7 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 						}
 						eventData = events.ProcessingCompleteData{
 							FileID:              fileID.String(),
+							DocumentID:          documentID, // Neo4j Document.id for cross-service consistency
 							URL:                 updatedFile.URL,
 							TotalProcessingTime: processingTime,
 							ChunksCreated:       0,
@@ -1067,6 +1091,7 @@ func (h *FileHandler) toFileResponse(file *models.File) FileResponse {
 		TenantID:            file.TenantID,
 		DataSourceID:        file.DataSourceID,
 		ProcessingSessionID: file.ProcessingSessionID,
+		Neo4jDocumentID:     file.Neo4jDocumentID,
 		URL:                 file.URL,
 		Path:                file.Path,
 		Filename:            file.Filename,
