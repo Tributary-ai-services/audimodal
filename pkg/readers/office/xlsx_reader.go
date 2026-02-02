@@ -3,9 +3,13 @@ package office
 import (
 	"archive/zip"
 	"context"
+	"encoding/xml"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -341,6 +345,204 @@ type XLSXCell struct {
 	Comment string
 }
 
+// XML parsing structures for XLSX OOXML format
+
+// xlsxWorkbookXML represents xl/workbook.xml
+type xlsxWorkbookXML struct {
+	XMLName xml.Name        `xml:"workbook"`
+	Sheets  xlsxSheetsXML   `xml:"sheets"`
+}
+
+type xlsxSheetsXML struct {
+	Sheet []xlsxSheetXML `xml:"sheet"`
+}
+
+type xlsxSheetXML struct {
+	Name    string `xml:"name,attr"`
+	SheetID string `xml:"sheetId,attr"`
+	RelID   string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
+	State   string `xml:"state,attr"`
+}
+
+// xlsxSharedStringsXML represents xl/sharedStrings.xml
+type xlsxSharedStringsXML struct {
+	XMLName xml.Name         `xml:"sst"`
+	Count   int              `xml:"count,attr"`
+	Strings []xlsxStringItem `xml:"si"`
+}
+
+type xlsxStringItem struct {
+	Text  string       `xml:"t"`
+	Runs  []xlsxRunXML `xml:"r"`
+}
+
+type xlsxRunXML struct {
+	Text string `xml:"t"`
+}
+
+// xlsxCoreProperties represents docProps/core.xml
+type xlsxCoreProperties struct {
+	XMLName      xml.Name `xml:"coreProperties"`
+	Title        string   `xml:"title"`
+	Creator      string   `xml:"creator"`
+	LastModified string   `xml:"lastModifiedBy"`
+	Created      string   `xml:"created"`
+	Modified     string   `xml:"modified"`
+}
+
+// readZipFileContent reads the content of a zip file entry
+func (r *XLSXReader) readZipFileContent(file *zip.File) ([]byte, error) {
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	return io.ReadAll(rc)
+}
+
+// parseSharedStrings parses the shared strings table
+func (r *XLSXReader) parseSharedStrings(data []byte) []string {
+	var sst xlsxSharedStringsXML
+	if err := xml.Unmarshal(data, &sst); err != nil {
+		return nil
+	}
+
+	strings := make([]string, len(sst.Strings))
+	for i, si := range sst.Strings {
+		if si.Text != "" {
+			strings[i] = si.Text
+		} else {
+			// Handle rich text (multiple runs)
+			var parts []string
+			for _, run := range si.Runs {
+				if run.Text != "" {
+					parts = append(parts, run.Text)
+				}
+			}
+			strings[i] = strings[len(parts)-1]
+			if len(parts) > 0 {
+				result := ""
+				for _, p := range parts {
+					result += p
+				}
+				strings[i] = result
+			}
+		}
+	}
+
+	return strings
+}
+
+// parseWorksheetXML parses a worksheet XML file using regex for robustness
+func (r *XLSXReader) parseWorksheetXML(data []byte, sharedStrings []string) []XLSXRow {
+	var rows []XLSXRow
+
+	// Find all row elements
+	rowPattern := regexp.MustCompile(`(?s)<row[^>]*r="(\d+)"[^>]*>(.*?)</row>`)
+	rowMatches := rowPattern.FindAllSubmatch(data, -1)
+
+	for _, rowMatch := range rowMatches {
+		if len(rowMatch) < 3 {
+			continue
+		}
+
+		rowNum, _ := strconv.Atoi(string(rowMatch[1]))
+		rowContent := rowMatch[2]
+
+		// Find all cell elements in this row
+		cellPattern := regexp.MustCompile(`(?s)<c[^>]*r="([A-Z]+)\d+"[^>]*(?:t="([^"]*)")?[^>]*>(.*?)</c>`)
+		cellMatches := cellPattern.FindAllSubmatch(rowContent, -1)
+
+		var cells []XLSXCell
+		maxCol := 0
+
+		for _, cellMatch := range cellMatches {
+			if len(cellMatch) < 4 {
+				continue
+			}
+
+			colRef := string(cellMatch[1])
+			cellType := string(cellMatch[2])
+			cellContent := cellMatch[3]
+
+			// Extract value
+			var value string
+			valuePattern := regexp.MustCompile(`<v>([^<]*)</v>`)
+			valueMatch := valuePattern.FindSubmatch(cellContent)
+			if len(valueMatch) > 1 {
+				value = string(valueMatch[1])
+			}
+
+			// Extract formula if present
+			var formula string
+			formulaPattern := regexp.MustCompile(`<f>([^<]*)</f>`)
+			formulaMatch := formulaPattern.FindSubmatch(cellContent)
+			if len(formulaMatch) > 1 {
+				formula = string(formulaMatch[1])
+			}
+
+			// Resolve shared string references
+			cellTypeStr := "text"
+			if cellType == "s" && value != "" {
+				// Shared string reference
+				idx, err := strconv.Atoi(value)
+				if err == nil && idx < len(sharedStrings) {
+					value = sharedStrings[idx]
+				}
+				cellTypeStr = "text"
+			} else if cellType == "n" || (cellType == "" && value != "" && isNumeric(value)) {
+				cellTypeStr = "number"
+			} else if cellType == "b" {
+				cellTypeStr = "boolean"
+			} else if formula != "" {
+				cellTypeStr = "formula"
+			}
+
+			// Track max column
+			colNum := columnToNumber(colRef)
+			if colNum > maxCol {
+				maxCol = colNum
+			}
+
+			cells = append(cells, XLSXCell{
+				Column:  colRef,
+				Value:   value,
+				Type:    cellTypeStr,
+				Formula: formula,
+			})
+		}
+
+		if len(cells) > 0 {
+			rows = append(rows, XLSXRow{
+				Number: rowNum,
+				Cells:  cells,
+			})
+		}
+	}
+
+	// Sort rows by number
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].Number < rows[j].Number
+	})
+
+	return rows
+}
+
+// columnToNumber converts column letter(s) to number (A=1, B=2, ..., Z=26, AA=27, etc.)
+func columnToNumber(col string) int {
+	result := 0
+	for _, c := range col {
+		result = result*26 + int(c-'A') + 1
+	}
+	return result
+}
+
+// isNumeric checks if a string represents a number
+func isNumeric(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
+}
+
 // parseWorkbook parses the complete XLSX workbook
 func (r *XLSXReader) parseWorkbook(sourcePath string, config map[string]any) (*XLSXWorkbook, error) {
 	zipReader, err := zip.OpenReader(sourcePath)
@@ -349,57 +551,132 @@ func (r *XLSXReader) parseWorkbook(sourcePath string, config map[string]any) (*X
 	}
 	defer zipReader.Close()
 
-	// In a real implementation, would parse:
-	// - app.xml for metadata
-	// - workbook.xml for sheet structure
-	// - sharedStrings.xml for string values
-	// - sheet*.xml for worksheet data
-
-	// Mock workbook structure
-	sheets := []XLSXSheet{
-		{
-			Name:       "Sheet1",
-			Index:      0,
-			MaxColumns: 5,
-			Hidden:     false,
-			Rows: []XLSXRow{
-				{
-					Number: 1,
-					Cells: []XLSXCell{
-						{Column: "A", Value: "Header 1", Type: "text"},
-						{Column: "B", Value: "Header 2", Type: "text"},
-						{Column: "C", Value: "Header 3", Type: "text"},
-					},
-				},
-				{
-					Number: 2,
-					Cells: []XLSXCell{
-						{Column: "A", Value: "Row 1 Value 1", Type: "text"},
-						{Column: "B", Value: "100", Type: "number"},
-						{Column: "C", Value: "2024-01-15", Type: "date"},
-					},
-				},
-				{
-					Number: 3,
-					Cells: []XLSXCell{
-						{Column: "A", Value: "Row 2 Value 1", Type: "text"},
-						{Column: "B", Value: "200", Type: "number"},
-						{Column: "C", Value: "2024-01-16", Type: "date"},
-					},
-				},
-			},
-		},
+	// Build file map for quick lookup
+	fileMap := make(map[string]*zip.File)
+	for _, file := range zipReader.File {
+		fileMap[file.Name] = file
 	}
 
 	workbook := &XLSXWorkbook{
-		Sheets:       sheets,
-		TotalRows:    3,
-		TotalColumns: 3,
-		HasFormulas:  false,
 		CreatedDate:  time.Now().Format("2006-01-02"),
 		ModifiedDate: time.Now().Format("2006-01-02"),
-		Creator:      "Microsoft Excel",
 	}
+
+	// Parse core properties for metadata
+	if coreFile, ok := fileMap["docProps/core.xml"]; ok {
+		if data, err := r.readZipFileContent(coreFile); err == nil {
+			var props xlsxCoreProperties
+			if err := xml.Unmarshal(data, &props); err == nil {
+				if props.Creator != "" {
+					workbook.Creator = props.Creator
+				}
+				if props.Created != "" {
+					workbook.CreatedDate = props.Created
+				}
+				if props.Modified != "" {
+					workbook.ModifiedDate = props.Modified
+				}
+			}
+		}
+	}
+
+	// Parse shared strings
+	var sharedStrings []string
+	if ssFile, ok := fileMap["xl/sharedStrings.xml"]; ok {
+		if data, err := r.readZipFileContent(ssFile); err == nil {
+			sharedStrings = r.parseSharedStrings(data)
+		}
+	}
+
+	// Parse workbook.xml for sheet structure
+	var sheetInfos []xlsxSheetXML
+	if wbFile, ok := fileMap["xl/workbook.xml"]; ok {
+		if data, err := r.readZipFileContent(wbFile); err == nil {
+			var wb xlsxWorkbookXML
+			if err := xml.Unmarshal(data, &wb); err == nil {
+				sheetInfos = wb.Sheets.Sheet
+			}
+		}
+	}
+
+	// If no sheet info from workbook.xml, discover sheets from file names
+	if len(sheetInfos) == 0 {
+		sheetPattern := regexp.MustCompile(`^xl/worksheets/sheet(\d+)\.xml$`)
+		for name := range fileMap {
+			if matches := sheetPattern.FindStringSubmatch(name); matches != nil {
+				idx, _ := strconv.Atoi(matches[1])
+				sheetInfos = append(sheetInfos, xlsxSheetXML{
+					Name:    fmt.Sprintf("Sheet%d", idx),
+					SheetID: matches[1],
+				})
+			}
+		}
+		// Sort by sheet ID
+		sort.Slice(sheetInfos, func(i, j int) bool {
+			iID, _ := strconv.Atoi(sheetInfos[i].SheetID)
+			jID, _ := strconv.Atoi(sheetInfos[j].SheetID)
+			return iID < jID
+		})
+	}
+
+	// Parse each worksheet
+	totalRows := 0
+	maxColumns := 0
+	hasFormulas := false
+
+	for idx, sheetInfo := range sheetInfos {
+		// Determine sheet file path
+		sheetPath := fmt.Sprintf("xl/worksheets/sheet%d.xml", idx+1)
+
+		// Try to find sheet by relationship ID or by index
+		sheetFile, ok := fileMap[sheetPath]
+		if !ok {
+			// Try without number
+			sheetPath = "xl/worksheets/sheet.xml"
+			sheetFile, ok = fileMap[sheetPath]
+		}
+		if !ok {
+			continue
+		}
+
+		data, err := r.readZipFileContent(sheetFile)
+		if err != nil {
+			continue
+		}
+
+		rows := r.parseWorksheetXML(data, sharedStrings)
+
+		// Calculate max columns for this sheet
+		sheetMaxCols := 0
+		for _, row := range rows {
+			if len(row.Cells) > sheetMaxCols {
+				sheetMaxCols = len(row.Cells)
+			}
+			for _, cell := range row.Cells {
+				if cell.Formula != "" {
+					hasFormulas = true
+				}
+			}
+		}
+
+		sheet := XLSXSheet{
+			Name:       sheetInfo.Name,
+			Index:      idx,
+			Rows:       rows,
+			MaxColumns: sheetMaxCols,
+			Hidden:     sheetInfo.State == "hidden",
+		}
+
+		workbook.Sheets = append(workbook.Sheets, sheet)
+		totalRows += len(rows)
+		if sheetMaxCols > maxColumns {
+			maxColumns = sheetMaxCols
+		}
+	}
+
+	workbook.TotalRows = totalRows
+	workbook.TotalColumns = maxColumns
+	workbook.HasFormulas = hasFormulas
 
 	return workbook, nil
 }

@@ -8,9 +8,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/jscharber/audimodal/pkg/core"
 )
@@ -448,9 +450,292 @@ func (r *DOCReader) extractDOCMetadata(sourcePath string) (DOCMetadata, error) {
 
 // extractSampleText extracts sample text from the document
 func (r *DOCReader) extractSampleText(sourcePath string) (string, error) {
-	// In a real implementation, you would parse the Word document binary format
-	// and extract the actual text content from the WordDocument stream
-	return "This is sample text from the DOC document. It would contain the actual extracted content from the first paragraph.", nil
+	text, err := r.extractAllText(sourcePath)
+	if err != nil {
+		return "", err
+	}
+	// Return first 500 characters as sample
+	if len(text) > 500 {
+		return text[:500] + "...", nil
+	}
+	return text, nil
+}
+
+// extractAllText extracts all text content from a DOC file
+func (r *DOCReader) extractAllText(sourcePath string) (string, error) {
+	data, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return "", err
+	}
+
+	// Try multiple extraction methods and combine results
+	var allText strings.Builder
+
+	// Method 1: Extract Unicode (UTF-16LE) text
+	unicodeText := r.extractUnicodeText(data)
+	if unicodeText != "" {
+		allText.WriteString(unicodeText)
+	}
+
+	// Method 2: Extract ASCII text if Unicode didn't yield much
+	if allText.Len() < 100 {
+		asciiText := r.extractASCIIText(data)
+		if asciiText != "" {
+			if allText.Len() > 0 {
+				allText.WriteString("\n")
+			}
+			allText.WriteString(asciiText)
+		}
+	}
+
+	// Method 3: Look for Word-specific text streams
+	wordText := r.extractWordDocumentText(data)
+	if wordText != "" && len(wordText) > allText.Len() {
+		// Use Word-specific extraction if it found more text
+		return wordText, nil
+	}
+
+	result := allText.String()
+	if result == "" {
+		return "", fmt.Errorf("no text content found in DOC file")
+	}
+
+	return r.cleanExtractedText(result), nil
+}
+
+// extractUnicodeText extracts UTF-16LE encoded text from binary data
+func (r *DOCReader) extractUnicodeText(data []byte) string {
+	var result strings.Builder
+
+	// Look for sequences of UTF-16LE encoded text
+	// UTF-16LE has low byte first, high byte second (often 0x00 for ASCII range)
+	i := 0
+	for i < len(data)-1 {
+		// Check for potential UTF-16LE sequence (printable ASCII range in UTF-16LE)
+		if data[i] >= 0x20 && data[i] <= 0x7E && data[i+1] == 0x00 {
+			// Found potential UTF-16LE text, collect the sequence
+			start := i
+			for i < len(data)-1 && data[i] >= 0x20 && data[i] <= 0x7E && data[i+1] == 0x00 {
+				i += 2
+			}
+			// Also include common control characters (newline, tab)
+			for i < len(data)-1 && ((data[i] >= 0x20 && data[i] <= 0x7E) || data[i] == 0x0D || data[i] == 0x0A || data[i] == 0x09) && data[i+1] == 0x00 {
+				i += 2
+			}
+
+			// Extract the UTF-16LE text if it's long enough
+			if i-start >= 6 { // At least 3 characters
+				utf16Bytes := data[start:i]
+				text := r.decodeUTF16LE(utf16Bytes)
+				if len(text) >= 3 {
+					if result.Len() > 0 {
+						result.WriteString(" ")
+					}
+					result.WriteString(text)
+				}
+			}
+		} else {
+			i++
+		}
+	}
+
+	return result.String()
+}
+
+// decodeUTF16LE decodes UTF-16LE bytes to a string
+func (r *DOCReader) decodeUTF16LE(data []byte) string {
+	if len(data)%2 != 0 {
+		data = data[:len(data)-1]
+	}
+
+	u16s := make([]uint16, len(data)/2)
+	for i := 0; i < len(u16s); i++ {
+		u16s[i] = binary.LittleEndian.Uint16(data[i*2:])
+	}
+
+	return string(utf16.Decode(u16s))
+}
+
+// extractASCIIText extracts ASCII text from binary data
+func (r *DOCReader) extractASCIIText(data []byte) string {
+	var result strings.Builder
+	var currentWord strings.Builder
+
+	for _, b := range data {
+		// Check if it's a printable ASCII character or common whitespace
+		if (b >= 0x20 && b <= 0x7E) || b == 0x0A || b == 0x0D || b == 0x09 {
+			currentWord.WriteByte(b)
+		} else {
+			// End of text sequence
+			word := currentWord.String()
+			if len(word) >= 4 { // Only keep sequences of 4+ characters
+				if result.Len() > 0 && !strings.HasSuffix(result.String(), " ") && !strings.HasSuffix(result.String(), "\n") {
+					result.WriteString(" ")
+				}
+				result.WriteString(word)
+			}
+			currentWord.Reset()
+		}
+	}
+
+	// Don't forget the last word
+	word := currentWord.String()
+	if len(word) >= 4 {
+		if result.Len() > 0 {
+			result.WriteString(" ")
+		}
+		result.WriteString(word)
+	}
+
+	return result.String()
+}
+
+// extractWordDocumentText attempts to extract text from the Word document structure
+func (r *DOCReader) extractWordDocumentText(data []byte) string {
+	// DOC files store text in specific locations
+	// The main text typically starts after the FIB (File Information Block)
+	// and is stored in the WordDocument stream
+
+	// Look for text start markers
+	var textStart int
+	var textEnd int
+
+	// Find potential text regions by looking for high density of printable chars
+	windowSize := 512
+	bestStart := 0
+	bestDensity := 0.0
+
+	for i := 512; i < len(data)-windowSize; i += 256 {
+		density := r.calculatePrintableDensity(data[i : i+windowSize])
+		if density > bestDensity && density > 0.7 {
+			bestDensity = density
+			bestStart = i
+		}
+	}
+
+	if bestDensity > 0.7 {
+		textStart = bestStart
+		// Find where the text ends
+		for i := textStart; i < len(data)-windowSize; i += 256 {
+			density := r.calculatePrintableDensity(data[i : i+windowSize])
+			if density < 0.3 {
+				textEnd = i
+				break
+			}
+		}
+		if textEnd == 0 {
+			textEnd = len(data)
+		}
+
+		// Extract text from the identified region
+		if textEnd > textStart {
+			return r.extractUnicodeText(data[textStart:textEnd])
+		}
+	}
+
+	return ""
+}
+
+// calculatePrintableDensity calculates the ratio of printable characters
+func (r *DOCReader) calculatePrintableDensity(data []byte) float64 {
+	if len(data) == 0 {
+		return 0
+	}
+	printable := 0
+	for _, b := range data {
+		if (b >= 0x20 && b <= 0x7E) || b == 0x0A || b == 0x0D || b == 0x09 || b == 0x00 {
+			printable++
+		}
+	}
+	return float64(printable) / float64(len(data))
+}
+
+// cleanExtractedText cleans up extracted text
+func (r *DOCReader) cleanExtractedText(text string) string {
+	// Remove excessive whitespace
+	spacePattern := regexp.MustCompile(`\s+`)
+	text = spacePattern.ReplaceAllString(text, " ")
+
+	// Remove common DOC artifacts
+	text = strings.ReplaceAll(text, "\x00", "")
+	text = strings.ReplaceAll(text, "\x07", " ") // Table cell marker
+	text = strings.ReplaceAll(text, "\x01", "")
+	text = strings.ReplaceAll(text, "\x13", "") // Field begin
+	text = strings.ReplaceAll(text, "\x14", "") // Field separator
+	text = strings.ReplaceAll(text, "\x15", "") // Field end
+
+	// Trim whitespace
+	text = strings.TrimSpace(text)
+
+	return text
+}
+
+// splitIntoParagraphs splits text into paragraphs
+func (r *DOCReader) splitIntoParagraphs(text string) []string {
+	// Split on common paragraph separators
+	// DOC files use various markers: \r\n, \r, \n, or multiple spaces
+
+	// First, normalize line endings
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	text = strings.ReplaceAll(text, "\r", "\n")
+
+	// Split on double newlines or single newlines
+	var paragraphs []string
+	parts := strings.Split(text, "\n")
+
+	var currentPara strings.Builder
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			// Empty line - end of paragraph
+			if currentPara.Len() > 0 {
+				paragraphs = append(paragraphs, currentPara.String())
+				currentPara.Reset()
+			}
+		} else {
+			if currentPara.Len() > 0 {
+				currentPara.WriteString(" ")
+			}
+			currentPara.WriteString(part)
+		}
+	}
+
+	// Don't forget the last paragraph
+	if currentPara.Len() > 0 {
+		paragraphs = append(paragraphs, currentPara.String())
+	}
+
+	// If no paragraph breaks found, split by sentences or fixed length
+	if len(paragraphs) <= 1 && len(text) > 500 {
+		paragraphs = r.splitByLength(text, 500)
+	}
+
+	return paragraphs
+}
+
+// splitByLength splits text into chunks of approximately the given length
+func (r *DOCReader) splitByLength(text string, maxLen int) []string {
+	var result []string
+
+	words := strings.Fields(text)
+	var current strings.Builder
+
+	for _, word := range words {
+		if current.Len()+len(word)+1 > maxLen && current.Len() > 0 {
+			result = append(result, current.String())
+			current.Reset()
+		}
+		if current.Len() > 0 {
+			current.WriteString(" ")
+		}
+		current.WriteString(word)
+	}
+
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+
+	return result
 }
 
 // parseDocument parses the complete DOC document
@@ -460,49 +745,47 @@ func (r *DOCReader) parseDocument(sourcePath string, config map[string]any) (*DO
 		return nil, err
 	}
 
-	// In a real implementation, you would:
-	// 1. Parse the OLE compound document structure
-	// 2. Extract the WordDocument stream
-	// 3. Parse the FIB (File Information Block)
-	// 4. Extract text from the document stream
-	// 5. Parse character and paragraph formatting
-	// 6. Extract tables, headers, footers, etc.
+	// Extract actual text content
+	text, err := r.extractAllText(sourcePath)
+	if err != nil {
+		// Fallback to empty document if text extraction fails
+		text = ""
+	}
 
-	// Mock document structure for demonstration
-	paragraphs := make([]DOCParagraph, metadata.ParagraphCount)
-	for i := 0; i < metadata.ParagraphCount; i++ {
+	// Split into paragraphs
+	paragraphTexts := r.splitIntoParagraphs(text)
+
+	// Create paragraph structures
+	paragraphs := make([]DOCParagraph, len(paragraphTexts))
+	for i, pText := range paragraphTexts {
 		paragraphs[i] = DOCParagraph{
-			Text:    fmt.Sprintf("This is paragraph %d content from the DOC document.", i+1),
+			Text:    pText,
 			Number:  i + 1,
 			Section: "body",
 			Style:   "Normal",
 			Properties: map[string]any{
 				"font_name": "Times New Roman",
 				"font_size": 12,
-				"is_bold":   false,
-				"is_italic": false,
 			},
 		}
 	}
 
-	// Mock tables if present
-	var tables []DOCTable
-	if metadata.HasTables {
-		tables = append(tables, DOCTable{
-			Headers: []string{"Column 1", "Column 2", "Column 3"},
-			Rows: [][]string{
-				{"Row 1 Cell 1", "Row 1 Cell 2", "Row 1 Cell 3"},
-				{"Row 2 Cell 1", "Row 2 Cell 2", "Row 2 Cell 3"},
-			},
-		})
+	// Update metadata with actual paragraph count
+	metadata.ParagraphCount = len(paragraphs)
+
+	// Count words
+	wordCount := 0
+	for _, p := range paragraphs {
+		wordCount += len(strings.Fields(p.Text))
 	}
+	metadata.WordCount = wordCount
 
 	return &DOCDocument{
 		Metadata:   metadata,
 		Paragraphs: paragraphs,
 		Headers:    []DOCParagraph{},
 		Footers:    []DOCParagraph{},
-		Tables:     tables,
+		Tables:     []DOCTable{},
 		Comments:   []DOCComment{},
 	}, nil
 }

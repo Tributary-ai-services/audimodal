@@ -1,0 +1,21 @@
+﻿Rank,Standard,Full Name,Domain,Enforcement Body,Audit Frequency,Penalty Range,Why Essential,TAS Priority,Implementation Effort
+1,SOC 2,Service Organization Control Type 2,Security/Trust,AICPA,Annual,$50K-$500K audit cost,De facto B2B SaaS requirement; requested in 90%+ enterprise procurement,CRITICAL,Medium
+2,ISO 27001,Information Security Management System,Security,ISO/Accredited CBs,"Annual surveillance, 3-yr recert",$20K-$100K certification,Global gold standard; hard requirement for international deals,CRITICAL,High
+3,GDPR,General Data Protection Regulation,Privacy,EU DPAs,Ongoing/complaint-driven,Up to 4% global revenue or €20M,Applies to ANY company handling EU resident data,CRITICAL,High
+4,PCI DSS,Payment Card Industry Data Security Standard,Payment,PCI SSC / Card Brands,Annual (SAQ or QSA),Fines $5K-$100K/month,Mandatory if processing payment card data,LOW,High
+5,HIPAA,Health Insurance Portability and Accountability Act,Healthcare,HHS OCR,Complaint-driven + audits,Up to $1.5M per violation category,Required for any entity handling PHI,MEDIUM,High
+6,SOX,Sarbanes-Oxley Act,Financial,SEC / PCAOB,Annual,Criminal penalties; exec certification,Mandatory for US public companies,LOW,High
+7,CCPA/CPRA,California Consumer Privacy Act / Privacy Rights Act,Privacy,California AG / CPPA,Ongoing/complaint-driven,"$2,500-$7,500 per violation",Applies to most companies with CA customers,HIGH,Medium
+8,NIST CSF,NIST Cybersecurity Framework,Security,NIST (voluntary),Self-assessed or mapped,N/A (framework),Most widely adopted security framework; contract reference,CRITICAL,Low
+9,NIST 800-171,Protecting Controlled Unclassified Information,Security,DoD / NIST,Self-assessment + DIBCAC,Contract termination; False Claims Act,Required for contractors handling CUI,HIGH,High
+10,CMMC,Cybersecurity Maturity Model Certification,Defense,DoD / Cyber AB,Every 3 years (certified),Contract ineligibility,Mandatory for DoD contracts (phased 2025+),HIGH,Very High
+11,FedRAMP,Federal Risk and Authorization Management Program,Government,GSA / FedRAMP PMO,Annual + continuous monitoring,Market exclusion,Required to sell cloud to federal agencies,HIGH,Very High
+12,FISMA,Federal Information Security Management Act,Government,OMB / DHS / NIST,Annual,Funding/contract impact,Required for federal agency systems,MEDIUM,High
+13,SOC 1,Service Organization Control Type 1,Financial,AICPA,Annual,$30K-$200K audit cost,Required when services impact client financial reporting,LOW,Medium
+14,GLBA,Gramm-Leach-Bliley Act,Financial,FTC / OCC / CFPB,Ongoing,Up to $100K per violation,Required for financial institutions,LOW,Medium
+15,HITRUST CSF,Health Information Trust Alliance CSF,Healthcare+,HITRUST Alliance,Annual (certified),$50K-$200K certification,Increasingly required by healthcare enterprises,MEDIUM,Very High
+16,ISO 27701,Privacy Information Management,Privacy,ISO/Accredited CBs,Annual surveillance,$15K-$50K additional to 27001,Privacy extension to 27001; GDPR demonstration,HIGH,Medium
+17,NIST 800-53,Security and Privacy Controls,Security,NIST / Federal agencies,Per system ATO cycle,N/A (framework),Foundation for federal security; cross-industry reference,HIGH,High
+18,CSA STAR,Cloud Security Alliance STAR,Cloud,Cloud Security Alliance,Annual,$5K-$30K assessment,Expected for cloud providers,HIGH,Low
+19,EU AI Act,EU Artificial Intelligence Act,AI,EU AI Office / Member States,Ongoing (effective 2025-2027),Up to 7% global revenue or €35M,Mandatory for AI systems in EU market,CRITICAL,High
+20,NIST AI RMF,AI Risk Management Framework,AI,NIST (voluntary),Self-assessed,N/A (framework),Emerging standard for AI governance,CRITICAL,Low

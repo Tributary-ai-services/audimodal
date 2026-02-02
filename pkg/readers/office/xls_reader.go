@@ -3,13 +3,16 @@ package office
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/jscharber/audimodal/pkg/core"
 )
@@ -489,41 +492,275 @@ func (r *XLSReader) extractXLSMetadata(sourcePath string) (XLSMetadata, error) {
 
 // extractSampleData extracts sample data for schema discovery
 func (r *XLSReader) extractSampleData(sourcePath string) ([]map[string]any, error) {
-	// Mock sample data - in production, would parse actual XLS content
-	return []map[string]any{
-		{
-			"sheet_name":   "Sheet1",
-			"row_number":   1,
-			"column_name":  "A",
-			"cell_address": "A1",
-			"cell_value":   "Sample Header",
-			"data_type":    "text",
-		},
-		{
-			"sheet_name":   "Sheet1",
-			"row_number":   1,
-			"column_name":  "B",
-			"cell_address": "B1",
-			"cell_value":   "Value",
-			"data_type":    "text",
-		},
-		{
-			"sheet_name":   "Sheet1",
-			"row_number":   2,
-			"column_name":  "A",
-			"cell_address": "A2",
-			"cell_value":   "Sample Data",
-			"data_type":    "text",
-		},
-		{
-			"sheet_name":   "Sheet1",
-			"row_number":   2,
-			"column_name":  "B",
-			"cell_address": "B2",
-			"cell_value":   "123.45",
-			"data_type":    "number",
-		},
-	}, nil
+	workbook, err := r.parseWorkbook(sourcePath, map[string]any{})
+	if err != nil {
+		return nil, err
+	}
+
+	var samples []map[string]any
+	for _, sheet := range workbook.Worksheets {
+		for _, row := range sheet.Rows {
+			for _, cell := range row.Cells {
+				samples = append(samples, map[string]any{
+					"sheet_name":   sheet.Name,
+					"row_number":   row.Number,
+					"column_name":  string(rune('A' + cell.Column - 1)),
+					"cell_address": cell.Address,
+					"cell_value":   cell.Value,
+					"data_type":    cell.DataType,
+				})
+				if len(samples) >= 10 {
+					return samples, nil
+				}
+			}
+		}
+	}
+
+	return samples, nil
+}
+
+// extractAllStrings extracts all string data from XLS binary
+func (r *XLSReader) extractAllStrings(data []byte) []string {
+	var strings []string
+
+	// Method 1: Extract UTF-16LE strings (common in XLS)
+	utf16Strings := r.extractUTF16LEStrings(data)
+	strings = append(strings, utf16Strings...)
+
+	// Method 2: Extract ASCII strings
+	asciiStrings := r.extractASCIIStrings(data)
+	strings = append(strings, asciiStrings...)
+
+	// Method 3: Try to find SST (Shared String Table) records
+	sstStrings := r.extractSSTStrings(data)
+	strings = append(strings, sstStrings...)
+
+	return r.deduplicateStrings(strings)
+}
+
+// extractUTF16LEStrings extracts UTF-16LE encoded strings
+func (r *XLSReader) extractUTF16LEStrings(data []byte) []string {
+	var result []string
+
+	i := 0
+	for i < len(data)-1 {
+		// Look for UTF-16LE sequences (printable ASCII with null byte)
+		if data[i] >= 0x20 && data[i] <= 0x7E && data[i+1] == 0x00 {
+			start := i
+			for i < len(data)-1 && data[i] >= 0x20 && data[i] <= 0x7E && data[i+1] == 0x00 {
+				i += 2
+			}
+			// Extract if long enough
+			if i-start >= 4 { // At least 2 chars
+				text := r.decodeUTF16LE(data[start:i])
+				if len(text) >= 2 {
+					result = append(result, text)
+				}
+			}
+		} else {
+			i++
+		}
+	}
+
+	return result
+}
+
+// decodeUTF16LE decodes UTF-16LE bytes to string
+func (r *XLSReader) decodeUTF16LE(data []byte) string {
+	if len(data)%2 != 0 {
+		data = data[:len(data)-1]
+	}
+	u16s := make([]uint16, len(data)/2)
+	for i := 0; i < len(u16s); i++ {
+		u16s[i] = binary.LittleEndian.Uint16(data[i*2:])
+	}
+	return string(utf16.Decode(u16s))
+}
+
+// extractASCIIStrings extracts ASCII strings from binary data
+func (r *XLSReader) extractASCIIStrings(data []byte) []string {
+	var result []string
+	var current strings.Builder
+
+	for _, b := range data {
+		if (b >= 0x20 && b <= 0x7E) || b == 0x09 {
+			current.WriteByte(b)
+		} else {
+			if current.Len() >= 3 {
+				result = append(result, current.String())
+			}
+			current.Reset()
+		}
+	}
+	if current.Len() >= 3 {
+		result = append(result, current.String())
+	}
+
+	return result
+}
+
+// extractSSTStrings tries to extract strings from BIFF SST records
+func (r *XLSReader) extractSSTStrings(data []byte) []string {
+	var result []string
+
+	// BIFF8 SST record type is 0x00FC
+	// Look for patterns that might be SST records
+	for i := 0; i < len(data)-4; i++ {
+		// Look for string length indicators followed by text
+		if data[i] > 0 && data[i] < 100 && data[i+1] == 0x00 {
+			strLen := int(data[i])
+			if i+2+strLen*2 <= len(data) {
+				// Try to decode as UTF-16LE
+				text := r.decodeUTF16LE(data[i+2 : i+2+strLen*2])
+				if r.isValidText(text) {
+					result = append(result, text)
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// isValidText checks if string contains valid text
+func (r *XLSReader) isValidText(s string) bool {
+	if len(s) < 2 {
+		return false
+	}
+	printable := 0
+	for _, c := range s {
+		if c >= 0x20 && c <= 0x7E {
+			printable++
+		}
+	}
+	return float64(printable)/float64(len(s)) > 0.8
+}
+
+// deduplicateStrings removes duplicate strings
+func (r *XLSReader) deduplicateStrings(strings []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+	for _, s := range strings {
+		s = r.cleanString(s)
+		if s != "" && !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+// cleanString cleans up extracted string
+func (r *XLSReader) cleanString(s string) string {
+	// Remove control characters
+	s = regexp.MustCompile(`[\x00-\x1F\x7F]`).ReplaceAllString(s, "")
+	s = strings.TrimSpace(s)
+	return s
+}
+
+// organizeIntoRows organizes extracted strings into row-like structure
+func (r *XLSReader) organizeIntoRows(strings []string) []XLSRow {
+	var rows []XLSRow
+
+	// Group strings into rows (heuristic: strings found close together are in same row)
+	// Since we don't have position info, create one cell per string
+	rowNum := 0
+	colNum := 0
+	var currentCells []XLSCell
+
+	for _, s := range strings {
+		if s == "" {
+			continue
+		}
+
+		// Detect if this might be a new row (heuristic)
+		if colNum >= 5 || (len(currentCells) > 0 && r.looksLikeNewRow(s, currentCells)) {
+			if len(currentCells) > 0 {
+				rowNum++
+				rows = append(rows, XLSRow{
+					Number: rowNum,
+					Cells:  currentCells,
+				})
+				currentCells = nil
+				colNum = 0
+			}
+		}
+
+		colNum++
+		columnName := string(rune('A' + colNum - 1))
+		if colNum > 26 {
+			columnName = "A" + string(rune('A'+colNum-27))
+		}
+
+		cell := XLSCell{
+			Address:  fmt.Sprintf("%s%d", columnName, rowNum+1),
+			Row:      rowNum + 1,
+			Column:   colNum,
+			Value:    s,
+			DataType: r.detectDataType(s),
+		}
+		currentCells = append(currentCells, cell)
+	}
+
+	// Don't forget last row
+	if len(currentCells) > 0 {
+		rowNum++
+		rows = append(rows, XLSRow{
+			Number: rowNum,
+			Cells:  currentCells,
+		})
+	}
+
+	return rows
+}
+
+// looksLikeNewRow heuristic to detect row boundaries
+func (r *XLSReader) looksLikeNewRow(s string, currentCells []XLSCell) bool {
+	// If we have cells and this string looks like a header or first column
+	if len(currentCells) > 0 {
+		// New row if current is much longer or shorter
+		avgLen := 0
+		for _, c := range currentCells {
+			avgLen += len(c.Value)
+		}
+		avgLen /= len(currentCells)
+
+		// Significant length difference might indicate new row
+		if len(s) > avgLen*3 || len(s) < avgLen/3 {
+			return true
+		}
+	}
+	return false
+}
+
+// detectDataType detects the data type of a cell value
+func (r *XLSReader) detectDataType(value string) string {
+	value = strings.TrimSpace(value)
+
+	// Check for number
+	if _, err := strconv.ParseFloat(value, 64); err == nil {
+		return "number"
+	}
+
+	// Check for date patterns
+	datePatterns := []string{
+		`^\d{1,2}/\d{1,2}/\d{2,4}$`,
+		`^\d{4}-\d{2}-\d{2}$`,
+		`^\d{1,2}-\w{3}-\d{2,4}$`,
+	}
+	for _, pattern := range datePatterns {
+		if matched, _ := regexp.MatchString(pattern, value); matched {
+			return "date"
+		}
+	}
+
+	// Check for boolean
+	lower := strings.ToLower(value)
+	if lower == "true" || lower == "false" || lower == "yes" || lower == "no" {
+		return "boolean"
+	}
+
+	return "text"
 }
 
 // parseWorkbook parses the complete XLS workbook
@@ -533,76 +770,42 @@ func (r *XLSReader) parseWorkbook(sourcePath string, config map[string]any) (*XL
 		return nil, err
 	}
 
-	// In a real implementation, you would:
-	// 1. Parse the OLE compound document structure
-	// 2. Extract the Workbook stream
-	// 3. Parse BIFF records (Binary Interchange File Format)
-	// 4. Extract worksheet data, formulas, formatting
-	// 5. Handle different Excel versions (BIFF5, BIFF8, etc.)
-
-	// Mock workbook structure for demonstration
-	worksheets := make([]XLSWorksheet, metadata.SheetCount)
-
-	for i := 0; i < metadata.SheetCount; i++ {
-		sheetName := fmt.Sprintf("Sheet%d", i+1)
-		if i < len(metadata.SheetNames) {
-			sheetName = metadata.SheetNames[i]
-		}
-
-		// Create mock rows with cells
-		rows := make([]XLSRow, 10) // Sample 10 rows per sheet
-		for rowIdx := 0; rowIdx < 10; rowIdx++ {
-			cells := make([]XLSCell, 5) // Sample 5 columns
-			for colIdx := 0; colIdx < 5; colIdx++ {
-				columnName := string(rune('A' + colIdx))
-				address := fmt.Sprintf("%s%d", columnName, rowIdx+1)
-
-				var value string
-				var dataType string
-
-				// Generate sample data based on position
-				if rowIdx == 0 {
-					value = fmt.Sprintf("Header %s", columnName)
-					dataType = "text"
-				} else if colIdx == 0 {
-					value = fmt.Sprintf("Row %d Data", rowIdx)
-					dataType = "text"
-				} else {
-					value = fmt.Sprintf("%.2f", float64(rowIdx*colIdx)*1.5)
-					dataType = "number"
-				}
-
-				cells[colIdx] = XLSCell{
-					Address:  address,
-					Row:      rowIdx + 1,
-					Column:   colIdx + 1,
-					Value:    value,
-					DataType: dataType,
-					Style: XLSCellStyle{
-						FontName: "Arial",
-						FontSize: 10,
-						Bold:     rowIdx == 0, // Header row is bold
-					},
-				}
-			}
-
-			rows[rowIdx] = XLSRow{
-				Number: rowIdx + 1,
-				Cells:  cells,
-			}
-		}
-
-		worksheets[i] = XLSWorksheet{
-			Name:   sheetName,
-			Index:  i,
-			Rows:   rows,
-			Hidden: false,
-		}
+	// Read file data
+	data, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return nil, err
 	}
+
+	// Extract all strings from the binary
+	strings := r.extractAllStrings(data)
+
+	// Organize strings into rows
+	rows := r.organizeIntoRows(strings)
+
+	// Create worksheet with extracted data
+	sheetName := "Sheet1"
+	if len(metadata.SheetNames) > 0 {
+		sheetName = metadata.SheetNames[0]
+	}
+
+	worksheet := XLSWorksheet{
+		Name:   sheetName,
+		Index:  0,
+		Rows:   rows,
+		Hidden: false,
+	}
+
+	// Update metadata
+	metadata.TotalRows = len(rows)
+	totalCells := 0
+	for _, row := range rows {
+		totalCells += len(row.Cells)
+	}
+	metadata.TotalCells = totalCells
 
 	return &XLSWorkbook{
 		Metadata:   metadata,
-		Worksheets: worksheets,
+		Worksheets: []XLSWorksheet{worksheet},
 	}, nil
 }
 

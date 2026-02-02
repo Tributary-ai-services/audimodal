@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/jscharber/audimodal/pkg/core"
 )
@@ -533,6 +535,293 @@ func (r *PPTReader) extractSampleSlide(sourcePath string) (string, error) {
 	return "This is sample slide content from the PPT presentation. It would contain the actual extracted text from the first slide.", nil
 }
 
+// extractAllTextFromPPT extracts all text content from a PPT binary file
+func (r *PPTReader) extractAllTextFromPPT(data []byte) []string {
+	var allText []string
+
+	// Extract UTF-16LE strings (common in Office binary formats)
+	utf16Strings := r.extractUTF16LEStrings(data)
+	allText = append(allText, utf16Strings...)
+
+	// Extract ASCII text
+	asciiStrings := r.extractASCIIStrings(data)
+	allText = append(allText, asciiStrings...)
+
+	// Filter and deduplicate
+	seen := make(map[string]bool)
+	var filtered []string
+	for _, s := range allText {
+		// Clean up the string
+		s = strings.TrimSpace(s)
+		if s == "" || len(s) < 3 {
+			continue
+		}
+		// Skip if already seen
+		if seen[s] {
+			continue
+		}
+		seen[s] = true
+		filtered = append(filtered, s)
+	}
+
+	return filtered
+}
+
+// extractUTF16LEStrings extracts UTF-16LE encoded strings from binary data
+func (r *PPTReader) extractUTF16LEStrings(data []byte) []string {
+	var results []string
+
+	// Look for UTF-16LE encoded text (common in PPT files)
+	for i := 0; i < len(data)-3; i += 2 {
+		// Check if this looks like a UTF-16LE string start
+		if data[i] >= 0x20 && data[i] < 0x7F && data[i+1] == 0x00 {
+			// Try to read a UTF-16LE string
+			var utf16Chars []uint16
+			for j := i; j < len(data)-1; j += 2 {
+				low := data[j]
+				high := data[j+1]
+
+				// Check for valid character
+				char := uint16(low) | (uint16(high) << 8)
+				if char == 0 {
+					break
+				}
+				// Check for printable ASCII in UTF-16 or extended chars
+				if char >= 0x20 && char < 0xFFFE {
+					utf16Chars = append(utf16Chars, char)
+				} else {
+					break
+				}
+
+				// Stop at reasonable length
+				if len(utf16Chars) > 1000 {
+					break
+				}
+			}
+
+			// Convert to string if we have enough characters
+			if len(utf16Chars) >= 3 {
+				str := string(utf16.Decode(utf16Chars))
+				str = strings.TrimSpace(str)
+				if len(str) >= 3 && r.isReasonableText(str) {
+					results = append(results, str)
+					i += len(utf16Chars) * 2 // Skip past this string
+				}
+			}
+		}
+	}
+
+	return results
+}
+
+// extractASCIIStrings extracts ASCII text from binary data
+func (r *PPTReader) extractASCIIStrings(data []byte) []string {
+	var results []string
+	var currentString []byte
+
+	for _, b := range data {
+		if b >= 0x20 && b < 0x7F {
+			currentString = append(currentString, b)
+		} else {
+			if len(currentString) >= 4 {
+				s := string(currentString)
+				if r.isReasonableText(s) {
+					results = append(results, s)
+				}
+			}
+			currentString = currentString[:0]
+		}
+	}
+
+	// Don't forget the last string
+	if len(currentString) >= 4 {
+		s := string(currentString)
+		if r.isReasonableText(s) {
+			results = append(results, s)
+		}
+	}
+
+	return results
+}
+
+// isReasonableText checks if a string appears to be actual text content
+func (r *PPTReader) isReasonableText(s string) bool {
+	if len(s) < 3 {
+		return false
+	}
+
+	// Count different character types
+	letters := 0
+	numbers := 0
+	spaces := 0
+	punctuation := 0
+
+	for _, c := range s {
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z':
+			letters++
+		case c >= '0' && c <= '9':
+			numbers++
+		case c == ' ':
+			spaces++
+		case c == '.' || c == ',' || c == '!' || c == '?' || c == ':' || c == ';' || c == '-':
+			punctuation++
+		}
+	}
+
+	total := len(s)
+
+	// Skip binary noise patterns
+	if letters < total/4 && spaces == 0 {
+		return false
+	}
+
+	// Skip strings that are mostly numbers or special chars
+	if numbers > total/2 && letters < total/4 {
+		return false
+	}
+
+	// Skip very short strings without spaces (likely not real text)
+	if len(s) < 10 && spaces == 0 {
+		return false
+	}
+
+	// Skip PowerPoint internal markers
+	lowerS := strings.ToLower(s)
+	internalPatterns := []string{
+		"powerpoint", "microsoft", "document", "arial", "times new roman",
+		"calibri", "theme", "slide layout", "placeholder",
+		"_hlk", "_ref", "normal", "default", "scheme", "txstyles",
+		"ppt/", "docprops", "xmlns", "xmls", "rels", "contenttype",
+		"fonts used", "slide titles", "embedded ole", "ole object",
+		"root entry", "summaryinformation", "documentsummaryinformation",
+		"current user", "pictures", "downrev", "shapexml",
+	}
+	for _, pattern := range internalPatterns {
+		if strings.Contains(lowerS, pattern) {
+			return false
+		}
+	}
+
+	// Skip patterns like "Shape 18", "Slide 10", "Text 1", "Title 1"
+	// These are internal PowerPoint element names
+	shapePattern := regexp.MustCompile(`^(Shape|Slide|Text|Title|Content|Subtitle|Footer|Header|Date|Picture|Table|Chart|Diagram|Media|Object|Group|Freeform|Rectangle|Oval|Line|Arrow|Callout|Action|Placeholder)\s*\d*$`)
+	if shapePattern.MatchString(s) {
+		return false
+	}
+
+	// Skip patterns like "On-screen Show (16:9)" - presentation settings
+	if strings.Contains(lowerS, "on-screen show") || strings.Contains(lowerS, "widescreen") {
+		return false
+	}
+
+	return true
+}
+
+// organizeTextIntoSlides attempts to organize extracted text into slides
+func (r *PPTReader) organizeTextIntoSlides(texts []string) []PPTSlide {
+	if len(texts) == 0 {
+		return nil
+	}
+
+	var slides []PPTSlide
+
+	// Group text into slides (heuristic: new slide when we see title-like text)
+	var currentSlideTexts []string
+	slideNumber := 1
+
+	// Pattern for likely slide titles (short, often capitalized)
+	titlePattern := regexp.MustCompile(`^[A-Z][^.!?]*$`)
+
+	for _, text := range texts {
+		text = strings.TrimSpace(text)
+		if text == "" {
+			continue
+		}
+
+		// Check if this looks like a new slide title
+		isTitle := len(text) < 100 && titlePattern.MatchString(text)
+
+		// Start a new slide if we have a title-like text and existing content
+		if isTitle && len(currentSlideTexts) > 0 {
+			// Save current slide
+			slide := r.createSlideFromTexts(slideNumber, currentSlideTexts)
+			slides = append(slides, slide)
+			slideNumber++
+			currentSlideTexts = nil
+		}
+
+		currentSlideTexts = append(currentSlideTexts, text)
+	}
+
+	// Don't forget the last slide
+	if len(currentSlideTexts) > 0 {
+		slide := r.createSlideFromTexts(slideNumber, currentSlideTexts)
+		slides = append(slides, slide)
+	}
+
+	// If we ended up with no slides or just one massive slide, split by text count
+	if len(slides) <= 1 && len(texts) > 10 {
+		return r.splitIntoSlidesByTextCount(texts, 5)
+	}
+
+	return slides
+}
+
+// splitIntoSlidesByTextCount splits texts into slides by grouping every N texts
+func (r *PPTReader) splitIntoSlidesByTextCount(texts []string, textsPerSlide int) []PPTSlide {
+	var slides []PPTSlide
+	slideNumber := 1
+
+	for i := 0; i < len(texts); i += textsPerSlide {
+		end := i + textsPerSlide
+		if end > len(texts) {
+			end = len(texts)
+		}
+		slideTexts := texts[i:end]
+		slide := r.createSlideFromTexts(slideNumber, slideTexts)
+		slides = append(slides, slide)
+		slideNumber++
+	}
+
+	return slides
+}
+
+// createSlideFromTexts creates a slide from a list of text strings
+func (r *PPTReader) createSlideFromTexts(slideNumber int, texts []string) PPTSlide {
+	var title string
+	var contentParts []string
+
+	for i, text := range texts {
+		if i == 0 && len(text) < 100 {
+			// First short text is likely the title
+			title = text
+		} else {
+			contentParts = append(contentParts, text)
+		}
+	}
+
+	content := strings.Join(contentParts, "\n\n")
+
+	return PPTSlide{
+		Number:  slideNumber,
+		Title:   title,
+		Content: content,
+		Layout:  "Title and Content",
+		Hidden:  false,
+		Shapes: []PPTShape{
+			{
+				Type: "title",
+				Text: title,
+			},
+			{
+				Type: "content",
+				Text: content,
+			},
+		},
+	}
+}
+
 // parsePresentation parses the complete PPT presentation
 func (r *PPTReader) parsePresentation(sourcePath string, config map[string]any) (*PPTPresentation, error) {
 	metadata, err := r.extractPPTMetadata(sourcePath)
@@ -540,83 +829,63 @@ func (r *PPTReader) parsePresentation(sourcePath string, config map[string]any) 
 		return nil, err
 	}
 
-	// In a real implementation, you would:
-	// 1. Parse the OLE compound document structure
-	// 2. Extract the PowerPoint Document stream
-	// 3. Parse slide records and atoms
-	// 4. Extract text, shapes, animations, etc.
-	// 5. Handle different PowerPoint versions
+	// Read the entire file
+	data, err := os.ReadFile(sourcePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read PPT file: %w", err)
+	}
 
-	// Mock presentation structure for demonstration
-	slides := make([]PPTSlide, metadata.SlideCount)
-	for i := 0; i < metadata.SlideCount; i++ {
-		slideNumber := i + 1
+	// Extract all text from the binary PPT file
+	texts := r.extractAllTextFromPPT(data)
 
-		// Generate sample content based on slide position
-		var content string
-		var title string
-		var layout string
+	// Organize text into slides
+	slides := r.organizeTextIntoSlides(texts)
 
-		if i == 0 {
-			title = "Presentation Title"
-			content = "Welcome to this presentation. This is the title slide with an overview of what we'll cover."
-			layout = "Title Slide"
-		} else if i == metadata.SlideCount-1 {
-			title = "Thank You"
-			content = "Thank you for your attention. Questions and discussion welcome."
-			layout = "Title Only"
-		} else {
-			title = fmt.Sprintf("Slide %d Title", slideNumber)
-			content = fmt.Sprintf("This is the content for slide %d. It contains important information about the topic being presented.", slideNumber)
-			layout = "Title and Content"
+	// Update metadata with actual slide count
+	if len(slides) > 0 {
+		metadata.SlideCount = len(slides)
+
+		// Count total words
+		totalWords := 0
+		for _, slide := range slides {
+			totalWords += len(strings.Fields(slide.Title))
+			totalWords += len(strings.Fields(slide.Content))
 		}
+		metadata.TotalWords = totalWords
+	}
 
-		// Create sample shapes
-		shapes := []PPTShape{
+	// If no slides were extracted, create a single slide with all extracted text
+	if len(slides) == 0 && len(texts) > 0 {
+		allContent := strings.Join(texts, "\n\n")
+		slides = []PPTSlide{
 			{
-				Type:     "title",
-				Text:     title,
-				Position: PPTPosition{X: 100, Y: 50},
-				Size:     PPTSize{Width: 800, Height: 100},
-				Style: PPTShapeStyle{
-					FontName: "Arial",
-					FontSize: 24,
-					Bold:     true,
-					Color:    "#000000",
-				},
-			},
-			{
-				Type:     "content",
-				Text:     content,
-				Position: PPTPosition{X: 100, Y: 200},
-				Size:     PPTSize{Width: 800, Height: 400},
-				Style: PPTShapeStyle{
-					FontName: "Arial",
-					FontSize: 16,
-					Bold:     false,
-					Color:    "#000000",
+				Number:  1,
+				Title:   "Extracted Content",
+				Content: allContent,
+				Layout:  "Content",
+				Shapes: []PPTShape{
+					{
+						Type: "content",
+						Text: allContent,
+					},
 				},
 			},
 		}
+		metadata.SlideCount = 1
+		metadata.TotalWords = len(strings.Fields(allContent))
+	}
 
-		// Sample speaker notes
-		notes := fmt.Sprintf("Speaker notes for slide %d. These are private notes for the presenter.", slideNumber)
-
-		slides[i] = PPTSlide{
-			Number:     slideNumber,
-			Title:      title,
-			Content:    content,
-			Notes:      notes,
-			Layout:     layout,
-			Hidden:     false,
-			Shapes:     shapes,
-			Animations: []PPTAnimation{},
-			Transition: PPTTransition{
-				Type:     "Fade",
-				Duration: 0.5,
+	// If still no content, return an empty presentation
+	if len(slides) == 0 {
+		slides = []PPTSlide{
+			{
+				Number:  1,
+				Title:   "No Content Extracted",
+				Content: "Unable to extract text content from this PPT file. The file may be encrypted or use an unsupported format.",
+				Layout:  "Content",
 			},
-			Comments: []PPTComment{},
 		}
+		metadata.SlideCount = 1
 	}
 
 	return &PPTPresentation{
