@@ -3,15 +3,29 @@ package office
 import (
 	"archive/zip"
 	"context"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jscharber/audimodal/pkg/core"
+)
+
+// OOXML namespaces used in PPTX files
+const (
+	nsDC    = "http://purl.org/dc/elements/1.1/"
+	nsDCT   = "http://purl.org/dc/terms/"
+	nsCP    = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+	nsA     = "http://schemas.openxmlformats.org/drawingml/2006/main"
+	nsP     = "http://schemas.openxmlformats.org/presentationml/2006/main"
+	nsR     = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+	nsRels  = "http://schemas.openxmlformats.org/package/2006/relationships"
 )
 
 // PPTXReader implements DataSourceReader for Microsoft PowerPoint presentations
@@ -342,6 +356,103 @@ type PPTXTable struct {
 	Headers []string
 }
 
+// XML parsing structures for OOXML format
+
+// coreProperties represents docProps/core.xml
+type coreProperties struct {
+	XMLName      xml.Name `xml:"coreProperties"`
+	Title        string   `xml:"title"`
+	Subject      string   `xml:"subject"`
+	Creator      string   `xml:"creator"`
+	Keywords     string   `xml:"keywords"`
+	Description  string   `xml:"description"`
+	LastModified string   `xml:"lastModifiedBy"`
+	Created      string   `xml:"created"`
+	Modified     string   `xml:"modified"`
+}
+
+// presentationXML represents ppt/presentation.xml
+type presentationXML struct {
+	XMLName   xml.Name         `xml:"presentation"`
+	SlideList slideIdListXML   `xml:"sldIdLst"`
+}
+
+type slideIdListXML struct {
+	Slides []slideIdXML `xml:"sldId"`
+}
+
+type slideIdXML struct {
+	ID    string `xml:"id,attr"`
+	RelID string `xml:"http://schemas.openxmlformats.org/officeDocument/2006/relationships id,attr"`
+}
+
+// slideXML represents ppt/slides/slideN.xml
+type slideXML struct {
+	XMLName    xml.Name        `xml:"sld"`
+	CommonData slideCommonData `xml:"cSld"`
+}
+
+type slideCommonData struct {
+	ShapeTree shapeTreeXML `xml:"spTree"`
+}
+
+type shapeTreeXML struct {
+	Shapes []shapeXML `xml:"sp"`
+}
+
+type shapeXML struct {
+	NvSpPr    nvSpPrXML    `xml:"nvSpPr"`
+	TextBody  textBodyXML  `xml:"txBody"`
+}
+
+type nvSpPrXML struct {
+	CNvPr    cNvPrXML    `xml:"cNvPr"`
+	NvPr     nvPrXML     `xml:"nvPr"`
+}
+
+type cNvPrXML struct {
+	Name string `xml:"name,attr"`
+}
+
+type nvPrXML struct {
+	Ph phXML `xml:"ph"`
+}
+
+type phXML struct {
+	Type string `xml:"type,attr"`
+	Idx  string `xml:"idx,attr"`
+}
+
+type textBodyXML struct {
+	Paragraphs []paragraphXML `xml:"p"`
+}
+
+type paragraphXML struct {
+	Runs []runXML `xml:"r"`
+}
+
+type runXML struct {
+	Text string `xml:"t"`
+}
+
+// notesSlideXML represents ppt/notesSlides/notesSlideN.xml
+type notesSlideXML struct {
+	XMLName    xml.Name        `xml:"notes"`
+	CommonData slideCommonData `xml:"cSld"`
+}
+
+// relationshipsXML represents _rels/.rels and other .rels files
+type relationshipsXML struct {
+	XMLName       xml.Name          `xml:"Relationships"`
+	Relationships []relationshipXML `xml:"Relationship"`
+}
+
+type relationshipXML struct {
+	ID     string `xml:"Id,attr"`
+	Type   string `xml:"Type,attr"`
+	Target string `xml:"Target,attr"`
+}
+
 // extractPPTXMetadata extracts metadata from PPTX file
 func (r *PPTXReader) extractPPTXMetadata(sourcePath string) (PPTXMetadata, error) {
 	zipReader, err := zip.OpenReader(sourcePath)
@@ -350,53 +461,163 @@ func (r *PPTXReader) extractPPTXMetadata(sourcePath string) (PPTXMetadata, error
 	}
 	defer zipReader.Close()
 
-	// Look for core.xml file containing metadata
-	for _, file := range zipReader.File {
-		if strings.HasSuffix(file.Name, "core.xml") {
-			rc, err := file.Open()
-			if err != nil {
-				continue
-			}
-			defer rc.Close()
-
-			// Parse XML metadata (simplified)
-			if _, err := io.ReadAll(rc); err != nil {
-				continue
-			}
-
-			// In a real implementation, would parse XML properly
-			// For now, return mock metadata
-			return PPTXMetadata{
-				Title:          "Sample Presentation",
-				Author:         "Unknown",
-				Subject:        "Presentation Subject",
-				Keywords:       "sample, presentation",
-				Description:    "Sample PPTX presentation",
-				Creator:        "Microsoft PowerPoint",
-				CreatedDate:    time.Now().Format("2006-01-02"),
-				ModifiedDate:   time.Now().Format("2006-01-02"),
-				SlideCount:     15,
-				HasAnimations:  true,
-				HasTransitions: true,
-			}, nil
-		}
-	}
-
-	// Default metadata if core.xml not found
-	return PPTXMetadata{
+	metadata := PPTXMetadata{
 		Title:          filepath.Base(sourcePath),
-		SlideCount:     10,
 		CreatedDate:    time.Now().Format("2006-01-02"),
 		ModifiedDate:   time.Now().Format("2006-01-02"),
 		HasAnimations:  false,
 		HasTransitions: false,
-	}, nil
+	}
+
+	// Count slides by looking for slide*.xml files
+	slideCount := 0
+	slidePattern := regexp.MustCompile(`^ppt/slides/slide\d+\.xml$`)
+
+	for _, file := range zipReader.File {
+		if slidePattern.MatchString(file.Name) {
+			slideCount++
+		}
+	}
+	metadata.SlideCount = slideCount
+
+	// Parse core.xml for metadata
+	for _, file := range zipReader.File {
+		if file.Name == "docProps/core.xml" {
+			rc, err := file.Open()
+			if err != nil {
+				continue
+			}
+
+			data, err := io.ReadAll(rc)
+			rc.Close()
+			if err != nil {
+				continue
+			}
+
+			// Parse the core properties XML
+			var props coreProperties
+			if err := xml.Unmarshal(data, &props); err == nil {
+				if props.Title != "" {
+					metadata.Title = props.Title
+				}
+				if props.Creator != "" {
+					metadata.Author = props.Creator
+					metadata.Creator = props.Creator
+				}
+				if props.LastModified != "" {
+					metadata.Author = props.LastModified
+				}
+				if props.Subject != "" {
+					metadata.Subject = props.Subject
+				}
+				if props.Keywords != "" {
+					metadata.Keywords = props.Keywords
+				}
+				if props.Description != "" {
+					metadata.Description = props.Description
+				}
+				if props.Created != "" {
+					metadata.CreatedDate = props.Created
+				}
+				if props.Modified != "" {
+					metadata.ModifiedDate = props.Modified
+				}
+			}
+			break
+		}
+	}
+
+	return metadata, nil
 }
 
 // extractSampleSlideText extracts sample text from the first slide
 func (r *PPTXReader) extractSampleSlideText(sourcePath string) (string, error) {
-	// In a real implementation, would parse slide1.xml
-	return "This is sample text from the first slide of the PPTX presentation. It would contain the actual extracted content including titles, bullet points, and other text elements.", nil
+	zipReader, err := zip.OpenReader(sourcePath)
+	if err != nil {
+		return "", err
+	}
+	defer zipReader.Close()
+
+	// Look for slide1.xml
+	for _, file := range zipReader.File {
+		if file.Name == "ppt/slides/slide1.xml" {
+			text, err := r.extractTextFromSlideFile(file)
+			if err != nil {
+				return "", err
+			}
+			return text, nil
+		}
+	}
+	return "", fmt.Errorf("slide1.xml not found")
+}
+
+// extractTextFromSlideFile extracts all text content from a slide XML file
+func (r *PPTXReader) extractTextFromSlideFile(file *zip.File) (string, error) {
+	rc, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return "", err
+	}
+
+	return r.extractTextFromSlideXML(data)
+}
+
+// extractTextFromSlideXML extracts text from slide XML content
+func (r *PPTXReader) extractTextFromSlideXML(data []byte) (string, error) {
+	// Extract all text between <a:t> tags using regex
+	// This handles the DrawingML text format used in PPTX files
+	textPattern := regexp.MustCompile(`<a:t[^>]*>([^<]*)</a:t>`)
+	matches := textPattern.FindAllSubmatch(data, -1)
+
+	var texts []string
+	for _, match := range matches {
+		if len(match) > 1 {
+			text := strings.TrimSpace(string(match[1]))
+			if text != "" {
+				texts = append(texts, text)
+			}
+		}
+	}
+
+	return strings.Join(texts, " "), nil
+}
+
+// extractTitleFromSlideXML attempts to extract the slide title
+func (r *PPTXReader) extractTitleFromSlideXML(data []byte) string {
+	// Look for title placeholder type="title" or type="ctrTitle"
+	// The title is typically in a shape with ph type="title"
+	titlePattern := regexp.MustCompile(`(?s)<p:sp[^>]*>.*?<p:ph[^>]*type="(?:title|ctrTitle)"[^>]*/>.*?<p:txBody>(.*?)</p:txBody>.*?</p:sp>`)
+	match := titlePattern.FindSubmatch(data)
+	if len(match) > 1 {
+		return r.extractTextFromTxBody(match[1])
+	}
+
+	// Fallback: look for any shape with title-like content
+	// Often the first text box in a slide contains the title
+	return ""
+}
+
+// extractTextFromTxBody extracts text from a txBody element
+func (r *PPTXReader) extractTextFromTxBody(txBodyData []byte) string {
+	textPattern := regexp.MustCompile(`<a:t[^>]*>([^<]*)</a:t>`)
+	matches := textPattern.FindAllSubmatch(txBodyData, -1)
+
+	var texts []string
+	for _, match := range matches {
+		if len(match) > 1 {
+			text := strings.TrimSpace(string(match[1]))
+			if text != "" {
+				texts = append(texts, text)
+			}
+		}
+	}
+
+	return strings.Join(texts, " ")
 }
 
 // parsePresentation parses the complete PPTX presentation
@@ -406,42 +627,156 @@ func (r *PPTXReader) parsePresentation(sourcePath string, config map[string]any)
 		return nil, err
 	}
 
-	// In a real implementation, would parse:
-	// - presentation.xml for slide structure
-	// - slide*.xml for slide content
-	// - slideLayout*.xml for layout information
-	// - slideMaster*.xml for master slides
-	// - notesSlide*.xml for slide notes
+	zipReader, err := zip.OpenReader(sourcePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open PPTX file: %w", err)
+	}
+	defer zipReader.Close()
 
-	// Mock presentation structure
-	slides := make([]PPTXSlide, metadata.SlideCount)
-	for i := 0; i < metadata.SlideCount; i++ {
-		slides[i] = PPTXSlide{
-			Number:  i + 1,
-			Title:   fmt.Sprintf("Slide %d Title", i+1),
-			Content: fmt.Sprintf("This is the content for slide %d. It includes bullet points:\n• Point 1\n• Point 2\n• Point 3", i+1),
-			Layout:  "title_content",
-			Notes:   fmt.Sprintf("These are speaker notes for slide %d.", i+1),
-			Shapes: []PPTXShape{
-				{
-					Type:   "textbox",
-					Text:   fmt.Sprintf("Additional text from shape on slide %d", i+1),
-					X:      100,
-					Y:      200,
-					Width:  400,
-					Height: 100,
-				},
-			},
+	// Build a map of file names to zip files for quick lookup
+	fileMap := make(map[string]*zip.File)
+	for _, file := range zipReader.File {
+		fileMap[file.Name] = file
+	}
+
+	// Find all slide files and sort them by slide number
+	slidePattern := regexp.MustCompile(`^ppt/slides/slide(\d+)\.xml$`)
+	var slideNumbers []int
+	slideFileMap := make(map[int]*zip.File)
+
+	for _, file := range zipReader.File {
+		if matches := slidePattern.FindStringSubmatch(file.Name); matches != nil {
+			num, _ := strconv.Atoi(matches[1])
+			slideNumbers = append(slideNumbers, num)
+			slideFileMap[num] = file
+		}
+	}
+
+	// Sort slide numbers to process in order
+	sort.Ints(slideNumbers)
+
+	// Parse each slide
+	slides := make([]PPTXSlide, 0, len(slideNumbers))
+	extractNotes := true
+	if val, ok := config["extract_slide_notes"].(bool); ok {
+		extractNotes = val
+	}
+
+	for _, slideNum := range slideNumbers {
+		slideFile := slideFileMap[slideNum]
+
+		// Read slide content
+		slideData, err := r.readZipFileContent(slideFile)
+		if err != nil {
+			continue
+		}
+
+		// Extract text content from slide
+		content, err := r.extractTextFromSlideXML(slideData)
+		if err != nil {
+			content = ""
+		}
+
+		// Extract title from slide
+		title := r.extractTitleFromSlideXML(slideData)
+		if title == "" {
+			// Use first line of content as title if no explicit title found
+			lines := strings.Split(content, " ")
+			if len(lines) > 0 && len(lines[0]) < 100 {
+				title = lines[0]
+			}
+		}
+
+		// Extract shapes with text
+		shapes := r.extractShapesFromSlideXML(slideData)
+
+		// Try to extract notes
+		notes := ""
+		if extractNotes {
+			notesFile := fmt.Sprintf("ppt/notesSlides/notesSlide%d.xml", slideNum)
+			if notesZipFile, ok := fileMap[notesFile]; ok {
+				notesData, err := r.readZipFileContent(notesZipFile)
+				if err == nil {
+					notes, _ = r.extractTextFromSlideXML(notesData)
+				}
+			}
+		}
+
+		slide := PPTXSlide{
+			Number:     slideNum,
+			Title:      title,
+			Content:    content,
+			Layout:     "default",
+			Notes:      notes,
+			Shapes:     shapes,
 			Tables:     []PPTXTable{},
 			Hidden:     false,
-			Animations: []string{"fadeIn", "slideFromLeft"},
+			Animations: []string{},
 		}
+
+		slides = append(slides, slide)
 	}
 
 	return &PPTXPresentation{
 		Metadata: metadata,
 		Slides:   slides,
 	}, nil
+}
+
+// readZipFileContent reads the content of a zip file entry
+func (r *PPTXReader) readZipFileContent(file *zip.File) ([]byte, error) {
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	return io.ReadAll(rc)
+}
+
+// extractShapesFromSlideXML extracts shapes with text from slide XML
+func (r *PPTXReader) extractShapesFromSlideXML(data []byte) []PPTXShape {
+	var shapes []PPTXShape
+
+	// Find all sp (shape) elements with text bodies
+	// Pattern to find shapes with text content
+	shapePattern := regexp.MustCompile(`(?s)<p:sp[^>]*>(.*?)</p:sp>`)
+	shapeMatches := shapePattern.FindAllSubmatch(data, -1)
+
+	for _, shapeMatch := range shapeMatches {
+		if len(shapeMatch) < 2 {
+			continue
+		}
+
+		shapeContent := shapeMatch[1]
+
+		// Check if this shape has a text body
+		if !strings.Contains(string(shapeContent), "<p:txBody>") {
+			continue
+		}
+
+		// Extract text from this shape
+		text := r.extractTextFromTxBody(shapeContent)
+		if text == "" {
+			continue
+		}
+
+		// Determine shape type from placeholder
+		shapeType := "textbox"
+		if strings.Contains(string(shapeContent), `type="title"`) || strings.Contains(string(shapeContent), `type="ctrTitle"`) {
+			shapeType = "title"
+		} else if strings.Contains(string(shapeContent), `type="body"`) {
+			shapeType = "body"
+		} else if strings.Contains(string(shapeContent), `type="subTitle"`) {
+			shapeType = "subtitle"
+		}
+
+		shapes = append(shapes, PPTXShape{
+			Type: shapeType,
+			Text: text,
+		})
+	}
+
+	return shapes
 }
 
 // PPTXIterator implements ChunkIterator for PPTX files

@@ -3,10 +3,12 @@ package office
 import (
 	"archive/zip"
 	"context"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -308,6 +310,32 @@ type DOCXTable struct {
 	Headers []string
 }
 
+// XML parsing structures for DOCX OOXML format
+
+// docxCoreProperties represents docProps/core.xml
+type docxCoreProperties struct {
+	XMLName      xml.Name `xml:"coreProperties"`
+	Title        string   `xml:"title"`
+	Subject      string   `xml:"subject"`
+	Creator      string   `xml:"creator"`
+	Keywords     string   `xml:"keywords"`
+	Description  string   `xml:"description"`
+	LastModified string   `xml:"lastModifiedBy"`
+	Created      string   `xml:"created"`
+	Modified     string   `xml:"modified"`
+}
+
+// docxAppProperties represents docProps/app.xml
+type docxAppProperties struct {
+	XMLName    xml.Name `xml:"Properties"`
+	Pages      int      `xml:"Pages"`
+	Words      int      `xml:"Words"`
+	Characters int      `xml:"Characters"`
+	Paragraphs int      `xml:"Paragraphs"`
+	Company    string   `xml:"Company"`
+	Application string  `xml:"Application"`
+}
+
 // extractDOCXMetadata extracts metadata from DOCX file
 func (r *DOCXReader) extractDOCXMetadata(sourcePath string) (DOCXMetadata, error) {
 	zipReader, err := zip.OpenReader(sourcePath)
@@ -316,53 +344,274 @@ func (r *DOCXReader) extractDOCXMetadata(sourcePath string) (DOCXMetadata, error
 	}
 	defer zipReader.Close()
 
-	// Look for core.xml file containing metadata
+	metadata := DOCXMetadata{
+		Title:        filepath.Base(sourcePath),
+		CreatedDate:  time.Now().Format("2006-01-02"),
+		ModifiedDate: time.Now().Format("2006-01-02"),
+	}
+
+	// Build file map for quick lookup
+	fileMap := make(map[string]*zip.File)
 	for _, file := range zipReader.File {
-		if strings.HasSuffix(file.Name, "core.xml") {
-			rc, err := file.Open()
-			if err != nil {
-				continue
-			}
-			defer rc.Close()
+		fileMap[file.Name] = file
+	}
 
-			// Parse XML metadata (simplified)
-			if _, err := io.ReadAll(rc); err != nil {
-				continue
+	// Parse core.xml for basic metadata
+	if coreFile, ok := fileMap["docProps/core.xml"]; ok {
+		if data, err := r.readZipFileContent(coreFile); err == nil {
+			var props docxCoreProperties
+			if err := xml.Unmarshal(data, &props); err == nil {
+				if props.Title != "" {
+					metadata.Title = props.Title
+				}
+				if props.Creator != "" {
+					metadata.Author = props.Creator
+					metadata.Creator = props.Creator
+				}
+				if props.LastModified != "" {
+					metadata.Author = props.LastModified
+				}
+				if props.Subject != "" {
+					metadata.Subject = props.Subject
+				}
+				if props.Keywords != "" {
+					metadata.Keywords = props.Keywords
+				}
+				if props.Description != "" {
+					metadata.Description = props.Description
+				}
+				if props.Created != "" {
+					metadata.CreatedDate = props.Created
+				}
+				if props.Modified != "" {
+					metadata.ModifiedDate = props.Modified
+				}
 			}
-
-			// In a real implementation, would parse XML properly
-			// For now, return mock metadata
-			return DOCXMetadata{
-				Title:          "Sample Document",
-				Author:         "Unknown",
-				Subject:        "Document Subject",
-				Keywords:       "sample, document",
-				Description:    "Sample DOCX document",
-				Creator:        "Microsoft Word",
-				CreatedDate:    time.Now().Format("2006-01-02"),
-				ModifiedDate:   time.Now().Format("2006-01-02"),
-				WordCount:      500,
-				ParagraphCount: 25,
-				PageCount:      3,
-			}, nil
 		}
 	}
 
-	// Default metadata if core.xml not found
-	return DOCXMetadata{
-		Title:          filepath.Base(sourcePath),
-		ParagraphCount: 10,
-		WordCount:      200,
-		PageCount:      1,
-		CreatedDate:    time.Now().Format("2006-01-02"),
-		ModifiedDate:   time.Now().Format("2006-01-02"),
-	}, nil
+	// Parse app.xml for document statistics
+	if appFile, ok := fileMap["docProps/app.xml"]; ok {
+		if data, err := r.readZipFileContent(appFile); err == nil {
+			var props docxAppProperties
+			if err := xml.Unmarshal(data, &props); err == nil {
+				if props.Pages > 0 {
+					metadata.PageCount = props.Pages
+				}
+				if props.Words > 0 {
+					metadata.WordCount = props.Words
+				}
+				if props.Paragraphs > 0 {
+					metadata.ParagraphCount = props.Paragraphs
+				}
+			}
+		}
+	}
+
+	// If paragraph count is still 0, count from document.xml
+	if metadata.ParagraphCount == 0 {
+		if docFile, ok := fileMap["word/document.xml"]; ok {
+			if data, err := r.readZipFileContent(docFile); err == nil {
+				// Count <w:p> tags (paragraphs)
+				paragraphPattern := regexp.MustCompile(`<w:p[>\s]`)
+				matches := paragraphPattern.FindAll(data, -1)
+				metadata.ParagraphCount = len(matches)
+			}
+		}
+	}
+
+	// Ensure at least 1 paragraph
+	if metadata.ParagraphCount == 0 {
+		metadata.ParagraphCount = 1
+	}
+
+	return metadata, nil
+}
+
+// readZipFileContent reads the content of a zip file entry
+func (r *DOCXReader) readZipFileContent(file *zip.File) ([]byte, error) {
+	rc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	return io.ReadAll(rc)
 }
 
 // extractSampleText extracts sample text from the document
 func (r *DOCXReader) extractSampleText(sourcePath string) (string, error) {
-	// In a real implementation, would parse document.xml
-	return "This is sample text from the DOCX document. It would contain the actual extracted content from the first paragraph.", nil
+	zipReader, err := zip.OpenReader(sourcePath)
+	if err != nil {
+		return "", err
+	}
+	defer zipReader.Close()
+
+	// Look for document.xml
+	for _, file := range zipReader.File {
+		if file.Name == "word/document.xml" {
+			data, err := r.readZipFileContent(file)
+			if err != nil {
+				return "", err
+			}
+			text := r.extractTextFromDocumentXML(data)
+			// Return first 500 characters as sample
+			if len(text) > 500 {
+				return text[:500] + "...", nil
+			}
+			return text, nil
+		}
+	}
+	return "", fmt.Errorf("document.xml not found")
+}
+
+// extractTextFromDocumentXML extracts all text from document.xml
+func (r *DOCXReader) extractTextFromDocumentXML(data []byte) string {
+	// Extract text from <w:t> tags (Word text elements)
+	textPattern := regexp.MustCompile(`<w:t[^>]*>([^<]*)</w:t>`)
+	matches := textPattern.FindAllSubmatch(data, -1)
+
+	var texts []string
+	for _, match := range matches {
+		if len(match) > 1 {
+			text := string(match[1])
+			if text != "" {
+				texts = append(texts, text)
+			}
+		}
+	}
+
+	return strings.Join(texts, " ")
+}
+
+// extractParagraphsFromDocumentXML extracts paragraphs with their text
+func (r *DOCXReader) extractParagraphsFromDocumentXML(data []byte) []DOCXParagraph {
+	var paragraphs []DOCXParagraph
+
+	// Find all <w:p> paragraph elements
+	// Using a simpler approach: split by paragraph tags and extract text from each
+	paragraphPattern := regexp.MustCompile(`(?s)<w:p[^>]*>(.*?)</w:p>`)
+	paragraphMatches := paragraphPattern.FindAllSubmatch(data, -1)
+
+	paragraphNum := 0
+	for _, match := range paragraphMatches {
+		if len(match) < 2 {
+			continue
+		}
+
+		paragraphContent := match[1]
+
+		// Extract text from this paragraph
+		textPattern := regexp.MustCompile(`<w:t[^>]*>([^<]*)</w:t>`)
+		textMatches := textPattern.FindAllSubmatch(paragraphContent, -1)
+
+		var textParts []string
+		for _, textMatch := range textMatches {
+			if len(textMatch) > 1 {
+				text := string(textMatch[1])
+				if text != "" {
+					textParts = append(textParts, text)
+				}
+			}
+		}
+
+		// Only add non-empty paragraphs
+		paragraphText := strings.Join(textParts, "")
+		if strings.TrimSpace(paragraphText) != "" {
+			paragraphNum++
+
+			// Check for formatting
+			formatting := make(map[string]any)
+			if strings.Contains(string(paragraphContent), "<w:b/>") || strings.Contains(string(paragraphContent), "<w:b ") {
+				formatting["bold"] = true
+			}
+			if strings.Contains(string(paragraphContent), "<w:i/>") || strings.Contains(string(paragraphContent), "<w:i ") {
+				formatting["italic"] = true
+			}
+			if strings.Contains(string(paragraphContent), "<w:u ") {
+				formatting["underline"] = true
+			}
+
+			paragraphs = append(paragraphs, DOCXParagraph{
+				Text:       paragraphText,
+				Number:     paragraphNum,
+				Section:    "body",
+				Formatting: formatting,
+			})
+		}
+	}
+
+	return paragraphs
+}
+
+// extractTablesFromDocumentXML extracts tables from document.xml
+func (r *DOCXReader) extractTablesFromDocumentXML(data []byte) []DOCXTable {
+	var tables []DOCXTable
+
+	// Find all <w:tbl> table elements
+	tablePattern := regexp.MustCompile(`(?s)<w:tbl[^>]*>(.*?)</w:tbl>`)
+	tableMatches := tablePattern.FindAllSubmatch(data, -1)
+
+	for _, tableMatch := range tableMatches {
+		if len(tableMatch) < 2 {
+			continue
+		}
+
+		tableContent := tableMatch[1]
+
+		// Find all rows <w:tr>
+		rowPattern := regexp.MustCompile(`(?s)<w:tr[^>]*>(.*?)</w:tr>`)
+		rowMatches := rowPattern.FindAllSubmatch(tableContent, -1)
+
+		var rows [][]string
+		for _, rowMatch := range rowMatches {
+			if len(rowMatch) < 2 {
+				continue
+			}
+
+			rowContent := rowMatch[1]
+
+			// Find all cells <w:tc>
+			cellPattern := regexp.MustCompile(`(?s)<w:tc[^>]*>(.*?)</w:tc>`)
+			cellMatches := cellPattern.FindAllSubmatch(rowContent, -1)
+
+			var cells []string
+			for _, cellMatch := range cellMatches {
+				if len(cellMatch) < 2 {
+					continue
+				}
+
+				// Extract text from cell
+				cellContent := cellMatch[1]
+				textPattern := regexp.MustCompile(`<w:t[^>]*>([^<]*)</w:t>`)
+				textMatches := textPattern.FindAllSubmatch(cellContent, -1)
+
+				var cellTexts []string
+				for _, textMatch := range textMatches {
+					if len(textMatch) > 1 {
+						cellTexts = append(cellTexts, string(textMatch[1]))
+					}
+				}
+				cells = append(cells, strings.Join(cellTexts, " "))
+			}
+
+			if len(cells) > 0 {
+				rows = append(rows, cells)
+			}
+		}
+
+		if len(rows) > 0 {
+			table := DOCXTable{
+				Rows: rows,
+			}
+			// First row as headers if we have multiple rows
+			if len(rows) > 1 {
+				table.Headers = rows[0]
+			}
+			tables = append(tables, table)
+		}
+	}
+
+	return tables
 }
 
 // parseDocument parses the complete DOCX document
@@ -372,32 +621,82 @@ func (r *DOCXReader) parseDocument(sourcePath string, config map[string]any) (*D
 		return nil, err
 	}
 
-	// In a real implementation, would parse document.xml and extract:
-	// - All paragraphs with formatting
-	// - Headers and footers if enabled
-	// - Tables if enabled
-	// - Comments if enabled
+	zipReader, err := zip.OpenReader(sourcePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open DOCX file: %w", err)
+	}
+	defer zipReader.Close()
 
-	// Mock document structure
-	paragraphs := make([]DOCXParagraph, metadata.ParagraphCount)
-	for i := 0; i < metadata.ParagraphCount; i++ {
-		paragraphs[i] = DOCXParagraph{
-			Text:    fmt.Sprintf("This is paragraph %d content from the DOCX document.", i+1),
-			Number:  i + 1,
-			Section: "body",
-			Formatting: map[string]any{
-				"bold":   false,
-				"italic": false,
-			},
+	// Build file map for quick lookup
+	fileMap := make(map[string]*zip.File)
+	for _, file := range zipReader.File {
+		fileMap[file.Name] = file
+	}
+
+	var paragraphs []DOCXParagraph
+	var tables []DOCXTable
+	var headers []DOCXParagraph
+	var footers []DOCXParagraph
+
+	// Parse main document
+	if docFile, ok := fileMap["word/document.xml"]; ok {
+		data, err := r.readZipFileContent(docFile)
+		if err == nil {
+			paragraphs = r.extractParagraphsFromDocumentXML(data)
+
+			// Extract tables if enabled
+			extractTables := true
+			if val, ok := config["extract_tables"].(bool); ok {
+				extractTables = val
+			}
+			if extractTables {
+				tables = r.extractTablesFromDocumentXML(data)
+			}
 		}
+	}
+
+	// Parse headers if enabled
+	extractHeaders := true
+	if val, ok := config["extract_headers_footers"].(bool); ok {
+		extractHeaders = val
+	}
+	if extractHeaders {
+		// Headers are in word/header1.xml, header2.xml, etc.
+		for name, file := range fileMap {
+			if strings.HasPrefix(name, "word/header") && strings.HasSuffix(name, ".xml") {
+				data, err := r.readZipFileContent(file)
+				if err == nil {
+					headerParagraphs := r.extractParagraphsFromDocumentXML(data)
+					for i := range headerParagraphs {
+						headerParagraphs[i].Section = "header"
+					}
+					headers = append(headers, headerParagraphs...)
+				}
+			}
+			if strings.HasPrefix(name, "word/footer") && strings.HasSuffix(name, ".xml") {
+				data, err := r.readZipFileContent(file)
+				if err == nil {
+					footerParagraphs := r.extractParagraphsFromDocumentXML(data)
+					for i := range footerParagraphs {
+						footerParagraphs[i].Section = "footer"
+					}
+					footers = append(footers, footerParagraphs...)
+				}
+			}
+		}
+	}
+
+	// Update metadata with actual paragraph count
+	if len(paragraphs) > 0 {
+		metadata.ParagraphCount = len(paragraphs)
 	}
 
 	return &DOCXDocument{
 		Metadata:   metadata,
 		Paragraphs: paragraphs,
-		Headers:    []DOCXParagraph{},
-		Footers:    []DOCXParagraph{},
-		Tables:     []DOCXTable{},
+		Headers:    headers,
+		Footers:    footers,
+		Tables:     tables,
 	}, nil
 }
 
