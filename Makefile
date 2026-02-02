@@ -82,6 +82,151 @@ test-verbose: ## Run tests with verbose output
 .PHONY: test-all
 test-all: test-unit test-integration test-embeddings ## Run all test suites
 
+##@ Compliance Testing
+
+.PHONY: test-compliance
+test-compliance: ## Run all compliance tests (unit + integration)
+	@echo "Running all compliance tests..."
+	go test -v ./pkg/dlp/compliance/... ./pkg/dlp/patterns/... ./tests/compliance/...
+
+.PHONY: test-compliance-unit
+test-compliance-unit: ## Run compliance unit tests only
+	@echo "Running compliance unit tests..."
+	go test -v ./pkg/dlp/compliance/... ./pkg/dlp/patterns/...
+
+.PHONY: test-compliance-integration
+test-compliance-integration: ## Run compliance integration tests
+	@echo "Running compliance integration tests..."
+	go test -v ./tests/compliance/...
+
+.PHONY: test-compliance-bench
+test-compliance-bench: ## Run compliance benchmark tests
+	@echo "Running compliance benchmark tests..."
+	go test -bench=. -benchmem ./pkg/dlp/compliance/... ./pkg/dlp/patterns/... ./tests/performance/...
+
+.PHONY: test-compliance-profile
+test-compliance-profile: ## Run compliance tests with CPU profiling
+	@echo "Running compliance tests with CPU profiling..."
+	go test -bench=. -cpuprofile=cpu.prof ./pkg/dlp/patterns/...
+	@echo "CPU profile generated: cpu.prof"
+	@echo "View with: go tool pprof cpu.prof"
+
+.PHONY: test-compliance-memprofile
+test-compliance-memprofile: ## Run compliance tests with memory profiling
+	@echo "Running compliance tests with memory profiling..."
+	go test -bench=. -memprofile=mem.prof ./pkg/dlp/patterns/...
+	@echo "Memory profile generated: mem.prof"
+	@echo "View with: go tool pprof mem.prof"
+
+.PHONY: test-compliance-trace
+test-compliance-trace: ## Run compliance tests with execution tracing
+	@echo "Running compliance tests with execution tracing..."
+	go test -trace=trace.out ./pkg/dlp/patterns/...
+	@echo "Trace generated: trace.out"
+	@echo "View with: go tool trace trace.out"
+
+.PHONY: test-compliance-coverage
+test-compliance-coverage: ## Generate compliance test coverage report
+	@echo "Generating compliance test coverage report..."
+	go test -coverprofile=compliance_coverage.out ./pkg/dlp/compliance/... ./pkg/dlp/patterns/...
+	go tool cover -html=compliance_coverage.out -o compliance_coverage.html
+	@echo "Coverage report generated: compliance_coverage.html"
+
+.PHONY: test-compliance-coverage-func
+test-compliance-coverage-func: ## Show compliance test coverage by function
+	@echo "Showing compliance test coverage by function..."
+	go test -coverprofile=compliance_coverage.out ./pkg/dlp/compliance/... ./pkg/dlp/patterns/...
+	go tool cover -func=compliance_coverage.out
+
+.PHONY: test-performance
+test-performance: ## Run performance tests
+	@echo "Running performance tests..."
+	go test -v ./tests/performance/...
+
+.PHONY: test-compliance-all
+test-compliance-all: test-compliance test-compliance-bench test-compliance-coverage ## Run all compliance tests, benchmarks, and coverage
+
+##@ K3s Integration Testing
+
+# Path to aether-secrets (relative to audimodal directory)
+AETHER_SECRETS_PATH ?= ../aether-secrets
+
+.PHONY: test-k3s
+test-k3s: ## Run K3s integration tests (requires AUDIMODAL_API_KEY env var)
+	@echo "Running K3s integration tests..."
+	@if [ -z "$$AUDIMODAL_API_KEY" ]; then \
+		echo "Error: AUDIMODAL_API_KEY not set. Use 'make test-k3s-with-secrets' or source secrets first."; \
+		exit 1; \
+	fi
+	go test -v -timeout 10m ./tests/k3s/... -count=1
+
+.PHONY: test-k3s-with-secrets
+test-k3s-with-secrets: ## Run K3s tests with secrets from aether-secrets
+	@echo "Loading secrets from aether-secrets..."
+	@if [ -f $(AETHER_SECRETS_PATH)/apps/audimodal/api-test.env ]; then \
+		set -a && . $(AETHER_SECRETS_PATH)/apps/audimodal/api-test.env && set +a && \
+		echo "Running K3s integration tests..." && \
+		go test -v -timeout 10m ./tests/k3s/... -count=1; \
+	else \
+		echo "Error: $(AETHER_SECRETS_PATH)/apps/audimodal/api-test.env not found"; \
+		echo "Create it from api-test.env.example with your test API key"; \
+		exit 1; \
+	fi
+
+.PHONY: test-k3s-short
+test-k3s-short: ## Run quick K3s smoke test (health check only)
+	@echo "Running K3s smoke test..."
+	@if [ -z "$$AUDIMODAL_API_KEY" ]; then \
+		echo "Error: AUDIMODAL_API_KEY not set"; \
+		exit 1; \
+	fi
+	go test -v -timeout 2m ./tests/k3s/... -run TestK3sComplianceSuite/TestHealthCheck -count=1
+
+.PHONY: test-k3s-gdpr
+test-k3s-gdpr: ## Run GDPR-specific K3s tests
+	@echo "Running GDPR K3s tests..."
+	@if [ -z "$$AUDIMODAL_API_KEY" ]; then \
+		echo "Error: AUDIMODAL_API_KEY not set"; \
+		exit 1; \
+	fi
+	go test -v -timeout 5m ./tests/k3s/... -run "GDPR" -count=1
+
+.PHONY: test-k3s-hipaa
+test-k3s-hipaa: ## Run HIPAA-specific K3s tests
+	@echo "Running HIPAA K3s tests..."
+	@if [ -z "$$AUDIMODAL_API_KEY" ]; then \
+		echo "Error: AUDIMODAL_API_KEY not set"; \
+		exit 1; \
+	fi
+	go test -v -timeout 5m ./tests/k3s/... -run "HIPAA" -count=1
+
+.PHONY: test-k3s-pci
+test-k3s-pci: ## Run PCI-DSS-specific K3s tests
+	@echo "Running PCI-DSS K3s tests..."
+	@if [ -z "$$AUDIMODAL_API_KEY" ]; then \
+		echo "Error: AUDIMODAL_API_KEY not set"; \
+		exit 1; \
+	fi
+	go test -v -timeout 5m ./tests/k3s/... -run "PCI" -count=1
+
+.PHONY: test-k3s-ccpa
+test-k3s-ccpa: ## Run CCPA-specific K3s tests
+	@echo "Running CCPA K3s tests..."
+	@if [ -z "$$AUDIMODAL_API_KEY" ]; then \
+		echo "Error: AUDIMODAL_API_KEY not set"; \
+		exit 1; \
+	fi
+	go test -v -timeout 5m ./tests/k3s/... -run "CCPA" -count=1
+
+.PHONY: test-k3s-all-regulations
+test-k3s-all-regulations: ## Run all regulation tests
+	@echo "Running all regulation K3s tests..."
+	@if [ -z "$$AUDIMODAL_API_KEY" ]; then \
+		echo "Error: AUDIMODAL_API_KEY not set"; \
+		exit 1; \
+	fi
+	go test -v -timeout 15m ./tests/k3s/... -run "Test.*_" -count=1
+
 .PHONY: coverage
 coverage: ## Generate test coverage report
 	@echo "Generating coverage report..."

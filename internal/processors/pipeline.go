@@ -14,6 +14,8 @@ import (
 	"github.com/jscharber/audimodal/internal/database"
 	"github.com/jscharber/audimodal/internal/database/models"
 	"github.com/jscharber/audimodal/pkg/core"
+	"github.com/jscharber/audimodal/pkg/dlp"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 	"github.com/jscharber/audimodal/pkg/preprocessing"
 	"github.com/jscharber/audimodal/pkg/readers"
 	"github.com/jscharber/audimodal/pkg/registry"
@@ -24,11 +26,12 @@ import (
 
 // Pipeline orchestrates the complete file processing workflow
 type Pipeline struct {
-	db       *database.Database
-	registry *registry.Registry
-	config   *PipelineConfig
-	metrics  *PipelineMetrics
-	mu       sync.RWMutex
+	db         *database.Database
+	registry   *registry.Registry
+	config     *PipelineConfig
+	metrics    *PipelineMetrics
+	dlpService *dlp.DLPService
+	mu         sync.RWMutex
 }
 
 // RegisterBasicPlugins ensures all basic readers and strategies are registered
@@ -53,6 +56,8 @@ type PipelineConfig struct {
 	MinQualityThreshold float64       `json:"min_quality_threshold"`
 	TempStoragePath     string        `json:"temp_storage_path"`
 	EnableMetrics       bool          `json:"enable_metrics"`
+	EnableDLP           bool          `json:"enable_dlp"`
+	DLPBatchSize        int           `json:"dlp_batch_size"`
 }
 
 // PipelineMetrics tracks processing statistics
@@ -69,17 +74,18 @@ type PipelineMetrics struct {
 
 // ProcessingRequest represents a file processing request
 type ProcessingRequest struct {
-	TenantID        uuid.UUID      `json:"tenant_id"`
-	SessionID       uuid.UUID      `json:"session_id"`
-	FileID          uuid.UUID      `json:"file_id"`
-	FilePath        string         `json:"file_path"`
-	ReaderType      string         `json:"reader_type,omitempty"`
-	StrategyType    string         `json:"strategy_type,omitempty"`
-	ReaderConfig    map[string]any `json:"reader_config,omitempty"`
-	StrategyConfig  map[string]any `json:"strategy_config,omitempty"`
-	Priority        string         `json:"priority"`
-	DLPScanEnabled  bool           `json:"dlp_scan_enabled"`
-	ComplianceRules []string       `json:"compliance_rules,omitempty"`
+	TenantID        uuid.UUID              `json:"tenant_id"`
+	SessionID       uuid.UUID              `json:"session_id"`
+	FileID          uuid.UUID              `json:"file_id"`
+	FilePath        string                 `json:"file_path"`
+	ReaderType      string                 `json:"reader_type,omitempty"`
+	StrategyType    string                 `json:"strategy_type,omitempty"`
+	ReaderConfig    map[string]any         `json:"reader_config,omitempty"`
+	StrategyConfig  map[string]any         `json:"strategy_config,omitempty"`
+	Priority        string                 `json:"priority"`
+	DLPScanEnabled  bool                   `json:"dlp_scan_enabled"`
+	RedactionMode   types.RedactionStrategy `json:"redaction_mode,omitempty"` // mask, replace, hash, remove, tokenize, none
+	ComplianceRules []string               `json:"compliance_rules,omitempty"`
 }
 
 // ProcessingResult contains the results of file processing
@@ -106,11 +112,21 @@ func NewPipeline(db *database.Database, config *PipelineConfig) *Pipeline {
 	// This is safe to call multiple times as it will just overwrite existing registrations
 	RegisterBasicPlugins()
 
+	// Initialize DLP service if DLP is enabled
+	var dlpService *dlp.DLPService
+	if config.EnableDLP {
+		dlpService = dlp.NewDLPService(nil) // Use default DLP config
+		fmt.Printf("DEBUG: Pipeline created with DLP service enabled\n")
+	} else {
+		fmt.Printf("DEBUG: Pipeline created with DLP DISABLED (config.EnableDLP=%v)\n", config.EnableDLP)
+	}
+
 	return &Pipeline{
-		db:       db,
-		registry: registry.GlobalRegistry,
-		config:   config,
-		metrics:  &PipelineMetrics{},
+		db:         db,
+		registry:   registry.GlobalRegistry,
+		config:     config,
+		metrics:    &PipelineMetrics{},
+		dlpService: dlpService,
 	}
 }
 
@@ -129,6 +145,8 @@ func GetDefaultPipelineConfig() *PipelineConfig {
 		MinQualityThreshold: 0.3,
 		TempStoragePath:     "/tmp/audimodal",
 		EnableMetrics:       true,
+		EnableDLP:           true, // Enable DLP scanning by default
+		DLPBatchSize:        20,
 	}
 }
 
@@ -169,6 +187,27 @@ func (p *Pipeline) ProcessFile(ctx context.Context, request *ProcessingRequest) 
 		result.ErrorMessage = err.Error()
 	} else {
 		result.Status = "completed"
+	}
+
+	// Perform DLP scanning if enabled and processing succeeded
+	dlpEnabled := p.config.EnableDLP || request.DLPScanEnabled
+	fmt.Printf("DEBUG Pipeline DLP: config.EnableDLP=%v, request.DLPScanEnabled=%v, dlpEnabled=%v, dlpService=%v, status=%s\n",
+		p.config.EnableDLP, request.DLPScanEnabled, dlpEnabled, p.dlpService != nil, result.Status)
+	if dlpEnabled && p.dlpService != nil && result.Status == "completed" {
+		violationsFound, dlpErr := p.performDLPScan(ctx, request)
+		if dlpErr != nil {
+			fmt.Printf("WARNING: DLP scan failed for file %s: %v\n", request.FileID.String(), dlpErr)
+			if result.Metadata == nil {
+				result.Metadata = map[string]any{}
+			}
+			result.Metadata["dlp_error"] = dlpErr.Error()
+		} else {
+			fmt.Printf("INFO: DLP scan completed for file %s: %d violations found\n", request.FileID.String(), violationsFound)
+			if result.Metadata == nil {
+				result.Metadata = map[string]any{}
+			}
+			result.Metadata["dlp_violations_found"] = violationsFound
+		}
 	}
 
 	if updateErr := p.updateFileStatus(ctx, request.FileID, finalStatus, result.ErrorMessage); updateErr != nil {
@@ -611,4 +650,190 @@ func (p *Pipeline) calculateContentHash(content any) string {
 		hash = hash*31 + int(char)
 	}
 	return fmt.Sprintf("%x", hash)
+}
+
+// performDLPScan scans all chunks of a processed file for PII and creates violations
+func (p *Pipeline) performDLPScan(ctx context.Context, request *ProcessingRequest) (int, error) {
+	tenantService := p.db.NewTenantService()
+	tenantRepo, err := tenantService.GetTenantRepository(ctx, request.TenantID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get tenant repository: %w", err)
+	}
+
+	var chunks []models.Chunk
+	if err := tenantRepo.DB().Where("file_id = ?", request.FileID).Find(&chunks).Error; err != nil {
+		return 0, fmt.Errorf("failed to get chunks: %w", err)
+	}
+
+	if len(chunks) == 0 {
+		return 0, nil // No chunks to scan
+	}
+
+	// Build compliance rules from request or use defaults
+	var complianceRules []types.ComplianceRule
+	if len(request.ComplianceRules) > 0 {
+		for _, ruleName := range request.ComplianceRules {
+			complianceRules = append(complianceRules, types.ComplianceRule{
+				Regulation: ruleName,
+				Required:   true,
+			})
+		}
+	} else {
+		// Default: check all major compliance frameworks
+		complianceRules = []types.ComplianceRule{
+			{Regulation: "GDPR", Required: true},
+			{Regulation: "HIPAA", Required: true},
+			{Regulation: "PCI-DSS", Required: true},
+			{Regulation: "CCPA", Required: true},
+		}
+	}
+
+	totalViolations := 0
+	batchSize := p.config.DLPBatchSize
+	if batchSize <= 0 {
+		batchSize = 20
+	}
+
+	// Process chunks in batches
+	for i := 0; i < len(chunks); i += batchSize {
+		end := i + batchSize
+		if end > len(chunks) {
+			end = len(chunks)
+		}
+
+		batch := chunks[i:end]
+
+		// Create batch scan request
+		chunkRequests := make([]dlp.ChunkScanRequest, len(batch))
+		for j, chunk := range batch {
+			chunkRequests[j] = dlp.ChunkScanRequest{
+				TenantID:        request.TenantID,
+				ChunkID:         chunk.ChunkID,
+				FileID:          request.FileID,
+				Content:         chunk.Content,
+				Metadata:        map[string]string{"chunk_number": fmt.Sprintf("%d", chunk.ChunkNumber)},
+				ComplianceRules: complianceRules,
+			}
+		}
+
+		batchRequest := &dlp.BatchScanRequest{
+			TenantID:        request.TenantID,
+			Chunks:          chunkRequests,
+			ComplianceRules: complianceRules,
+			MaxConcurrency:  5,
+		}
+
+		batchResponse, err := p.dlpService.ScanBatch(ctx, batchRequest)
+		if err != nil {
+			return totalViolations, fmt.Errorf("batch DLP scan failed: %w", err)
+		}
+
+		// Process scan results and create violations
+		for chunkID, scanResponse := range batchResponse.Results {
+			now := time.Now()
+
+			// Update chunk DLP status
+			chunkUpdates := map[string]interface{}{
+				"dlp_scan_status": models.DLPScanStatusCompleted,
+			}
+			if scanResponse.ScanResult != nil {
+				chunkUpdates["dlp_finding_count"] = scanResponse.ScanResult.TotalMatches
+				chunkUpdates["dlp_risk_score"] = scanResponse.ScanResult.RiskScore
+			}
+			chunkUpdates["dlp_scanned_at"] = &now
+
+			if err := tenantRepo.DB().Model(&models.Chunk{}).Where("chunk_id = ?", chunkID).Updates(chunkUpdates).Error; err != nil {
+				fmt.Printf("WARNING: Failed to update chunk %s DLP status: %v\n", chunkID, err)
+			}
+
+			// Create violations for compliance results
+			if scanResponse.ComplianceResult != nil && len(scanResponse.ComplianceResult.Violations) > 0 {
+				for _, violation := range scanResponse.ComplianceResult.Violations {
+					// Find the chunk to get its UUID
+					var chunkUUID uuid.UUID
+					for _, c := range batch {
+						if c.ChunkID == chunkID {
+							chunkUUID = c.ID
+							break
+						}
+					}
+
+					// Derive regulation from rule (e.g., "GDPR-001" -> "GDPR")
+					regulation := violation.Rule
+					if idx := len(violation.Rule); idx > 4 && violation.Rule[idx-4] == '-' {
+						regulation = violation.Rule[:idx-4]
+					}
+
+					// Get or create the default compliance policy for this tenant
+					policyID, policyErr := p.getOrCreateCompliancePolicy(tenantRepo, request.TenantID)
+					if policyErr != nil {
+						fmt.Printf("WARNING: Failed to get/create compliance policy: %v\n", policyErr)
+						continue
+					}
+
+					dlpViolation := models.DLPViolation{
+						TenantID:       request.TenantID,
+						PolicyID:       policyID,
+						FileID:         request.FileID,
+						ChunkID:        &chunkUUID,
+						RuleName:       violation.Rule,
+						Severity:       violation.Severity,
+						ComplianceType: regulation,
+						Confidence:     0.9, // High confidence for pattern matches
+						Context:        violation.Description,
+						Status:         "detected",
+						Acknowledged:   false,
+					}
+
+					if err := tenantRepo.DB().Create(&dlpViolation).Error; err != nil {
+						fmt.Printf("WARNING: Failed to create DLP violation for chunk %s: %v\n", chunkID, err)
+					} else {
+						totalViolations++
+					}
+				}
+			}
+		}
+	}
+
+	return totalViolations, nil
+}
+
+// getOrCreateCompliancePolicy gets or creates the default compliance scanner policy for a tenant
+func (p *Pipeline) getOrCreateCompliancePolicy(tenantRepo *database.TenantRepository, tenantID uuid.UUID) (uuid.UUID, error) {
+	const defaultPolicyName = "compliance-auto-scanner"
+
+	// Try to find existing policy
+	var policy models.DLPPolicy
+	err := tenantRepo.DB().Where("tenant_id = ? AND name = ?", tenantID, defaultPolicyName).First(&policy).Error
+	if err == nil {
+		return policy.ID, nil
+	}
+
+	// Create default compliance policy if not found
+	policy = models.DLPPolicy{
+		TenantID:    tenantID,
+		Name:        defaultPolicyName,
+		DisplayName: "Compliance Auto-Scanner",
+		Description: "Automatically created policy for compliance scanning (GDPR, HIPAA, PCI-DSS, CCPA)",
+		Enabled:     true,
+		Priority:    100,
+		ContentRules: models.DLPContentRules{
+			{Name: "SSN Detection", Type: "builtin", BuiltinType: "ssn", Sensitivity: "critical", Confidence: 0.9},
+			{Name: "Credit Card Detection", Type: "builtin", BuiltinType: "credit_card", Sensitivity: "critical", Confidence: 0.9},
+			{Name: "Email Detection", Type: "builtin", BuiltinType: "email", Sensitivity: "medium", Confidence: 0.8},
+			{Name: "Phone Detection", Type: "builtin", BuiltinType: "phone", Sensitivity: "medium", Confidence: 0.8},
+			{Name: "IP Address Detection", Type: "builtin", BuiltinType: "ip_address", Sensitivity: "low", Confidence: 0.7},
+		},
+		Actions: models.DLPActions{
+			{Type: "audit", Priority: 1, AuditLevel: "warning"},
+		},
+		Status: "active",
+	}
+
+	if err := tenantRepo.DB().Create(&policy).Error; err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create default compliance policy: %w", err)
+	}
+
+	fmt.Printf("Created default compliance policy for tenant %s: %s\n", tenantID, policy.ID)
+	return policy.ID, nil
 }

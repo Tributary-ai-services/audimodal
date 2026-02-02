@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"time"
 
@@ -20,10 +21,10 @@ type DLPPolicy struct {
 	Priority int  `gorm:"not null;default:50" json:"priority"`
 
 	// Content rules
-	ContentRules []DLPContentRule `gorm:"type:jsonb" json:"content_rules"`
+	ContentRules DLPContentRules `gorm:"type:jsonb" json:"content_rules"`
 
 	// Actions to take when policy is triggered
-	Actions []DLPAction `gorm:"type:jsonb" json:"actions"`
+	Actions DLPActions `gorm:"type:jsonb" json:"actions"`
 
 	// Conditions for when this policy applies
 	Conditions DLPConditions `gorm:"type:jsonb" json:"conditions"`
@@ -117,11 +118,12 @@ type DLPViolation struct {
 	ChunkID  *uuid.UUID `gorm:"type:uuid;index" json:"chunk_id,omitempty"`
 
 	// Violation details
-	RuleName    string  `gorm:"not null" json:"rule_name"`
-	Severity    string  `gorm:"not null" json:"severity"`
-	Confidence  float64 `gorm:"not null" json:"confidence"`
-	MatchedText string  `gorm:"type:text" json:"matched_text,omitempty"`
-	Context     string  `gorm:"type:text" json:"context,omitempty"`
+	RuleName       string  `gorm:"not null" json:"rule_name"`
+	Severity       string  `gorm:"not null" json:"severity"`
+	ComplianceType string  `gorm:"not null;default:'general'" json:"compliance_type"` // pii, hipaa, pci-dss, gdpr, general
+	Confidence     float64 `gorm:"not null" json:"confidence"`
+	MatchedText    string  `gorm:"type:text" json:"matched_text,omitempty"`
+	Context        string  `gorm:"type:text" json:"context,omitempty"`
 
 	// Location information
 	StartOffset int64 `json:"start_offset,omitempty"`
@@ -129,7 +131,7 @@ type DLPViolation struct {
 	LineNumber  int   `json:"line_number,omitempty"`
 
 	// Actions taken
-	ActionsTaken []string `gorm:"type:jsonb" json:"actions_taken"`
+	ActionsTaken StringSlice `gorm:"type:jsonb" json:"actions_taken"`
 
 	// Status
 	Status         string     `gorm:"not null;default:'detected'" json:"status"`
@@ -156,7 +158,7 @@ func (d *DLPContentRule) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), d)
 }
 
-func (d DLPContentRule) Value() (interface{}, error) {
+func (d DLPContentRule) Value() (driver.Value, error) {
 	return json.Marshal(d)
 }
 
@@ -167,7 +169,7 @@ func (d *DLPAction) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), d)
 }
 
-func (d DLPAction) Value() (interface{}, error) {
+func (d DLPAction) Value() (driver.Value, error) {
 	return json.Marshal(d)
 }
 
@@ -178,7 +180,7 @@ func (d *DLPConditions) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), d)
 }
 
-func (d DLPConditions) Value() (interface{}, error) {
+func (d DLPConditions) Value() (driver.Value, error) {
 	return json.Marshal(d)
 }
 
@@ -193,7 +195,10 @@ func (d *DLPContentRules) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), d)
 }
 
-func (d DLPContentRules) Value() (interface{}, error) {
+func (d DLPContentRules) Value() (driver.Value, error) {
+	if d == nil {
+		return nil, nil
+	}
 	return json.Marshal(d)
 }
 
@@ -204,7 +209,10 @@ func (d *DLPActions) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), d)
 }
 
-func (d DLPActions) Value() (interface{}, error) {
+func (d DLPActions) Value() (driver.Value, error) {
+	if d == nil {
+		return nil, nil
+	}
 	return json.Marshal(d)
 }
 

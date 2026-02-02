@@ -638,6 +638,127 @@
   - [x] ✅ Knowledge graph query and relationship analysis endpoints
   - [x] ✅ Semantic search and insight generation APIs
 
+---
+
+## 🔒 **COMPLIANCE STANDARDS ROADMAP**
+*Source: issues/compliance_standards.xlsx | Status: 4 Implemented, 66+ Planned/Conditional*
+
+---
+
+### 📊 Top 20 Core Standards
+
+| Rank | Standard | Full Name | Domain | TAS Priority | Status | Effort |
+|------|----------|-----------|--------|--------------|--------|--------|
+| 1 | SOC 2 | Service Organization Control Type 2 | Security/Trust | CRITICAL | 🔲 Planned | Medium |
+| 2 | ISO 27001 | Information Security Management System | Security | CRITICAL | 🔲 Planned | High |
+| 3 | **GDPR** | General Data Protection Regulation | Privacy | CRITICAL | ✅ Implemented | High |
+| 4 | **PCI DSS** | Payment Card Industry Data Security Standard | Payment | LOW | ✅ Implemented | High |
+| 5 | **HIPAA** | Health Insurance Portability and Accountability Act | Healthcare | MEDIUM | ✅ Implemented | High |
+| 6 | SOX | Sarbanes-Oxley Act | Financial | LOW | 🔲 Planned | High |
+| 7 | **CCPA/CPRA** | California Consumer Privacy Act | Privacy | HIGH | ✅ Implemented | Medium |
+| 8 | NIST CSF | NIST Cybersecurity Framework | Security | CRITICAL | 🔲 Planned | Low |
+| 9 | NIST 800-171 | Protecting Controlled Unclassified Information | Security | HIGH | 🔲 Planned | High |
+| 10 | CMMC | Cybersecurity Maturity Model Certification | Defense | HIGH | 🔲 Planned | Very High |
+| 11 | FedRAMP | Federal Risk and Authorization Management Program | Government | HIGH | 🔲 Planned | Very High |
+| 12 | FISMA | Federal Information Security Management Act | Government | MEDIUM | 🔲 Planned | High |
+| 13 | SOC 1 | Service Organization Control Type 1 | Financial | LOW | 🔲 Planned | Medium |
+| 14 | GLBA | Gramm-Leach-Bliley Act | Financial | LOW | 🔲 Planned | Medium |
+| 15 | HITRUST CSF | Health Information Trust Alliance CSF | Healthcare | MEDIUM | 🔲 Planned | Very High |
+| 16 | ISO 27701 | Privacy Information Management | Privacy | HIGH | 🔲 Planned | Medium |
+| 17 | NIST 800-53 | Security and Privacy Controls | Security | HIGH | 🔲 Planned | High |
+| 18 | CSA STAR | Cloud Security Alliance STAR | Cloud | HIGH | 🔲 Planned | Low |
+| 19 | EU AI Act | EU Artificial Intelligence Act | AI | CRITICAL | 🔲 Planned | High |
+| 20 | NIST AI RMF | AI Risk Management Framework | AI | CRITICAL | 🔲 Planned | Low |
+
+### ✅ Currently Implemented Standards (4)
+
+| Standard | Rule IDs | PII Types Detected | Location |
+|----------|----------|-------------------|----------|
+| GDPR | GDPR-001, GDPR-002 | Email, Name, Address, Phone, SSN, DOB | `pkg/dlp/compliance/checker.go` |
+| HIPAA | HIPAA-001 | SSN, DOB, Name, Email (PHI) | `pkg/dlp/compliance/checker.go` |
+| PCI-DSS | PCI-001 | Credit Card Numbers | `pkg/dlp/compliance/checker.go` |
+| CCPA | CCPA-001 | Email, Name, Address, SSN, IP Address | `pkg/dlp/compliance/checker.go` |
+
+### 🔗 Framework Mappings
+
+| Primary Framework | Maps To | Coverage | Notes |
+|-------------------|---------|----------|-------|
+| SOC 2 | ISO 27001 | ~70% | TSCs align with many ISO controls |
+| SOC 2 | NIST CSF | ~60% | Trust Services Criteria map to CSF |
+| SOC 2 | HIPAA | ~50% | Security controls overlap |
+| ISO 27001 | NIST 800-53 | ~65% | ISO less granular than 800-53 |
+| ISO 27701 | GDPR | ~80% | Designed for GDPR compliance |
+| ISO 27701 | CCPA/CPRA | ~70% | Privacy controls applicable |
+| HITRUST CSF | HIPAA | 100% | Full HIPAA incorporation |
+| HITRUST CSF | SOC 2 | ~85% | Comprehensive mapping |
+| HITRUST CSF | NIST CSF | ~90% | Strong alignment |
+| HITRUST CSF | ISO 27001 | ~80% | Includes ISO requirements |
+| NIST 800-53 | FedRAMP | 100% | FedRAMP baselines from 800-53 |
+| NIST 800-53 | FISMA | 100% | FISMA requires 800-53 |
+| NIST 800-171 | CMMC Level 2 | 100% | CMMC L2 = 800-171 + assessment |
+| FedRAMP | StateRAMP | ~90% | StateRAMP accepts FedRAMP |
+| EU AI Act | NIST AI RMF | ~50% | Complementary frameworks |
+| EU AI Act | ISO 42001 | ~60% | ISO supports AI Act requirements |
+
+### 📅 TAS Implementation Roadmap
+
+#### Phase 1: Foundation (Months 1-6)
+| Standard | Rationale | Effort |
+|----------|-----------|--------|
+| SOC 2 Type I | Table stakes for enterprise sales; fastest path to credibility | Medium |
+| NIST CSF | Framework alignment; no certification required | Low |
+| NIST AI RMF | AI governance foundation; differentiator for AI platform | Low |
+| GDPR | Legal requirement for EU market; privacy foundation | ✅ Done |
+| CCPA/CPRA | Legal requirement for CA customers | ✅ Done |
+
+#### Phase 2: Credibility (Months 6-12)
+| Standard | Rationale | Effort |
+|----------|-----------|--------|
+| SOC 2 Type II | Full annual audit; required for serious enterprise deals | Medium |
+| ISO 27001 | International recognition; opens global markets | High |
+| CSA STAR Level 1 | Cloud security credibility; self-assessment | Low |
+| ISO 27701 | Privacy management; GDPR demonstration | Medium |
+
+#### Phase 3: AI Leadership (Months 12-18)
+| Standard | Rationale | Effort |
+|----------|-----------|--------|
+| EU AI Act Prep | Mandatory for EU AI market; competitive advantage | High |
+| ISO 42001 | AI management certification; first-mover advantage | High |
+| CSA STAR Level 2 | Third-party cloud security certification | Medium |
+
+#### Phase 4: Government (Months 18-24)
+| Standard | Rationale | Effort |
+|----------|-----------|--------|
+| NIST 800-171 | Required for CUI; prepares for CMMC | High |
+| FedRAMP Ready | Federal market entry; significant investment | Very High |
+| StateRAMP | State/local government; leverages FedRAMP work | Medium |
+
+#### Phase 5: Expansion (Months 24-36)
+| Standard | Rationale | Effort |
+|----------|-----------|--------|
+| CMMC Level 2 | DoD contractor eligibility | Very High |
+| FedRAMP Moderate | Full federal authorization | Very High |
+| HITRUST | Healthcare enterprise deals | Very High |
+
+### ❓ Quick Reference
+
+| Question | Answer |
+|----------|--------|
+| What's the minimum for enterprise SaaS sales? | SOC 2 Type II + ISO 27001 |
+| What's required for EU market? | GDPR + EU AI Act (for AI systems) |
+| What's required for US federal sales? | FedRAMP (Moderate for most use cases) |
+| What's required for DoD contracts? | CMMC Level 2 (based on NIST 800-171) |
+| What's required for healthcare? | HIPAA + ideally HITRUST CSF |
+| What's required for financial services? | SOC 1/SOC 2 + GLBA + potentially PCI DSS |
+| What's the fastest path to credibility? | SOC 2 Type I (3-6 months) → Type II (12 months) |
+| Which frameworks map together? | HITRUST → HIPAA/NIST/ISO/SOC2; FedRAMP → NIST 800-53; CMMC → NIST 800-171 |
+| What's emerging for AI specifically? | EU AI Act (mandatory 2025-27), NIST AI RMF (voluntary), ISO 42001 (certifiable) |
+| What provides the most control overlap? | HITRUST CSF (maps to 40+ frameworks) or NIST 800-53 (comprehensive) |
+
+**📚 Full Details**: See `docs/COMPLIANCE_STANDARDS_DETAIL.md` for complete attributes (Enforcement Body, Audit Frequency, Penalty Range, etc.)
+
+---
+
 #### **Advanced Security Features** `pkg/security/`
 - [ ] **Zero Trust Architecture**: Enhanced security model
 - [ ] **Advanced DLP Policies**: Machine learning-based content classification

@@ -63,6 +63,7 @@ type DLPViolationResponse struct {
 	ChunkID        *uuid.UUID `json:"chunk_id,omitempty"`
 	RuleName       string     `json:"rule_name"`
 	Severity       string     `json:"severity"`
+	ComplianceType string     `json:"compliance_type"`
 	Confidence     float64    `json:"confidence"`
 	MatchedText    string     `json:"matched_text,omitempty"`
 	Context        string     `json:"context,omitempty"`
@@ -76,6 +77,7 @@ type DLPViolationResponse struct {
 	AcknowledgedAt *string    `json:"acknowledged_at,omitempty"`
 	CreatedAt      string     `json:"created_at"`
 	UpdatedAt      string     `json:"updated_at"`
+	FileName       string     `json:"file_name,omitempty"`
 }
 
 // ServeHTTP implements the http.Handler interface
@@ -197,7 +199,31 @@ func (h *DLPHandler) handleViolationRoutes(w http.ResponseWriter, r *http.Reques
 	}
 
 	if len(parts) >= violationIndex+2 {
-		violationID, err := uuid.Parse(parts[violationIndex+1])
+		// Check for special endpoints first (summary, bulk-acknowledge)
+		nextPart := parts[violationIndex+1]
+
+		if nextPart == "summary" {
+			// /api/v1/tenants/{tenant_id}/violations/summary
+			if r.Method == http.MethodGet {
+				h.GetViolationsSummary(w, r, tenantID)
+			} else {
+				response.WriteError(w, getRequestID(r), http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed", nil)
+			}
+			return
+		}
+
+		if nextPart == "bulk-acknowledge" {
+			// /api/v1/tenants/{tenant_id}/violations/bulk-acknowledge
+			if r.Method == http.MethodPost {
+				h.BulkAcknowledgeViolations(w, r, tenantID)
+			} else {
+				response.WriteError(w, getRequestID(r), http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed", nil)
+			}
+			return
+		}
+
+		// Parse violation ID for other routes
+		violationID, err := uuid.Parse(nextPart)
 		if err != nil {
 			response.WriteBadRequest(w, getRequestID(r), "Invalid violation ID format", nil)
 			return
@@ -463,7 +489,7 @@ func (h *DLPHandler) ListViolations(w http.ResponseWriter, r *http.Request, tena
 	}
 
 	var violations []models.DLPViolation
-	query := tenantRepo.DB().Limit(pageSize).Offset(offset).Order("created_at DESC")
+	query := tenantRepo.DB().Preload("File").Limit(pageSize).Offset(offset).Order("created_at DESC")
 
 	// Filter by severity if provided
 	if severity := r.URL.Query().Get("severity"); severity != "" {
@@ -473,6 +499,17 @@ func (h *DLPHandler) ListViolations(w http.ResponseWriter, r *http.Request, tena
 	// Filter by status if provided
 	if status := r.URL.Query().Get("status"); status != "" {
 		query = query.Where("status = ?", status)
+	}
+
+	// Filter by acknowledged status if provided
+	if acknowledgedStr := r.URL.Query().Get("acknowledged"); acknowledgedStr != "" {
+		acknowledged := acknowledgedStr == "true"
+		query = query.Where("acknowledged = ?", acknowledged)
+	}
+
+	// Filter by compliance type if provided
+	if complianceType := r.URL.Query().Get("compliance_type"); complianceType != "" {
+		query = query.Where("compliance_type = ?", complianceType)
 	}
 
 	err = query.Find(&violations).Error
@@ -496,6 +533,13 @@ func (h *DLPHandler) ListViolations(w http.ResponseWriter, r *http.Request, tena
 	if status := r.URL.Query().Get("status"); status != "" {
 		countQuery = countQuery.Where("status = ?", status)
 	}
+	if acknowledgedStr := r.URL.Query().Get("acknowledged"); acknowledgedStr != "" {
+		acknowledged := acknowledgedStr == "true"
+		countQuery = countQuery.Where("acknowledged = ?", acknowledged)
+	}
+	if complianceType := r.URL.Query().Get("compliance_type"); complianceType != "" {
+		countQuery = countQuery.Where("compliance_type = ?", complianceType)
+	}
 	countQuery.Count(&totalCount)
 
 	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
@@ -511,7 +555,7 @@ func (h *DLPHandler) GetViolation(w http.ResponseWriter, r *http.Request, tenant
 	}
 
 	var violation models.DLPViolation
-	err = tenantRepo.DB().Where("id = ?", violationID).First(&violation).Error
+	err = tenantRepo.DB().Preload("File").Where("id = ?", violationID).First(&violation).Error
 	if err != nil {
 		response.WriteNotFound(w, getRequestID(r), "Violation not found")
 		return
@@ -538,7 +582,7 @@ func (h *DLPHandler) ListPolicyViolations(w http.ResponseWriter, r *http.Request
 	}
 
 	var violations []models.DLPViolation
-	err = tenantRepo.DB().Where("policy_id = ?", policyID).
+	err = tenantRepo.DB().Preload("File").Where("policy_id = ?", policyID).
 		Limit(pageSize).Offset(offset).Order("created_at DESC").Find(&violations).Error
 	if err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to list violations", err.Error())
@@ -617,7 +661,7 @@ func (h *DLPHandler) AcknowledgeViolation(w http.ResponseWriter, r *http.Request
 	}
 
 	var violation models.DLPViolation
-	err = tenantRepo.DB().Where("id = ?", violationID).First(&violation).Error
+	err = tenantRepo.DB().Preload("File").Where("id = ?", violationID).First(&violation).Error
 	if err != nil {
 		response.WriteNotFound(w, getRequestID(r), "Violation not found")
 		return
@@ -636,6 +680,153 @@ func (h *DLPHandler) AcknowledgeViolation(w http.ResponseWriter, r *http.Request
 
 	responseData := h.toViolationResponse(&violation)
 	response.WriteSuccess(w, getRequestID(r), responseData, nil)
+}
+
+// GetViolationsSummary handles GET /api/v1/tenants/{tenant_id}/violations/summary
+func (h *DLPHandler) GetViolationsSummary(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
+	tenantService := h.db.NewTenantService()
+	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
+	if err != nil {
+		response.WriteNotFound(w, getRequestID(r), "Tenant not found")
+		return
+	}
+
+	// Get total violations count
+	var totalViolations int64
+	tenantRepo.DB().Model(&models.DLPViolation{}).Count(&totalViolations)
+
+	// Get acknowledged count
+	var acknowledgedCount int64
+	tenantRepo.DB().Model(&models.DLPViolation{}).Where("acknowledged = ?", true).Count(&acknowledgedCount)
+
+	// Get counts by severity
+	type severityCount struct {
+		Severity string
+		Count    int64
+	}
+	var severityCounts []severityCount
+	tenantRepo.DB().Model(&models.DLPViolation{}).
+		Select("severity, count(*) as count").
+		Group("severity").
+		Scan(&severityCounts)
+
+	bySeverity := make(map[string]int64)
+	var criticalCount, highCount, mediumCount, lowCount int64
+	for _, sc := range severityCounts {
+		bySeverity[sc.Severity] = sc.Count
+		switch sc.Severity {
+		case "critical":
+			criticalCount = sc.Count
+		case "high":
+			highCount = sc.Count
+		case "medium":
+			mediumCount = sc.Count
+		case "low":
+			lowCount = sc.Count
+		}
+	}
+
+	// Get counts by compliance type (rule type)
+	type complianceCount struct {
+		ComplianceType string
+		Count          int64
+	}
+	var complianceCounts []complianceCount
+	tenantRepo.DB().Model(&models.DLPViolation{}).
+		Select("compliance_type, count(*) as count").
+		Group("compliance_type").
+		Scan(&complianceCounts)
+
+	byRuleType := make(map[string]int64)
+	var piiDetections int64
+	for _, cc := range complianceCounts {
+		byRuleType[cc.ComplianceType] = cc.Count
+		// Count PII-related detections
+		if cc.ComplianceType == "pii" || cc.ComplianceType == "GDPR" || cc.ComplianceType == "CCPA" {
+			piiDetections += cc.Count
+		}
+	}
+
+	// Calculate compliance score (simple formula: 100 - (unacknowledged critical * 10 + high * 5 + medium * 2 + low * 1))
+	unacknowledgedCount := totalViolations - acknowledgedCount
+	complianceScore := 100 - int(criticalCount*10+highCount*5+mediumCount*2+lowCount)
+	if complianceScore < 0 {
+		complianceScore = 0
+	}
+
+	summaryResponse := map[string]interface{}{
+		"total_violations":     totalViolations,
+		"unacknowledged_count": unacknowledgedCount,
+		"acknowledged_count":   acknowledgedCount,
+		"compliance_score":     complianceScore,
+		"critical_count":       criticalCount,
+		"high_count":           highCount,
+		"medium_count":         mediumCount,
+		"low_count":            lowCount,
+		"pii_detections":       piiDetections,
+		"by_severity":          bySeverity,
+		"by_rule_type":         byRuleType,
+	}
+
+	response.WriteSuccess(w, getRequestID(r), summaryResponse, nil)
+}
+
+// BulkAcknowledgeViolations handles POST /api/v1/tenants/{tenant_id}/violations/bulk-acknowledge
+func (h *DLPHandler) BulkAcknowledgeViolations(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
+	var bulkRequest struct {
+		ViolationIDs   []string `json:"violation_ids"`
+		AcknowledgedBy string   `json:"acknowledged_by"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&bulkRequest); err != nil {
+		response.WriteBadRequest(w, getRequestID(r), "Invalid JSON request", err.Error())
+		return
+	}
+
+	if len(bulkRequest.ViolationIDs) == 0 {
+		response.WriteBadRequest(w, getRequestID(r), "No violation IDs provided", nil)
+		return
+	}
+
+	tenantService := h.db.NewTenantService()
+	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
+	if err != nil {
+		response.WriteNotFound(w, getRequestID(r), "Tenant not found")
+		return
+	}
+
+	now := time.Now()
+	successCount := 0
+	failedIDs := []string{}
+
+	for _, idStr := range bulkRequest.ViolationIDs {
+		violationID, err := uuid.Parse(idStr)
+		if err != nil {
+			failedIDs = append(failedIDs, idStr)
+			continue
+		}
+
+		result := tenantRepo.DB().Model(&models.DLPViolation{}).
+			Where("id = ?", violationID).
+			Updates(map[string]interface{}{
+				"acknowledged":    true,
+				"acknowledged_by": bulkRequest.AcknowledgedBy,
+				"acknowledged_at": now,
+			})
+
+		if result.Error != nil || result.RowsAffected == 0 {
+			failedIDs = append(failedIDs, idStr)
+		} else {
+			successCount++
+		}
+	}
+
+	bulkResponse := map[string]interface{}{
+		"success_count": successCount,
+		"failure_count": len(failedIDs),
+		"failed_ids":    failedIDs,
+	}
+
+	response.WriteSuccess(w, getRequestID(r), bulkResponse, nil)
 }
 
 // Helper methods
@@ -675,6 +866,7 @@ func (h *DLPHandler) toViolationResponse(violation *models.DLPViolation) DLPViol
 		ChunkID:        violation.ChunkID,
 		RuleName:       violation.RuleName,
 		Severity:       violation.Severity,
+		ComplianceType: violation.ComplianceType,
 		Confidence:     violation.Confidence,
 		MatchedText:    violation.MatchedText,
 		Context:        violation.Context,
@@ -687,6 +879,11 @@ func (h *DLPHandler) toViolationResponse(violation *models.DLPViolation) DLPViol
 		AcknowledgedBy: violation.AcknowledgedBy,
 		CreatedAt:      violation.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:      violation.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+
+	// Include filename if File relation is loaded
+	if violation.File != nil {
+		responseData.FileName = violation.File.Filename
 	}
 
 	if violation.AcknowledgedAt != nil {

@@ -481,7 +481,7 @@
             "description": "Filter by file type",
             "schema": {
               "type": "string",
-              "enum": ["pdf", "docx", "xlsx", "pptx", "txt", "html", "json", "xml", "csv", "image", "email", "archive"]
+              "enum": ["pdf", "docx", "xlsx", "pptx", "ppt", "txt", "html", "json", "xml", "csv", "image", "email", "archive"]
             }
           },
           {
@@ -2724,7 +2724,7 @@
           },
           "file_type": {
             "type": "string",
-            "enum": ["pdf", "docx", "xlsx", "pptx", "txt", "html", "json", "xml", "csv", "image", "email", "archive", "other"]
+            "enum": ["pdf", "docx", "xlsx", "pptx", "ppt", "txt", "html", "json", "xml", "csv", "image", "email", "archive", "other"]
           },
           "checksum": {
             "type": "string"

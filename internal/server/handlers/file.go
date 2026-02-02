@@ -769,6 +769,7 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 		ChunkingStrategy string `json:"chunking_strategy"`
 		Priority         string `json:"priority"`
 		DLPScanEnabled   bool   `json:"dlp_scan_enabled"`
+		RedactionMode    string `json:"redaction_mode"` // mask, replace, hash, remove, tokenize, none
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -814,7 +815,8 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 				"strategy_type":    req.ChunkingStrategy,
 				"priority":         req.Priority,
 				"dlp_scan_enabled": req.DLPScanEnabled,
-				"dataset":          "documents", // Use shared documents dataset
+				"redaction_mode":   req.RedactionMode, // mask, replace, hash, remove, tokenize, none
+				"dataset":          "documents",       // Use shared documents dataset
 			}
 
 			tierResult, err := h.embeddingCoordinator.ProcessSingleFileWithEmbeddings(ctx, tenantID, fileID, options)

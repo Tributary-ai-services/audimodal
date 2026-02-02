@@ -10,6 +10,9 @@ import (
 
 	"github.com/jscharber/audimodal/internal/database"
 	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/pkg/dlp"
+	"github.com/jscharber/audimodal/pkg/dlp/scanner"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 	"github.com/jscharber/audimodal/pkg/embeddings"
 )
 
@@ -27,6 +30,7 @@ type TierProcessor struct {
 	db               *database.Database
 	pipeline         *Pipeline
 	embeddingService embeddings.EmbeddingService
+	dlpService       *dlp.DLPService
 	config           *TierProcessorConfig
 }
 
@@ -41,6 +45,8 @@ type TierProcessorConfig struct {
 	EnableEmbeddings       bool          `json:"enable_embeddings"`
 	EmbeddingBatchSize     int           `json:"embedding_batch_size"`
 	EmbeddingDataset       string        `json:"embedding_dataset"`
+	EnableDLP              bool          `json:"enable_dlp"`
+	DLPBatchSize           int           `json:"dlp_batch_size"`
 }
 
 // TierProcessingResult contains results with tier-specific metrics
@@ -49,6 +55,8 @@ type TierProcessingResult struct {
 	Tier               ProcessingTier   `json:"tier"`
 	EmbeddingsCreated  int              `json:"embeddings_created"`
 	EmbeddingTime      time.Duration    `json:"embedding_time"`
+	DLPViolationsFound int              `json:"dlp_violations_found"`
+	DLPScanTime        time.Duration    `json:"dlp_scan_time"`
 	CheckpointsCreated int              `json:"checkpoints_created"`
 	ResourcesUsed      *ResourceMetrics `json:"resources_used"`
 }
@@ -67,12 +75,27 @@ func NewTierProcessor(db *database.Database, pipeline *Pipeline, embeddingServic
 		config = GetDefaultTierProcessorConfig()
 	}
 
+	// Initialize DLP service if DLP is enabled
+	var dlpService *dlp.DLPService
+	if config.EnableDLP {
+		dlpService = dlp.NewDLPService(nil) // Use default DLP config
+		fmt.Printf("DEBUG: TierProcessor created with DLP service enabled\n")
+	} else {
+		fmt.Printf("DEBUG: TierProcessor created with DLP DISABLED (config.EnableDLP=%v)\n", config.EnableDLP)
+	}
+
 	return &TierProcessor{
 		db:               db,
 		pipeline:         pipeline,
 		embeddingService: embeddingService,
+		dlpService:       dlpService,
 		config:           config,
 	}
+}
+
+// SetDLPService allows setting a custom DLP service
+func (tp *TierProcessor) SetDLPService(dlpService *dlp.DLPService) {
+	tp.dlpService = dlpService
 }
 
 // GetDefaultTierProcessorConfig returns default tier processor configuration
@@ -87,6 +110,8 @@ func GetDefaultTierProcessorConfig() *TierProcessorConfig {
 		EnableEmbeddings:       true,
 		EmbeddingBatchSize:     50,
 		EmbeddingDataset:       "default",
+		EnableDLP:              true, // Enable DLP scanning by default
+		DLPBatchSize:           20,
 	}
 }
 
@@ -136,6 +161,27 @@ func (tp *TierProcessor) ProcessFileWithTier(ctx context.Context, request *Proce
 			result.EmbeddingsCreated = embeddingsCreated
 		}
 		result.EmbeddingTime = time.Since(embeddingStartTime)
+	}
+
+	// Post-process: perform DLP scanning if enabled (either by config or request flag)
+	dlpEnabled := tp.config.EnableDLP || request.DLPScanEnabled
+	fmt.Printf("DEBUG DLP: config.EnableDLP=%v, request.DLPScanEnabled=%v, dlpEnabled=%v, dlpService=%v, status=%s\n",
+		tp.config.EnableDLP, request.DLPScanEnabled, dlpEnabled, tp.dlpService != nil, result.ProcessingResult.Status)
+	if dlpEnabled && tp.dlpService != nil && result.ProcessingResult.Status == "completed" {
+		dlpStartTime := time.Now()
+		violationsFound, err := tp.performDLPScan(tierCtx, request, result)
+		if err != nil {
+			// Log error but don't fail the entire processing
+			if result.ProcessingResult.Metadata == nil {
+				result.ProcessingResult.Metadata = map[string]any{}
+			}
+			result.ProcessingResult.Metadata["dlp_error"] = err.Error()
+			fmt.Printf("WARNING: DLP scan failed for file %s: %v\n", request.FileID.String(), err)
+		} else {
+			result.DLPViolationsFound = violationsFound
+			fmt.Printf("INFO: DLP scan completed for file %s: %d violations found\n", request.FileID.String(), violationsFound)
+		}
+		result.DLPScanTime = time.Since(dlpStartTime)
 	}
 
 	result.Tier = tier
@@ -360,6 +406,227 @@ func (tp *TierProcessor) generateEmbeddings(ctx context.Context, request *Proces
 	}
 
 	return embeddingsCreated, nil
+}
+
+// performDLPScan scans all chunks of a processed file for PII and creates violations
+func (tp *TierProcessor) performDLPScan(ctx context.Context, request *ProcessingRequest, result *TierProcessingResult) (int, error) {
+	if tp.dlpService == nil {
+		return 0, fmt.Errorf("DLP service not configured")
+	}
+
+	// Get all chunks for this file from the database
+	tenantService := tp.db.NewTenantService()
+	tenantRepo, err := tenantService.GetTenantRepository(ctx, request.TenantID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get tenant repository: %w", err)
+	}
+
+	var chunks []models.Chunk
+	if err := tenantRepo.DB().Where("file_id = ?", request.FileID).Find(&chunks).Error; err != nil {
+		return 0, fmt.Errorf("failed to get chunks: %w", err)
+	}
+
+	if len(chunks) == 0 {
+		return 0, nil // No chunks to scan
+	}
+
+	// Build compliance rules from request or use defaults
+	// These map to the regulations defined in pkg/dlp/compliance/checker.go
+	var complianceRules []types.ComplianceRule
+	if len(request.ComplianceRules) > 0 {
+		for _, ruleName := range request.ComplianceRules {
+			complianceRules = append(complianceRules, types.ComplianceRule{
+				Regulation: ruleName,
+				Required:   true,
+			})
+		}
+	} else {
+		// Default: check all major compliance frameworks
+		// GDPR, HIPAA, PCI-DSS, CCPA are implemented in pkg/dlp/compliance/checker.go
+		complianceRules = []types.ComplianceRule{
+			{Regulation: "GDPR", Required: true},
+			{Regulation: "HIPAA", Required: true},
+			{Regulation: "PCI-DSS", Required: true},
+			{Regulation: "CCPA", Required: true},
+		}
+	}
+
+	totalViolations := 0
+	batchSize := tp.config.DLPBatchSize
+	if batchSize <= 0 {
+		batchSize = 20
+	}
+
+	// Process chunks in batches
+	for i := 0; i < len(chunks); i += batchSize {
+		end := i + batchSize
+		if end > len(chunks) {
+			end = len(chunks)
+		}
+
+		batch := chunks[i:end]
+
+		// Create batch scan request
+		chunkRequests := make([]dlp.ChunkScanRequest, len(batch))
+		for j, chunk := range batch {
+			chunkRequests[j] = dlp.ChunkScanRequest{
+				TenantID:        request.TenantID,
+				ChunkID:         chunk.ChunkID,
+				FileID:          request.FileID,
+				Content:         chunk.Content,
+				Metadata:        map[string]string{"chunk_number": fmt.Sprintf("%d", chunk.ChunkNumber)},
+				ComplianceRules: complianceRules,
+			}
+		}
+
+		batchRequest := &dlp.BatchScanRequest{
+			TenantID:        request.TenantID,
+			Chunks:          chunkRequests,
+			ComplianceRules: complianceRules,
+			MaxConcurrency:  5,
+		}
+
+		batchResponse, err := tp.dlpService.ScanBatch(ctx, batchRequest)
+		if err != nil {
+			fmt.Printf("WARNING: DLP batch scan failed for file %s batch %d: %v\n", request.FileID.String(), i/batchSize, err)
+			continue
+		}
+
+		// Process results and create violations
+		for chunkID, scanResponse := range batchResponse.Results {
+			// Update chunk DLP status
+			chunkUpdates := map[string]interface{}{
+				"dlp_scan_status": models.DLPScanStatusCompleted,
+			}
+			if scanResponse.ScanResult != nil {
+				chunkUpdates["dlp_finding_count"] = scanResponse.ScanResult.TotalMatches
+				chunkUpdates["dlp_risk_score"] = scanResponse.ScanResult.RiskScore
+			}
+			now := time.Now()
+			chunkUpdates["dlp_scanned_at"] = &now
+
+			// Apply redaction if enabled and there are findings to redact
+			if request.RedactionMode != "" && request.RedactionMode != types.RedactionNone &&
+				scanResponse.ScanResult != nil && scanResponse.ScanResult.TotalMatches > 0 {
+
+				// Find original chunk content
+				var originalContent string
+				for _, c := range batch {
+					if c.ChunkID == chunkID {
+						originalContent = c.Content
+						break
+					}
+				}
+
+				if originalContent != "" {
+					redactionEngine := scanner.NewBasicRedactionEngine()
+					redactedContent, redactErr := redactionEngine.RedactContent(originalContent, scanResponse.ScanResult, request.RedactionMode)
+					if redactErr != nil {
+						fmt.Printf("WARNING: Failed to redact chunk %s: %v\n", chunkID, redactErr)
+					} else if redactedContent != originalContent {
+						chunkUpdates["content"] = redactedContent
+						chunkUpdates["redaction_applied"] = true
+						chunkUpdates["redaction_mode"] = string(request.RedactionMode)
+						fmt.Printf("DEBUG: Redacted %d findings in chunk %s using %s mode\n",
+							scanResponse.ScanResult.TotalMatches, chunkID, request.RedactionMode)
+					}
+				}
+			}
+
+			if err := tenantRepo.DB().Model(&models.Chunk{}).Where("chunk_id = ?", chunkID).Updates(chunkUpdates).Error; err != nil {
+				fmt.Printf("WARNING: Failed to update chunk %s DLP status: %v\n", chunkID, err)
+			}
+
+			// Create violations for compliance results
+			if scanResponse.ComplianceResult != nil && len(scanResponse.ComplianceResult.Violations) > 0 {
+				for _, violation := range scanResponse.ComplianceResult.Violations {
+					// Find the chunk to get its UUID
+					var chunkUUID uuid.UUID
+					for _, c := range batch {
+						if c.ChunkID == chunkID {
+							chunkUUID = c.ID
+							break
+						}
+					}
+
+					// Derive regulation from rule (e.g., "GDPR-001" -> "GDPR")
+					regulation := violation.Rule
+					if idx := len(violation.Rule); idx > 4 && violation.Rule[idx-4] == '-' {
+						regulation = violation.Rule[:idx-4]
+					}
+
+					// Get or create the default compliance policy for this tenant
+					policyID, policyErr := tp.getOrCreateCompliancePolicy(tenantRepo, request.TenantID)
+					if policyErr != nil {
+						fmt.Printf("WARNING: Failed to get/create compliance policy: %v\n", policyErr)
+						continue
+					}
+
+					dlpViolation := models.DLPViolation{
+						TenantID:       request.TenantID,
+						PolicyID:       policyID,
+						FileID:         request.FileID,
+						ChunkID:        &chunkUUID,
+						RuleName:       violation.Rule,
+						Severity:       violation.Severity,
+						ComplianceType: regulation,
+						Confidence:     0.9, // High confidence for pattern matches
+						Context:        violation.Description,
+						Status:         "detected",
+						Acknowledged:   false,
+					}
+
+					if err := tenantRepo.DB().Create(&dlpViolation).Error; err != nil {
+						fmt.Printf("WARNING: Failed to create DLP violation for chunk %s: %v\n", chunkID, err)
+					} else {
+						totalViolations++
+					}
+				}
+			}
+		}
+	}
+
+	return totalViolations, nil
+}
+
+// getOrCreateCompliancePolicy gets or creates the default compliance scanner policy for a tenant
+func (tp *TierProcessor) getOrCreateCompliancePolicy(tenantRepo *database.TenantRepository, tenantID uuid.UUID) (uuid.UUID, error) {
+	const defaultPolicyName = "compliance-auto-scanner"
+
+	// Try to find existing policy
+	var policy models.DLPPolicy
+	err := tenantRepo.DB().Where("tenant_id = ? AND name = ?", tenantID, defaultPolicyName).First(&policy).Error
+	if err == nil {
+		return policy.ID, nil
+	}
+
+	// Create default compliance policy if not found
+	policy = models.DLPPolicy{
+		TenantID:    tenantID,
+		Name:        defaultPolicyName,
+		DisplayName: "Compliance Auto-Scanner",
+		Description: "Automatically created policy for compliance scanning (GDPR, HIPAA, PCI-DSS, CCPA)",
+		Enabled:     true,
+		Priority:    100,
+		ContentRules: models.DLPContentRules{
+			{Name: "SSN Detection", Type: "builtin", BuiltinType: "ssn", Sensitivity: "critical", Confidence: 0.9},
+			{Name: "Credit Card Detection", Type: "builtin", BuiltinType: "credit_card", Sensitivity: "critical", Confidence: 0.9},
+			{Name: "Email Detection", Type: "builtin", BuiltinType: "email", Sensitivity: "medium", Confidence: 0.8},
+			{Name: "Phone Detection", Type: "builtin", BuiltinType: "phone", Sensitivity: "medium", Confidence: 0.8},
+			{Name: "IP Address Detection", Type: "builtin", BuiltinType: "ip_address", Sensitivity: "low", Confidence: 0.7},
+		},
+		Actions: models.DLPActions{
+			{Type: "audit", Priority: 1, AuditLevel: "warning"},
+		},
+		Status: "active",
+	}
+
+	if err := tenantRepo.DB().Create(&policy).Error; err != nil {
+		return uuid.Nil, fmt.Errorf("failed to create default compliance policy: %w", err)
+	}
+
+	fmt.Printf("Created default compliance policy for tenant %s: %s\n", tenantID, policy.ID)
+	return policy.ID, nil
 }
 
 // GetTierMetrics returns metrics for each processing tier

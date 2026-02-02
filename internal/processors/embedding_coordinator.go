@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/jscharber/audimodal/internal/database"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 	"github.com/jscharber/audimodal/pkg/embeddings"
 	"github.com/jscharber/audimodal/pkg/embeddings/client"
 	"github.com/jscharber/audimodal/pkg/embeddings/providers"
@@ -192,6 +193,9 @@ func (ec *EmbeddingCoordinator) ProcessSingleFileWithEmbeddings(ctx context.Cont
 		}
 		if dlpEnabled, ok := options["dlp_scan_enabled"].(bool); ok {
 			request.DLPScanEnabled = dlpEnabled
+		}
+		if redactionMode, ok := options["redaction_mode"].(string); ok {
+			request.RedactionMode = types.RedactionStrategy(redactionMode)
 		}
 	}
 

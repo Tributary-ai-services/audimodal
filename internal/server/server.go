@@ -559,7 +559,7 @@ func isSessionRoute(path, apiPrefix string) bool {
 }
 
 func isDLPRoute(path, apiPrefix string) bool {
-	return contains(path, "/dlp-policies") || contains(path, "/violations")
+	return strings.Contains(path, "/dlp-policies") || strings.Contains(path, "/violations")
 }
 
 func isFileRoute(path, apiPrefix string) bool {
