@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -30,6 +32,7 @@ type ChunkResponse struct {
 	ChunkID          string                     `json:"chunk_id"`
 	ChunkType        string                     `json:"chunk_type"`
 	ChunkNumber      int                        `json:"chunk_number"`
+	Content          string                     `json:"content,omitempty"`
 	ContentPreview   string                     `json:"content_preview,omitempty"`
 	S3Bucket         string                     `json:"s3_bucket,omitempty"`
 	S3Key            string                     `json:"s3_key,omitempty"`
@@ -180,6 +183,9 @@ func (h *ChunkHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *ChunkHandler) ListChunks(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID) {
 	page, pageSize, offset := getPagination(r.Context())
 
+	// Check include_content param (default: false for this general listing endpoint)
+	includeContent := r.URL.Query().Get("include_content") == "true"
+
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
 	if err != nil {
@@ -224,10 +230,50 @@ func (h *ChunkHandler) ListChunks(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
+	// Hydrate content from S3 if requested
+	var contents map[int]string
+	if includeContent && s3UploaderInstance != nil && len(chunks) > 0 {
+		contents = make(map[int]string, len(chunks))
+		const maxConcurrent = 10
+		sem := make(chan struct{}, maxConcurrent)
+		var mu sync.Mutex
+		var wg sync.WaitGroup
+
+		for i, chunk := range chunks {
+			if chunk.S3Bucket == "" || chunk.S3Key == "" {
+				mu.Lock()
+				contents[i] = chunk.ContentPreview
+				mu.Unlock()
+				continue
+			}
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(idx int, c models.Chunk) {
+				defer wg.Done()
+				defer func() { <-sem }()
+
+				content, err := s3UploaderInstance.GetChunkContent(r.Context(), c.S3Bucket, c.S3Key)
+				mu.Lock()
+				if err != nil {
+					log.Printf("[ListChunks] Failed to read S3 content for chunk %s: %v", c.ID, err)
+					contents[idx] = c.ContentPreview
+				} else {
+					contents[idx] = content
+				}
+				mu.Unlock()
+			}(i, chunk)
+		}
+		wg.Wait()
+	}
+
 	// Convert to response format
 	responseData := make([]ChunkResponse, len(chunks))
 	for i, chunk := range chunks {
-		responseData[i] = h.toChunkResponse(&chunk)
+		resp := h.toChunkResponse(&chunk)
+		if contents != nil {
+			resp.Content = contents[i]
+		}
+		responseData[i] = resp
 	}
 
 	// Get total count

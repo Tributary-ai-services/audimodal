@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -788,6 +790,28 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request, tenantI
 	response.WriteNoContent(w)
 }
 
+// chunkWithContentResponse is the response struct that includes full content from S3
+type chunkWithContentResponse struct {
+	ID             uuid.UUID              `json:"id"`
+	TenantID       uuid.UUID              `json:"tenant_id"`
+	FileID         uuid.UUID              `json:"file_id"`
+	ChunkID        string                 `json:"chunk_id"`
+	ChunkType      string                 `json:"chunk_type"`
+	ChunkNumber    int                    `json:"chunk_number"`
+	Content        string                 `json:"content"`
+	ContentPreview string                 `json:"content_preview,omitempty"`
+	ContentHash    string                 `json:"content_hash"`
+	SizeBytes      int64                  `json:"size_bytes"`
+	PageNumber     *int                   `json:"page_number,omitempty"`
+	LineNumber     *int                   `json:"line_number,omitempty"`
+	ProcessedAt    string                 `json:"processed_at"`
+	ProcessedBy    string                 `json:"processed_by"`
+	Language       string                 `json:"language,omitempty"`
+	Metadata       models.ChunkMetadata   `json:"metadata,omitempty"`
+	CreatedAt      string                 `json:"created_at"`
+	UpdatedAt      string                 `json:"updated_at"`
+}
+
 // ListFileChunks handles GET /api/v1/tenants/{tenant_id}/files/{id}/chunks
 func (h *FileHandler) ListFileChunks(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID, fileID uuid.UUID) {
 	if r.Method != http.MethodGet {
@@ -796,6 +820,9 @@ func (h *FileHandler) ListFileChunks(w http.ResponseWriter, r *http.Request, ten
 	}
 
 	page, pageSize, offset := getPagination(r.Context())
+
+	// Check include_content param (default: true for backward compat)
+	includeContent := r.URL.Query().Get("include_content") != "false"
 
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
@@ -825,7 +852,88 @@ func (h *FileHandler) ListFileChunks(w http.ResponseWriter, r *http.Request, ten
 	var totalCount int64
 	tenantRepo.DB().Model(&models.Chunk{}).Where("file_id = ?", fileID).Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), chunks, page, pageSize, totalCount)
+	// Build response with content hydrated from S3
+	responseData := make([]chunkWithContentResponse, len(chunks))
+
+	if includeContent && s3UploaderInstance != nil && len(chunks) > 0 {
+		// Hydrate content from S3 concurrently with bounded parallelism
+		const maxConcurrent = 10
+		sem := make(chan struct{}, maxConcurrent)
+		var wg sync.WaitGroup
+		contents := make([]string, len(chunks))
+
+		for i, chunk := range chunks {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(idx int, c models.Chunk) {
+				defer wg.Done()
+				defer func() { <-sem }()
+
+				if c.S3Bucket != "" && c.S3Key != "" {
+					content, err := s3UploaderInstance.GetChunkContent(r.Context(), c.S3Bucket, c.S3Key)
+					if err != nil {
+						log.Printf("[ListFileChunks] Failed to read S3 content for chunk %s: %v", c.ID, err)
+						// Fall back to content_preview
+						contents[idx] = c.ContentPreview
+					} else {
+						contents[idx] = content
+					}
+				} else {
+					contents[idx] = c.ContentPreview
+				}
+			}(i, chunk)
+		}
+		wg.Wait()
+
+		for i, chunk := range chunks {
+			responseData[i] = chunkWithContentResponse{
+				ID:             chunk.ID,
+				TenantID:       chunk.TenantID,
+				FileID:         chunk.FileID,
+				ChunkID:        chunk.ChunkID,
+				ChunkType:      chunk.ChunkType,
+				ChunkNumber:    chunk.ChunkNumber,
+				Content:        contents[i],
+				ContentPreview: chunk.ContentPreview,
+				ContentHash:    chunk.ContentHash,
+				SizeBytes:      chunk.SizeBytes,
+				PageNumber:     chunk.PageNumber,
+				LineNumber:     chunk.LineNumber,
+				ProcessedAt:    chunk.ProcessedAt.Format("2006-01-02T15:04:05Z"),
+				ProcessedBy:    chunk.ProcessedBy,
+				Language:       chunk.Language,
+				Metadata:       chunk.Metadata,
+				CreatedAt:      chunk.CreatedAt.Format("2006-01-02T15:04:05Z"),
+				UpdatedAt:      chunk.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			}
+		}
+	} else {
+		// No content hydration — return content_preview as content for compat
+		for i, chunk := range chunks {
+			responseData[i] = chunkWithContentResponse{
+				ID:             chunk.ID,
+				TenantID:       chunk.TenantID,
+				FileID:         chunk.FileID,
+				ChunkID:        chunk.ChunkID,
+				ChunkType:      chunk.ChunkType,
+				ChunkNumber:    chunk.ChunkNumber,
+				Content:        chunk.ContentPreview,
+				ContentPreview: chunk.ContentPreview,
+				ContentHash:    chunk.ContentHash,
+				SizeBytes:      chunk.SizeBytes,
+				PageNumber:     chunk.PageNumber,
+				LineNumber:     chunk.LineNumber,
+				ProcessedAt:    chunk.ProcessedAt.Format("2006-01-02T15:04:05Z"),
+				ProcessedBy:    chunk.ProcessedBy,
+				Language:       chunk.Language,
+				Metadata:       chunk.Metadata,
+				CreatedAt:      chunk.CreatedAt.Format("2006-01-02T15:04:05Z"),
+				UpdatedAt:      chunk.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			}
+		}
+	}
+
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // ProcessFile handles POST /api/v1/tenants/{tenant_id}/files/{id}/process
