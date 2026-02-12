@@ -18,10 +18,12 @@ type Chunk struct {
 	ChunkType   string `gorm:"not null;index" json:"chunk_type"` // text, table, image, etc.
 	ChunkNumber int    `gorm:"not null" json:"chunk_number"`     // Sequential number within file
 
-	// Content
-	Content     string `gorm:"type:text;not null" json:"content"`
-	ContentHash string `gorm:"index" json:"content_hash"` // Hash of content for deduplication
-	SizeBytes   int64  `gorm:"not null" json:"size_bytes"`
+	// Content (stored in S3, not in PostgreSQL)
+	S3Bucket       string `gorm:"not null" json:"s3_bucket"`
+	S3Key          string `gorm:"not null" json:"s3_key"`
+	ContentPreview string `gorm:"column:content_preview;type:varchar(500)" json:"content_preview,omitempty"` // First 500 chars
+	ContentHash    string `gorm:"index" json:"content_hash"`                                                // Hash of content for deduplication
+	SizeBytes      int64  `gorm:"not null" json:"size_bytes"`
 
 	// Position information
 	StartPosition *int64 `json:"start_position,omitempty"`
@@ -314,12 +316,12 @@ func (c *Chunk) IsLowQuality() bool {
 	return c.GetQualityScore() < 0.5
 }
 
-// GetContentPreview returns a preview of the content
+// GetContentPreview returns the stored content preview
 func (c *Chunk) GetContentPreview(maxLength int) string {
-	if len(c.Content) <= maxLength {
-		return c.Content
+	if len(c.ContentPreview) <= maxLength {
+		return c.ContentPreview
 	}
-	return c.Content[:maxLength] + "..."
+	return c.ContentPreview[:maxLength] + "..."
 }
 
 // AddRelationship adds a relationship to another chunk

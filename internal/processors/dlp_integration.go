@@ -111,7 +111,7 @@ func (p *DLPProcessor) ProcessChunk(ctx context.Context, tenantID uuid.UUID, chu
 		TenantID: tenantID,
 		ChunkID:  chunkID.String(),
 		FileID:   chunk.FileID,
-		Content:  chunk.Content,
+		Content:  chunk.ContentPreview,
 		Metadata: p.extractChunkMetadata(chunk),
 		ScanConfig: &types.ScanConfig{
 			TenantID:        tenantID,

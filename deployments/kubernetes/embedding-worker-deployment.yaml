@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audimodal-embedding-worker
+  namespace: aether-be
+  labels:
+    app.kubernetes.io/name: audimodal-embedding-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: audimodal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audimodal-embedding-worker
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audimodal-embedding-worker
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: audimodal
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: embedding-worker
+        image: registry-api.tas.scharber.com/audimodal:latest
+        command: ["./embeddingworker"]
+        ports:
+        - name: health
+          containerPort: 8081
+          protocol: TCP
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-shared.tas-shared.svc.cluster.local:9092"
+        - name: KAFKA_GROUP_ID
+          value: "audimodal-embedding-workers"
+        - name: DB_HOST
+          value: "postgres-shared.tas-shared.svc.cluster.local"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: audimodal-secrets
+              key: db-username
+              optional: true
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: audimodal-secrets
+              key: db-password
+              optional: true
+        - name: DB_DATABASE
+          value: "audimodal"
+        - name: DB_SSL_MODE
+          value: "disable"
+        - name: AWS_ENDPOINT_URL
+          value: "http://minio-shared.tas-shared.svc.cluster.local:9000"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: audimodal-secrets
+              key: minio-access-key
+              optional: true
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: audimodal-secrets
+              key: minio-secret-key
+              optional: true
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-secret
+              key: OPENAI_API_KEY
+        - name: DEEPLAKE_API_URL
+          value: "http://deeplake-api.aether-be.svc.cluster.local:8000"
+        - name: DEEPLAKE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aether-backend-secret
+              key: DEEPLAKE_API_KEY
+        - name: EMBEDDING_MODEL
+          value: "text-embedding-3-small"
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30

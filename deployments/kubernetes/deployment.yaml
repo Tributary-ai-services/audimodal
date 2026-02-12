@@ -150,8 +150,6 @@ spec:
         - name: config
           mountPath: /app/config
           readOnly: true
-        - name: data
-          mountPath: /app/data
         - name: logs
           mountPath: /app/logs
         - name: temp
@@ -166,9 +164,6 @@ spec:
       - name: config
         configMap:
           name: eaiingest-config
-      - name: data
-        persistentVolumeClaim:
-          claimName: eaiingest-data-pvc
       - name: logs
         emptyDir: {}
       - name: temp

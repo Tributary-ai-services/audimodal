@@ -30,7 +30,9 @@ type ChunkResponse struct {
 	ChunkID          string                     `json:"chunk_id"`
 	ChunkType        string                     `json:"chunk_type"`
 	ChunkNumber      int                        `json:"chunk_number"`
-	Content          string                     `json:"content"`
+	ContentPreview   string                     `json:"content_preview,omitempty"`
+	S3Bucket         string                     `json:"s3_bucket,omitempty"`
+	S3Key            string                     `json:"s3_key,omitempty"`
 	ContentHash      string                     `json:"content_hash"`
 	SizeBytes        int64                      `json:"size_bytes"`
 	StartPosition    *int64                     `json:"start_position,omitempty"`
@@ -626,7 +628,9 @@ func (h *ChunkHandler) toChunkResponse(chunk *models.Chunk) ChunkResponse {
 		ChunkID:          chunk.ChunkID,
 		ChunkType:        chunk.ChunkType,
 		ChunkNumber:      chunk.ChunkNumber,
-		Content:          chunk.Content,
+		ContentPreview:   chunk.ContentPreview,
+		S3Bucket:         chunk.S3Bucket,
+		S3Key:            chunk.S3Key,
 		ContentHash:      chunk.ContentHash,
 		SizeBytes:        chunk.SizeBytes,
 		StartPosition:    chunk.StartPosition,

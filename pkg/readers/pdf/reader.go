@@ -580,6 +580,9 @@ func (it *MapReduceIterator) processAllPages(ctx context.Context) error {
 		return fmt.Errorf("reduce failed: %w", err)
 	}
 
+	log.Printf("[MapReduce] Reducer produced %d chunks from %d pages (%d failed, %d total chars)",
+		len(chunks), result.TotalPages, result.FailedPages, result.TotalCharacters)
+
 	it.chunks = chunks
 	return nil
 }

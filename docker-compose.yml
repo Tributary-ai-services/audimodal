@@ -37,8 +37,11 @@ services:
       - AWS_S3_BUCKET=audimodal-uploads
       - AWS_S3_FORCE_PATH_STYLE=true
       - S3_UPLOAD_EXPIRATION=3600
+      # Kafka Configuration
+      - KAFKA_BOOTSTRAP_SERVERS=tas-kafka-shared:9092
+      - KAFKA_GROUP_ID=audimodal-api
+      - KAFKA_CLIENT_ID=audimodal-api
     volumes:
-      - ./data:/app/data
       - ./logs:/app/logs
       - ./temp:/app/temp
     depends_on:

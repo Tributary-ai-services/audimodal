@@ -103,9 +103,9 @@ func GetDefaultTierProcessorConfig() *TierProcessorConfig {
 	return &TierProcessorConfig{
 		SmallFileTierThreshold: 10 * 1024 * 1024,   // 10MB
 		LargeFileTierThreshold: 1024 * 1024 * 1024, // 1GB
-		SmallFileTimeout:       5 * time.Minute,
-		MediumFileTimeout:      30 * time.Minute,
-		LargeFileTimeout:       2 * time.Hour,
+		SmallFileTimeout:       6 * time.Hour,  // Scanned PDFs need long OCR time regardless of file size
+		MediumFileTimeout:      6 * time.Hour,
+		LargeFileTimeout:       6 * time.Hour,
 		CheckpointInterval:     5 * time.Minute,
 		EnableEmbeddings:       true,
 		EmbeddingBatchSize:     50,
@@ -364,7 +364,7 @@ func (tp *TierProcessor) generateEmbeddings(ctx context.Context, request *Proces
 			chunkInputs[j] = &embeddings.ChunkInput{
 				ID:          chunk.ChunkID,
 				DocumentID:  documentID, // Use Neo4j Document ID for cross-service consistency
-				Content:     chunk.Content,
+				Content:     chunk.ContentPreview, // Use preview for embedding in legacy pipeline
 				ChunkIndex:  chunk.ChunkNumber,
 				ContentType: chunk.ChunkType,
 				Metadata: map[string]interface{}{
@@ -473,7 +473,7 @@ func (tp *TierProcessor) performDLPScan(ctx context.Context, request *Processing
 				TenantID:        request.TenantID,
 				ChunkID:         chunk.ChunkID,
 				FileID:          request.FileID,
-				Content:         chunk.Content,
+				Content:         chunk.ContentPreview,
 				Metadata:        map[string]string{"chunk_number": fmt.Sprintf("%d", chunk.ChunkNumber)},
 				ComplianceRules: complianceRules,
 			}
@@ -513,7 +513,7 @@ func (tp *TierProcessor) performDLPScan(ctx context.Context, request *Processing
 				var originalContent string
 				for _, c := range batch {
 					if c.ChunkID == chunkID {
-						originalContent = c.Content
+						originalContent = c.ContentPreview
 						break
 					}
 				}

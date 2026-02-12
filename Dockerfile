@@ -22,6 +22,21 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 # Build pdfworker binary for map-reduce PDF processing
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o pdfworker ./cmd/pdfworker
 
+# Build OCR worker binary for Kafka pipeline
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ocrworker ./cmd/ocrworker
+
+# Build assembler binary for Kafka pipeline
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o assembler ./cmd/assembler
+
+# Build DLP worker binary for Kafka pipeline
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dlpworker ./cmd/dlpworker
+
+# Build embedding worker binary for Kafka pipeline
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o embeddingworker ./cmd/embeddingworker
+
+# Build backfill utility for one-time DLP job publishing
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o backfill-dlp ./cmd/backfill-dlp
+
 # Production stage
 FROM alpine:3.18
 
@@ -49,6 +64,11 @@ WORKDIR /app
 # Copy binaries from builder stage
 COPY --from=builder /app/main .
 COPY --from=builder /app/pdfworker .
+COPY --from=builder /app/ocrworker .
+COPY --from=builder /app/assembler .
+COPY --from=builder /app/dlpworker .
+COPY --from=builder /app/embeddingworker .
+COPY --from=builder /app/backfill-dlp .
 
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh

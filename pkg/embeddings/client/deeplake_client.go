@@ -512,7 +512,7 @@ func (c *DeepLakeAPIClient) makeRequest(ctx context.Context, method, endpoint st
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.config.APIKey))
+	req.Header.Set("X-API-Key", c.config.APIKey)
 	req.Header.Set("User-Agent", c.config.UserAgent)
 
 	if c.config.TenantID != "" {
