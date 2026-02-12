@@ -126,14 +126,14 @@ type ExtractionConfig struct {
 func DefaultExtractionConfig() *ExtractionConfig {
 	return &ExtractionConfig{
 		OCRLanguage:         "eng",
-		OCRDPI:              150, // Lower = less memory
-		OCRTimeout:          300, // 5 minutes per page
+		OCRDPI:              300, // Higher DPI for better OCR quality
+		OCRTimeout:          600, // 10 minutes per page (quality over speed)
 		TextThreshold:       100, // 100 chars to classify as text_only
 		LargeImageThreshold: 50,  // 50% of page = large image
 		OCRAnyImage:         false,
 		OCRImageMinWidth:    200, // Min 200px width to trigger OCR
 		OCRImageMinHeight:   200, // Min 200px height to trigger OCR
-		MaxMemoryMB:         1024,
+		MaxMemoryMB:         2048,
 		PreserveLayout:      true,
 		ExtractImages:       false, // Disabled by default for memory
 	}

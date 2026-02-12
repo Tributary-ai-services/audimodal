@@ -136,7 +136,7 @@ func GetDefaultPipelineConfig() *PipelineConfig {
 		MaxConcurrentFiles:  2, // Reduced from 5 to limit peak memory (60% reduction)
 		MaxConcurrentChunks: 20,
 		ChunkBatchSize:      5, // Reduced from 10 for faster GC cycles and lower peak memory
-		ProcessingTimeout:   30 * time.Minute,
+		ProcessingTimeout:   6 * time.Hour, // Must accommodate large OCR PDFs (122-page scan can take hours)
 		RetryAttempts:       3,
 		RetryDelay:          5 * time.Second,
 		AutoSelectReader:    true,
@@ -179,6 +179,12 @@ func (p *Pipeline) ProcessFile(ctx context.Context, request *ProcessingRequest) 
 		p.updateMetrics(result)
 	}
 
+	// Use a fresh context for post-processing (status updates, DLP scan).
+	// The extraction may have taken hours, causing the original context to expire,
+	// but we still need to save results and update status.
+	postCtx, postCancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer postCancel()
+
 	// Update final file status
 	finalStatus := models.FileStatusProcessed
 	if err != nil {
@@ -194,7 +200,7 @@ func (p *Pipeline) ProcessFile(ctx context.Context, request *ProcessingRequest) 
 	fmt.Printf("DEBUG Pipeline DLP: config.EnableDLP=%v, request.DLPScanEnabled=%v, dlpEnabled=%v, dlpService=%v, status=%s\n",
 		p.config.EnableDLP, request.DLPScanEnabled, dlpEnabled, p.dlpService != nil, result.Status)
 	if dlpEnabled && p.dlpService != nil && result.Status == "completed" {
-		violationsFound, dlpErr := p.performDLPScan(ctx, request)
+		violationsFound, dlpErr := p.performDLPScan(postCtx, request)
 		if dlpErr != nil {
 			fmt.Printf("WARNING: DLP scan failed for file %s: %v\n", request.FileID.String(), dlpErr)
 			if result.Metadata == nil {
@@ -210,7 +216,7 @@ func (p *Pipeline) ProcessFile(ctx context.Context, request *ProcessingRequest) 
 		}
 	}
 
-	if updateErr := p.updateFileStatus(ctx, request.FileID, finalStatus, result.ErrorMessage); updateErr != nil {
+	if updateErr := p.updateFileStatus(postCtx, request.FileID, finalStatus, result.ErrorMessage); updateErr != nil {
 		// Log error but don't override original error
 		if err == nil {
 			err = fmt.Errorf("failed to update final file status: %w", updateErr)
@@ -332,9 +338,27 @@ func (p *Pipeline) executeProcessingPipeline(ctx context.Context, request *Proce
 
 // processChunks processes all chunks from the iterator
 func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterator, strategy core.ChunkingStrategy, request *ProcessingRequest, result *ProcessingResult) error {
+	// Use a fresh context for chunk processing. The extraction phase (MapReduce
+	// OCR) can take hours and already manages its own per-page timeouts. The
+	// parent context may expire during extraction, but we must continue to
+	// iterate chunks and save them to the database.
+	chunkCtx, chunkCancel := context.WithCancel(context.Background())
+	defer chunkCancel()
+
+	// Propagate only explicit cancellation from parent
+	go func() {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.Canceled {
+				chunkCancel()
+			}
+		case <-chunkCtx.Done():
+		}
+	}()
+
 	// Get tenant repository
 	tenantService := p.db.NewTenantService()
-	tenantRepo, err := tenantService.GetTenantRepository(ctx, request.TenantID)
+	tenantRepo, err := tenantService.GetTenantRepository(chunkCtx, request.TenantID)
 	if err != nil {
 		return fmt.Errorf("failed to get tenant repository: %w", err)
 	}
@@ -349,15 +373,15 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 	iteratorCallCount := 0
 	for {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-chunkCtx.Done():
+			return chunkCtx.Err()
 		default:
 		}
 
 		// Get next chunk from iterator
 		iteratorCallCount++
 		log.Printf("[PIPELINE] Calling iterator.Next() #%d, current chunks=%d", iteratorCallCount, chunkNumber)
-		rawChunk, err := iterator.Next(ctx)
+		rawChunk, err := iterator.Next(chunkCtx)
 		if err != nil {
 			if err == core.ErrIteratorExhausted {
 				log.Printf("[PIPELINE] Iterator exhausted after %d calls, total chunks=%d", iteratorCallCount, chunkNumber)
@@ -382,7 +406,7 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 
 		// Apply chunking strategy
 		log.Printf("[PIPELINE] Calling strategy.ProcessChunk() for iterator #%d", iteratorCallCount)
-		processedChunks, err := strategy.ProcessChunk(ctx, rawChunk.Data, metadata)
+		processedChunks, err := strategy.ProcessChunk(chunkCtx, rawChunk.Data, metadata)
 		if err != nil {
 			return fmt.Errorf("strategy processing failed: %w", err)
 		}
@@ -417,7 +441,7 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 			if len(chunkBatch) >= p.config.ChunkBatchSize {
 				batchNum := result.ChunksCreated/p.config.ChunkBatchSize + 1
 				log.Printf("[PIPELINE] Saving batch #%d with %d chunks (total so far: %d)", batchNum, len(chunkBatch), result.ChunksCreated)
-				if err := p.saveBatch(ctx, tenantRepo, chunkBatch); err != nil {
+				if err := p.saveBatch(chunkCtx, tenantRepo, chunkBatch); err != nil {
 					return fmt.Errorf("failed to save chunk batch: %w", err)
 				}
 				result.ChunksCreated += len(chunkBatch)
@@ -431,7 +455,7 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 
 	// Process remaining chunks in batch
 	if len(chunkBatch) > 0 {
-		if err := p.saveBatch(ctx, tenantRepo, chunkBatch); err != nil {
+		if err := p.saveBatch(chunkCtx, tenantRepo, chunkBatch); err != nil {
 			return fmt.Errorf("failed to save final chunk batch: %w", err)
 		}
 		result.ChunksCreated += len(chunkBatch)
@@ -443,7 +467,7 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 	}
 
 	// Update file chunk count
-	return p.updateFileChunkCount(ctx, request.FileID, result.ChunksCreated)
+	return p.updateFileChunkCount(chunkCtx, request.FileID, result.ChunksCreated)
 }
 
 // saveBatch saves a batch of chunks to the database
@@ -463,13 +487,19 @@ func (p *Pipeline) convertToDBChunk(chunk core.Chunk, request *ProcessingRequest
 	content := fmt.Sprintf("%v", chunk.Data)
 	sanitizedContent := preprocessing.SanitizeUTF8String(content)
 
+	// Generate content preview (first 500 chars)
+	preview := sanitizedContent
+	if len(preview) > 500 {
+		preview = preview[:500]
+	}
+
 	dbChunk := &models.Chunk{
 		TenantID:        request.TenantID,
 		FileID:          request.FileID,
 		ChunkID:         chunk.Metadata.ChunkID,
 		ChunkType:       chunk.Metadata.ChunkType,
 		ChunkNumber:     p.extractChunkNumber(chunk.Metadata.ChunkID),
-		Content:         sanitizedContent,
+		ContentPreview:  preview,
 		ContentHash:     p.calculateContentHash(chunk.Data),
 		SizeBytes:       chunk.Metadata.SizeBytes,
 		StartPosition:   chunk.Metadata.StartPosition,
@@ -710,7 +740,7 @@ func (p *Pipeline) performDLPScan(ctx context.Context, request *ProcessingReques
 				TenantID:        request.TenantID,
 				ChunkID:         chunk.ChunkID,
 				FileID:          request.FileID,
-				Content:         chunk.Content,
+				Content:         chunk.ContentPreview, // Use preview for DLP scanning in legacy pipeline
 				Metadata:        map[string]string{"chunk_number": fmt.Sprintf("%d", chunk.ChunkNumber)},
 				ComplianceRules: complianceRules,
 			}

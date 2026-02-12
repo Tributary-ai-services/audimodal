@@ -242,16 +242,49 @@ func (e *DefaultPageExtractor) renderPageToImage(ctx context.Context, pdfPath st
 	return imgPath, nil
 }
 
-// ocrImage runs tesseract on an image file
+// preprocessImage applies gentle denoising to improve OCR quality without
+// destroying character shapes. Tesseract handles binarization internally.
+// Requires ImageMagick's convert command.
+func (e *DefaultPageExtractor) preprocessImage(ctx context.Context, imgPath string) (string, error) {
+	dir := filepath.Dir(imgPath)
+	ext := filepath.Ext(imgPath)
+	base := strings.TrimSuffix(filepath.Base(imgPath), ext)
+	outPath := filepath.Join(dir, base+"_preprocessed"+ext)
+
+	// Gentle preprocessing: grayscale + normalize contrast + light denoise
+	// Avoid binarization — Tesseract's internal Otsu threshold is better
+	cmd := exec.CommandContext(ctx, "convert", imgPath,
+		"-colorspace", "Gray",
+		"-normalize",   // Stretch contrast to full range
+		"-despeckle",   // Light denoise
+		outPath)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		// Preprocessing is best-effort; fall back to original
+		return imgPath, nil
+	}
+
+	return outPath, nil
+}
+
+// ocrImage runs tesseract on an image file with quality-optimized settings
 func (e *DefaultPageExtractor) ocrImage(ctx context.Context, imgPath string, language string) (string, float64, error) {
+	// Preprocess image for better OCR quality
+	processedPath, _ := e.preprocessImage(ctx, imgPath)
+
 	// Try with TSV output for confidence
-	text, confidence, err := e.ocrImageWithTSV(ctx, imgPath, language)
+	text, confidence, err := e.ocrImageWithTSV(ctx, processedPath, language)
 	if err == nil {
 		return text, confidence, nil
 	}
 
 	// Fall back to plain text output
-	cmd := exec.CommandContext(ctx, "tesseract", imgPath, "stdout", "-l", language)
+	cmd := exec.CommandContext(ctx, "tesseract", processedPath, "stdout",
+		"-l", language,
+		"--oem", "1",  // LSTM neural net engine (best quality)
+		"--psm", "3")  // Fully automatic page segmentation
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -263,7 +296,11 @@ func (e *DefaultPageExtractor) ocrImage(ctx context.Context, imgPath string, lan
 
 // ocrImageWithTSV runs tesseract with TSV output for confidence scores
 func (e *DefaultPageExtractor) ocrImageWithTSV(ctx context.Context, imgPath string, language string) (string, float64, error) {
-	cmd := exec.CommandContext(ctx, "tesseract", imgPath, "stdout", "-l", language, "tsv")
+	cmd := exec.CommandContext(ctx, "tesseract", imgPath, "stdout",
+		"-l", language,
+		"--oem", "1",  // LSTM neural net engine (best quality)
+		"--psm", "3",  // Fully automatic page segmentation
+		"tsv")
 
 	output, err := cmd.Output()
 	if err != nil {

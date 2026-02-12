@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audimodal-ocr-worker
+  namespace: aether-be
+  labels:
+    app.kubernetes.io/name: audimodal-ocr-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: audimodal
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: audimodal-ocr-worker
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: audimodal-ocr-worker
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: audimodal
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: ocr-worker
+        image: registry-api.tas.scharber.com/audimodal:latest
+        command: ["./ocrworker"]
+        ports:
+        - name: health
+          containerPort: 8081
+          protocol: TCP
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-shared.tas-shared.svc.cluster.local:9092"
+        - name: KAFKA_GROUP_ID
+          value: "audimodal-ocr-workers"
+        - name: AWS_ENDPOINT_URL
+          value: "http://minio-shared.tas-shared.svc.cluster.local:9000"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: audimodal-secrets
+              key: minio-access-key
+              optional: true
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: audimodal-secrets
+              key: minio-secret-key
+              optional: true
+        - name: AWS_REGION
+          value: "us-east-1"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: temp
+          mountPath: /tmp
+      volumes:
+      - name: temp
+        emptyDir:
+          sizeLimit: 5Gi
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 60

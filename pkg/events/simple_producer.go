@@ -93,6 +93,11 @@ func (p *SimpleProducer) getTopicForEvent(eventType string) string {
 	return "events"
 }
 
+// WriteMessages writes raw Kafka messages directly (for batch operations like Splitter).
+func (p *SimpleProducer) WriteMessages(ctx context.Context, msgs ...kafka.Message) error {
+	return p.writer.WriteMessages(ctx, msgs...)
+}
+
 // Close closes the producer
 func (p *SimpleProducer) Close() error {
 	return p.writer.Close()

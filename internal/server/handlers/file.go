@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +24,16 @@ import (
 	"github.com/jscharber/audimodal/pkg/embeddings"
 	"github.com/jscharber/audimodal/pkg/events"
 )
+
+var s3UploaderInstance *services.S3Uploader
+
+func init() {
+	var err error
+	s3UploaderInstance, err = services.NewS3Uploader()
+	if err != nil {
+		fmt.Printf("WARNING: Failed to initialize S3 uploader: %v\n", err)
+	}
+}
 
 const (
 	// MaxMultipartFileSize is the maximum file size for multipart uploads (10MB)
@@ -38,6 +50,7 @@ type FileHandler struct {
 	pipeline             *processors.Pipeline
 	mlAnalysisService    *services.MLAnalysisService
 	eventProducer        *events.SimpleProducer
+	splitter             *processors.Splitter
 }
 
 // NewFileHandler creates a new file handler
@@ -60,6 +73,12 @@ func NewFileHandler(db *database.Database, storageService *services.StorageServi
 	mlAnalysisConfig := services.DefaultMLAnalysisServiceConfig()
 	mlAnalysisService := services.NewMLAnalysisService(db, nil, mlAnalysisConfig)
 
+	// Initialize Splitter for Kafka pipeline (requires S3 + Kafka producer)
+	var splitter *processors.Splitter
+	if s3UploaderInstance != nil && eventProducer != nil {
+		splitter = processors.NewSplitter(db.DB(), s3UploaderInstance, eventProducer)
+	}
+
 	return &FileHandler{
 		db:                   db,
 		embeddingCoordinator: embeddingCoordinator,
@@ -67,6 +86,7 @@ func NewFileHandler(db *database.Database, storageService *services.StorageServi
 		pipeline:             pipeline,
 		mlAnalysisService:    mlAnalysisService,
 		eventProducer:        eventProducer,
+		splitter:             splitter,
 	}
 }
 
@@ -189,6 +209,8 @@ func (h *FileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				h.GetFileMetadata(w, r, tenantCtx.TenantID, fileID)
 			case "violations":
 				h.ListFileViolations(w, r, tenantCtx.TenantID, fileID)
+			case "processing-status":
+				h.GetProcessingStatus(w, r, tenantCtx.TenantID, fileID)
 			default:
 				response.WriteNotFound(w, getRequestID(r), "Resource not found")
 			}
@@ -400,38 +422,44 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
-	// TODO: For production, implement proper storage (S3, local filesystem, etc.)
-	// For now, we store locally and create a file:// URL
-	localStorageDir := os.Getenv("EAI_STORAGE_LOCAL_PATH")
-	if localStorageDir == "" {
-		localStorageDir = "/app/data/storage"
-	}
-
-	// Ensure storage directory exists
-	if err := os.MkdirAll(filepath.Join(localStorageDir, tenantID.String()), 0755); err != nil {
-		response.WriteInternalServerError(w, getRequestID(r), "Failed to create storage directory", err.Error())
-		return
-	}
-
-	// Generate unique filename for storage
+	// Upload file to S3 (MinIO) in tenant-specific bucket
 	fileUUID := uuid.New()
-	storedFilename := fmt.Sprintf("%s_%s", fileUUID.String(), filename)
-	storagePath = filepath.Join(localStorageDir, tenantID.String(), storedFilename)
-	fileURL = fmt.Sprintf("file://%s", storagePath)
+	tenantShortID := services.GetTenantShortID(tenantID.String())
+	bucket := services.GetTenantBucket(tenantShortID)
+	s3Key := services.GetFileKey(fileUUID.String(), filename)
 
-	// Copy from temp to final storage location
-	tempFile.Seek(0, 0)
-	finalFile, err := os.Create(storagePath)
-	if err != nil {
-		response.WriteInternalServerError(w, getRequestID(r), "Failed to create storage file", err.Error())
-		return
-	}
-	defer finalFile.Close()
-
-	_, err = io.Copy(finalFile, tempFile)
-	if err != nil {
-		response.WriteInternalServerError(w, getRequestID(r), "Failed to store file", err.Error())
-		return
+	if s3UploaderInstance != nil {
+		tempFile.Seek(0, 0)
+		if err := s3UploaderInstance.UploadFile(r.Context(), bucket, s3Key, tempFile, fileHeader.Size); err != nil {
+			response.WriteInternalServerError(w, getRequestID(r), "Failed to upload file to S3", err.Error())
+			return
+		}
+		storagePath = s3Key
+		fileURL = fmt.Sprintf("s3://%s/%s", bucket, s3Key)
+	} else {
+		// Fallback to local storage if S3 is not available
+		localStorageDir := os.Getenv("EAI_STORAGE_LOCAL_PATH")
+		if localStorageDir == "" {
+			localStorageDir = "/app/data/storage"
+		}
+		if err := os.MkdirAll(filepath.Join(localStorageDir, tenantID.String()), 0755); err != nil {
+			response.WriteInternalServerError(w, getRequestID(r), "Failed to create storage directory", err.Error())
+			return
+		}
+		storedFilename := fmt.Sprintf("%s_%s", fileUUID.String(), filename)
+		storagePath = filepath.Join(localStorageDir, tenantID.String(), storedFilename)
+		fileURL = fmt.Sprintf("file://%s", storagePath)
+		tempFile.Seek(0, 0)
+		finalFile, err := os.Create(storagePath)
+		if err != nil {
+			response.WriteInternalServerError(w, getRequestID(r), "Failed to create storage file", err.Error())
+			return
+		}
+		defer finalFile.Close()
+		if _, err = io.Copy(finalFile, tempFile); err != nil {
+			response.WriteInternalServerError(w, getRequestID(r), "Failed to store file", err.Error())
+			return
+		}
 	}
 
 	// Create file record with storage information
@@ -551,11 +579,47 @@ func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		// Create file record using storage service
-		fileRecord, err = h.storageService.CreateFileFromURL(r.Context(), tenantID, req.URL, req.DataSourceID, req.ProcessingSessionID)
-		if err != nil {
-			response.WriteInternalServerError(w, getRequestID(r), "Failed to create file from URL", err.Error())
-			return
+		// If all metadata was provided in the request, create the record directly
+		// without calling CreateFileFromURL (which requires cloud_credentials for S3 access).
+		// This is the common path when aether-be provides size, filename, and content_type.
+		if req.Size > 0 && req.Filename != "" && req.ContentType != "" {
+			var neo4jDocID *string
+			if req.DocumentID != "" {
+				neo4jDocID = &req.DocumentID
+			}
+			fileRecord = &models.File{
+				TenantID:            tenantID,
+				DataSourceID:        req.DataSourceID,
+				ProcessingSessionID: req.ProcessingSessionID,
+				Neo4jDocumentID:     neo4jDocID,
+				URL:                 req.URL,
+				Path:                req.URL,
+				Filename:            req.Filename,
+				Extension:           req.Extension,
+				ContentType:         req.ContentType,
+				Size:                req.Size,
+				Checksum:            req.Checksum,
+				ChecksumType:        req.ChecksumType,
+				Status:              models.FileStatusDiscovered,
+				EncryptionStatus:    "none",
+				Metadata:            req.Metadata,
+				LastModified:        time.Now(),
+			}
+			if err := tenantRepo.ValidateAndCreate(fileRecord); err != nil {
+				if strings.Contains(err.Error(), "validation") {
+					response.WriteValidationError(w, getRequestID(r), err.Error())
+					return
+				}
+				response.WriteInternalServerError(w, getRequestID(r), "Failed to create file", err.Error())
+				return
+			}
+		} else {
+			// Fall back to storage service for credential-based access
+			fileRecord, err = h.storageService.CreateFileFromURL(r.Context(), tenantID, req.URL, req.DataSourceID, req.ProcessingSessionID)
+			if err != nil {
+				response.WriteInternalServerError(w, getRequestID(r), "Failed to create file from URL", err.Error())
+				return
+			}
 		}
 
 		// Update any metadata provided in the request
@@ -709,6 +773,14 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request, tenantI
 		return
 	}
 
+	// Delete dependent records before deleting the file
+	// 1. Delete pipeline_page_results (FK → processing_jobs)
+	tenantRepo.DB().Exec("DELETE FROM pipeline_page_results WHERE job_id IN (SELECT id FROM processing_jobs WHERE file_id = ?)", fileID)
+	// 2. Delete processing_jobs (FK → files)
+	tenantRepo.DB().Where("file_id = ?", fileID).Delete(&models.ProcessingJob{})
+	// 3. Delete chunks (FK → files)
+	tenantRepo.DB().Where("file_id = ?", fileID).Delete(&models.Chunk{})
+
 	// Use Unscoped() to perform hard delete instead of soft delete
 	if err := tenantRepo.DB().Unscoped().Delete(&file).Error; err != nil {
 		response.WriteInternalServerError(w, getRequestID(r), "Failed to delete file", err.Error())
@@ -716,6 +788,28 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request, tenantI
 	}
 
 	response.WriteNoContent(w)
+}
+
+// chunkWithContentResponse is the response struct that includes full content from S3
+type chunkWithContentResponse struct {
+	ID             uuid.UUID              `json:"id"`
+	TenantID       uuid.UUID              `json:"tenant_id"`
+	FileID         uuid.UUID              `json:"file_id"`
+	ChunkID        string                 `json:"chunk_id"`
+	ChunkType      string                 `json:"chunk_type"`
+	ChunkNumber    int                    `json:"chunk_number"`
+	Content        string                 `json:"content"`
+	ContentPreview string                 `json:"content_preview,omitempty"`
+	ContentHash    string                 `json:"content_hash"`
+	SizeBytes      int64                  `json:"size_bytes"`
+	PageNumber     *int                   `json:"page_number,omitempty"`
+	LineNumber     *int                   `json:"line_number,omitempty"`
+	ProcessedAt    string                 `json:"processed_at"`
+	ProcessedBy    string                 `json:"processed_by"`
+	Language       string                 `json:"language,omitempty"`
+	Metadata       models.ChunkMetadata   `json:"metadata,omitempty"`
+	CreatedAt      string                 `json:"created_at"`
+	UpdatedAt      string                 `json:"updated_at"`
 }
 
 // ListFileChunks handles GET /api/v1/tenants/{tenant_id}/files/{id}/chunks
@@ -726,6 +820,9 @@ func (h *FileHandler) ListFileChunks(w http.ResponseWriter, r *http.Request, ten
 	}
 
 	page, pageSize, offset := getPagination(r.Context())
+
+	// Check include_content param (default: true for backward compat)
+	includeContent := r.URL.Query().Get("include_content") != "false"
 
 	tenantService := h.db.NewTenantService()
 	tenantRepo, err := tenantService.GetTenantRepository(r.Context(), tenantID)
@@ -755,7 +852,88 @@ func (h *FileHandler) ListFileChunks(w http.ResponseWriter, r *http.Request, ten
 	var totalCount int64
 	tenantRepo.DB().Model(&models.Chunk{}).Where("file_id = ?", fileID).Count(&totalCount)
 
-	response.WritePaginated(w, getRequestID(r), chunks, page, pageSize, totalCount)
+	// Build response with content hydrated from S3
+	responseData := make([]chunkWithContentResponse, len(chunks))
+
+	if includeContent && s3UploaderInstance != nil && len(chunks) > 0 {
+		// Hydrate content from S3 concurrently with bounded parallelism
+		const maxConcurrent = 10
+		sem := make(chan struct{}, maxConcurrent)
+		var wg sync.WaitGroup
+		contents := make([]string, len(chunks))
+
+		for i, chunk := range chunks {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(idx int, c models.Chunk) {
+				defer wg.Done()
+				defer func() { <-sem }()
+
+				if c.S3Bucket != "" && c.S3Key != "" {
+					content, err := s3UploaderInstance.GetChunkContent(r.Context(), c.S3Bucket, c.S3Key)
+					if err != nil {
+						log.Printf("[ListFileChunks] Failed to read S3 content for chunk %s: %v", c.ID, err)
+						// Fall back to content_preview
+						contents[idx] = c.ContentPreview
+					} else {
+						contents[idx] = content
+					}
+				} else {
+					contents[idx] = c.ContentPreview
+				}
+			}(i, chunk)
+		}
+		wg.Wait()
+
+		for i, chunk := range chunks {
+			responseData[i] = chunkWithContentResponse{
+				ID:             chunk.ID,
+				TenantID:       chunk.TenantID,
+				FileID:         chunk.FileID,
+				ChunkID:        chunk.ChunkID,
+				ChunkType:      chunk.ChunkType,
+				ChunkNumber:    chunk.ChunkNumber,
+				Content:        contents[i],
+				ContentPreview: chunk.ContentPreview,
+				ContentHash:    chunk.ContentHash,
+				SizeBytes:      chunk.SizeBytes,
+				PageNumber:     chunk.PageNumber,
+				LineNumber:     chunk.LineNumber,
+				ProcessedAt:    chunk.ProcessedAt.Format("2006-01-02T15:04:05Z"),
+				ProcessedBy:    chunk.ProcessedBy,
+				Language:       chunk.Language,
+				Metadata:       chunk.Metadata,
+				CreatedAt:      chunk.CreatedAt.Format("2006-01-02T15:04:05Z"),
+				UpdatedAt:      chunk.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			}
+		}
+	} else {
+		// No content hydration — return content_preview as content for compat
+		for i, chunk := range chunks {
+			responseData[i] = chunkWithContentResponse{
+				ID:             chunk.ID,
+				TenantID:       chunk.TenantID,
+				FileID:         chunk.FileID,
+				ChunkID:        chunk.ChunkID,
+				ChunkType:      chunk.ChunkType,
+				ChunkNumber:    chunk.ChunkNumber,
+				Content:        chunk.ContentPreview,
+				ContentPreview: chunk.ContentPreview,
+				ContentHash:    chunk.ContentHash,
+				SizeBytes:      chunk.SizeBytes,
+				PageNumber:     chunk.PageNumber,
+				LineNumber:     chunk.LineNumber,
+				ProcessedAt:    chunk.ProcessedAt.Format("2006-01-02T15:04:05Z"),
+				ProcessedBy:    chunk.ProcessedBy,
+				Language:       chunk.Language,
+				Metadata:       chunk.Metadata,
+				CreatedAt:      chunk.CreatedAt.Format("2006-01-02T15:04:05Z"),
+				UpdatedAt:      chunk.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+			}
+		}
+	}
+
+	response.WritePaginated(w, getRequestID(r), responseData, page, pageSize, totalCount)
 }
 
 // ProcessFile handles POST /api/v1/tenants/{tenant_id}/files/{id}/process
@@ -802,8 +980,60 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 		return
 	}
 
-	// Use the embedding coordinator for processing (includes chunk creation + embedding generation)
-	// Fall back to basic pipeline if embedding coordinator is not available
+	// Capture start time for processing duration calculation
+	processingStartTime := time.Now()
+
+	// Primary path: Use Kafka pipeline via Splitter for S3-stored files
+	if h.splitter != nil && strings.HasPrefix(file.URL, "s3://") {
+		go func() {
+			ctx := context.Background()
+
+			// Parse S3 bucket and key from URL: s3://bucket/key
+			s3URL := strings.TrimPrefix(file.URL, "s3://")
+			slashIdx := strings.Index(s3URL, "/")
+			if slashIdx < 0 {
+				fmt.Printf("ERROR: Invalid S3 URL for file %s: %s\n", fileID.String(), file.URL)
+				return
+			}
+			s3Bucket := s3URL[:slashIdx]
+			s3Key := s3URL[slashIdx+1:]
+
+			// Extract tenant short ID from bucket name (upload-{shortID})
+			tenantShortID := strings.TrimPrefix(s3Bucket, "upload-")
+
+			jobID, err := h.splitter.SplitFile(ctx, tenantID, fileID, s3Bucket, s3Key, tenantShortID)
+			if err != nil {
+				fmt.Printf("ERROR: Splitter failed for file %s: %v\n", fileID.String(), err)
+
+				// Update file status to error
+				backgroundTenantService := h.db.NewTenantService()
+				backgroundTenantRepo, repoErr := backgroundTenantService.GetTenantRepository(ctx, tenantID)
+				if repoErr == nil {
+					var updatedFile models.File
+					if backgroundTenantRepo.DB().Where("id = ?", fileID).First(&updatedFile).Error == nil {
+						updatedFile.MarkAsError("Splitter failed: " + err.Error())
+						updatedFile.CalculateProcessingDuration(processingStartTime)
+						backgroundTenantRepo.DB().Save(&updatedFile)
+					}
+				}
+				return
+			}
+
+			fmt.Printf("INFO: File %s submitted to Kafka pipeline, job_id=%s\n", fileID.String(), jobID.String())
+		}()
+
+		responseData := map[string]any{
+			"message":  "File processing started (Kafka pipeline)",
+			"file_id":  fileID,
+			"status":   file.Status,
+			"strategy": file.ChunkingStrategy,
+		}
+		response.WriteSuccess(w, getRequestID(r), responseData, nil)
+		return
+	}
+
+	// Fallback: Use the embedding coordinator for processing (includes chunk creation + embedding generation)
+	// This path is used for non-S3 files or when Splitter is not available
 	if h.embeddingCoordinator != nil {
 		// Process file in background using the embedding coordinator (includes embeddings)
 		go func() {
@@ -834,11 +1064,13 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 				if err != nil {
 					// Processing failed - mark as error
 					updatedFile.MarkAsError("Failed to process file: " + err.Error())
+					updatedFile.CalculateProcessingDuration(processingStartTime)
 				} else if tierResult != nil && tierResult.ProcessingResult != nil {
 					// Processing succeeded - mark as processed with chunk count
 					updatedFile.MarkAsProcessed(tierResult.ChunksCreated, req.ChunkingStrategy)
 					now := time.Now()
 					updatedFile.ProcessedAt = &now
+					updatedFile.CalculateProcessingDuration(processingStartTime)
 
 					// Log embedding results
 					fmt.Printf("INFO: File %s processed with %d chunks and %d embeddings created.\n",
@@ -949,10 +1181,12 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 			if dbErr := backgroundTenantRepo.DB().Where("id = ?", fileID).First(&updatedFile).Error; dbErr == nil {
 				if err != nil {
 					updatedFile.MarkAsError("Failed to process file: " + err.Error())
+					updatedFile.CalculateProcessingDuration(processingStartTime)
 				} else if result != nil {
 					updatedFile.MarkAsProcessed(result.ChunksCreated, req.ChunkingStrategy)
 					now := time.Now()
 					updatedFile.ProcessedAt = &now
+					updatedFile.CalculateProcessingDuration(processingStartTime)
 				}
 				backgroundTenantRepo.DB().Save(&updatedFile)
 			}
@@ -967,6 +1201,42 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 		"file_id":  fileID,
 		"status":   file.Status,
 		"strategy": file.ChunkingStrategy,
+	}
+
+	response.WriteSuccess(w, getRequestID(r), responseData, nil)
+}
+
+// GetProcessingStatus handles GET /api/v1/tenants/{tenant_id}/files/{id}/processing-status
+func (h *FileHandler) GetProcessingStatus(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID, fileID uuid.UUID) {
+	if r.Method != http.MethodGet {
+		response.WriteError(w, getRequestID(r), http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "Method not allowed", nil)
+		return
+	}
+
+	// Query the latest processing job for this file
+	var job models.ProcessingJob
+	err := h.db.DB().Where("file_id = ? AND tenant_id = ?", fileID, tenantID).
+		Order("created_at DESC").First(&job).Error
+	if err != nil {
+		response.WriteNotFound(w, getRequestID(r), "No processing job found for this file")
+		return
+	}
+
+	responseData := map[string]any{
+		"job_id":          job.ID,
+		"file_id":         job.FileID,
+		"status":          job.Status,
+		"total_pages":     job.TotalPages,
+		"completed_pages": job.CompletedPages,
+		"failed_pages":    job.FailedPages,
+		"created_at":      job.CreatedAt,
+		"updated_at":      job.UpdatedAt,
+	}
+	if job.CompletedAt != nil {
+		responseData["completed_at"] = job.CompletedAt
+	}
+	if job.ErrorMessage != nil {
+		responseData["error_message"] = *job.ErrorMessage
 	}
 
 	response.WriteSuccess(w, getRequestID(r), responseData, nil)

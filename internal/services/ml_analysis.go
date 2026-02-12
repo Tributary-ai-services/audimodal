@@ -381,7 +381,7 @@ func (s *MLAnalysisService) AnalyzeDocument(ctx context.Context, tenantID, docum
 			requests = append(requests, MLAnalysisRequest{
 				DocumentID:  documentID,
 				ChunkID:     &chunk.ID,
-				Content:     chunk.Content,
+				Content:     chunk.ContentPreview,
 				ContentType: "text",
 				TenantID:    tenantID,
 				Priority:    1,
@@ -535,8 +535,8 @@ func (s *MLAnalysisService) computeSummaryFromChunks(ctx context.Context, tenant
 	keyEntities := []string{}
 
 	// Simple entity extraction from first chunk
-	if len(chunks) > 0 && len(chunks[0].Content) > 0 {
-		content := chunks[0].Content
+	if len(chunks) > 0 && len(chunks[0].ContentPreview) > 0 {
+		content := chunks[0].ContentPreview
 		// Look for capitalized words as potential entities
 		words := strings.Fields(content)
 		seen := make(map[string]bool)

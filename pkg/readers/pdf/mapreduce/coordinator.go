@@ -95,6 +95,28 @@ func (c *DefaultCoordinator) Process(ctx context.Context, pdfPath string, tenant
 		}
 	}
 
+	// Create a deadline-free context for page processing.
+	// The parent ctx may have a short deadline (e.g., from an HTTP handler),
+	// but processing 100+ OCR pages can take 20+ minutes. Each page gets its
+	// own timeout via the worker pool. We only propagate explicit cancellation
+	// (context.Canceled), NOT deadline exceeded, so processing continues even
+	// if the upstream context times out.
+	processingCtx, processingCancel := context.WithCancel(context.Background())
+	defer processingCancel()
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			// Only propagate explicit cancellation, not deadline exceeded.
+			// When the parent's deadline expires, we want processing to continue
+			// since each page has its own independent timeout.
+			if ctx.Err() == context.Canceled {
+				processingCancel()
+			}
+		case <-processingCtx.Done():
+		}
+	}()
+
 	// Phase 3: Extract content from all pages
 	log.Printf("[MapReduce] Phase 2: Extracting content from %d pages", totalPages)
 
@@ -102,92 +124,145 @@ func (c *DefaultCoordinator) Process(ctx context.Context, pdfPath string, tenant
 	var wg sync.WaitGroup
 	errors := make([]ProcessingError, 0)
 
-	// Process pages with retries
-	for pageNum := 1; pageNum <= totalPages; pageNum++ {
-		wg.Add(1)
+	// Use a work channel to limit goroutine creation.
+	// Instead of spawning totalPages goroutines (which all block on the pool
+	// semaphore), we spawn a fixed number of worker goroutines that pull jobs
+	// from a channel. This prevents goroutine accumulation and ensures each
+	// page gets its full timeout budget after it starts processing.
+	type pageWork struct {
+		pageNum        int
+		classification PageClassificationType
+	}
 
-		go func(pn int) {
+	workCh := make(chan pageWork, totalPages)
+	for pageNum := 1; pageNum <= totalPages; pageNum++ {
+		classification := ClassUnknown
+		if pageNum-1 < len(classifications) && classifications[pageNum-1] != nil {
+			classification = classifications[pageNum-1].Classification
+		}
+		workCh <- pageWork{pageNum: pageNum, classification: classification}
+	}
+	close(workCh)
+
+	numWorkers := c.config.MaxConcurrentWorkers
+	if numWorkers <= 0 {
+		numWorkers = 4
+	}
+
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
 			defer wg.Done()
 
-			classification := ClassUnknown
-			if pn-1 < len(classifications) && classifications[pn-1] != nil {
-				classification = classifications[pn-1].Classification
-			}
+			for work := range workCh {
+				pn := work.pageNum
+				classification := work.classification
 
-			// Create job
-			job := &PageJob{
-				JobID:          uuid.New().String(),
-				TenantID:       tenantID,
-				FileID:         fileID,
-				PDFPath:        pdfPath,
-				PageNumber:     pn,
-				TotalPages:     totalPages,
-				Classification: classification,
-				Config:         c.config.Extraction,
-			}
-
-			// Process with retries
-			var pageResult *PageResult
-			var processErr error
-
-			for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
-				if attempt > 0 {
-					time.Sleep(time.Duration(c.config.RetryDelay) * time.Second)
-					log.Printf("[MapReduce] Retrying page %d (attempt %d/%d)", pn, attempt, c.config.MaxRetries)
-				}
-
-				pageResult, processErr = c.pool.ProcessPage(ctx, job)
-				if processErr == nil && pageResult != nil && pageResult.Status == StatusCompleted {
-					break
-				}
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-
-			if processErr != nil || pageResult == nil || pageResult.Status != StatusCompleted {
-				errMsg := "unknown error"
-				if processErr != nil {
-					errMsg = processErr.Error()
-				} else if pageResult != nil && pageResult.Error != "" {
-					errMsg = pageResult.Error
-				}
-
-				errors = append(errors, ProcessingError{
-					PageNumber: pn,
-					Error:      errMsg,
-					Retryable:  true,
-					RetryCount: c.config.MaxRetries,
-				})
-				result.FailedPages++
-
-				// Create failed result
-				if pageResult == nil {
-					pageResult = &PageResult{
+				// Check if processing was cancelled
+				if processingCtx.Err() != nil {
+					mu.Lock()
+					errors = append(errors, ProcessingError{
+						PageNumber: pn,
+						Error:      "processing cancelled",
+						Retryable:  true,
+					})
+					result.FailedPages++
+					result.PageResults[pn-1] = &PageResult{
 						PageNumber:     pn,
 						TotalPages:     totalPages,
 						Classification: classification,
 						Status:         StatusFailed,
-						Error:          errMsg,
+						Error:          "processing cancelled",
 						ProcessedAt:    time.Now(),
 					}
+					mu.Unlock()
+					continue
 				}
-			} else {
-				result.TotalCharacters += len(pageResult.Content)
-			}
 
-			result.PageResults[pn-1] = pageResult
+				// Create job
+				job := &PageJob{
+					JobID:          uuid.New().String(),
+					TenantID:       tenantID,
+					FileID:         fileID,
+					PDFPath:        pdfPath,
+					PageNumber:     pn,
+					TotalPages:     totalPages,
+					Classification: classification,
+					Config:         c.config.Extraction,
+				}
 
-			// Save to database
-			if c.db != nil {
-				c.savePageResultToDB(ctx, tenantID, fileID, pageResult)
-			}
+				// Process with retries
+				var pageResult *PageResult
+				var processErr error
 
-			// Log progress periodically
-			if pn%c.config.CheckpointInterval == 0 {
-				log.Printf("[MapReduce] Progress: %d/%d pages processed", pn, totalPages)
+				for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
+					if attempt > 0 {
+						time.Sleep(time.Duration(c.config.RetryDelay) * time.Second)
+						log.Printf("[MapReduce] Retrying page %d (attempt %d/%d): %v", pn, attempt, c.config.MaxRetries, processErr)
+					}
+
+					pageResult, processErr = c.pool.ProcessPage(processingCtx, job)
+					if processErr == nil && pageResult != nil && pageResult.Status == StatusCompleted {
+						break
+					}
+				}
+
+				mu.Lock()
+
+				if processErr != nil || pageResult == nil || pageResult.Status != StatusCompleted {
+					errMsg := "unknown error"
+					if processErr != nil {
+						errMsg = processErr.Error()
+					} else if pageResult != nil && pageResult.Error != "" {
+						errMsg = pageResult.Error
+					}
+
+					log.Printf("[MapReduce] Page %d failed after %d retries: %s", pn, c.config.MaxRetries, errMsg)
+
+					errors = append(errors, ProcessingError{
+						PageNumber: pn,
+						Error:      errMsg,
+						Retryable:  true,
+						RetryCount: c.config.MaxRetries,
+					})
+					result.FailedPages++
+
+					// Create failed result
+					if pageResult == nil {
+						pageResult = &PageResult{
+							PageNumber:     pn,
+							TotalPages:     totalPages,
+							Classification: classification,
+							Status:         StatusFailed,
+							Error:          errMsg,
+							ProcessedAt:    time.Now(),
+						}
+					}
+				} else {
+					result.TotalCharacters += len(pageResult.Content)
+				}
+
+				result.PageResults[pn-1] = pageResult
+
+				// Save to database
+				if c.db != nil {
+					c.savePageResultToDB(processingCtx, tenantID, fileID, pageResult)
+				}
+
+				// Log progress periodically
+				completed := 0
+				for _, pr := range result.PageResults {
+					if pr != nil {
+						completed++
+					}
+				}
+				if completed%c.config.CheckpointInterval == 0 {
+					log.Printf("[MapReduce] Progress: %d/%d pages processed (%d failed so far)", completed, totalPages, result.FailedPages)
+				}
+
+				mu.Unlock()
 			}
-		}(pageNum)
+		}()
 	}
 
 	wg.Wait()
@@ -247,67 +322,102 @@ func (c *DefaultCoordinator) Resume(ctx context.Context, fileID uuid.UUID) (*Pro
 	// Process remaining pages
 	allPending := append(pendingPages, failedRetryable...)
 
+	// Create a deadline-free context for page processing (same as Process method)
+	processingCtx, processingCancel := context.WithCancel(context.Background())
+	defer processingCancel()
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.Canceled {
+				processingCancel()
+			}
+		case <-processingCtx.Done():
+		}
+	}()
+
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	errors := make([]ProcessingError, 0)
 	results := make(map[int]*PageResult)
 
-	for _, pageNum := range allPending {
-		wg.Add(1)
+	// Use a work channel instead of spawning one goroutine per page
+	type resumeWork struct {
+		pageNum        int
+		classification PageClassificationType
+	}
 
-		go func(pn int) {
+	workCh := make(chan resumeWork, len(allPending))
+	for _, pn := range allPending {
+		classification := ClassUnknown
+		for _, pr := range pageResults {
+			if pr.PageNumber == pn {
+				classification = PageClassificationType(pr.Classification)
+				break
+			}
+		}
+		workCh <- resumeWork{pageNum: pn, classification: classification}
+	}
+	close(workCh)
+
+	numWorkers := c.config.MaxConcurrentWorkers
+	if numWorkers <= 0 {
+		numWorkers = 4
+	}
+
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
 			defer wg.Done()
 
-			// Get classification from existing page result
-			var classification PageClassificationType = ClassUnknown
-			for _, pr := range pageResults {
-				if pr.PageNumber == pn {
-					classification = PageClassificationType(pr.Classification)
-					break
-				}
-			}
+			for work := range workCh {
+				pn := work.pageNum
 
-			job := &PageJob{
-				JobID:          uuid.New().String(),
-				TenantID:       file.TenantID,
-				FileID:         fileID,
-				PDFPath:        file.Path,
-				PageNumber:     pn,
-				TotalPages:     totalPages,
-				Classification: classification,
-				Config:         c.config.Extraction,
-			}
-
-			pageResult, err := c.pool.ProcessPage(ctx, job)
-
-			mu.Lock()
-			defer mu.Unlock()
-
-			if err != nil || pageResult == nil || pageResult.Status != StatusCompleted {
-				errMsg := "unknown error"
-				if err != nil {
-					errMsg = err.Error()
-				} else if pageResult != nil && pageResult.Error != "" {
-					errMsg = pageResult.Error
+				job := &PageJob{
+					JobID:          uuid.New().String(),
+					TenantID:       file.TenantID,
+					FileID:         fileID,
+					PDFPath:        file.Path,
+					PageNumber:     pn,
+					TotalPages:     totalPages,
+					Classification: work.classification,
+					Config:         c.config.Extraction,
 				}
 
-				errors = append(errors, ProcessingError{
-					PageNumber: pn,
-					Error:      errMsg,
-					Retryable:  true,
-				})
-			}
+				pageResult, err := c.pool.ProcessPage(processingCtx, job)
 
-			if pageResult != nil {
-				results[pn] = pageResult
-				c.savePageResultToDB(ctx, file.TenantID, fileID, pageResult)
+				mu.Lock()
+
+				if err != nil || pageResult == nil || pageResult.Status != StatusCompleted {
+					errMsg := "unknown error"
+					if err != nil {
+						errMsg = err.Error()
+					} else if pageResult != nil && pageResult.Error != "" {
+						errMsg = pageResult.Error
+					}
+
+					log.Printf("[MapReduce] Resume: page %d failed: %s", pn, errMsg)
+
+					errors = append(errors, ProcessingError{
+						PageNumber: pn,
+						Error:      errMsg,
+						Retryable:  true,
+					})
+				}
+
+				if pageResult != nil {
+					results[pn] = pageResult
+					c.savePageResultToDB(processingCtx, file.TenantID, fileID, pageResult)
+				}
+
+				mu.Unlock()
 			}
-		}(pageNum)
+		}()
 	}
 
 	wg.Wait()
 
-	return c.buildResultFromDB(ctx, fileID, totalPages)
+	return c.buildResultFromDB(processingCtx, fileID, totalPages)
 }
 
 // initializePageResults creates page result records for all pages

@@ -64,7 +64,8 @@ func (p *DefaultWorkerPool) ProcessPage(ctx context.Context, job *PageJob) (*Pag
 	}
 	p.mu.RUnlock()
 
-	// Acquire semaphore to limit concurrency
+	// Acquire semaphore to limit concurrency.
+	// We use the caller's context here so cancellation is respected while waiting.
 	select {
 	case p.semaphore <- struct{}{}:
 		defer func() { <-p.semaphore }()
@@ -75,13 +76,29 @@ func (p *DefaultWorkerPool) ProcessPage(ctx context.Context, job *PageJob) (*Pag
 	atomic.AddInt64(&p.activeWorkers, 1)
 	defer atomic.AddInt64(&p.activeWorkers, -1)
 
-	// Create timeout context for this page
+	// Create per-page timeout from context.Background() so it does NOT inherit
+	// any deadline from the parent context. This ensures each page gets its full
+	// timeout budget regardless of how long prior pages took or any upstream
+	// deadline on the parent context.
 	timeout := time.Duration(p.config.WorkerTimeoutSeconds) * time.Second
 	if timeout <= 0 {
 		timeout = 5 * time.Minute
 	}
-	pageCtx, cancel := context.WithTimeout(ctx, timeout)
+	pageCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	// Propagate only explicit parent cancellation (for graceful shutdown),
+	// not deadline exceeded. This prevents an upstream timeout from killing
+	// page processing that has its own independent timeout.
+	go func() {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.Canceled {
+				cancel()
+			}
+		case <-pageCtx.Done():
+		}
+	}()
 
 	// Assign a unique job ID if not set
 	if job.JobID == "" {
@@ -107,7 +124,10 @@ func (p *DefaultWorkerPool) ProcessPage(ctx context.Context, job *PageJob) (*Pag
 
 // executeWorker runs the pdfworker binary as a subprocess
 func (p *DefaultWorkerPool) executeWorker(ctx context.Context, jobJSON []byte) (*PageResult, error) {
-	cmd := exec.CommandContext(ctx, p.workerPath)
+	// Do NOT use exec.CommandContext — it only kills the direct process, not
+	// child processes (e.g. tesseract). Instead we manage the timeout ourselves
+	// and kill the entire process group on cancellation.
+	cmd := exec.Command(p.workerPath)
 
 	// Set up stdin/stdout pipes
 	cmd.Stdin = bytes.NewReader(jobJSON)
@@ -116,9 +136,11 @@ func (p *DefaultWorkerPool) executeWorker(ctx context.Context, jobJSON []byte) (
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	// Set process attributes for Linux
+	// Set process attributes for Linux: use a new process group so we can
+	// kill the worker AND all its children (tesseract, etc.) on timeout.
 	if runtime.GOOS == "linux" {
 		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setpgid:   true,           // Create new process group
 			Pdeathsig: syscall.SIGKILL, // Kill worker if parent dies
 		}
 	}
@@ -128,9 +150,25 @@ func (p *DefaultWorkerPool) executeWorker(ctx context.Context, jobJSON []byte) (
 		return nil, fmt.Errorf("failed to start worker: %w", err)
 	}
 
+	// Kill entire process group on context cancellation/timeout
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			if cmd.Process != nil {
+				// Kill the entire process group (negative PID)
+				_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			}
+		case <-done:
+		}
+	}()
+
 	// Wait for completion
-	if err := cmd.Wait(); err != nil {
-		// Check if it was a context cancellation
+	err := cmd.Wait()
+	close(done) // stop the killer goroutine
+
+	if err != nil {
+		// Check if it was a context cancellation/timeout
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("worker timed out: %w", ctx.Err())
 		}
@@ -236,13 +274,25 @@ func (p *InlineWorkerPool) ProcessPage(ctx context.Context, job *PageJob) (*Page
 	atomic.AddInt64(&p.activeWorkers, 1)
 	defer atomic.AddInt64(&p.activeWorkers, -1)
 
-	// Create timeout context
+	// Create per-page timeout from context.Background() so it does NOT inherit
+	// any deadline from the parent context.
 	timeout := time.Duration(p.config.WorkerTimeoutSeconds) * time.Second
 	if timeout <= 0 {
 		timeout = 5 * time.Minute
 	}
-	pageCtx, cancel := context.WithTimeout(ctx, timeout)
+	pageCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	// Propagate only explicit parent cancellation, not deadline exceeded
+	go func() {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.Canceled {
+				cancel()
+			}
+		case <-pageCtx.Done():
+		}
+	}()
 
 	// Process inline
 	result, err := p.extractor.ExtractPage(pageCtx, job)
