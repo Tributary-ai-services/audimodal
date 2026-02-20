@@ -31,6 +31,10 @@ go.work.sum
 /bin/
 /server
 /pdfworker
+/assembler
+/dlpworker
+/embeddingworker
+/ocrworker
 
 # Data directory
 /data/
