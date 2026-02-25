@@ -39,7 +39,7 @@ func NewSplitter(db *gorm.DB, s3Uploader *services.S3Uploader, producer *events.
 
 // SplitFile downloads a PDF from S3, classifies pages, and produces one Kafka message per page.
 // It returns the processing job ID for tracking.
-func (s *Splitter) SplitFile(ctx context.Context, tenantID, fileID uuid.UUID, s3Bucket, s3Key, tenantShortID string) (uuid.UUID, error) {
+func (s *Splitter) SplitFile(ctx context.Context, tenantID, fileID uuid.UUID, s3Bucket, s3Key, tenantShortID string, redactionMode string, dlpScanEnabled bool) (uuid.UUID, error) {
 	startTime := time.Now()
 
 	// Step 1: Download PDF from S3 to temp file
@@ -64,11 +64,20 @@ func (s *Splitter) SplitFile(ctx context.Context, tenantID, fileID uuid.UUID, s3
 	}
 
 	// Step 3: Create processing job record (status: splitting)
+	jobMetadata := models.JobMetadata{}
+	if redactionMode != "" {
+		jobMetadata["redaction_mode"] = redactionMode
+	}
+	if dlpScanEnabled {
+		jobMetadata["dlp_scan_enabled"] = true
+	}
+
 	job := models.ProcessingJob{
 		TenantID:   tenantID,
 		FileID:     fileID,
 		TotalPages: totalPages,
 		Status:     models.JobStatusSplitting,
+		Metadata:   jobMetadata,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
 	}

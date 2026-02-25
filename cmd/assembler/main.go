@@ -24,6 +24,9 @@ import (
 
 	"github.com/jscharber/audimodal/internal/database/models"
 	"github.com/jscharber/audimodal/internal/services"
+	"github.com/jscharber/audimodal/pkg/dlp"
+	"github.com/jscharber/audimodal/pkg/dlp/scanner"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 	"github.com/jscharber/audimodal/pkg/events"
 	"github.com/jscharber/audimodal/pkg/metrics"
 	"github.com/jscharber/audimodal/pkg/preprocessing"
@@ -281,6 +284,32 @@ func assembleFile(ctx context.Context, db *gorm.DB, s3Uploader *services.S3Uploa
 		s3Bucket = services.GetTenantBucket(services.GetTenantShortID(tenantID.String()))
 	}
 
+	// Read redaction settings from job metadata
+	redactionMode := ""
+	dlpScanEnabled := false
+	if job.Metadata != nil {
+		if rm, ok := job.Metadata["redaction_mode"]; ok {
+			if rmStr, ok := rm.(string); ok {
+				redactionMode = rmStr
+			}
+		}
+		if de, ok := job.Metadata["dlp_scan_enabled"]; ok {
+			if deBool, ok := de.(bool); ok {
+				dlpScanEnabled = deBool
+			}
+		}
+	}
+
+	// Initialize DLP service and redaction engine if redaction is enabled
+	var dlpService *dlp.DLPService
+	var redactionEngine *scanner.BasicRedactionEngine
+	redactionEnabled := dlpScanEnabled && redactionMode != "" && redactionMode != "none"
+	if redactionEnabled {
+		dlpService = dlp.NewDLPService(nil)
+		redactionEngine = scanner.NewBasicRedactionEngine()
+		log.Printf("[Assembler] DLP redaction enabled for job %s (mode: %s)", job.ID.String(), redactionMode)
+	}
+
 	// Create chunks: one chunk per completed page
 	chunks := make([]models.Chunk, 0, len(pageResults))
 	chunkCount := 0
@@ -304,10 +333,51 @@ func assembleFile(ctx context.Context, db *gorm.DB, s3Uploader *services.S3Uploa
 		// Sanitize content to ensure valid UTF-8 before any DB insertion
 		content = preprocessing.SanitizeUTF8String(content)
 
+		// Apply DLP scanning and redaction before storing
+		chunkDLPStatus := "pending"
+		piiDetected := false
+		var dlpScanResultJSON string
+
+		if redactionEnabled && dlpService != nil {
+			scanResponse, scanErr := dlpService.ScanContent(ctx, &dlp.DLPScanRequest{
+				TenantID:  tenantID,
+				ContentID: fmt.Sprintf("page_%d", pr.PageNumber),
+				Content:   content,
+				Metadata: map[string]string{
+					"file_id":     fileID.String(),
+					"page_number": strconv.Itoa(pr.PageNumber),
+					"pipeline":    "kafka",
+				},
+			})
+			if scanErr != nil {
+				log.Printf("[Assembler] DLP scan failed for page %d: %v", pr.PageNumber, scanErr)
+			} else {
+				if scanResponse.ScanResult != nil {
+					if resultBytes, jsonErr := json.Marshal(scanResponse.ScanResult); jsonErr == nil {
+						dlpScanResultJSON = string(resultBytes)
+					}
+					if scanResponse.ScanResult.TotalMatches > 0 {
+						piiDetected = true
+
+						// Apply redaction
+						redactedContent, redactErr := redactionEngine.RedactContent(content, scanResponse.ScanResult, types.RedactionStrategy(redactionMode))
+						if redactErr != nil {
+							log.Printf("[Assembler] Redaction failed for page %d: %v", pr.PageNumber, redactErr)
+						} else {
+							log.Printf("[Assembler] Redacted %d findings on page %d using %s mode",
+								scanResponse.ScanResult.TotalMatches, pr.PageNumber, redactionMode)
+							content = redactedContent
+						}
+					}
+				}
+				chunkDLPStatus = "completed"
+			}
+		}
+
 		chunkID := uuid.New()
 		chunkKey := services.GetChunkKey(fileID.String(), chunkID.String())
 
-		// Upload chunk content to S3
+		// Upload chunk content to S3 (redacted if applicable)
 		s3Start := time.Now()
 		if err := s3Uploader.UploadChunkContent(ctx, s3Bucket, chunkKey, content); err != nil {
 			log.Printf("[Assembler] Failed to upload chunk %d to S3: %v", pr.PageNumber, err)
@@ -327,22 +397,24 @@ func assembleFile(ctx context.Context, db *gorm.DB, s3Uploader *services.S3Uploa
 
 		pageNum := pr.PageNumber
 		chunk := models.Chunk{
-			TenantID:       tenantID,
-			FileID:         fileID,
-			ChunkID:        fmt.Sprintf("page_%d", pr.PageNumber),
-			ChunkType:      "pdf_page",
-			ChunkNumber:    i + 1,
-			S3Bucket:       s3Bucket,
-			S3Key:          chunkKey,
-			ContentPreview: preview,
-			ContentHash:    hex.EncodeToString(hash[:]),
-			SizeBytes:      int64(len(content)),
-			PageNumber:     &pageNum,
-			ProcessedAt:    time.Now(),
-			ProcessedBy:    "kafka_pipeline",
-			ProcessingTime: derefInt64(pr.ProcessingDurationMs),
+			TenantID:        tenantID,
+			FileID:          fileID,
+			ChunkID:         fmt.Sprintf("page_%d", pr.PageNumber),
+			ChunkType:       "pdf_page",
+			ChunkNumber:     i + 1,
+			S3Bucket:        s3Bucket,
+			S3Key:           chunkKey,
+			ContentPreview:  preview,
+			ContentHash:     hex.EncodeToString(hash[:]),
+			SizeBytes:       int64(len(content)),
+			PageNumber:      &pageNum,
+			ProcessedAt:     time.Now(),
+			ProcessedBy:     "kafka_pipeline",
+			ProcessingTime:  derefInt64(pr.ProcessingDurationMs),
 			EmbeddingStatus: "pending",
-			DLPScanStatus:   "pending",
+			DLPScanStatus:   chunkDLPStatus,
+			DLPScanResult:   dlpScanResultJSON,
+			PIIDetected:     piiDetected,
 			Context: models.ChunkContext{
 				"page_number":       strconv.Itoa(pr.PageNumber),
 				"extraction_method": preprocessing.SanitizeUTF8String(pr.ExtractionMethod),
