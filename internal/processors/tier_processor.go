@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/jscharber/audimodal/internal/database"
 	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/internal/services"
 	"github.com/jscharber/audimodal/pkg/dlp"
 	"github.com/jscharber/audimodal/pkg/dlp/scanner"
 	"github.com/jscharber/audimodal/pkg/dlp/types"
@@ -31,6 +33,7 @@ type TierProcessor struct {
 	pipeline         *Pipeline
 	embeddingService embeddings.EmbeddingService
 	dlpService       *dlp.DLPService
+	s3Uploader       *services.S3Uploader
 	config           *TierProcessorConfig
 }
 
@@ -84,11 +87,22 @@ func NewTierProcessor(db *database.Database, pipeline *Pipeline, embeddingServic
 		fmt.Printf("DEBUG: TierProcessor created with DLP DISABLED (config.EnableDLP=%v)\n", config.EnableDLP)
 	}
 
+	// Initialize S3 uploader for DLP redaction (updating S3 content after redaction)
+	var s3Uploader *services.S3Uploader
+	if config.EnableDLP {
+		var s3Err error
+		s3Uploader, s3Err = services.NewS3Uploader()
+		if s3Err != nil {
+			fmt.Printf("WARNING: TierProcessor failed to create S3 uploader for redaction: %v\n", s3Err)
+		}
+	}
+
 	return &TierProcessor{
 		db:               db,
 		pipeline:         pipeline,
 		embeddingService: embeddingService,
 		dlpService:       dlpService,
+		s3Uploader:       s3Uploader,
 		config:           config,
 	}
 }
@@ -119,27 +133,41 @@ func GetDefaultTierProcessorConfig() *TierProcessorConfig {
 func (tp *TierProcessor) ProcessFileWithTier(ctx context.Context, request *ProcessingRequest) (*TierProcessingResult, error) {
 	startTime := time.Now()
 
-	// Determine file size and tier
-	fileInfo, err := os.Stat(request.FilePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file info: %w", err)
+	// Determine file size and tier.
+	// For S3 paths, look up the size from the database since os.Stat won't work.
+	var fileSize int64
+	if strings.HasPrefix(request.FilePath, "s3://") {
+		var file struct {
+			Size int64
+		}
+		if err := tp.db.DB().Table("files").Select("size").Where("id = ? AND tenant_id = ?", request.FileID, request.TenantID).First(&file).Error; err != nil {
+			return nil, fmt.Errorf("failed to get file size from database: %w", err)
+		}
+		fileSize = file.Size
+	} else {
+		fileInfo, err := os.Stat(request.FilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get file info: %w", err)
+		}
+		fileSize = fileInfo.Size()
 	}
 
-	tier := tp.determineTier(fileInfo.Size())
+	tier := tp.determineTier(fileSize)
 
 	// Create tier-specific context with appropriate timeout
 	tierCtx, cancel := tp.createTierContext(ctx, tier)
 	defer cancel()
 
 	// Process using tier-specific strategy
+	var err error
 	var result *TierProcessingResult
 	switch tier {
 	case TierSmall:
-		result, err = tp.processSmallFile(tierCtx, request, fileInfo)
+		result, err = tp.processSmallFile(tierCtx, request)
 	case TierMedium:
-		result, err = tp.processMediumFile(tierCtx, request, fileInfo)
+		result, err = tp.processMediumFile(tierCtx, request)
 	case TierLarge:
-		result, err = tp.processLargeFile(tierCtx, request, fileInfo)
+		result, err = tp.processLargeFile(tierCtx, request)
 	default:
 		return nil, fmt.Errorf("unknown processing tier: %v", tier)
 	}
@@ -218,7 +246,7 @@ func (tp *TierProcessor) createTierContext(ctx context.Context, tier ProcessingT
 }
 
 // processSmallFile processes small files with minimal overhead
-func (tp *TierProcessor) processSmallFile(ctx context.Context, request *ProcessingRequest, fileInfo os.FileInfo) (*TierProcessingResult, error) {
+func (tp *TierProcessor) processSmallFile(ctx context.Context, request *ProcessingRequest) (*TierProcessingResult, error) {
 	// For small files, use simple processing with no checkpoints
 	result, err := tp.pipeline.ProcessFile(ctx, request)
 	if err != nil {
@@ -234,7 +262,7 @@ func (tp *TierProcessor) processSmallFile(ctx context.Context, request *Processi
 }
 
 // processMediumFile processes medium files with batching
-func (tp *TierProcessor) processMediumFile(ctx context.Context, request *ProcessingRequest, fileInfo os.FileInfo) (*TierProcessingResult, error) {
+func (tp *TierProcessor) processMediumFile(ctx context.Context, request *ProcessingRequest) (*TierProcessingResult, error) {
 	// For medium files, use standard processing with progress tracking
 	result, err := tp.pipeline.ProcessFile(ctx, request)
 	if err != nil {
@@ -250,7 +278,7 @@ func (tp *TierProcessor) processMediumFile(ctx context.Context, request *Process
 }
 
 // processLargeFile processes large files with streaming and checkpoints
-func (tp *TierProcessor) processLargeFile(ctx context.Context, request *ProcessingRequest, fileInfo os.FileInfo) (*TierProcessingResult, error) {
+func (tp *TierProcessor) processLargeFile(ctx context.Context, request *ProcessingRequest) (*TierProcessingResult, error) {
 	// For large files, use streaming processing with periodic checkpoints
 	checkpointTicker := time.NewTicker(tp.config.CheckpointInterval)
 	defer checkpointTicker.Stop()
@@ -524,9 +552,29 @@ func (tp *TierProcessor) performDLPScan(ctx context.Context, request *Processing
 					if redactErr != nil {
 						fmt.Printf("WARNING: Failed to redact chunk %s: %v\n", chunkID, redactErr)
 					} else if redactedContent != originalContent {
-						chunkUpdates["content"] = redactedContent
+						// Re-truncate redacted content to 500 chars for content_preview
+						runes := []rune(redactedContent)
+						if len(runes) > 500 {
+							runes = runes[:500]
+						}
+						chunkUpdates["content_preview"] = string(runes)
 						chunkUpdates["redaction_applied"] = true
 						chunkUpdates["redaction_mode"] = string(request.RedactionMode)
+
+						// Also update S3 content if chunk has S3 references
+						for _, c := range batch {
+							if c.ChunkID == chunkID && c.S3Bucket != "" && c.S3Key != "" {
+								if tp.s3Uploader != nil {
+									if s3Err := tp.s3Uploader.UploadChunkContent(ctx, c.S3Bucket, c.S3Key, redactedContent); s3Err != nil {
+										fmt.Printf("WARNING: Failed to update S3 content for chunk %s: %v\n", chunkID, s3Err)
+									} else {
+										fmt.Printf("DEBUG: Updated S3 content for chunk %s\n", chunkID)
+									}
+								}
+								break
+							}
+						}
+
 						fmt.Printf("DEBUG: Redacted %d findings in chunk %s using %s mode\n",
 							scanResponse.ScanResult.TotalMatches, chunkID, request.RedactionMode)
 					}

@@ -22,6 +22,7 @@ import (
 	"github.com/jscharber/audimodal/internal/server/response"
 	"github.com/jscharber/audimodal/internal/services"
 	"github.com/jscharber/audimodal/pkg/embeddings"
+	"github.com/jscharber/audimodal/pkg/dlp/types"
 	"github.com/jscharber/audimodal/pkg/events"
 )
 
@@ -983,8 +984,11 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 	// Capture start time for processing duration calculation
 	processingStartTime := time.Now()
 
-	// Primary path: Use Kafka pipeline via Splitter for S3-stored files
-	if h.splitter != nil && strings.HasPrefix(file.URL, "s3://") {
+	// Primary path: Use Kafka pipeline via Splitter for S3-stored PDF files only.
+	// The Splitter uses pdfinfo/pdftotext and only works with PDFs; non-PDF files
+	// (txt, docx, etc.) fall through to the embedding coordinator path below.
+	isPDF := strings.EqualFold(file.Extension, "pdf") || strings.EqualFold(file.ContentType, "application/pdf")
+	if h.splitter != nil && strings.HasPrefix(file.URL, "s3://") && isPDF {
 		go func() {
 			ctx := context.Background()
 
@@ -1001,7 +1005,7 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 			// Extract tenant short ID from bucket name (upload-{shortID})
 			tenantShortID := strings.TrimPrefix(s3Bucket, "upload-")
 
-			jobID, err := h.splitter.SplitFile(ctx, tenantID, fileID, s3Bucket, s3Key, tenantShortID)
+			jobID, err := h.splitter.SplitFile(ctx, tenantID, fileID, s3Bucket, s3Key, tenantShortID, req.RedactionMode, req.DLPScanEnabled)
 			if err != nil {
 				fmt.Printf("ERROR: Splitter failed for file %s: %v\n", fileID.String(), err)
 
@@ -1014,6 +1018,27 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 						updatedFile.MarkAsError("Splitter failed: " + err.Error())
 						updatedFile.CalculateProcessingDuration(processingStartTime)
 						backgroundTenantRepo.DB().Save(&updatedFile)
+
+						// Publish processing failed event to Kafka so aether-be updates Neo4j
+						if h.eventProducer != nil {
+							var documentID string
+							if updatedFile.Neo4jDocumentID != nil {
+								documentID = *updatedFile.Neo4jDocumentID
+							}
+							eventData := events.ProcessingCompleteData{
+								FileID:              fileID.String(),
+								DocumentID:          documentID,
+								URL:                 updatedFile.URL,
+								TotalProcessingTime: time.Since(processingStartTime),
+								Success:             false,
+							}
+							event := events.NewProcessingCompleteEvent("audimodal", tenantID.String(), eventData)
+							if pubErr := h.eventProducer.PublishEvent(ctx, event); pubErr != nil {
+								fmt.Printf("WARNING: Failed to publish splitter error event for file %s: %v\n", fileID.String(), pubErr)
+							} else {
+								fmt.Printf("INFO: Published processing failed event for file %s to Kafka\n", fileID.String())
+							}
+						}
 					}
 				}
 				return
@@ -1163,6 +1188,7 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 				StrategyType:   req.ChunkingStrategy,
 				Priority:       req.Priority,
 				DLPScanEnabled: req.DLPScanEnabled,
+				RedactionMode:  types.RedactionStrategy(req.RedactionMode),
 			}
 
 			// Process the file through the basic pipeline (use background context to avoid cancellation)

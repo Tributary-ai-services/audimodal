@@ -2,6 +2,7 @@ package processors
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -9,12 +10,16 @@ import (
 	"sync"
 	"time"
 
+	"os"
+
 	"github.com/google/uuid"
 
 	"github.com/jscharber/audimodal/internal/database"
 	"github.com/jscharber/audimodal/internal/database/models"
+	"github.com/jscharber/audimodal/internal/services"
 	"github.com/jscharber/audimodal/pkg/core"
 	"github.com/jscharber/audimodal/pkg/dlp"
+	"github.com/jscharber/audimodal/pkg/dlp/scanner"
 	"github.com/jscharber/audimodal/pkg/dlp/types"
 	"github.com/jscharber/audimodal/pkg/preprocessing"
 	"github.com/jscharber/audimodal/pkg/readers"
@@ -31,6 +36,7 @@ type Pipeline struct {
 	config     *PipelineConfig
 	metrics    *PipelineMetrics
 	dlpService *dlp.DLPService
+	s3Uploader *services.S3Uploader
 	mu         sync.RWMutex
 }
 
@@ -121,12 +127,21 @@ func NewPipeline(db *database.Database, config *PipelineConfig) *Pipeline {
 		fmt.Printf("DEBUG: Pipeline created with DLP DISABLED (config.EnableDLP=%v)\n", config.EnableDLP)
 	}
 
+	// Initialize S3 uploader for downloading S3-stored files
+	var s3Uploader *services.S3Uploader
+	if s3Up, s3Err := services.NewS3Uploader(); s3Err != nil {
+		fmt.Printf("WARNING: Pipeline failed to create S3 uploader: %v\n", s3Err)
+	} else {
+		s3Uploader = s3Up
+	}
+
 	return &Pipeline{
 		db:         db,
 		registry:   registry.GlobalRegistry,
 		config:     config,
 		metrics:    &PipelineMetrics{},
 		dlpService: dlpService,
+		s3Uploader: s3Uploader,
 	}
 }
 
@@ -196,10 +211,12 @@ func (p *Pipeline) ProcessFile(ctx context.Context, request *ProcessingRequest) 
 	}
 
 	// Perform DLP scanning if enabled and processing succeeded
+	// Skip post-processing DLP scan if inline redaction was applied (already scanned during chunk creation)
+	inlineRedactionWasApplied := request.RedactionMode != "" && request.RedactionMode != types.RedactionNone && request.DLPScanEnabled
 	dlpEnabled := p.config.EnableDLP || request.DLPScanEnabled
-	fmt.Printf("DEBUG Pipeline DLP: config.EnableDLP=%v, request.DLPScanEnabled=%v, dlpEnabled=%v, dlpService=%v, status=%s\n",
-		p.config.EnableDLP, request.DLPScanEnabled, dlpEnabled, p.dlpService != nil, result.Status)
-	if dlpEnabled && p.dlpService != nil && result.Status == "completed" {
+	fmt.Printf("DEBUG Pipeline DLP: config.EnableDLP=%v, request.DLPScanEnabled=%v, dlpEnabled=%v, dlpService=%v, status=%s, inlineRedaction=%v\n",
+		p.config.EnableDLP, request.DLPScanEnabled, dlpEnabled, p.dlpService != nil, result.Status, inlineRedactionWasApplied)
+	if dlpEnabled && p.dlpService != nil && result.Status == "completed" && !inlineRedactionWasApplied {
 		violationsFound, dlpErr := p.performDLPScan(postCtx, request)
 		if dlpErr != nil {
 			fmt.Printf("WARNING: DLP scan failed for file %s: %v\n", request.FileID.String(), dlpErr)
@@ -274,6 +291,28 @@ func (p *Pipeline) ProcessFiles(ctx context.Context, requests []*ProcessingReque
 
 // executeProcessingPipeline runs the complete processing pipeline for a file
 func (p *Pipeline) executeProcessingPipeline(ctx context.Context, request *ProcessingRequest, result *ProcessingResult) error {
+	// Step 0: If the file is in S3, download it to a local temp file first
+	if strings.HasPrefix(request.FilePath, "s3://") {
+		if p.s3Uploader == nil {
+			return fmt.Errorf("S3 uploader not available, cannot download file from %s", request.FilePath)
+		}
+		s3URL := strings.TrimPrefix(request.FilePath, "s3://")
+		slashIdx := strings.Index(s3URL, "/")
+		if slashIdx < 0 {
+			return fmt.Errorf("invalid S3 URL: %s", request.FilePath)
+		}
+		s3Bucket := s3URL[:slashIdx]
+		s3Key := s3URL[slashIdx+1:]
+		ext := filepath.Ext(request.FilePath)
+		tempFile := filepath.Join(os.TempDir(), fmt.Sprintf("pipeline-%s-%s%s", request.FileID.String()[:8], uuid.New().String()[:8], ext))
+		if err := p.s3Uploader.DownloadFile(ctx, s3Bucket, s3Key, tempFile); err != nil {
+			return fmt.Errorf("failed to download file from S3: %w", err)
+		}
+		defer os.Remove(tempFile)
+		log.Printf("[Pipeline] Downloaded S3 file to %s for processing", tempFile)
+		request.FilePath = tempFile
+	}
+
 	// Step 1: Auto-select reader if needed
 	readerType := request.ReaderType
 	if readerType == "" && p.config.AutoSelectReader {
@@ -425,6 +464,53 @@ func (p *Pipeline) processChunks(ctx context.Context, iterator core.ChunkIterato
 			if p.config.EnableQualityFilter && dbChunk.Quality.Completeness < p.config.MinQualityThreshold {
 				continue // Skip low-quality chunks
 			}
+
+			// Apply inline DLP scan + redaction before saving if enabled
+			inlineRedactionApplied := false
+			if request.RedactionMode != "" && request.RedactionMode != types.RedactionNone &&
+				request.DLPScanEnabled && p.dlpService != nil {
+
+				scanResp, scanErr := p.dlpService.ScanContent(chunkCtx, &dlp.DLPScanRequest{
+					TenantID:  request.TenantID,
+					ContentID: dbChunk.ChunkID,
+					Content:   dbChunk.ContentPreview,
+					Metadata: map[string]string{
+						"file_id":  request.FileID.String(),
+						"pipeline": "direct",
+					},
+				})
+				if scanErr != nil {
+					log.Printf("[PIPELINE] DLP scan failed for chunk %s: %v", dbChunk.ChunkID, scanErr)
+				} else if scanResp.ScanResult != nil {
+					dbChunk.DLPScanStatus = models.DLPScanStatusCompleted
+					if scanResp.ScanResult.TotalMatches > 0 {
+						dbChunk.PIIDetected = true
+
+						// Apply redaction to content preview
+						redactionEngine := scanner.NewBasicRedactionEngine()
+						redactedContent, redactErr := redactionEngine.RedactContent(
+							dbChunk.ContentPreview, scanResp.ScanResult, request.RedactionMode)
+						if redactErr != nil {
+							log.Printf("[PIPELINE] Redaction failed for chunk %s: %v", dbChunk.ChunkID, redactErr)
+						} else {
+							// Re-truncate to 500 chars after redaction
+							runes := []rune(redactedContent)
+							if len(runes) > 500 {
+								runes = runes[:500]
+							}
+							dbChunk.ContentPreview = string(runes)
+							dbChunk.ContentHash = p.calculateContentHash(redactedContent)
+							log.Printf("[PIPELINE] Redacted %d findings in chunk %s using %s mode",
+								scanResp.ScanResult.TotalMatches, dbChunk.ChunkID, request.RedactionMode)
+						}
+					}
+					if resultBytes, jsonErr := json.Marshal(scanResp.ScanResult); jsonErr == nil {
+						dbChunk.DLPScanResult = string(resultBytes)
+					}
+					inlineRedactionApplied = true
+				}
+			}
+			_ = inlineRedactionApplied
 
 			chunkBatch = append(chunkBatch, dbChunk)
 

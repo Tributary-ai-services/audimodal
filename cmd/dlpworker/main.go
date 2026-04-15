@@ -141,6 +141,17 @@ func processDLPJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 	chunkID, _ := uuid.Parse(job.ChunkID)
 	tenantID, _ := uuid.Parse(job.TenantID)
 
+	// Skip chunks already scanned by the assembler (inline redaction)
+	var existingChunk models.Chunk
+	if err := db.Where("id = ?", chunkID).Select("dlp_scan_status").First(&existingChunk).Error; err == nil {
+		if existingChunk.DLPScanStatus == models.DLPScanStatusCompleted {
+			log.Printf("[DLPWorker] Chunk %s already scanned (by assembler), skipping", job.ChunkID)
+			// Still publish embedding job so downstream processing continues
+			publishEmbeddingJob(ctx, producer, job)
+			return
+		}
+	}
+
 	// Update chunk status to processing
 	db.Model(&models.Chunk{}).Where("id = ?", chunkID).
 		Update("dlp_scan_status", models.DLPScanStatusProcessing)
@@ -223,6 +234,11 @@ func processDLPJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 		job.ChunkID, hasPII, findingCount, riskScore, time.Since(startTime).Milliseconds())
 
 	// Publish embedding job for downstream processing
+	publishEmbeddingJob(ctx, producer, job)
+}
+
+// publishEmbeddingJob publishes an embedding job to Kafka for downstream processing
+func publishEmbeddingJob(ctx context.Context, producer *events.SimpleProducer, job events.DLPJobMessage) {
 	embeddingMsg := events.EmbeddingJobMessage{
 		MessageID:  uuid.New().String(),
 		TenantID:   job.TenantID,
