@@ -356,12 +356,22 @@ func (r *Router) setupRoutes() {
 		}
 	}
 
+	// Activity publisher — envelope-v1 events for the Live Streams page.
+	// Nil is safe; FileHandler no-ops when it's missing.
+	var activityPublisher *events.ActivityPublisher
+	if r.config.Kafka.BootstrapServers != "" {
+		activityPublisher = events.NewActivityPublisher(events.ActivityPublisherConfig{
+			BootstrapServers: r.config.Kafka.BootstrapServers,
+		})
+		r.logger.Info("Activity publisher initialized", "topic", events.ActivityTopic)
+	}
+
 	// Create handlers
 	tenantHandler := handlers.NewTenantHandler(r.db)
 	dataSourceHandler := handlers.NewDataSourceHandler(r.db)
 	sessionHandler := handlers.NewProcessingSessionHandler(r.db)
 	dlpHandler := handlers.NewDLPHandler(r.db)
-	fileHandler := handlers.NewFileHandler(r.db, storageService, eventProducer)
+	fileHandler := handlers.NewFileHandler(r.db, storageService, eventProducer, activityPublisher)
 	chunkHandler := handlers.NewChunkHandler(r.db)
 	webHandler := handlers.NewWebHandler(r.db, r.logger)
 	mlAnalysisHandler := handlers.NewMLAnalysisHandler(r.db, r.logger)

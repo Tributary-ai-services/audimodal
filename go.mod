@@ -31,6 +31,7 @@ require (
 require (
 	cloud.google.com/go/storage v1.56.0
 	github.com/Tributary-ai-services/Gatekeeper v0.0.0-20260717185958-05032a9e9780
+	github.com/Tributary-ai-services/aether-shared/go-events v0.0.0-20260912121931-9c1b9fde7a9f
 	github.com/aws/aws-sdk-go-v2 v1.37.1
 	github.com/aws/aws-sdk-go-v2/config v1.30.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.2
