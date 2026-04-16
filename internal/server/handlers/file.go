@@ -51,11 +51,13 @@ type FileHandler struct {
 	pipeline             *processors.Pipeline
 	mlAnalysisService    *services.MLAnalysisService
 	eventProducer        *events.SimpleProducer
+	activityPublisher    *events.ActivityPublisher
 	splitter             *processors.Splitter
 }
 
-// NewFileHandler creates a new file handler
-func NewFileHandler(db *database.Database, storageService *services.StorageService, eventProducer *events.SimpleProducer) *FileHandler {
+// NewFileHandler creates a new file handler. activityPublisher is optional —
+// pass nil to disable tas.activity.documents streaming without breaking uploads.
+func NewFileHandler(db *database.Database, storageService *services.StorageService, eventProducer *events.SimpleProducer, activityPublisher *events.ActivityPublisher) *FileHandler {
 	// Initialize processing pipeline
 	pipelineConfig := processors.GetDefaultPipelineConfig()
 	pipeline := processors.NewPipeline(db, pipelineConfig)
@@ -87,6 +89,7 @@ func NewFileHandler(db *database.Database, storageService *services.StorageServi
 		pipeline:             pipeline,
 		mlAnalysisService:    mlAnalysisService,
 		eventProducer:        eventProducer,
+		activityPublisher:    activityPublisher,
 		splitter:             splitter,
 	}
 }
@@ -491,6 +494,18 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
+	// Publish activity event so the Live Streams page sees the upload in real time.
+	// Fire-and-forget — failure to publish must not fail the upload.
+	if h.activityPublisher != nil {
+		go h.activityPublisher.PublishDocumentUploaded(r.Context(), tenantID.String(), "", getRequestID(r), events.DocumentUploadedPayload{
+			FileID:    fileRecord.ID.String(),
+			FileName:  filename,
+			SizeBytes: fileHeader.Size,
+			MimeType:  contentType,
+			Source:    "upload",
+		})
+	}
+
 	responseData := h.toFileResponse(fileRecord)
 	response.WriteCreated(w, getRequestID(r), responseData)
 }
@@ -665,6 +680,18 @@ func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Reques
 			response.WriteInternalServerError(w, getRequestID(r), "Failed to create file", err.Error())
 			return
 		}
+	}
+
+	// Publish activity event for JSON-based file registration too, so URL/S3
+	// uploads surface on the Live Streams page alongside multipart uploads.
+	if h.activityPublisher != nil {
+		go h.activityPublisher.PublishDocumentUploaded(r.Context(), tenantID.String(), "", getRequestID(r), events.DocumentUploadedPayload{
+			FileID:    fileRecord.ID.String(),
+			FileName:  fileRecord.Filename,
+			SizeBytes: fileRecord.Size,
+			MimeType:  fileRecord.ContentType,
+			Source:    "json",
+		})
 	}
 
 	responseData := h.toFileResponse(fileRecord)
