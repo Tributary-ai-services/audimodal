@@ -7,14 +7,15 @@ RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
+# Copy the shared go-events module (referenced via replace directive)
+COPY go-events/ /go-events/
 
 # Copy source code
 COPY . .
+
+# Update replace directive for container paths and download deps
+RUN sed -i 's|=> ../aether-shared/go-events|=> /go-events|' go.mod && \
+    go mod download
 
 # Build the main application (Kafka disabled temporarily)
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
