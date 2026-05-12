@@ -111,6 +111,12 @@ func (p *ActivityPublisher) PublishDocumentFailed(ctx context.Context, tenantID,
 }
 
 // dualPublish sends both legacy and CloudEvents messages with a shared event ID.
+//
+// Callers typically invoke this from a goroutine spawned out of an HTTP handler.
+// In that case the request context is canceled the moment the response is
+// flushed, which would race the Kafka write to completion. Detach from any
+// request-scoped context and apply our own timeout instead, so the publish
+// always gets a fair shot.
 func (p *ActivityPublisher) dualPublish(ctx context.Context, eventType ActivityEventType, tenantID, userID, requestID, subject string, payload any) {
 	if p == nil || p.writer == nil {
 		return
@@ -121,7 +127,9 @@ func (p *ActivityPublisher) dualPublish(ctx context.Context, eventType ActivityE
 	legacyMsg := p.buildLegacy(eventID, eventType, tenantID, userID, requestID, payload)
 	ceMsg := p.buildCE(eventID, eventType, tenantID, userID, requestID, subject, payload)
 
-	writeCtx, cancel := context.WithTimeout(ctx, p.timeout)
+	// Intentionally detach from ctx — see method doc.
+	_ = ctx
+	writeCtx, cancel := context.WithTimeout(context.Background(), p.timeout)
 	defer cancel()
 
 	var msgs []kafka.Message
