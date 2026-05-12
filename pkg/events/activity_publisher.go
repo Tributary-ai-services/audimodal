@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"time"
 
@@ -110,55 +109,26 @@ func (p *ActivityPublisher) PublishDocumentFailed(ctx context.Context, tenantID,
 	p.dualPublish(ctx, ActivityDocumentFailed, tenantID, userID, requestID, payload.FileID, payload)
 }
 
-// dualPublish sends both legacy and CloudEvents messages with a shared event ID.
+// dualPublish publishes a CloudEvents 1.0 envelope. The legacy Envelope v1
+// path was retired in 2026-05 after aether-be's consumer reported zero
+// legacy-envelope deliveries for 24h; see Phase 4 of the streaming-pipeline
+// plan. The method name is retained for back-compat with call sites; it
+// now publishes a single CE message.
 func (p *ActivityPublisher) dualPublish(ctx context.Context, eventType ActivityEventType, tenantID, userID, requestID, subject string, payload any) {
 	if p == nil || p.writer == nil {
 		return
 	}
 
-	eventID := uuid.NewString()
-
-	legacyMsg := p.buildLegacy(eventID, eventType, tenantID, userID, requestID, payload)
-	ceMsg := p.buildCE(eventID, eventType, tenantID, userID, requestID, subject, payload)
+	ceMsg := p.buildCE(uuid.NewString(), eventType, tenantID, userID, requestID, subject, payload)
+	if ceMsg == nil {
+		return
+	}
 
 	writeCtx, cancel := context.WithTimeout(ctx, p.timeout)
 	defer cancel()
 
-	var msgs []kafka.Message
-	if legacyMsg != nil {
-		msgs = append(msgs, *legacyMsg)
-	}
-	if ceMsg != nil {
-		msgs = append(msgs, *ceMsg)
-	}
-
-	if len(msgs) == 0 {
-		return
-	}
-
-	if err := p.writer.WriteMessages(writeCtx, msgs...); err != nil {
+	if err := p.writer.WriteMessages(writeCtx, *ceMsg); err != nil {
 		p.logger.Printf("activity_publisher: publish %s failed: %v", eventType, err)
-	}
-}
-
-func (p *ActivityPublisher) buildLegacy(eventID string, eventType ActivityEventType, tenantID, userID, requestID string, payload any) *kafka.Message {
-	env := NewActivityEnvelopeWithID(eventID, eventType, tenantID, userID, requestID, payload)
-
-	data, err := json.Marshal(env)
-	if err != nil {
-		p.logger.Printf("activity_publisher: marshal legacy %s failed: %v", eventType, err)
-		return nil
-	}
-
-	return &kafka.Message{
-		Key:   []byte(tenantID + ":" + requestID),
-		Value: data,
-		Headers: []kafka.Header{
-			{Key: "schema-version", Value: []byte(env.SchemaVersion)},
-			{Key: "event-type", Value: []byte(string(eventType))},
-			{Key: "source-service", Value: []byte(env.SourceService)},
-		},
-		Time: env.Timestamp,
 	}
 }
 

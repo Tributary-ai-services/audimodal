@@ -42,9 +42,10 @@ func (f *fakeWriter) snapshot() []kafka.Message {
 	return out
 }
 
-// TestDualPublish_LegacyAndCE verifies that each publish call emits both a
-// legacy envelope and a CloudEvents 1.0 message with the same event ID.
-func TestDualPublish_LegacyAndCE(t *testing.T) {
+// TestPublish_CloudEventOnly verifies that each publish call emits a single
+// CloudEvents 1.0 message. The legacy Envelope v1 mirror was retired in
+// Phase 4 once aether-be reported zero legacy deliveries for 24h.
+func TestPublish_CloudEventOnly(t *testing.T) {
 	w := &fakeWriter{}
 	p := NewActivityPublisherWithWriter(w, ActivityTopic, log.Default())
 
@@ -57,29 +58,11 @@ func TestDualPublish_LegacyAndCE(t *testing.T) {
 	})
 
 	msgs := w.snapshot()
-	if len(msgs) != 2 {
-		t.Fatalf("expected 2 messages (legacy + CE), got %d", len(msgs))
+	if len(msgs) != 1 {
+		t.Fatalf("expected 1 CE message, got %d", len(msgs))
 	}
 
-	// First message: legacy envelope
-	legacyMsg := msgs[0]
-	var env Envelope
-	if err := json.Unmarshal(legacyMsg.Value, &env); err != nil {
-		t.Fatalf("unmarshal legacy: %v", err)
-	}
-	if env.SchemaVersion != "1" {
-		t.Errorf("legacy SchemaVersion = %q, want 1", env.SchemaVersion)
-	}
-	if env.EventType != ActivityDocumentUploaded {
-		t.Errorf("legacy EventType = %q, want %q", env.EventType, ActivityDocumentUploaded)
-	}
-	if env.SourceService != "audimodal" {
-		t.Errorf("legacy SourceService = %q", env.SourceService)
-	}
-	legacyID := env.EventID
-
-	// Second message: CloudEvents
-	ceMsg := msgs[1]
+	ceMsg := msgs[0]
 	if !kafkabind.IsCloudEvent(ceMsg.Headers) {
 		t.Error("CE message missing content-type header")
 	}
@@ -103,10 +86,8 @@ func TestDualPublish_LegacyAndCE(t *testing.T) {
 	if ce.Subject != "file-abc" {
 		t.Errorf("CE subject = %q, want file-abc", ce.Subject)
 	}
-
-	// Stable event ID across both formats
-	if ce.ID != legacyID {
-		t.Errorf("event IDs differ: legacy=%q, CE=%q — must be identical for dedup", legacyID, ce.ID)
+	if ce.ID == "" {
+		t.Error("CE id is empty")
 	}
 }
 
@@ -142,8 +123,9 @@ func TestDualPublish_NilReceiverSafe(t *testing.T) {
 	}
 }
 
-// TestDualPublish_AllEventTypes verifies 3 helper methods each produce 2 messages.
-func TestDualPublish_AllEventTypes(t *testing.T) {
+// TestPublish_AllEventTypes verifies the three helper methods each emit one
+// CloudEvents message of the right type.
+func TestPublish_AllEventTypes(t *testing.T) {
 	w := &fakeWriter{}
 	p := NewActivityPublisherWithWriter(w, ActivityTopic, log.Default())
 	ctx := context.Background()
@@ -153,24 +135,22 @@ func TestDualPublish_AllEventTypes(t *testing.T) {
 	p.PublishDocumentFailed(ctx, "t", "u", "r", DocumentFailedPayload{FileID: "f", Error: "boom"})
 
 	msgs := w.snapshot()
-	if len(msgs) != 6 {
-		t.Fatalf("expected 6 messages (3 events × 2 formats), got %d", len(msgs))
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 CE messages, got %d", len(msgs))
 	}
 
-	// Verify CE types for the even-indexed messages (1, 3, 5)
 	wantCETypes := []string{
 		"com.tas.activity.document.uploaded",
 		"com.tas.activity.document.processed",
 		"com.tas.activity.document.failed",
 	}
 	for i, wantType := range wantCETypes {
-		ceIdx := i*2 + 1
 		var ce tasevents.Event
-		if err := json.Unmarshal(msgs[ceIdx].Value, &ce); err != nil {
-			t.Fatalf("CE msg %d unmarshal: %v", ceIdx, err)
+		if err := json.Unmarshal(msgs[i].Value, &ce); err != nil {
+			t.Fatalf("CE msg %d unmarshal: %v", i, err)
 		}
 		if ce.Type != wantType {
-			t.Errorf("CE msg %d type = %q, want %q", ceIdx, ce.Type, wantType)
+			t.Errorf("CE msg %d type = %q, want %q", i, ce.Type, wantType)
 		}
 	}
 }
