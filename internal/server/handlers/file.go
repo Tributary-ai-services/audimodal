@@ -497,7 +497,8 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 	// Publish activity event so the Live Streams page sees the upload in real time.
 	// Fire-and-forget — failure to publish must not fail the upload.
 	if h.activityPublisher != nil {
-		go h.activityPublisher.PublishDocumentUploaded(r.Context(), tenantID.String(), "", getRequestID(r), events.DocumentUploadedPayload{
+		ceTenantID := canonicalTenantID(r, tenantID.String())
+		go h.activityPublisher.PublishDocumentUploaded(r.Context(), ceTenantID, "", getRequestID(r), events.DocumentUploadedPayload{
 			FileID:    fileRecord.ID.String(),
 			FileName:  filename,
 			SizeBytes: fileHeader.Size,
@@ -685,7 +686,8 @@ func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Reques
 	// Publish activity event for JSON-based file registration too, so URL/S3
 	// uploads surface on the Live Streams page alongside multipart uploads.
 	if h.activityPublisher != nil {
-		go h.activityPublisher.PublishDocumentUploaded(r.Context(), tenantID.String(), "", getRequestID(r), events.DocumentUploadedPayload{
+		ceTenantID := canonicalTenantID(r, tenantID.String())
+		go h.activityPublisher.PublishDocumentUploaded(r.Context(), ceTenantID, "", getRequestID(r), events.DocumentUploadedPayload{
 			FileID:    fileRecord.ID.String(),
 			FileName:  fileRecord.Filename,
 			SizeBytes: fileRecord.Size,
