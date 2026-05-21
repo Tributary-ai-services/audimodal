@@ -63,11 +63,15 @@ type DocumentUploadedPayload struct {
 }
 
 // DocumentProcessedPayload is carried by ActivityDocumentProcessed events.
+// Confidence is the pipeline's quality score for the extracted content, in
+// the range [0.0, 1.0] (from ProcessingResult.QualityScore). The Live Streams
+// panel surfaces this as the document's analysis confidence.
 type DocumentProcessedPayload struct {
-	FileID     string `json:"file_id"`
-	FileName   string `json:"file_name,omitempty"`
-	ChunkCount int    `json:"chunk_count,omitempty"`
-	DurationMS int64  `json:"duration_ms,omitempty"`
+	FileID     string  `json:"file_id"`
+	FileName   string  `json:"file_name,omitempty"`
+	ChunkCount int     `json:"chunk_count,omitempty"`
+	DurationMS int64   `json:"duration_ms,omitempty"`
+	Confidence float64 `json:"confidence,omitempty"`
 }
 
 // DocumentFailedPayload is carried by ActivityDocumentFailed events.

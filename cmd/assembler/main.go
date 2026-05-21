@@ -74,6 +74,15 @@ func main() {
 	}
 	defer producer.Close()
 
+	// Activity CloudEvents publisher — feeds the Live Streams panel and
+	// TimescaleDB events table. Distinct from `producer` above, which
+	// publishes legacy ProcessingCompleteEvents on the cross-service topic.
+	activityPublisher := events.NewActivityPublisher(events.ActivityPublisherConfig{
+		BootstrapServers: bootstrapServers,
+		Logger:           log.Default(),
+	})
+	defer func() { _ = activityPublisher.Close() }()
+
 	// Create Kafka consumer for page results
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     []string{bootstrapServers},
@@ -124,7 +133,7 @@ func main() {
 				continue
 			}
 
-			processPageResult(ctx, msg, db, s3Uploader, producer)
+			processPageResult(ctx, msg, db, s3Uploader, producer, activityPublisher)
 
 			if err := reader.CommitMessages(ctx, msg); err != nil {
 				log.Printf("[Assembler] Error committing offset: %v", err)
@@ -133,7 +142,7 @@ func main() {
 	}
 }
 
-func processPageResult(ctx context.Context, msg kafka.Message, db *gorm.DB, s3Uploader *services.S3Uploader, producer *events.SimpleProducer) {
+func processPageResult(ctx context.Context, msg kafka.Message, db *gorm.DB, s3Uploader *services.S3Uploader, producer *events.SimpleProducer, activityPublisher *events.ActivityPublisher) {
 	var result events.PageResultMessage
 	if err := json.Unmarshal(msg.Value, &result); err != nil {
 		log.Printf("[Assembler] Failed to unmarshal page result: %v", err)
@@ -217,11 +226,12 @@ func processPageResult(ctx context.Context, msg kafka.Message, db *gorm.DB, s3Up
 		jobID.String(), job.CompletedPages, job.FailedPages, job.TotalPages)
 
 	// Determine final status based on failure rate
-	assembleFile(ctx, db, s3Uploader, producer, &job, tenantID, fileID)
+	assembleFile(ctx, db, s3Uploader, producer, activityPublisher, &job, tenantID, fileID)
 }
 
 func assembleFile(ctx context.Context, db *gorm.DB, s3Uploader *services.S3Uploader,
-	producer *events.SimpleProducer, job *models.ProcessingJob, tenantID, fileID uuid.UUID) {
+	producer *events.SimpleProducer, activityPublisher *events.ActivityPublisher,
+	job *models.ProcessingJob, tenantID, fileID uuid.UUID) {
 
 	// Update job to assembling
 	db.Model(job).Updates(map[string]any{
@@ -249,6 +259,9 @@ func assembleFile(ctx context.Context, db *gorm.DB, s3Uploader *services.S3Uploa
 				"processed_at":        &now,
 				"processing_duration": processingDuration,
 			})
+
+		// Publish CloudEvent so the Live Streams panel shows the failure.
+		publishActivityFailed(ctx, activityPublisher, tenantID, fileID, job.ID, "assemble", errMsg)
 		return
 	}
 
@@ -457,9 +470,9 @@ func assembleFile(ctx context.Context, db *gorm.DB, s3Uploader *services.S3Uploa
 	updateFileStatus(db, tenantID, fileID, "processed", "")
 	db.Model(&models.File{}).Where("id = ? AND tenant_id = ?", fileID, tenantID).
 		Updates(map[string]any{
-			"chunk_count":          chunkCount,
-			"processed_at":         &now,
-			"processing_duration":  processingDuration,
+			"chunk_count":         chunkCount,
+			"processed_at":        &now,
+			"processing_duration": processingDuration,
 		})
 
 	pipelineMetrics.AssemblerFilesCompleted.Inc()
@@ -469,26 +482,30 @@ func assembleFile(ctx context.Context, db *gorm.DB, s3Uploader *services.S3Uploa
 		fileID.String(), chunkCount, job.FailedPages)
 
 	// Publish processing complete event
-	publishCompleteEvent(ctx, producer, tenantID, fileID, file, chunkCount, job)
+	publishCompleteEvent(ctx, producer, activityPublisher, tenantID, fileID, file, chunkCount, pageResults, job)
 }
 
 func publishCompleteEvent(ctx context.Context, producer *events.SimpleProducer,
-	tenantID, fileID uuid.UUID, file models.File, chunkCount int, job *models.ProcessingJob) {
+	activityPublisher *events.ActivityPublisher,
+	tenantID, fileID uuid.UUID, file models.File, chunkCount int,
+	pageResults []models.PipelinePageResult, job *models.ProcessingJob) {
 
 	var documentID string
 	if file.Neo4jDocumentID != nil {
 		documentID = *file.Neo4jDocumentID
 	}
 
+	success := job.FailedPages == 0
+
 	eventData := events.ProcessingCompleteData{
-		FileID:              fileID.String(),
-		DocumentID:          documentID,
-		URL:                 file.URL,
-		ChunksCreated:       chunkCount,
-		DLPViolationsFound:  0,
-		FinalDataClass:      "internal",
-		StorageLocation:     file.Path,
-		Success:             job.FailedPages == 0,
+		FileID:             fileID.String(),
+		DocumentID:         documentID,
+		URL:                file.URL,
+		ChunksCreated:      chunkCount,
+		DLPViolationsFound: 0,
+		FinalDataClass:     "internal",
+		StorageLocation:    file.Path,
+		Success:            success,
 	}
 
 	event := events.NewProcessingCompleteEvent("audimodal-assembler", tenantID.String(), eventData)
@@ -497,6 +514,63 @@ func publishCompleteEvent(ctx context.Context, producer *events.SimpleProducer,
 	} else {
 		log.Printf("[Assembler] Published processing complete event for file %s", fileID.String())
 	}
+
+	// Activity CloudEvent for the Live Streams panel + TimescaleDB events
+	// table. Separate from the legacy event above, which is consumed by
+	// aether-be's processing_event_handler for cross-service sync.
+	if activityPublisher == nil {
+		return
+	}
+
+	durationMS := time.Since(job.CreatedAt).Milliseconds()
+	if success {
+		activityPublisher.PublishDocumentProcessed(ctx, tenantID.String(), "", job.ID.String(),
+			events.DocumentProcessedPayload{
+				FileID:     fileID.String(),
+				FileName:   file.Filename,
+				ChunkCount: chunkCount,
+				DurationMS: durationMS,
+				Confidence: averageOCRConfidence(pageResults),
+			})
+	} else {
+		errMsg := fmt.Sprintf("%d of %d pages failed", job.FailedPages, job.TotalPages)
+		publishActivityFailed(ctx, activityPublisher, tenantID, fileID, job.ID, "assemble", errMsg)
+	}
+}
+
+// publishActivityFailed fire-and-forget publishes a document.failed CloudEvent.
+// requestID falls back to the job ID so consumers can correlate with the
+// originating processing job.
+func publishActivityFailed(ctx context.Context, activityPublisher *events.ActivityPublisher,
+	tenantID, fileID, jobID uuid.UUID, stage, errMsg string) {
+
+	if activityPublisher == nil {
+		return
+	}
+	activityPublisher.PublishDocumentFailed(ctx, tenantID.String(), "", jobID.String(),
+		events.DocumentFailedPayload{
+			FileID: fileID.String(),
+			Stage:  stage,
+			Error:  errMsg,
+		})
+}
+
+// averageOCRConfidence returns the mean OCR confidence across pages that
+// reported a confidence value. Returns 0 when none did (PDFs with native
+// text layers skip OCR), which omitempty will drop from the JSON payload.
+func averageOCRConfidence(pageResults []models.PipelinePageResult) float64 {
+	var sum float64
+	var n int
+	for _, pr := range pageResults {
+		if pr.OCRConfidence != nil {
+			sum += *pr.OCRConfidence
+			n++
+		}
+	}
+	if n == 0 {
+		return 0
+	}
+	return sum / float64(n)
 }
 
 func publishDLPJobs(ctx context.Context, producer *events.SimpleProducer, chunks []models.Chunk, tenantID, fileID string) {
