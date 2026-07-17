@@ -35,6 +35,8 @@ go.work.sum
 /dlpworker
 /embeddingworker
 /ocrworker
+/admin
+/audimodal
 
 # Data directory
 /data/
