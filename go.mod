@@ -5,7 +5,6 @@ go 1.24.0
 toolchain go1.24.4
 
 require (
-
 	// Core dependencies
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
@@ -31,7 +30,7 @@ require (
 
 require (
 	cloud.google.com/go/storage v1.56.0
-	github.com/Tributary-ai-services/Gatekeeper v0.0.0-00010101000000-000000000000
+	github.com/Tributary-ai-services/Gatekeeper v0.0.0-20260717185958-05032a9e9780
 	github.com/aws/aws-sdk-go-v2 v1.37.1
 	github.com/aws/aws-sdk-go-v2/config v1.30.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.2
@@ -160,8 +159,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.7.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-// Gatekeeper is developed in-tree alongside audimodal; resolve it to the local
-// sibling path. Used by pkg/dlp/shadow to dual-run Gatekeeper's scanner against
-// audimodal's DLP (audimodal#26, G6).
-replace github.com/Tributary-ai-services/Gatekeeper => ../Gatekeeper
