@@ -23,6 +23,9 @@ import (
 	"github.com/jscharber/audimodal/internal/database/models"
 	"github.com/jscharber/audimodal/internal/services"
 	"github.com/jscharber/audimodal/pkg/dlp"
+	"github.com/jscharber/audimodal/pkg/dlp/compliance"
+	"github.com/jscharber/audimodal/pkg/dlp/scanner"
+	"github.com/jscharber/audimodal/pkg/dlp/shadow"
 	dlpTypes "github.com/jscharber/audimodal/pkg/dlp/types"
 	"github.com/jscharber/audimodal/pkg/events"
 	"github.com/jscharber/audimodal/pkg/metrics"
@@ -65,8 +68,28 @@ func main() {
 	}
 	defer producer.Close()
 
-	// Create DLP service (built-in PII scanner, no external API needed)
-	dlpService := dlp.NewDLPService(nil)
+	// Create DLP service (built-in PII scanner, no external API needed).
+	//
+	// DLP_SHADOW_SCAN=true wraps the scanner in a Gatekeeper shadow (audimodal#26,
+	// G6): it dual-runs Gatekeeper on every scan and LOGS the per-type finding
+	// diff, while audimodal stays authoritative (result unchanged). This measures
+	// the coverage delta — Gatekeeper detects cloud secrets audimodal has no
+	// matcher for — before any cutover. Off by default; enabling it changes
+	// nothing audimodal detects or redacts.
+	var dlpService *dlp.DLPService
+	if os.Getenv("DLP_SHADOW_SCAN") == "true" {
+		shadowLog := log.New(os.Stderr, "[DLPWorker][gk-shadow] ", log.LstdFlags)
+		primary := shadow.New(scanner.NewBasicDLPScanner(), shadowLog)
+		dlpService = dlp.NewDLPServiceWithComponents(
+			primary,
+			scanner.NewBasicRedactionEngine(),
+			compliance.NewBasicComplianceChecker(),
+			nil,
+		)
+		log.Println("[DLPWorker] Gatekeeper shadow scanning ENABLED (log-only diff; audimodal authoritative)")
+	} else {
+		dlpService = dlp.NewDLPService(nil)
+	}
 
 	// Create Kafka consumer for DLP jobs
 	reader := kafka.NewReader(kafka.ReaderConfig{
@@ -126,7 +149,6 @@ func main() {
 
 func processDLPJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 	s3Uploader *services.S3Uploader, dlpService *dlp.DLPService, producer *events.SimpleProducer) {
-
 	startTime := time.Now()
 
 	var job events.DLPJobMessage
@@ -164,7 +186,7 @@ func processDLPJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 		db.Model(&models.Chunk{}).Where("id = ?", chunkID).
 			Updates(map[string]any{
 				"dlp_scan_status": models.DLPScanStatusFailed,
-				"updated_at":     time.Now(),
+				"updated_at":      time.Now(),
 			})
 		return
 	}
@@ -186,7 +208,7 @@ func processDLPJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 		db.Model(&models.Chunk{}).Where("id = ?", chunkID).
 			Updates(map[string]any{
 				"dlp_scan_status": models.DLPScanStatusFailed,
-				"updated_at":     time.Now(),
+				"updated_at":      time.Now(),
 			})
 		return
 	}
@@ -209,12 +231,12 @@ func processDLPJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 	// Update chunk in DB
 	db.Model(&models.Chunk{}).Where("id = ?", chunkID).
 		Updates(map[string]any{
-			"dlp_scan_status":  models.DLPScanStatusCompleted,
-			"dlp_scan_result":  scanResultJSON,
+			"dlp_scan_status":   models.DLPScanStatusCompleted,
+			"dlp_scan_result":   scanResultJSON,
 			"dlp_finding_count": findingCount,
-			"dlp_risk_score":   riskScore,
-			"pii_detected":     hasPII,
-			"updated_at":       time.Now(),
+			"dlp_risk_score":    riskScore,
+			"pii_detected":      hasPII,
+			"updated_at":        time.Now(),
 		})
 
 	pipelineMetrics.DLPChunksScanned.Inc()

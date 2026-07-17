@@ -1,3 +1,7 @@
+//go:build ignore
+
+// Standalone tool — run with `go run scripts/todo.go`. Tagged `ignore` so it
+// doesn't collide with the other package main in this dir during build/vet/lint.
 package main
 
 import (

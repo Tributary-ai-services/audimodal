@@ -1,3 +1,8 @@
+//go:build ignore
+
+// Standalone migration tool — run with `go run scripts/backfill_neo4j_document_ids.go`.
+// Tagged `ignore` so it doesn't collide with the other package main in this dir.
+//
 // Package main provides a data migration script to backfill neo4j_document_id
 // for existing files in the AudiModal database.
 //
