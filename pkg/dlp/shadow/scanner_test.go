@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	gk "github.com/Tributary-ai-services/Gatekeeper/pkg/scan"
+
 	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
 

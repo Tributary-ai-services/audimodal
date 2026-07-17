@@ -149,7 +149,6 @@ func main() {
 
 func processDLPJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 	s3Uploader *services.S3Uploader, dlpService *dlp.DLPService, producer *events.SimpleProducer) {
-
 	startTime := time.Now()
 
 	var job events.DLPJobMessage

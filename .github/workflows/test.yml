@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+env:
+  # pkg/dlp/shadow links Gatekeeper's scanner; nohs selects its cgo-free Go
+  # regexp engine so CI needs neither libhyperscan nor pkg-config.
+  GOFLAGS: -tags=nohs
+
 jobs:
   test:
     name: Test
@@ -51,6 +56,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-${{ matrix.go-version }}-
           
+    - name: Checkout Gatekeeper (public sibling for the ../Gatekeeper replace)
+      run: git clone --depth 1 https://github.com/Tributary-ai-services/Gatekeeper.git "$GITHUB_WORKSPACE/../Gatekeeper"
+
     - name: Download dependencies
       run: go mod download
       
@@ -143,6 +151,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-1.21-
           
+    - name: Checkout Gatekeeper (public sibling for the ../Gatekeeper replace)
+      run: git clone --depth 1 https://github.com/Tributary-ai-services/Gatekeeper.git "$GITHUB_WORKSPACE/../Gatekeeper"
+
     - name: Download dependencies
       run: go mod download
       
@@ -185,6 +196,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-1.21-
           
+    - name: Checkout Gatekeeper (public sibling for the ../Gatekeeper replace)
+      run: git clone --depth 1 https://github.com/Tributary-ai-services/Gatekeeper.git "$GITHUB_WORKSPACE/../Gatekeeper"
+
     - name: Download dependencies
       run: go mod download
       

@@ -1,6 +1,10 @@
 run:
   timeout: 5m
   tests: true
+  # pkg/dlp/shadow links Gatekeeper's scanner; nohs selects its cgo-free Go
+  # regexp engine so linting doesn't need libhyperscan/pkg-config.
+  build-tags:
+    - nohs
 
 output:
   formats:

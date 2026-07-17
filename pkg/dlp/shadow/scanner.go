@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	gk "github.com/Tributary-ai-services/Gatekeeper/pkg/scan"
+
 	"github.com/jscharber/audimodal/pkg/dlp"
 	"github.com/jscharber/audimodal/pkg/dlp/types"
 )
@@ -60,7 +61,9 @@ var _ dlp.DLPScanner = (*Scanner)(nil)
 
 // ScanContent runs the primary scanner (authoritative), shadows it with
 // Gatekeeper, and returns the primary result unchanged.
-func (s *Scanner) ScanContent(ctx context.Context, content string, config *types.ScanConfig) (*types.ScanResult, error) {
+func (s *Scanner) ScanContent(
+	ctx context.Context, content string, config *types.ScanConfig,
+) (*types.ScanResult, error) {
 	res, err := s.primary.ScanContent(ctx, content, config)
 	if err != nil {
 		return res, err // primary error is the real error; don't shadow a failed scan
@@ -70,7 +73,9 @@ func (s *Scanner) ScanContent(ctx context.Context, content string, config *types
 }
 
 // ScanChunk mirrors ScanContent for the chunk path.
-func (s *Scanner) ScanChunk(ctx context.Context, chunk *types.ChunkContent, config *types.ScanConfig) (*types.ScanResult, error) {
+func (s *Scanner) ScanChunk(
+	ctx context.Context, chunk *types.ChunkContent, config *types.ScanConfig,
+) (*types.ScanResult, error) {
 	res, err := s.primary.ScanChunk(ctx, chunk, config)
 	if err != nil {
 		return res, err
