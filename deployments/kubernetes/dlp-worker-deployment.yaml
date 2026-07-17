@@ -26,13 +26,18 @@ spec:
     spec:
       containers:
       - name: dlp-worker
-        image: registry-api.tas.scharber.com/audimodal:latest
+        image: registry-api.tas.scharber.com/audimodal:g6-93f5615
         command: ["./dlpworker"]
         ports:
         - name: health
           containerPort: 8081
           protocol: TCP
         env:
+        # G6: dual-run Gatekeeper alongside audimodal's DLP and log the per-type
+        # finding diff (audimodal authoritative, result unchanged). Measure-only —
+        # docs/AIQG-GATEKEEPER-INTEGRATION.md §4a, audimodal#26.
+        - name: DLP_SHADOW_SCAN
+          value: "true"
         - name: KAFKA_BOOTSTRAP_SERVERS
           value: "kafka-shared.tas-shared.svc.cluster.local:9092"
         - name: KAFKA_GROUP_ID
