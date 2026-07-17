@@ -68,9 +68,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-go-
     
-    - name: Checkout Gatekeeper (public sibling for the ../Gatekeeper replace)
-      run: git clone --depth 1 https://github.com/Tributary-ai-services/Gatekeeper.git "$GITHUB_WORKSPACE/../Gatekeeper"
-
     - name: Download dependencies
       run: go mod download
     
@@ -337,9 +334,6 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         check-latest: true
     
-    - name: Checkout Gatekeeper (public sibling for the ../Gatekeeper replace)
-      run: git clone --depth 1 https://github.com/Tributary-ai-services/Gatekeeper.git "$GITHUB_WORKSPACE/../Gatekeeper"
-
     - name: Download dependencies
       run: go mod download
     

@@ -28,8 +28,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ocrworker ./cmd/o
 # Build assembler binary for Kafka pipeline
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o assembler ./cmd/assembler
 
-# Build DLP worker binary for Kafka pipeline
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o dlpworker ./cmd/dlpworker
+# Build DLP worker binary for Kafka pipeline.
+# -tags nohs: dlpworker links Gatekeeper's scanner (pkg/dlp/shadow) whose default
+# engine is cgo Hyperscan; nohs selects its cgo-free Go regexp engine so this
+# stays CGO_ENABLED=0 with no libhyperscan/pkg-config in the image.
+RUN CGO_ENABLED=0 GOOS=linux go build -tags nohs -a -installsuffix cgo -o dlpworker ./cmd/dlpworker
 
 # Build embedding worker binary for Kafka pipeline
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o embeddingworker ./cmd/embeddingworker
