@@ -1,334 +1,258 @@
+---
+doc_type: readme
+audience: "engineer who has just landed on the audimodal repository and needs to decide whether it does what they need, then get it building and answering requests"
+assumes: ["Go toolchain basics", "kubectl and Kubernetes namespaces", "what a Kafka topic is"]
+answers:
+  - "What does audimodal do to a document I hand it?"
+  - "What is actually deployed and running today, and which parts of the repository are unreachable code?"
+  - "How do I build it, and why does a plain go build fail?"
+  - "Do the tests pass, and which ones fail before I touch anything?"
+  - "How do I make an authenticated call against the running service, and where does the credential come from?"
+  - "Is the Gatekeeper integration blocking anything, or only recording?"
+  - "Which services must be up for audimodal to start, and which only for it to process documents?"
+  - "Why is CI red, and does my pull request need it green?"
+verified_against: "audimodal@a96cde3, 2026-08-26"
+depth: standard
+---
+
 # AudiModal.ai
-*Open-Source AI-Powered Document Processing Platform*
 
-## 🎯 Transform Your Document Workflows
+*Document ingestion and content scanning for the Tributary AI Services (TAS) platform.*
 
-AudiModal.ai is an enterprise-grade, cloud-native document processing platform that revolutionizes how organizations discover, process, and manage their unstructured document assets. Built with AI/ML classification capabilities, enterprise security, compliance automation, and multi-tenant architecture, it provides comprehensive document intelligence for regulated industries.
+## What this is
 
-**Transform your document repositories into intelligent, searchable, and compliant knowledge bases with advanced ML/AI capabilities.**
+AudiModal is the ingestion half of TAS. You give it a file — a scanned contract, a spreadsheet, an email archive — and it turns that file into text, chunks, findings, and vectors that the rest of the platform can search and reason over. Along the way it extracts text (falling back to optical character recognition for scanned pages), splits the document into chunks, scans each chunk for personally identifiable information (PII), generates embeddings, and writes those vectors to the DeepLake service. File bytes live in MinIO; the `File`, `Tenant`, and `ProcessingSession` records that track all of it live in PostgreSQL. Everything is scoped to a tenant.
 
----
+It is not the user-facing application — that is `aether` and `aether-be`. It is not the vector store; it writes into `deeplake-api` and does not own the index. It is not a model gateway; document text never goes to a language model through this service.
 
-## ✨ Key Features
+The extractors are one Go package per family:
 
-### 🤖 **AI-Powered Document Intelligence**
-- **Custom Model Training**: Domain-specific ML model training with job management and worker pools
-- **Model Versioning & A/B Testing**: Advanced model lifecycle management with statistical experimentation
-- **Predictive Analytics**: Document lifecycle prediction and usage pattern forecasting
-- **Knowledge Graph Construction**: Entity and relationship extraction with graph-based intelligence
-- **Semantic Search**: Vector-based document discovery with hybrid search capabilities
-- **Content Intelligence**: Advanced document relationship mapping and similarity analysis
-- **ML-Powered Insights**: Automated insight generation with comprehensive reporting
-- **Advanced PII Detection**: Pattern recognition for 15+ PII types including SSN, credit cards, medical records
-- **Anomaly Detection**: Real-time threat detection and security monitoring
-
-### 🔒 **Enterprise Security & Compliance**
-- **Multi-Regulatory Support**: GDPR, HIPAA, SOX, PCI DSS compliance built-in
-- **Zero-Trust Architecture**: Continuous verification and risk-based access controls
-- **Data Loss Prevention**: Real-time policy enforcement with automated redaction
-- **Audit Trail**: Immutable compliance logging with 7-year retention
-- **Geographic Controls**: Data residency enforcement by jurisdiction
-
-### ⚡ **Scalable Processing Engine**
-- **Multi-Tier Processing**: Handle everything from real-time small files to distributed large document processing
-- **Streaming Ingest**: Real-time document processing with Kafka integration and WebSocket support
-- **Performance**: 10,000+ files per hour per tenant with sub-second API response times
-- **Auto-Scaling**: Intelligent workload distribution across processing tiers
-- **Unified Sync Framework**: Multi-platform synchronization with conflict resolution
-- **Change Data Capture**: Real-time database and file system monitoring
-
-### 🏢 **Multi-Tenant Architecture**
-- **Tenant Isolation**: Secure separation supporting 1,000+ concurrent tenants
-- **Kubernetes CRDs**: Declarative resource management with custom operators
-- **Enterprise Connectors**: 8+ platform integrations (SharePoint, Confluence, Jira, Slack, etc.)
-- **Flexible Deployment**: AWS, Azure, GCP, or on-premises with Docker/Kubernetes
-
----
-
-## 🎛️ **Platform Capabilities**
-
-### 📄 **Document Processing Pipeline**
-- **Universal Format Support**: 98% coverage including PDF, Office docs, images, text files, emails, PST archives
-- **OCR & Text Extraction**: High-accuracy document digitization with image processing
-- **Chunking Strategies**: Smart document segmentation with 5+ strategy implementations
-- **Metadata Enrichment**: Automatic tagging and classification with ML models
-
-### 🔗 **Data Integration & Connectivity**
-- **Storage Flexibility**: S3, Azure Blob, Google Cloud Storage, local file systems with encryption
-- **Enterprise Connectors**: SharePoint, Confluence, Jira, Slack, Teams, Box, Dropbox, OneDrive
-- **API-First Design**: 90+ RESTful endpoints with complete OpenAPI 3.0.3 specification
-- **Event Streaming**: Real-time processing updates via Kafka with CDC connectors
-- **Webhook Support**: Custom notifications and workflow triggers
-
-### 📊 **Analytics & ML Insights**
-- **ML-Powered Reports**: 8 report types with automated insight generation
-- **Document Health Analytics**: Orphaned document detection and quality assessment
-- **Usage Analytics**: Access pattern analysis and trend detection
-- **Predictive Insights**: Document lifecycle forecasting with confidence scoring
-- **Knowledge Graph Analytics**: Entity and relationship visualization
-- **Security Monitoring**: Real-time anomaly detection and threat assessment
-
----
-
-## 🚀 **Getting Started**
-
-### Prerequisites
-- Go 1.23.0+
-- PostgreSQL 13+
-- Redis 6+
-- Docker & Docker Compose
-- Kubernetes 1.24+ (for production)
-
-### Quick Setup
-```bash
-# Clone the repository
-git clone https://github.com/your-org/audimodal.git
-cd audimodal
-
-# Start with Docker Compose
-docker-compose up -d
-
-# Or build and run locally
-make build
-./bin/server --config config/server.yaml
+```console
+$ ls -d pkg/readers/*/ | xargs -n1 basename | tr "\n" " "
+archive csv email html image json markdown microsoft office pdf rtf text xml
 ```
 
-### Development Environment
-```bash
-# Install dependencies
-go mod download
+## Status & scope
 
-# Run tests
-make test
+**As of 2026-08-26.** AudiModal runs on the TAS k3s cluster in namespace `aether-be`, alongside the Aether backend and the DeepLake service, as five deployments:
 
-# Start development server
-make dev
+| Deployment | Ready | Image |
+|---|---|---|
+| `audimodal` (the API server) | 1/1 | `audimodal:tenant-canonical-20260520103052` |
+| `audimodal-ocr-worker` | 2/2 | `audimodal:latest` |
+| `audimodal-assembler` | 1/1 | `audimodal:latest` |
+| `audimodal-dlp-worker` | 1/1 | `audimodal:g6-93f5615` |
+| `audimodal-embedding-worker` | 1/1 | `audimodal:latest` |
 
-# Generate API documentation
-make docs
+All five are running and the API server reports healthy. The service has no ingress: it is reachable in-cluster at `audimodal.aether-be:8080` and from outside through NodePort `30084`, so there is no public hostname to hand anyone. The API server image was built on 2026-05-20 and the commit this document was verified against landed on 2026-07-17, so `main` is about two months ahead of what is deployed.
+
+Deployed is not the same as busy. The pipeline is idle: the most recent processing the DLP worker recorded was on 2026-07-17, and a Loki query for audimodal log streams in `aether-be` over the last 30 days returns zero streams — the namespace is in the Alloy collection allowlist, so this reflects silence, not a collection gap. Treat any throughput number you find in this repository as unmeasured.
+
+Four things a newcomer will otherwise get wrong:
+
+**Content scanning records, it does not block.** The data loss prevention (DLP) worker runs with `DLP_SHADOW_SCAN=true`. That wraps AudiModal's own scanner in a Gatekeeper shadow which dual-runs both engines and logs the per-type difference, then returns AudiModal's result unchanged (`pkg/dlp/shadow/scanner.go:1-18`, wired at `cmd/dlpworker/main.go:80`). AudiModal stays authoritative; a Gatekeeper error is logged and swallowed. Nothing Gatekeeper finds is redacted, quarantined, or blocked. The point of the shadow is to size the gap before any cutover — AudiModal's own scanner advertises five pattern types (`pkg/dlp/scanner/basic_scanner.go:150`) against Gatekeeper's much wider set. Here is the worker announcing the shadow and, an hour later, the single diff it recorded that day — this is what "measure-only" looks like in practice:
+
+```text
+2026/07/17 20:36:04 [DLPWorker] Gatekeeper shadow scanning ENABLED (log-only diff; audimodal authoritative)
+[DLPWorker][gk-shadow] 2026/07/17 21:37:28 dlp-shadow: gatekeeper_only=[aws_access_key:1 aws_secret_key:1 connection_string:1 credit_card:1 private_key:1 sql:1] both(audimodal/gk)=[email:2/2 phone_number:1/1 ssn:1/1]
 ```
 
-### API Integration
-```bash
-# Process a document
-curl -X POST http://localhost:8080/v1/documents \
-  -H "Authorization: Bearer $JWT_TOKEN" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@document.pdf" \
-  -F "tenant_id=your-tenant-id"
+**Authentication is a length check, not verification.** `AuthenticationMiddleware` (`internal/server/middleware.go:150-191`) accepts any `X-API-Key` of 32 characters or more without consulting the database, and accepts any `Authorization: Bearer` header without validating the token — both paths carry a TODO comment saying so. Separately, `/api/v1/tenants` and `/api/v1/tenants/{id}` are registered through a pass-through `noAuthMiddleware` (`internal/server/server.go:373-389`), so tenant metadata is readable with no header at all. Do not put untrusted traffic in front of this.
 
-# Train a custom ML model
-curl -X POST http://localhost:8080/v1/ml/training/jobs \
-  -H "Authorization: Bearer $JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"model_type": "classification", "dataset_id": "uuid"}'
+**The enterprise connectors and the sync framework are unreachable code.** `pkg/connectors/` contains packages for Box, Confluence, Dropbox, Google Drive, Notion, OneDrive, SharePoint, and Slack. No file in this repository imports `pkg/connectors`. `pkg/sync` is imported only by `internal/api/sync_controller.go`, which is itself imported by nothing under `cmd/`. They compile; no running process can reach them. `ROADMAP.md` marks both categories 100% complete, along with "Authentication ✅ Complete 100%" — that file has not been maintained and should not be used to judge status.
 
-# Perform semantic search
-curl -X POST http://localhost:8080/v1/ml/search/semantic \
-  -H "Authorization: Bearer $JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "contract terms", "tenant_id": "your-tenant-id"}'
+**CI is red, and was already red before you got here.** The twelve most recent workflow runs — Tests and CI/CD Pipeline, on `main` and on pull requests, the newest from 2026-07-17 — all failed. Tests never reaches a test: it stops at its formatting gate, and `gofmt -s -l .` still reports 37 files at this commit. The job matrix also pins Go 1.22 and 1.23 while `go.mod` requires 1.24, so two of the three legs cannot compile the module. `main` has no branch protection, so a pull request here does not need a green check to merge — and a red check is not evidence that you broke something.
+
+The interface spec in `api/openapi.json` describes 36 paths and 54 operations. Earlier revisions of this page claimed 90 or more endpoints; that number was never true of this spec.
+
+## Quick start
+
+Two paths. The first gets you a build and a test run on a laptop. The second gets you a real response out of the deployed service.
+
+### Build it
+
+A plain build fails, and the error does not name AudiModal:
+
+```console
+$ go build ./...
+github.com/flier/gohs/internal/hs: exec: "pkg-config": executable file not found in $PATH
 ```
 
----
+That is Gatekeeper's scanner reaching for its cgo Hyperscan engine. Select the pure-Go regexp engine with the `nohs` build tag, which is exactly what the Dockerfile does for the DLP worker (`Dockerfile:35`) and what CI sets globally (`.github/workflows/test.yml:12`):
 
-## 🔧 **Current Status & Recent Improvements**
-
-### ✅ **Latest Enhancements (v1.8.0)**
-- **RESTful Error Handling**: Comprehensive HTTP status code improvements for all API endpoints
-  - Proper 400/404/500 error responses with detailed error categorization
-  - Search endpoints return 200 with empty results instead of 404/500 for no matches
-  - Dataset not found scenarios properly return 404 vs 500 errors
-- **Enhanced Test Coverage**: 
-  - File handler unit tests with routing and validation coverage
-  - DeepLake API client tests with 85.4% coverage
-  - Comprehensive error scenario testing
-- **Improved DeepLake Integration**: 
-  - Better handling of DeepLake's non-standard error responses (HTTP 200 with success:false)
-  - Intelligent error categorization (dataset_not_found, search_unavailable, etc.)
-  - Robust retry logic and timeout handling
-
-### 📊 **Test Coverage Status**
-| Component | Coverage | Status |
-|-----------|----------|---------|
-| **DeepLake Client** | 85.4% | ✅ Excellent |
-| **Processing Strategies** | 88.4% | ✅ Excellent |
-| **Data Readers** | 70.0% | ✅ Good |
-| **API Handlers** | 1.5% | 🔨 In Progress |
-| **Core Logic** | 50.0% | ⚠️ Moderate |
-
-### 🎯 **Production Readiness**
-- **Error Handling**: Production-ready with comprehensive error categorization
-- **Embeddings Pipeline**: Fully functional with OpenAI integration
-- **Search Functionality**: RESTful search endpoints with proper status codes
-- **Multi-tenant Support**: Secure tenant isolation and context validation
-- **Database Integration**: Robust connection handling and transaction management
-
----
-
-## 💼 **Use Cases**
-
-### Legal & Compliance
-- **e-Discovery**: Rapid document review and privilege identification
-- **Contract Analysis**: Extract key terms, dates, and obligations
-- **Regulatory Reporting**: Automated compliance document generation
-
-### Healthcare
-- **Medical Records Processing**: HIPAA-compliant patient data extraction
-- **Claims Processing**: Automated insurance document review
-- **Research Data**: De-identification for clinical studies
-
-### Financial Services
-- **Know Your Customer (KYC)**: Identity verification and risk assessment
-- **Loan Processing**: Document verification and risk scoring
-- **Audit Support**: SOX compliance and financial reporting
-
-### Human Resources
-- **Resume Processing**: Candidate screening and skills extraction
-- **Employee Onboarding**: Document verification and compliance tracking
-- **Benefits Administration**: Form processing and enrollment management
-
----
-
-## 🏗️ **Architecture Highlights**
-
-### Cloud-Native Foundation
-- **Kubernetes CRDs**: Declarative resource management with custom operators for tenant provisioning
-- **Microservices**: Independently scalable components with fault isolation and auto-scaling
-- **Container Security**: Hardened images with vulnerability scanning and security policies
-- **Observability**: OpenTelemetry integration with distributed tracing and metrics
-
-### AI/ML Platform
-- **Custom Model Training**: Job management system with worker pools and concurrent processing
-- **Model Registry**: Version control with A/B testing and statistical significance analysis  
-- **Knowledge Graph**: Entity extraction and relationship mapping with graph algorithms
-- **Vector Search**: DeepLake integration with hybrid semantic and keyword search
-- **Predictive Analytics**: Time series forecasting and document lifecycle prediction
-- **Content Intelligence**: Advanced document similarity and relationship analysis
-
-### Enterprise Integration
-- **Multi-Platform Sync**: Unified synchronization framework with conflict resolution
-- **Enterprise Connectors**: Native integrations for SharePoint, Confluence, Jira, Slack, Teams
-- **Change Data Capture**: Real-time monitoring of databases and file systems
-- **Streaming Processing**: Kafka-based event processing with WebSocket support
-
----
-
-## 📊 **Technical Specifications**
-
-### Performance Metrics
-- **Processing Capacity**: 10,000+ documents/hour per tenant
-- **Response Time**: Sub-200ms API response time for 95% of requests
-- **Concurrent Users**: Support for 1,000+ concurrent tenants
-- **Model Training**: Up to 10,000 documents/hour processing capacity
-- **Search Performance**: Sub-200ms semantic search response time
-- **Prediction Accuracy**: 85-95% accuracy for document lifecycle predictions
-
-### Scalability
-- **Horizontal Scaling**: Auto-scaling worker pools and processing tiers
-- **Multi-Tenant**: Secure tenant isolation with shared infrastructure
-- **Storage**: Unlimited document storage with intelligent tiering
-- **Memory Optimization**: Configurable resource limits with efficient cleanup
-- **Load Balancing**: Intelligent workload distribution across services
-
-### Deployment Options
-- **Docker**: Single-node deployment with Docker Compose
-- **Kubernetes**: Production-ready with custom operators and CRDs
-- **Cloud Providers**: AWS, Azure, GCP with native integrations
-- **On-Premises**: Full air-gapped deployment capability
-- **Hybrid**: Mixed cloud and on-premises deployment
-
----
-
-## 📚 **Documentation & Resources**
-
-### Development Documentation
-- **📖 Developer Guide**: [DEVELOPER_DOCUMENTATION.md](./DEVELOPER_DOCUMENTATION.md) - Complete 50+ page developer guide
-- **🔌 API Reference**: [api/openapi.json](./api/openapi.json) - Complete OpenAPI 3.0.3 specification (90+ endpoints)
-- **🗺️ Implementation Roadmap**: [ROADMAP.md](./ROADMAP.md) - Detailed implementation status and roadmap
-- **📋 Release Notes**: [RELEASE_NOTES_v1.8.0.md](./RELEASE_NOTES_v1.8.0.md) - Latest version release notes
-
-### Technical Resources
-- **⚙️ Configuration**: [config/](./config/) - Server configuration examples and documentation  
-- **🐳 Docker**: [docker-compose.yml](./docker-compose.yml) - Development environment setup
-- **☸️ Kubernetes**: [deployments/k8s/](./deployments/k8s/) - Production Kubernetes manifests
-- **🔧 Makefile**: [Makefile](./Makefile) - Build and development commands
-
----
-
-## 🔌 **Integrations & Technology Stack**
-
-### Enterprise Platform Connectors
-- **Microsoft Ecosystem**: SharePoint, OneDrive, Teams, Office 365
-- **Collaboration Platforms**: Confluence, Jira, Slack, Notion  
-- **Cloud Storage**: Box, Dropbox, Google Drive, AWS S3, Azure Blob
-- **Development Tools**: GitHub, GitLab, Bitbucket
-
-### Technology Partners
-- **AI/ML Frameworks**: OpenAI GPT models, Hugging Face Transformers, Custom PyTorch/TensorFlow
-- **Vector Database**: DeepLake for embeddings and semantic search
-- **Message Streaming**: Apache Kafka for event processing
-- **Observability**: OpenTelemetry, Prometheus, Grafana for monitoring
-- **Container Orchestration**: Kubernetes with custom operators and CRDs
-
-### Deployment Ecosystem  
-- **Cloud Providers**: AWS, Microsoft Azure, Google Cloud Platform
-- **Container Platforms**: Docker, Kubernetes, OpenShift
-- **Infrastructure as Code**: Terraform, Helm charts, Kustomize
-- **CI/CD Integration**: GitHub Actions, GitLab CI, Jenkins
-
----
-
-## 🚀 **Contributing & Development**
-
-### Getting Involved
-- **Issues**: Report bugs and request features via GitHub Issues
-- **Pull Requests**: Follow our contribution guidelines in [CONTRIBUTING.md](./CONTRIBUTING.md)
-- **Code Reviews**: All contributions require peer review before merging
-- **Testing**: Maintain test coverage above 80% for all new features
-
-### Development Workflow
-```bash
-# Fork and clone the repository
-git clone https://github.com/your-username/audimodal.git
-cd audimodal
-
-# Create feature branch
-git checkout -b feature/your-feature-name
-
-# Install dependencies and setup development environment
-make dev-setup
-
-# Run tests before committing
-make test-all
-
-# Submit pull request with detailed description
+```console
+$ go build -tags nohs ./... && echo "build ok"
+build ok
 ```
 
-### Code Quality Standards
-- **Go Standards**: Follow effective Go practices and formatting with `gofmt`
-- **Documentation**: Document all public APIs and complex logic
-- **Testing**: Unit tests, integration tests, and benchmarks required
-- **Security**: Security scanning and vulnerability checks on all commits
-- **Performance**: Benchmark critical paths and optimize for scalability
+Gatekeeper is a versioned module requirement, not a sibling `replace` (`go.mod:33`), so the repository builds standalone with nothing checked out next to it.
 
----
+### Test it
 
-## 📄 **License**
+The DLP packages — the part of the tree that changed most recently — pass:
 
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+```console
+$ go test -tags nohs -count=1 ./pkg/dlp/...
+?   	github.com/jscharber/audimodal/pkg/dlp	[no test files]
+ok  	github.com/jscharber/audimodal/pkg/dlp/compliance	0.004s
+ok  	github.com/jscharber/audimodal/pkg/dlp/patterns	0.008s
+?   	github.com/jscharber/audimodal/pkg/dlp/scanner	[no test files]
+ok  	github.com/jscharber/audimodal/pkg/dlp/shadow	0.029s
+?   	github.com/jscharber/audimodal/pkg/dlp/types	[no test files]
+```
 
----
+The full suite does not. Running the package set the Makefile uses at commit `a96cde3`, with no source changes, 19 packages pass and 4 fail:
 
-## 🙏 **Acknowledgments**
+```console
+$ go test -tags nohs $(go list ./tests/... ./pkg/... ./internal/... | grep -v -E "(cmd/|controllers)") 2>&1 | grep -E '^FAIL\s'
+FAIL	github.com/jscharber/audimodal/tests	280.651s
+FAIL	github.com/jscharber/audimodal/pkg/preprocessing	0.011s
+FAIL	github.com/jscharber/audimodal/pkg/readers/pdf	0.543s
+FAIL	github.com/jscharber/audimodal/pkg/readers/pdf/mapreduce	0.427s
+```
 
-Special thanks to the open-source community and contributors who have made this project possible:
+These failures pre-date this document and are unrelated to it — nothing in the working tree was modified to produce that run. Three of the four have distinct causes worth knowing before you chase them:
 
-- **Go Community**: For the excellent tooling and libraries
-- **Kubernetes Community**: For cloud-native orchestration capabilities  
-- **AI/ML Community**: For advancing the state of document intelligence
-- **Security Community**: For best practices in enterprise security
+- `pkg/readers/pdf/mapreduce/types_test.go:33` asserts defaults that the code no longer has — `got 300, expected 150` for the page-scan resolution, and the same shape for the timeout and the memory ceiling. The test is stale, not the code.
+- `pkg/readers/pdf` shells out to poppler and tesseract, which are installed in the runtime image but probably not on your machine: `pdftotext failed: exit status 1`.
+- `github.com/jscharber/audimodal/tests` is an integration suite that expects a DeepLake service on the hostname `deeplake-api`: `dial tcp: lookup deeplake-api on 10.255.255.254:53: read udp ... i/o timeout`. CI supplies a WireMock stand-in; locally it will hang for its timeouts and then fail.
 
----
+`make test-unit` runs the narrower set CI uses first, and is the faster loop.
 
-*AudiModal.ai - Open-source AI-powered document processing platform for the enterprise.*
+### Call the deployed service
+
+There is no public hostname, so forward the in-cluster service:
+
+```console
+$ kubectl port-forward -n aether-be svc/audimodal 8084:8080
+Forwarding from 127.0.0.1:8084 -> 8080
+Forwarding from [::1]:8084 -> 8080
+```
+
+Health needs no credential. The three checks are the database, process memory, and disk (`internal/server/server.go:74-80`):
+
+```console
+$ curl -s http://localhost:8084/health | jq .
+{
+  "service": "audimodal",
+  "status": "healthy",
+  "summary": {
+    "degraded": 0,
+    "healthy": 3,
+    "unhealthy": 0,
+    "unknown": 0
+  },
+  "timestamp": "2026-08-26T23:37:48.151111603Z",
+  "version": "1.0.0"
+}
+```
+
+Anything tenant-scoped does need one, and this is the first wall most people hit:
+
+```console
+$ curl -s http://localhost:8084/api/v1/tenants/1d644409-fc3d-4036-bbf5-16c869b5b88c/files
+Authentication required
+```
+
+The credential is an API key sent in the `X-API-Key` header. For the k3s test suite it is `AUDIMODAL_API_KEY`, sourced from `apps/audimodal/api-test.env` in the `aether-secrets` repository (`Makefile:164-174`) — that file is absent there today, so `make test-k3s-with-secrets` currently exits with its own "not found" message. Export the key and the call succeeds:
+
+```console
+$ curl -s -H "X-API-Key: $AUDIMODAL_API_KEY" \
+    http://localhost:8084/api/v1/tenants/1d644409-fc3d-4036-bbf5-16c869b5b88c/files | jq .
+{
+  "success": true,
+  "data": [],
+  "meta": {
+    "pagination": {
+      "page": 1,
+      "page_size": 20,
+      "total_pages": 0,
+      "total_count": 0,
+      "has_next": false,
+      "has_prev": false
+    },
+    "count": 0
+  },
+  "timestamp": "2026-08-26T23:38:14.625756403Z",
+  "request_id": "req_1787787494623870885"
+}
+```
+
+A key shorter than 32 characters also returns `401`, with the body `Invalid API key` (`internal/server/middleware.go:184-187`); a tenant identifier that is a well-formed UUID but absent from the database returns `404` with the body `Tenant not found`. Because the middleware only measures the key, the capture above was produced with an arbitrary 32-character string — see the authentication note under *Status & scope* before you conclude anything from that.
+
+> [!UNVERIFIED] `docker-compose.yml` brings up the API server and a PostgreSQL container with `AUTH_ENABLED=false` on host port 8084. That path was not exercised for this document; only the Go build, the test runs, and the cluster calls above were.
+
+## How it fits
+
+AudiModal has one synchronous entry point and a four-stage asynchronous pipeline behind it. The API server accepts an upload, stores the bytes, and publishes a job; four worker binaries pass the document along Kafka topics (`pkg/events/kafka_messages.go:9-13`) until vectors land in DeepLake.
+
+```mermaid
+flowchart LR
+    A[aether-be] -->|upload| S[audimodal API<br/>:8080]
+    S --> M[(MinIO<br/>file bytes)]
+    S --> P[(PostgreSQL<br/>File / Tenant /<br/>ProcessingSession)]
+    S -->|audimodal.page-jobs| O[ocr-worker x2]
+    O -->|audimodal.page-results| AS[assembler]
+    AS -->|audimodal.dlp-jobs| D[dlp-worker<br/>+ Gatekeeper shadow]
+    D -->|audimodal.embedding-jobs| E[embedding-worker]
+    E --> DL[(deeplake-api<br/>vectors)]
+    D -.->|violation rows| P
+```
+
+The hard dependency is PostgreSQL, at `postgres-shared.tas-shared.svc.cluster.local:5432`. Every tenant-scoped route resolves the tenant through a database lookup before dispatch (`internal/server/middleware.go:195-220`), so with the database unreachable every route below `/api/v1/tenants/{id}/` fails and the `database` health check flips the service to unhealthy.
+
+Kafka is softer than it looks. If the producer cannot connect, the server logs a warning and carries on without it (`internal/server/server.go:352-357`): the API stays up and uploads still get stored, but nothing is queued, so documents sit at rest and never reach the workers. MinIO at `minio-shared.tas-shared.svc.cluster.local:9000` holds the bytes; DeepLake at `deeplake-api:8000` receives the vectors at the end of the chain. Gatekeeper is a linked library, not a service — there is nothing to be up or down.
+
+The dotted arrow is worth one sentence, because it is where scanning becomes durable: for every finding the DLP worker writes a `DLPViolation` row into PostgreSQL, attached to a per-tenant system policy it creates on demand (`cmd/dlpworker/main.go:249-252`, `cmd/dlpworker/main.go:335-360`). That write is where a tenant mismatch between services surfaces, as it did on the last run:
+
+```text
+2026/07/17 21:37:28 [DLPWorker] Failed to create system policy for tenant 3ec05a0c-d3df-47b5-8c94-3529c33dab46: ERROR: insert or update on table "dlp_policies" violates foreign key constraint "dlp_policies_tenant_id_fkey" (SQLSTATE 23503)
+2026/07/17 21:37:28 [DLPWorker] Chunk 98376802-cb7f-484c-8282-931393c23b3f scanned: pii=true, findings=4, risk=0.85, duration=477ms
+```
+
+The scan still ran and the chunk still moved down the pipeline; only the violation rows were dropped, because the job named a tenant that has no row in AudiModal's own `tenants` table.
+
+On the other side, `aether-be` is the caller: it uploads on a user's behalf and reads processing state back. Both live in namespace `aether-be`, and that namespace has no NetworkPolicy objects, so nothing stands between them at the network layer.
+
+## Configuration
+
+Everything is environment variables, read into `internal/server/config.go`. The ones that change behaviour:
+
+| Variable | Default in code | In the deployment | What it does |
+|---|---|---|---|
+| `SERVER_PORT` | `8080` | not set | The only port variable the loader reads (`internal/server/config.go:17`, `cmd/server/main.go:79`). The manifest sets a shorter, differently-named port variable that nothing reads, so the listener lands on 8080 by default anyway. |
+| `AUTH_ENABLED` | `true` | unset, so `true` | When false, the middleware waves everything through. `docker-compose.yml` sets it false. |
+| `API_KEY_HEADER` | `X-API-Key` | unset | Header the key is read from. |
+| `API_PREFIX` | `/api/v1` | unset | Prefix all routes hang off. |
+| `DLP_SHADOW_SCAN` | off | `true` on the DLP worker | Dual-runs Gatekeeper and logs the difference. Record-only. |
+| `KAFKA_ENABLED` | — | `true` | Off means uploads are stored but never processed. |
+| `DB_AUTO_MIGRATE` | — | `false` | True in `docker-compose.yml`, false in the cluster. |
+| `EAI_ENCRYPTION_KEY` | falls back to a hardcoded literal (`internal/server/server.go:336-338`) | unset | Encrypts stored storage-backend credentials. The cluster is running on the fallback. |
+
+The API server container also carries two Go runtime settings, tuned against its 8Gi memory limit and 500m processor limit:
+
+```text
+GOGC=20
+GOMEMLIMIT=4GiB
+```
+
+Secrets are Kubernetes secrets in namespace `aether-be`, referenced here by location only:
+
+- `audimodal-secrets` — keys `db-username`, `db-password`, `minio-access-key`, `minio-secret-key`.
+- `postgres-shared-secret` — keys `username`, `password`, used by the API server deployment.
+- `aether-backend-secret` — keys `jwt-secret` and `DEEPLAKE_API_KEY`.
+- `openai-secret` — key `OPENAI_API_KEY`, used by the embedding path.
+- The test API key lives outside the cluster, in the `aether-secrets` repository at `apps/audimodal/api-test.env`.
+
+Server defaults also live in `config/server.yaml`, and the deployment manifests that set all of the above are in `deployments/kubernetes/`.
+
+## Where to go next
+
+- [DEVELOPER.md](./DEVELOPER.md) — build, test, and deploy mechanics in more depth than this page carries.
+- [DEVELOPER_DOCUMENTATION.md](./DEVELOPER_DOCUMENTATION.md) — the long-form internals guide.
+- [api/openapi.json](./api/openapi.json) — the interface spec, 36 paths. [docs/api/](./docs/api/) has per-area notes including [authentication.md](./docs/api/authentication.md), which describes the intended scheme rather than the one implemented today.
+- [docs/architecture/](./docs/architecture/) — design notes for the PDF map-reduce path and the embedding path.
+- [KNOWN_ISSUES.md](./KNOWN_ISSUES.md) — tracked defects, including the event-bus data race.
+- [deployments/kubernetes/](./deployments/kubernetes/) — the manifests behind the five deployments listed above.
+- Entity documentation for `File`, `Tenant`, and `ProcessingSession` lives in the shared repository at `aether-shared/data-models/audimodal/`, with the cross-service upload flow under `aether-shared/data-models/cross-service/flows/`.
+- [ROADMAP.md](./ROADMAP.md) — kept for history. Its completion table contradicts the code in at least three places; *Status & scope* above is the current answer.
