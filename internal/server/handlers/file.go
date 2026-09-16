@@ -21,8 +21,8 @@ import (
 	"github.com/jscharber/audimodal/internal/processors"
 	"github.com/jscharber/audimodal/internal/server/response"
 	"github.com/jscharber/audimodal/internal/services"
-	"github.com/jscharber/audimodal/pkg/embeddings"
 	"github.com/jscharber/audimodal/pkg/dlp/types"
+	"github.com/jscharber/audimodal/pkg/embeddings"
 	"github.com/jscharber/audimodal/pkg/events"
 )
 
@@ -51,11 +51,13 @@ type FileHandler struct {
 	pipeline             *processors.Pipeline
 	mlAnalysisService    *services.MLAnalysisService
 	eventProducer        *events.SimpleProducer
+	activityPublisher    *events.ActivityPublisher
 	splitter             *processors.Splitter
 }
 
-// NewFileHandler creates a new file handler
-func NewFileHandler(db *database.Database, storageService *services.StorageService, eventProducer *events.SimpleProducer) *FileHandler {
+// NewFileHandler creates a new file handler. activityPublisher is optional —
+// pass nil to disable tas.activity.documents streaming without breaking uploads.
+func NewFileHandler(db *database.Database, storageService *services.StorageService, eventProducer *events.SimpleProducer, activityPublisher *events.ActivityPublisher) *FileHandler {
 	// Initialize processing pipeline
 	pipelineConfig := processors.GetDefaultPipelineConfig()
 	pipeline := processors.NewPipeline(db, pipelineConfig)
@@ -87,6 +89,7 @@ func NewFileHandler(db *database.Database, storageService *services.StorageServi
 		pipeline:             pipeline,
 		mlAnalysisService:    mlAnalysisService,
 		eventProducer:        eventProducer,
+		activityPublisher:    activityPublisher,
 		splitter:             splitter,
 	}
 }
@@ -491,6 +494,19 @@ func (h *FileHandler) handleFileUpload(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
+	// Publish activity event so the Live Streams page sees the upload in real time.
+	// Fire-and-forget — failure to publish must not fail the upload.
+	if h.activityPublisher != nil {
+		ceTenantID := canonicalTenantID(r, tenantID.String())
+		go h.activityPublisher.PublishDocumentUploaded(r.Context(), ceTenantID, "", getRequestID(r), events.DocumentUploadedPayload{
+			FileID:    fileRecord.ID.String(),
+			FileName:  filename,
+			SizeBytes: fileHeader.Size,
+			MimeType:  contentType,
+			Source:    "upload",
+		})
+	}
+
 	responseData := h.toFileResponse(fileRecord)
 	response.WriteCreated(w, getRequestID(r), responseData)
 }
@@ -508,7 +524,7 @@ func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Reques
 		ChecksumType        string                 `json:"checksum_type,omitempty"`
 		DataSourceID        *uuid.UUID             `json:"data_source_id,omitempty"`
 		ProcessingSessionID *uuid.UUID             `json:"processing_session_id,omitempty"`
-		DocumentID          string                 `json:"document_id,omitempty"`  // Neo4j Document.id from Aether-BE for cross-service consistency
+		DocumentID          string                 `json:"document_id,omitempty"` // Neo4j Document.id from Aether-BE for cross-service consistency
 		Metadata            map[string]interface{} `json:"metadata,omitempty"`
 		ValidateAccess      bool                   `json:"validate_access,omitempty"` // Whether to validate S3 access
 	}
@@ -667,6 +683,19 @@ func (h *FileHandler) handleJSONFileCreate(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
+	// Publish activity event for JSON-based file registration too, so URL/S3
+	// uploads surface on the Live Streams page alongside multipart uploads.
+	if h.activityPublisher != nil {
+		ceTenantID := canonicalTenantID(r, tenantID.String())
+		go h.activityPublisher.PublishDocumentUploaded(r.Context(), ceTenantID, "", getRequestID(r), events.DocumentUploadedPayload{
+			FileID:    fileRecord.ID.String(),
+			FileName:  fileRecord.Filename,
+			SizeBytes: fileRecord.Size,
+			MimeType:  fileRecord.ContentType,
+			Source:    "json",
+		})
+	}
+
 	responseData := h.toFileResponse(fileRecord)
 	response.WriteCreated(w, getRequestID(r), responseData)
 }
@@ -793,24 +822,24 @@ func (h *FileHandler) DeleteFile(w http.ResponseWriter, r *http.Request, tenantI
 
 // chunkWithContentResponse is the response struct that includes full content from S3
 type chunkWithContentResponse struct {
-	ID             uuid.UUID              `json:"id"`
-	TenantID       uuid.UUID              `json:"tenant_id"`
-	FileID         uuid.UUID              `json:"file_id"`
-	ChunkID        string                 `json:"chunk_id"`
-	ChunkType      string                 `json:"chunk_type"`
-	ChunkNumber    int                    `json:"chunk_number"`
-	Content        string                 `json:"content"`
-	ContentPreview string                 `json:"content_preview,omitempty"`
-	ContentHash    string                 `json:"content_hash"`
-	SizeBytes      int64                  `json:"size_bytes"`
-	PageNumber     *int                   `json:"page_number,omitempty"`
-	LineNumber     *int                   `json:"line_number,omitempty"`
-	ProcessedAt    string                 `json:"processed_at"`
-	ProcessedBy    string                 `json:"processed_by"`
-	Language       string                 `json:"language,omitempty"`
-	Metadata       models.ChunkMetadata   `json:"metadata,omitempty"`
-	CreatedAt      string                 `json:"created_at"`
-	UpdatedAt      string                 `json:"updated_at"`
+	ID             uuid.UUID            `json:"id"`
+	TenantID       uuid.UUID            `json:"tenant_id"`
+	FileID         uuid.UUID            `json:"file_id"`
+	ChunkID        string               `json:"chunk_id"`
+	ChunkType      string               `json:"chunk_type"`
+	ChunkNumber    int                  `json:"chunk_number"`
+	Content        string               `json:"content"`
+	ContentPreview string               `json:"content_preview,omitempty"`
+	ContentHash    string               `json:"content_hash"`
+	SizeBytes      int64                `json:"size_bytes"`
+	PageNumber     *int                 `json:"page_number,omitempty"`
+	LineNumber     *int                 `json:"line_number,omitempty"`
+	ProcessedAt    string               `json:"processed_at"`
+	ProcessedBy    string               `json:"processed_by"`
+	Language       string               `json:"language,omitempty"`
+	Metadata       models.ChunkMetadata `json:"metadata,omitempty"`
+	CreatedAt      string               `json:"created_at"`
+	UpdatedAt      string               `json:"updated_at"`
 }
 
 // ListFileChunks handles GET /api/v1/tenants/{tenant_id}/files/{id}/chunks
@@ -1039,6 +1068,20 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 								fmt.Printf("INFO: Published processing failed event for file %s to Kafka\n", fileID.String())
 							}
 						}
+
+						// Activity CloudEvent for the Live Streams panel + TimescaleDB.
+						// Splitter never got to the assembler, so this is the only
+						// place a document.failed event for this file can originate.
+						if h.activityPublisher != nil {
+							ceTenantID := canonicalTenantID(r, tenantID.String())
+							go h.activityPublisher.PublishDocumentFailed(r.Context(), ceTenantID, "", getRequestID(r),
+								events.DocumentFailedPayload{
+									FileID:   fileID.String(),
+									FileName: updatedFile.Filename,
+									Stage:    "split",
+									Error:    err.Error(),
+								})
+						}
 					}
 				}
 				return
@@ -1172,6 +1215,36 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 							map[bool]string{true: "complete", false: "failed"}[eventData.Success], fileID.String(), eventData.EmbeddingsCreated)
 					}
 				}
+
+				// Activity CloudEvent for the Live Streams panel + TimescaleDB
+				// events table. Separate from the legacy event above, which is
+				// consumed by aether-be's processing_event_handler.
+				if h.activityPublisher != nil {
+					ceTenantID := canonicalTenantID(r, tenantID.String())
+					durationMS := time.Since(processingStartTime).Milliseconds()
+					if err == nil && tierResult != nil && tierResult.ProcessingResult != nil {
+						go h.activityPublisher.PublishDocumentProcessed(r.Context(), ceTenantID, "", getRequestID(r),
+							events.DocumentProcessedPayload{
+								FileID:     fileID.String(),
+								FileName:   updatedFile.Filename,
+								ChunkCount: tierResult.ChunksCreated,
+								DurationMS: durationMS,
+								Confidence: tierResult.ProcessingResult.QualityScore,
+							})
+					} else {
+						errMsg := "processing returned no result"
+						if err != nil {
+							errMsg = err.Error()
+						}
+						go h.activityPublisher.PublishDocumentFailed(r.Context(), ceTenantID, "", getRequestID(r),
+							events.DocumentFailedPayload{
+								FileID:   fileID.String(),
+								FileName: updatedFile.Filename,
+								Stage:    "process",
+								Error:    errMsg,
+							})
+					}
+				}
 			} else {
 				fmt.Printf("ERROR: Failed to reload file %s for status update: %v\n", fileID.String(), dbErr)
 			}
@@ -1215,6 +1288,36 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 					updatedFile.CalculateProcessingDuration(processingStartTime)
 				}
 				backgroundTenantRepo.DB().Save(&updatedFile)
+
+				// Activity CloudEvent for the Live Streams panel + TimescaleDB.
+				// The basic pipeline doesn't publish a legacy event either, so this
+				// is the only signal downstream consumers get for this path.
+				if h.activityPublisher != nil {
+					ceTenantID := canonicalTenantID(r, tenantID.String())
+					durationMS := time.Since(processingStartTime).Milliseconds()
+					if err == nil && result != nil {
+						go h.activityPublisher.PublishDocumentProcessed(r.Context(), ceTenantID, "", getRequestID(r),
+							events.DocumentProcessedPayload{
+								FileID:     fileID.String(),
+								FileName:   updatedFile.Filename,
+								ChunkCount: result.ChunksCreated,
+								DurationMS: durationMS,
+								Confidence: result.QualityScore,
+							})
+					} else {
+						errMsg := "processing returned no result"
+						if err != nil {
+							errMsg = err.Error()
+						}
+						go h.activityPublisher.PublishDocumentFailed(r.Context(), ceTenantID, "", getRequestID(r),
+							events.DocumentFailedPayload{
+								FileID:   fileID.String(),
+								FileName: updatedFile.Filename,
+								Stage:    "process",
+								Error:    errMsg,
+							})
+					}
+				}
 			}
 		}()
 	} else {

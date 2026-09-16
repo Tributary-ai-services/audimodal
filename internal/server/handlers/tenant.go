@@ -347,6 +347,22 @@ func getRequestID(r *http.Request) string {
 	return "unknown"
 }
 
+// canonicalTenantID returns the upstream Aether tenant id forwarded via the
+// X-Aether-Tenant-Id header (e.g. "tenant_1766596584"), falling back to the
+// supplied AudiModal internal tenant UUID when the header is absent.
+//
+// Activity CloudEvents must carry the same tenantid value the aether-be WS hub
+// keys broadcasts on, otherwise the per-tenant filter drops every event before
+// fan-out. aether-be sets this header on /files registration and /process
+// requests; outside the platform (smoke tests, manual uploads, etc.) we fall
+// back to the internal UUID so legacy behavior is unchanged.
+func canonicalTenantID(r *http.Request, audimodalTenantID string) string {
+	if v := strings.TrimSpace(r.Header.Get("X-Aether-Tenant-Id")); v != "" {
+		return v
+	}
+	return audimodalTenantID
+}
+
 func getPagination(ctx context.Context) (page, pageSize, offset int) {
 	if pagination, ok := ctx.Value("pagination").(map[string]int); ok {
 		return pagination["page"], pagination["page_size"], pagination["offset"]
