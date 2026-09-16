@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"time"
 
@@ -26,9 +25,15 @@ type kafkaWriter interface {
 	Close() error
 }
 
-// ActivityPublisher fire-and-forget publishes envelope-v1 activity events.
-// During the CloudEvents migration it dual-publishes both legacy and CE
-// formats with a shared event ID so consumers can deduplicate.
+// ActivityPublisher fire-and-forget publishes document activity events as
+// CloudEvents 1.0 (structured mode) to tas.activity.documents.
+//
+// It used to dual-publish a legacy Envelope v1 message alongside each
+// CloudEvent, as a migration window. That window was never needed: aether-be's
+// streaming consumer detects the format from the content-type header and
+// normalises legacy messages to CloudEvents, so consumers already read either.
+// Publishing only CloudEvents halves the message volume and removes a second
+// wire format nobody depends on.
 type ActivityPublisher struct {
 	writer  kafkaWriter
 	topic   string
@@ -95,78 +100,45 @@ func NewActivityPublisherWithWriter(w kafkaWriter, topic string, logger *log.Log
 	}
 }
 
-// PublishDocumentUploaded publishes a document.uploaded envelope.
+// PublishDocumentUploaded publishes a com.tas.activity.document.uploaded event.
 func (p *ActivityPublisher) PublishDocumentUploaded(ctx context.Context, tenantID, userID, requestID string, payload DocumentUploadedPayload) {
-	p.dualPublish(ctx, ActivityDocumentUploaded, tenantID, userID, requestID, payload.FileID, payload)
+	p.publish(ctx, ActivityDocumentUploaded, tenantID, userID, requestID, payload.FileID, payload)
 }
 
-// PublishDocumentProcessed publishes a document.processed envelope.
+// PublishDocumentProcessed publishes a com.tas.activity.document.processed event.
 func (p *ActivityPublisher) PublishDocumentProcessed(ctx context.Context, tenantID, userID, requestID string, payload DocumentProcessedPayload) {
-	p.dualPublish(ctx, ActivityDocumentProcessed, tenantID, userID, requestID, payload.FileID, payload)
+	p.publish(ctx, ActivityDocumentProcessed, tenantID, userID, requestID, payload.FileID, payload)
 }
 
-// PublishDocumentFailed publishes a document.failed envelope.
+// PublishDocumentFailed publishes a com.tas.activity.document.failed event.
 func (p *ActivityPublisher) PublishDocumentFailed(ctx context.Context, tenantID, userID, requestID string, payload DocumentFailedPayload) {
-	p.dualPublish(ctx, ActivityDocumentFailed, tenantID, userID, requestID, payload.FileID, payload)
+	p.publish(ctx, ActivityDocumentFailed, tenantID, userID, requestID, payload.FileID, payload)
 }
 
-// dualPublish sends both legacy and CloudEvents messages with a shared event ID.
+// publish sends one CloudEvents message.
 //
 // Callers typically invoke this from a goroutine spawned out of an HTTP handler.
 // In that case the request context is canceled the moment the response is
 // flushed, which would race the Kafka write to completion. Detach from any
 // request-scoped context and apply our own timeout instead, so the publish
 // always gets a fair shot.
-func (p *ActivityPublisher) dualPublish(ctx context.Context, eventType ActivityEventType, tenantID, userID, requestID, subject string, payload any) {
+func (p *ActivityPublisher) publish(ctx context.Context, eventType ActivityEventType, tenantID, userID, requestID, subject string, payload any) {
 	if p == nil || p.writer == nil {
 		return
 	}
 
-	eventID := uuid.NewString()
-
-	legacyMsg := p.buildLegacy(eventID, eventType, tenantID, userID, requestID, payload)
-	ceMsg := p.buildCE(eventID, eventType, tenantID, userID, requestID, subject, payload)
+	msg := p.buildCE(uuid.NewString(), eventType, tenantID, userID, requestID, subject, payload)
+	if msg == nil {
+		return
+	}
 
 	// Intentionally detach from ctx — see method doc.
 	_ = ctx
 	writeCtx, cancel := context.WithTimeout(context.Background(), p.timeout)
 	defer cancel()
 
-	var msgs []kafka.Message
-	if legacyMsg != nil {
-		msgs = append(msgs, *legacyMsg)
-	}
-	if ceMsg != nil {
-		msgs = append(msgs, *ceMsg)
-	}
-
-	if len(msgs) == 0 {
-		return
-	}
-
-	if err := p.writer.WriteMessages(writeCtx, msgs...); err != nil {
+	if err := p.writer.WriteMessages(writeCtx, *msg); err != nil {
 		p.logger.Printf("activity_publisher: publish %s failed: %v", eventType, err)
-	}
-}
-
-func (p *ActivityPublisher) buildLegacy(eventID string, eventType ActivityEventType, tenantID, userID, requestID string, payload any) *kafka.Message {
-	env := NewActivityEnvelopeWithID(eventID, eventType, tenantID, userID, requestID, payload)
-
-	data, err := json.Marshal(env)
-	if err != nil {
-		p.logger.Printf("activity_publisher: marshal legacy %s failed: %v", eventType, err)
-		return nil
-	}
-
-	return &kafka.Message{
-		Key:   []byte(tenantID + ":" + requestID),
-		Value: data,
-		Headers: []kafka.Header{
-			{Key: "schema-version", Value: []byte(env.SchemaVersion)},
-			{Key: "event-type", Value: []byte(string(eventType))},
-			{Key: "source-service", Value: []byte(env.SourceService)},
-		},
-		Time: env.Timestamp,
 	}
 }
 

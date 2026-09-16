@@ -516,8 +516,8 @@ func publishCompleteEvent(ctx context.Context, producer *events.SimpleProducer,
 	}
 
 	// Activity CloudEvent for the Live Streams panel + TimescaleDB events
-	// table. Separate from the legacy event above, which is consumed by
-	// aether-be's processing_event_handler for cross-service sync.
+	// table. Separate from the processing-complete event above, which is
+	// consumed by aether-be's processing_event_handler for cross-service sync.
 	if activityPublisher == nil {
 		return
 	}
@@ -530,7 +530,8 @@ func publishCompleteEvent(ctx context.Context, producer *events.SimpleProducer,
 				FileName:   file.Filename,
 				ChunkCount: chunkCount,
 				DurationMS: durationMS,
-				Confidence: averageOCRConfidence(pageResults),
+				// OCR confidence, not a quality score — see DocumentProcessedPayload.
+				OCRConfidence: averageOCRConfidence(pageResults),
 			})
 	} else {
 		errMsg := fmt.Sprintf("%d of %d pages failed", job.FailedPages, job.TotalPages)

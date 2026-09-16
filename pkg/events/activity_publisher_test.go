@@ -42,9 +42,9 @@ func (f *fakeWriter) snapshot() []kafka.Message {
 	return out
 }
 
-// TestDualPublish_LegacyAndCE verifies that each publish call emits both a
-// legacy envelope and a CloudEvents 1.0 message with the same event ID.
-func TestDualPublish_LegacyAndCE(t *testing.T) {
+// TestPublish_EmitsOneCloudEvent verifies that each publish call emits exactly
+// one CloudEvents 1.0 message and no legacy envelope.
+func TestPublish_EmitsOneCloudEvent(t *testing.T) {
 	w := &fakeWriter{}
 	p := NewActivityPublisherWithWriter(w, ActivityTopic, log.Default())
 
@@ -57,31 +57,19 @@ func TestDualPublish_LegacyAndCE(t *testing.T) {
 	})
 
 	msgs := w.snapshot()
-	if len(msgs) != 2 {
-		t.Fatalf("expected 2 messages (legacy + CE), got %d", len(msgs))
+	if len(msgs) != 1 {
+		t.Fatalf("expected exactly 1 message (CloudEvents only), got %d", len(msgs))
 	}
 
-	// First message: legacy envelope
-	legacyMsg := msgs[0]
-	var env Envelope
-	if err := json.Unmarshal(legacyMsg.Value, &env); err != nil {
-		t.Fatalf("unmarshal legacy: %v", err)
-	}
-	if env.SchemaVersion != "1" {
-		t.Errorf("legacy SchemaVersion = %q, want 1", env.SchemaVersion)
-	}
-	if env.EventType != ActivityDocumentUploaded {
-		t.Errorf("legacy EventType = %q, want %q", env.EventType, ActivityDocumentUploaded)
-	}
-	if env.SourceService != "audimodal" {
-		t.Errorf("legacy SourceService = %q", env.SourceService)
-	}
-	legacyID := env.EventID
-
-	// Second message: CloudEvents
-	ceMsg := msgs[1]
+	ceMsg := msgs[0]
 	if !kafkabind.IsCloudEvent(ceMsg.Headers) {
-		t.Error("CE message missing content-type header")
+		t.Error("message missing the CloudEvents content-type header")
+	}
+	// A legacy envelope carried these headers; none may remain.
+	for _, h := range ceMsg.Headers {
+		if h.Key == "schema-version" || h.Key == "source-service" {
+			t.Errorf("legacy header %q still present", h.Key)
+		}
 	}
 
 	var ce tasevents.Event
@@ -90,6 +78,9 @@ func TestDualPublish_LegacyAndCE(t *testing.T) {
 	}
 	if ce.SpecVersion != "1.0" {
 		t.Errorf("CE specversion = %q, want 1.0", ce.SpecVersion)
+	}
+	if ce.ID == "" {
+		t.Error("CE id is empty")
 	}
 	if ce.Type != "com.tas.activity.document.uploaded" {
 		t.Errorf("CE type = %q", ce.Type)
@@ -103,16 +94,11 @@ func TestDualPublish_LegacyAndCE(t *testing.T) {
 	if ce.Subject != "file-abc" {
 		t.Errorf("CE subject = %q, want file-abc", ce.Subject)
 	}
-
-	// Stable event ID across both formats
-	if ce.ID != legacyID {
-		t.Errorf("event IDs differ: legacy=%q, CE=%q — must be identical for dedup", legacyID, ce.ID)
-	}
 }
 
-// TestDualPublish_DoesNotBlockOnFailure verifies that a failing Kafka
-// write is swallowed — activity events are best-effort.
-func TestDualPublish_DoesNotBlockOnFailure(t *testing.T) {
+// TestPublish_DoesNotBlockOnFailure verifies that a failing Kafka write is
+// swallowed — activity events are best-effort.
+func TestPublish_DoesNotBlockOnFailure(t *testing.T) {
 	w := &fakeWriter{failWith: errors.New("broker down")}
 	p := NewActivityPublisherWithWriter(w, ActivityTopic, log.New(nopWriter{}, "", 0))
 
@@ -133,8 +119,8 @@ func TestDualPublish_DoesNotBlockOnFailure(t *testing.T) {
 	}
 }
 
-// TestDualPublish_NilReceiverSafe verifies a nil publisher is a silent no-op.
-func TestDualPublish_NilReceiverSafe(t *testing.T) {
+// TestPublish_NilReceiverSafe verifies a nil publisher is a silent no-op.
+func TestPublish_NilReceiverSafe(t *testing.T) {
 	var p *ActivityPublisher
 	p.PublishDocumentFailed(context.Background(), "t", "u", "r", DocumentFailedPayload{Error: "x"})
 	if err := p.Close(); err != nil {
@@ -142,8 +128,9 @@ func TestDualPublish_NilReceiverSafe(t *testing.T) {
 	}
 }
 
-// TestDualPublish_AllEventTypes verifies 3 helper methods each produce 2 messages.
-func TestDualPublish_AllEventTypes(t *testing.T) {
+// TestPublish_AllEventTypes verifies the three helpers each produce one
+// CloudEvent of the right type, and that events get distinct ids.
+func TestPublish_AllEventTypes(t *testing.T) {
 	w := &fakeWriter{}
 	p := NewActivityPublisherWithWriter(w, ActivityTopic, log.Default())
 	ctx := context.Background()
@@ -153,25 +140,65 @@ func TestDualPublish_AllEventTypes(t *testing.T) {
 	p.PublishDocumentFailed(ctx, "t", "u", "r", DocumentFailedPayload{FileID: "f", Error: "boom"})
 
 	msgs := w.snapshot()
-	if len(msgs) != 6 {
-		t.Fatalf("expected 6 messages (3 events × 2 formats), got %d", len(msgs))
+	if len(msgs) != 3 {
+		t.Fatalf("expected 3 messages (one CloudEvent per call), got %d", len(msgs))
 	}
 
-	// Verify CE types for the even-indexed messages (1, 3, 5)
 	wantCETypes := []string{
 		"com.tas.activity.document.uploaded",
 		"com.tas.activity.document.processed",
 		"com.tas.activity.document.failed",
 	}
+	seen := map[string]bool{}
 	for i, wantType := range wantCETypes {
-		ceIdx := i*2 + 1
 		var ce tasevents.Event
-		if err := json.Unmarshal(msgs[ceIdx].Value, &ce); err != nil {
-			t.Fatalf("CE msg %d unmarshal: %v", ceIdx, err)
+		if err := json.Unmarshal(msgs[i].Value, &ce); err != nil {
+			t.Fatalf("CE msg %d unmarshal: %v", i, err)
 		}
 		if ce.Type != wantType {
-			t.Errorf("CE msg %d type = %q, want %q", ceIdx, ce.Type, wantType)
+			t.Errorf("CE msg %d type = %q, want %q", i, ce.Type, wantType)
 		}
+		if seen[ce.ID] {
+			t.Errorf("CE msg %d reuses event id %q", i, ce.ID)
+		}
+		seen[ce.ID] = true
+	}
+}
+
+// TestDocumentProcessedPayload_ConfidenceFieldsStaySeparate pins the fix for
+// one wire field carrying two incomparable measures: the pipeline quality
+// score travels as "confidence", OCR word confidence as "ocr_confidence", and
+// setting one must not populate the other.
+func TestDocumentProcessedPayload_ConfidenceFieldsStaySeparate(t *testing.T) {
+	decode := func(payload DocumentProcessedPayload) map[string]any {
+		t.Helper()
+		b, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(b, &m); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		return m
+	}
+
+	// Assembler shape: OCR confidence only.
+	ocrOnly := decode(DocumentProcessedPayload{FileID: "f", OCRConfidence: 1.0})
+	if _, ok := ocrOnly["confidence"]; ok {
+		t.Error("OCR-only payload must not emit \"confidence\" — the UI would show it as analysis confidence")
+	}
+	if got := ocrOnly["ocr_confidence"]; got != 1.0 {
+		t.Errorf("ocr_confidence = %v, want 1", got)
+	}
+
+	// Handler shape: quality score only.
+	qualityOnly := decode(DocumentProcessedPayload{FileID: "f", Confidence: 0.82})
+	if got := qualityOnly["confidence"]; got != 0.82 {
+		t.Errorf("confidence = %v, want 0.82", got)
+	}
+	if _, ok := qualityOnly["ocr_confidence"]; ok {
+		t.Error("quality-only payload must not emit \"ocr_confidence\"")
 	}
 }
 
