@@ -288,7 +288,7 @@ func (sm *SessionManager) processFile(ctx context.Context, sessionCtx *SessionCo
 		TenantID:        sessionCtx.TenantID,
 		SessionID:       sessionCtx.SessionID,
 		FileID:          jobCtx.FileID,
-		FilePath:        file.Path,
+		FilePath:        ProcessingPath(file.Path, file.URL),
 		Priority:        sessionCtx.Config.Priority,
 		DLPScanEnabled:  sessionCtx.Config.DLPScanEnabled,
 		ComplianceRules: sessionCtx.Config.ComplianceRules,
