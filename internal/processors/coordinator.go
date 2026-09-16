@@ -118,7 +118,7 @@ func (c *Coordinator) ProcessSingleFile(ctx context.Context, tenantID uuid.UUID,
 		TenantID:  tenantID,
 		SessionID: uuid.New(), // Create a temporary session
 		FileID:    fileID,
-		FilePath:  file.Path,
+		FilePath:  ProcessingPath(file.Path, file.URL),
 		Priority:  "normal",
 	}
 

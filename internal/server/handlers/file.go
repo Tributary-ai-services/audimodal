@@ -1257,7 +1257,7 @@ func (h *FileHandler) ProcessFile(w http.ResponseWriter, r *http.Request, tenant
 			processingRequest := &processors.ProcessingRequest{
 				TenantID:       tenantID,
 				FileID:         fileID,
-				FilePath:       file.Path,
+				FilePath:       processors.ProcessingPath(file.Path, file.URL),
 				StrategyType:   req.ChunkingStrategy,
 				Priority:       req.Priority,
 				DLPScanEnabled: req.DLPScanEnabled,

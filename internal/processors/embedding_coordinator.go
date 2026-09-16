@@ -161,11 +161,12 @@ func (ec *EmbeddingCoordinator) ProcessSingleFileWithEmbeddings(ctx context.Cont
 	// Get file information to set path
 	var file struct {
 		Path string
+		URL  string
 	}
-	if err := ec.coordinator.db.DB().Table("files").Select("path").Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
+	if err := ec.coordinator.db.DB().Table("files").Select("path", "url").Where("id = ? AND tenant_id = ?", fileID, tenantID).First(&file).Error; err != nil {
 		return nil, fmt.Errorf("file not found: %w", err)
 	}
-	request.FilePath = file.Path
+	request.FilePath = ProcessingPath(file.Path, file.URL)
 
 	// Apply options
 	if options != nil {
