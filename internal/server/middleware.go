@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"crypto/subtle"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
 
@@ -147,46 +150,89 @@ func LoggingMiddleware(config *Config) Middleware {
 }
 
 // AuthenticationMiddleware handles authentication
+// authenticateAPIKey reports whether the presented key matches one of the
+// configured keys. Comparison is constant-time so a caller cannot recover a key
+// by timing the response, and every candidate is compared so the work does not
+// depend on which key matched.
+//
+// With no keys configured this always returns false: API-key auth is then off,
+// not open. The previous implementation accepted ANY key of 32+ characters.
+func authenticateAPIKey(config *Config, presented string) bool {
+	if presented == "" {
+		return false
+	}
+	ok := false
+	for _, candidate := range config.APIKeys {
+		if candidate == "" {
+			continue
+		}
+		if subtle.ConstantTimeCompare([]byte(presented), []byte(candidate)) == 1 {
+			ok = true
+		}
+	}
+	return ok
+}
+
+// authenticateJWT validates a bearer token as an HMAC-signed JWT.
+//
+// The signing method is pinned to HMAC. Accepting whatever the token's own
+// header asks for is what makes "alg: none" and RS256-key-confusion attacks
+// work, so anything else is rejected before the signature is checked.
+// Expiry is enforced by the parser; a token without an exp claim is rejected
+// too, since an unexpiring bearer token is indistinguishable from a password.
+func authenticateJWT(config *Config, token string) bool {
+	if config.JWTSecret == "" || token == "" {
+		return false
+	}
+	parsed, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method %v", t.Header["alg"])
+		}
+		return []byte(config.JWTSecret), nil
+	}, jwt.WithValidMethods([]string{"HS256", "HS384", "HS512"}), jwt.WithExpirationRequired())
+	return err == nil && parsed.Valid
+}
+
 func AuthenticationMiddleware(config *Config, db *database.Database) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Debug logging
-			// TODO: Add proper logger to context
-
 			if !config.AuthEnabled {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Skip auth for health check and metrics endpoints
+			// Health and metrics stay reachable without credentials: they are
+			// what tells an operator the service is up, including when auth
+			// itself is misconfigured.
 			if r.URL.Path == config.HealthCheckPath || r.URL.Path == config.MetricsPath {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Check for API key in header
-			apiKey := r.Header.Get(config.APIKeyHeader)
-			if apiKey == "" {
-				// Check for JWT token
-				authHeader := r.Header.Get("Authorization")
-				if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-					http.Error(w, "Authentication required", http.StatusUnauthorized)
+			// An API key and a bearer token are alternatives, and either must
+			// actually verify. Every path below that does not verify falls
+			// through to 401 -- there is deliberately no branch that continues
+			// without having authenticated something.
+			if apiKey := r.Header.Get(config.APIKeyHeader); apiKey != "" {
+				if authenticateAPIKey(config, apiKey) {
+					next.ServeHTTP(w, r)
 					return
 				}
-
-				token := strings.TrimPrefix(authHeader, "Bearer ")
-				// TODO: Implement JWT validation
-				_ = token
-			}
-
-			// TODO: Validate API key against database
-			// For now, we'll create a simple validation
-			if apiKey != "" && len(apiKey) < 32 {
 				http.Error(w, "Invalid API key", http.StatusUnauthorized)
 				return
 			}
 
-			next.ServeHTTP(w, r)
+			authHeader := r.Header.Get("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				if authenticateJWT(config, strings.TrimPrefix(authHeader, "Bearer ")) {
+					next.ServeHTTP(w, r)
+					return
+				}
+				http.Error(w, "Invalid token", http.StatusUnauthorized)
+				return
+			}
+
+			http.Error(w, "Authentication required", http.StatusUnauthorized)
 		})
 	}
 }

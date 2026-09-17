@@ -39,8 +39,14 @@ type Config struct {
 	RateLimitBurst   int  `yaml:"rate_limit_burst" env:"RATE_LIMIT_BURST" default:"200"`
 
 	// Authentication
-	AuthEnabled   bool          `yaml:"auth_enabled" env:"AUTH_ENABLED" default:"true"`
-	JWTSecret     string        `yaml:"jwt_secret" env:"JWT_SECRET" default:""`
+	AuthEnabled bool   `yaml:"auth_enabled" env:"AUTH_ENABLED" default:"true"`
+	JWTSecret   string `yaml:"jwt_secret" env:"JWT_SECRET" default:""`
+	// APIKeys are the accepted X-API-Key values. Empty means API-key auth is
+	// disabled (every key is rejected), not that every key is accepted.
+	// NOTE: the env tags in this struct are decorative -- config comes from
+	// GetDefaultConfig() plus explicit wiring in cmd/server/main.go, which is
+	// where AUDIMODAL_API_KEYS is read.
+	APIKeys       []string      `yaml:"api_keys" env:"AUDIMODAL_API_KEYS"`
 	JWTExpiration time.Duration `yaml:"jwt_expiration" env:"JWT_EXPIRATION" default:"24h"`
 	APIKeyHeader  string        `yaml:"api_key_header" env:"API_KEY_HEADER" default:"X-API-Key"`
 
@@ -234,6 +240,11 @@ func (c *Config) Validate() error {
 	v.When(c.AuthEnabled, func(v *validation.Validator) {
 		v.Required("jwt_secret", c.JWTSecret, "JWT secret is required when authentication is enabled").
 			MinLength("jwt_secret", c.JWTSecret, 32, "JWT secret must be at least 32 characters for security")
+		// A short API key is worse than none: it invites brute force while
+		// looking like protection.
+		for i, key := range c.APIKeys {
+			v.MinLength(fmt.Sprintf("api_keys[%d]", i), key, 32, "API keys must be at least 32 characters")
+		}
 	})
 
 	// Rate limiting validation
