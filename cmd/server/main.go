@@ -9,6 +9,7 @@ import (
 	_ "net/http/pprof" // Enable pprof profiling endpoints
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jscharber/audimodal/internal/database"
@@ -92,6 +93,8 @@ func main() {
 	if envDBUsername := os.Getenv("DB_USERNAME"); envDBUsername != "" {
 		*dbUsername = envDBUsername
 	}
+	var apiKeys []string
+
 	if envDBPassword := os.Getenv("DB_PASSWORD"); envDBPassword != "" {
 		*dbPassword = envDBPassword
 	}
@@ -100,6 +103,13 @@ func main() {
 	}
 	if envJWTSecret := os.Getenv("JWT_SECRET"); envJWTSecret != "" {
 		*jwtSecret = envJWTSecret
+	}
+	if envAPIKeys := os.Getenv("AUDIMODAL_API_KEYS"); envAPIKeys != "" {
+		for _, k := range strings.Split(envAPIKeys, ",") {
+			if k = strings.TrimSpace(k); k != "" {
+				apiKeys = append(apiKeys, k)
+			}
+		}
 	}
 	if envTLSEnabled := os.Getenv("TLS_ENABLED"); envTLSEnabled == "true" {
 		*tlsEnabled = true
@@ -212,6 +222,17 @@ func main() {
 	}()
 
 	// Validate JWT secret for production
+	serverConfig.APIKeys = apiKeys
+	if serverConfig.AuthEnabled {
+		// Say out loud which credentials will actually be accepted. Silence
+		// here is how "auth is on" came to mean "everything is allowed".
+		appLogger.Info("Authentication enabled",
+			"accepted_api_keys", len(serverConfig.APIKeys),
+			"jwt_validation", serverConfig.JWTSecret != "")
+		if len(serverConfig.APIKeys) == 0 {
+			appLogger.Warn("No API keys configured (AUDIMODAL_API_KEYS unset): every X-API-Key will be rejected; callers must present a signed JWT")
+		}
+	}
 	if serverConfig.AuthEnabled && serverConfig.JWTSecret == "" {
 		appLogger.Fatal("JWT secret is required when authentication is enabled. Set JWT_SECRET environment variable or use --jwt-secret flag.")
 	}
