@@ -62,7 +62,10 @@ test-handlers: ## Run handler tests
 .PHONY: test-config
 test-config: ## Run configuration tests
 	@echo "Running configuration tests..."
-	go test -v ./internal/server/config_test.go
+	# Was ./internal/server/config_test.go, a file that does not exist, so this
+	# target always failed with "directory not found". The config tests live in
+	# the package as config_simple_test.go.
+	go test -v ./internal/server/
 
 .PHONY: test-race
 test-race: ## Run tests with race detection
