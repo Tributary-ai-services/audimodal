@@ -12,7 +12,7 @@ answers:
   - "Which services must be up for audimodal to start, and which only for it to process documents?"
   - "Where do document activity events go, in what format, and which tenant id do they carry?"
   - "Why is CI red, and does my pull request need it green?"
-verified_against: "audimodal@b6ae459, 2026-09-16"
+verified_against: "audimodal@0a4509e, 2026-09-17"
 depth: standard
 ---
 
@@ -35,19 +35,19 @@ archive csv email html image json markdown microsoft office pdf rtf text xml
 
 ## Status & scope
 
-**As of 2026-09-16.** AudiModal runs on the TAS k3s cluster in namespace `aether-be`, alongside the Aether backend and the DeepLake service, as five deployments:
+**As of 2026-09-17.** AudiModal runs on the TAS k3s cluster in namespace `aether-be`, alongside the Aether backend and the DeepLake service, as five deployments:
 
 | Deployment | Ready | Image |
 |---|---|---|
-| `audimodal` (the API server) | 1/1 | `audimodal:am8-cloudevents-only-f1e262f` |
+| `audimodal` (the API server) | 1/1 | `audimodal:am22-s3-path-3424701` |
 | `audimodal-ocr-worker` | 2/2 | `audimodal:latest` |
 | `audimodal-assembler` (joins a file's per-page OCR results back into stored chunks, then queues them for scanning) | 1/1 | `audimodal:am8-cloudevents-only-f1e262f` |
 | `audimodal-dlp-worker` | 1/1 | `audimodal:g6-93f5615` |
 | `audimodal-embedding-worker` | 1/1 | `audimodal:latest` |
 
-All five are running and the API server reports healthy. The service has no ingress: it is reachable in-cluster at `audimodal.aether-be:8080` and from outside through the `audimodal-nodeport` service on port `30084`, so there is no public hostname to hand anyone. The API server and the assembler were rolled on 2026-09-16 to an image built from `f1e262f`, the feature commit that PR #32 merged, so both run the activity-event code described under *How it fits*. The optical character recognition (OCR), data loss prevention (DLP), and embedding workers were not rebuilt; their pods date from earlier in 2026, and nothing in that PR changed their binaries.
+All five are running and the API server reports healthy. The service has no ingress: it is reachable in-cluster at `audimodal.aether-be:8080` and from outside through the `audimodal-nodeport` service on port `30084`, so there is no public hostname to hand anyone. The assembler was rolled on 2026-09-16 to an image built from `f1e262f`, the feature commit PR #32 merged. The API server was rolled again on 2026-09-16 to `am22-s3-path-3424701`, built from `3424701` in PR #34, which fixed processing of directly uploaded non-PDF files; it carries the same activity-event code described under *How it fits*, since #34 branched from the merged #32. The optical character recognition (OCR), data loss prevention (DLP), and embedding workers were not rebuilt; their pods date from earlier in 2026, and neither PR changed their binaries.
 
-Deployed is not the same as busy. Loki does hold audimodal streams for the last 30 days, but the only document traffic in them is a handful of verification uploads on 2026-09-16 under tenant `4c71b774-df6b-429e-9cce-1f4e00458386`, which ran end to end — the assembler logged `File a9cde0ee-fc9f-48f4-93d0-3176453bf5a1 assembled: 1 chunks created, 0 pages failed` and the DLP worker scanned the chunk a second later. Outside that, the pipeline is idle. Treat any throughput number you find in this repository as unmeasured.
+Deployed is not the same as busy. Loki does hold audimodal streams for the last 30 days, but the only document traffic in them is verification uploads on 2026-09-16 and 09-17 under tenant `4c71b774-df6b-429e-9cce-1f4e00458386`, which ran end to end — the assembler logged `File a9cde0ee-fc9f-48f4-93d0-3176453bf5a1 assembled: 1 chunks created, 0 pages failed` and the DLP worker scanned the chunk a second later. Outside that, the pipeline is idle. Treat any throughput number you find in this repository as unmeasured.
 
 Four things a newcomer will otherwise get wrong:
 
@@ -118,7 +118,7 @@ These failures pre-date this document and are unrelated to it — nothing in the
 - `pkg/preprocessing` fails one subtest, `TestFileDecompressor_DetectCompressionType/TAR_GZ_file`: `pkg/preprocessing/decompressor_test.go:71` reports `Expected compression type 'tar.gz', got 'gzip'`. The detector classifies the `.tar.gz` fixture as plain `gzip`; nothing outside that subtest was traced.
 - `pkg/readers/pdf/mapreduce/types_test.go:33` asserts defaults that the code no longer has — `got 300, expected 150` for the page-scan resolution, `got 600, expected 300` for the timeout, and `got 2048, expected 1024` for the memory ceiling. The test is stale, not the code.
 - `pkg/readers/pdf` shells out to poppler and tesseract. Having them installed does not help: on a machine with `/usr/bin/pdftotext` present the tests still fail, because they point it at a file that does not exist — `pdftotext failed: exit status 1 (stderr: I/O Error: Couldn't open file '/mock/path/test.pdf': No such file or directory.`
-- `github.com/jscharber/audimodal/tests` is an integration suite that expects services on the hostnames `audimodal` and `deeplake-api`: `Get "http://deeplake-api:8000/api/v1/health": dial tcp: lookup deeplake-api on 10.255.255.254:53: no such host`. CI supplies a WireMock stand-in. Locally, how long it takes to fail depends on your resolver — eight seconds on 2026-09-16 when the lookup returned `no such host`, nearly five minutes on 2026-08-26 when the same lookup timed out.
+- `github.com/jscharber/audimodal/tests` is an integration suite that expects services on the hostnames `audimodal` and `deeplake-api`: `Get "http://deeplake-api:8000/api/v1/health": dial tcp: lookup deeplake-api on 10.255.255.254:53: no such host`. The Tests workflow supplies a WireMock stand-in for DeepLake (`.github/workflows/test.yml:25`); the CI/CD Pipeline workflow defines no services, which is why its `Run tests` step fails the same way. Locally, how long it takes to fail depends on your resolver — eight seconds on 2026-09-16 when the lookup returned `no such host`, nearly five minutes on 2026-08-26 when the same lookup timed out.
 
 `make test-unit` runs the narrower set CI uses first, and is the faster loop.
 
@@ -221,9 +221,7 @@ Startup and processing need different things. The API server's `main` pings Post
 
 The hard dependency at runtime is PostgreSQL, at `postgres-shared.tas-shared.svc.cluster.local:5432`. Every tenant-scoped route resolves the tenant through a database lookup before dispatch (`internal/server/middleware.go:195-220`), so with the database unreachable every route below `/api/v1/tenants/{id}/` fails and the `database` health check flips the service to unhealthy.
 
-Kafka is softer than it looks. If the producer cannot connect, the server logs a warning and carries on without it (`internal/server/server.go:352-357`): the API stays up and uploads still get stored, but nothing is queued, so documents sit at rest and never reach the workers. The activity publisher described below is softer still — it is created whenever a broker address is configured, whether or not `KAFKA_ENABLED` is true (`internal/server/server.go:361-367`), and a failed write costs one log line and nothing else.
-
-> [!UNVERIFIED] The warning cited above cannot fire for an unreachable broker: `NewSimpleProducer` builds a `kafka.Writer` and always returns a nil error (`pkg/events/simple_producer.go:25-39`), so the server logs `Kafka event producer initialized` whether or not Kafka is up, and the failure appears later as a failed publish. The practical outcome — uploads stored, nothing queued — is the same. No run with Kafka down was observed for this document.
+Kafka is softer than it looks. The API stays up and uploads still get stored, but nothing is queued, so documents sit at rest and never reach the workers. Note that the server cannot tell you this at startup: it has a warning branch for a failed producer (`internal/server/server.go:352-357`), but `NewSimpleProducer` builds a `kafka.Writer` and always returns a nil error (`pkg/events/simple_producer.go:25-39`), so the log always reads `Kafka event producer initialized` whether or not a broker is reachable, and the trouble first appears as a failed publish. The activity publisher below is softer still — it is created whenever `KAFKA_BROKERS` is non-empty, which its default of `localhost:9092` guarantees, so it exists regardless of `KAFKA_ENABLED` (`internal/server/server.go:361-367`), and a failed write costs one log line and nothing else.
 
 MinIO at `minio-shared.tas-shared.svc.cluster.local:9000` holds the bytes; DeepLake at `deeplake-api:8000` receives the vectors at the end of the chain. Gatekeeper is a linked library, not a service — there is nothing to be up or down.
 
@@ -250,7 +248,7 @@ Two processes publish, and they cover different exits. The API server announces 
 
 The tenant id on the event is the one aether-be's WebSocket hub filters on, not AudiModal's own. When aether-be calls `/files` or `/process` it sends its tenant id (for example `tenant_1766596584`) in the `X-Aether-Tenant-Id` header, and the API server stamps that value on the event, falling back to AudiModal's internal tenant UUID when the header is absent (`internal/server/handlers/tenant.go:350-364`). An event carrying the internal UUID reaches the hub and is dropped before fan-out.
 
-> [!UNVERIFIED] The assembler has no request to read that header from, so its `processed` and `failed` events carry AudiModal's internal tenant UUID (`cmd/assembler/main.go:527`, `cmd/assembler/main.go:551`). By the reasoning in `tenant.go`, the hub would drop them, and PDFs processed through the page pipeline would never reach Live Streams for their tenant. This follows from the code only; no event on the topic or on the Live Streams page was inspected for this document.
+**Known bug: the assembler's events are dropped.** It has no request to read that header from, so its `processed` and `failed` events carry AudiModal's internal tenant UUID (`cmd/assembler/main.go:527`, `cmd/assembler/main.go:551`). aether-be drops any event whose tenant differs from the subscriber's — `Conn.accepts` compares the two and returns false (`internal/streaming/hub.go:89` in aether-be), and the connection's tenant is the caller's Aether space tenant (`internal/handlers/stream.go`). So a PDF processed through the page pipeline never reaches Live Streams for its tenant. Both sides were read on 2026-09-17; no message on the topic and no Live Streams session was observed, so the mechanism is confirmed from code while the symptom is not.
 
 Publishing is fire-and-forget. The API server calls the publisher from a goroutine after the HTTP response is written, so the publisher ignores the request context — which is cancelled the moment the response flushes — and gives each write its own 2-second timeout (`pkg/events/activity_publisher.go:118-143`). Before that fix every upload logged `publish document.uploaded failed: context canceled` and produced no message. A failed write now logs `activity_publisher: publish <type> failed: <error>` and the upload still succeeds. On 2026-09-16 the API server logged `Activity publisher initialized` with topic `tas.activity.documents` at startup, and Loki held no `activity_publisher` failure lines for the previous 30 days.
 
