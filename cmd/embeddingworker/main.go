@@ -146,7 +146,7 @@ func processEmbeddingJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 		db.Model(&models.Chunk{}).Where("id = ?", chunkID).
 			Updates(map[string]any{
 				"embedding_status": models.EmbeddingStatusFailed,
-				"updated_at":      time.Now(),
+				"updated_at":       time.Now(),
 			})
 		return
 	}
@@ -156,7 +156,7 @@ func processEmbeddingJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 		db.Model(&models.Chunk{}).Where("id = ?", chunkID).
 			Updates(map[string]any{
 				"embedding_status": models.EmbeddingStatusSkipped,
-				"updated_at":      time.Now(),
+				"updated_at":       time.Now(),
 			})
 		return
 	}
@@ -183,7 +183,7 @@ func processEmbeddingJob(ctx context.Context, msg kafka.Message, db *gorm.DB,
 		db.Model(&models.Chunk{}).Where("id = ?", chunkID).
 			Updates(map[string]any{
 				"embedding_status": models.EmbeddingStatusFailed,
-				"updated_at":      time.Now(),
+				"updated_at":       time.Now(),
 			})
 		return
 	}

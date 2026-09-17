@@ -388,13 +388,13 @@ func (c *Consumer) GetMetrics() (map[string]interface{}, error) {
 	stats := c.reader.Stats()
 
 	return map[string]interface{}{
-		"topic":          stats.Topic,
-		"partition":      stats.Partition,
-		"messages":       stats.Messages,
-		"bytes":          stats.Bytes,
-		"rebalances":     stats.Rebalances,
-		"offset":         stats.Offset,
-		"lag":            stats.Lag,
-		"running":        c.running,
+		"topic":      stats.Topic,
+		"partition":  stats.Partition,
+		"messages":   stats.Messages,
+		"bytes":      stats.Bytes,
+		"rebalances": stats.Rebalances,
+		"offset":     stats.Offset,
+		"lag":        stats.Lag,
+		"running":    c.running,
 	}, nil
 }

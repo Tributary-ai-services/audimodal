@@ -255,8 +255,8 @@ func (e *DefaultPageExtractor) preprocessImage(ctx context.Context, imgPath stri
 	// Avoid binarization — Tesseract's internal Otsu threshold is better
 	cmd := exec.CommandContext(ctx, "convert", imgPath,
 		"-colorspace", "Gray",
-		"-normalize",   // Stretch contrast to full range
-		"-despeckle",   // Light denoise
+		"-normalize", // Stretch contrast to full range
+		"-despeckle", // Light denoise
 		outPath)
 
 	var stderr bytes.Buffer
@@ -283,8 +283,8 @@ func (e *DefaultPageExtractor) ocrImage(ctx context.Context, imgPath string, lan
 	// Fall back to plain text output
 	cmd := exec.CommandContext(ctx, "tesseract", processedPath, "stdout",
 		"-l", language,
-		"--oem", "1",  // LSTM neural net engine (best quality)
-		"--psm", "3")  // Fully automatic page segmentation
+		"--oem", "1", // LSTM neural net engine (best quality)
+		"--psm", "3") // Fully automatic page segmentation
 
 	output, err := cmd.Output()
 	if err != nil {
@@ -298,8 +298,8 @@ func (e *DefaultPageExtractor) ocrImage(ctx context.Context, imgPath string, lan
 func (e *DefaultPageExtractor) ocrImageWithTSV(ctx context.Context, imgPath string, language string) (string, float64, error) {
 	cmd := exec.CommandContext(ctx, "tesseract", imgPath, "stdout",
 		"-l", language,
-		"--oem", "1",  // LSTM neural net engine (best quality)
-		"--psm", "3",  // Fully automatic page segmentation
+		"--oem", "1", // LSTM neural net engine (best quality)
+		"--psm", "3", // Fully automatic page segmentation
 		"tsv")
 
 	output, err := cmd.Output()

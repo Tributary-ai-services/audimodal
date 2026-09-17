@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -478,12 +479,24 @@ func TestStressEventSystem(t *testing.T) {
 		t.Skip("Skipping stress test in short mode")
 	}
 
-	eventBus := events.NewInMemoryEventBus(events.EventBusConfig{})
+	const numGoroutines = 50
+	const eventsPerGoroutine = 1000
+	const totalEvents = numGoroutines * eventsPerGoroutine
 
-	// Setup handler that counts events
-	var eventCount int64
+	// A zero-value EventBusConfig gives an unbuffered queue and zero workers, so
+	// every Publish would fail with "event queue is full" even on a running bus.
+	// Size the queue for the whole run so Publish never has to drop an event, and
+	// give it real workers so the events are actually delivered.
+	busConfig := events.DefaultEventBusConfig()
+	busConfig.QueueSize = totalEvents
+	busConfig.WorkerCount = runtime.NumCPU()
+	eventBus := events.NewInMemoryEventBus(busConfig)
+
+	// Setup handler that counts events. Workers are concurrent, so the counter
+	// has to be atomic.
+	var eventCount atomic.Int64
 	handlerFunc := func(ctx context.Context, event interface{}) error {
-		eventCount++
+		eventCount.Add(1)
 		return nil
 	}
 
@@ -491,10 +504,13 @@ func TestStressEventSystem(t *testing.T) {
 		HandlerFunc: handlerFunc,
 	}
 
-	eventBus.Subscribe(handler, "file_processed")
+	require.NoError(t, eventBus.Subscribe(handler, "file_processed"))
 
-	const numGoroutines = 50
-	const eventsPerGoroutine = 1000
+	// Publish is a no-op until the bus is started.
+	require.NoError(t, eventBus.Start())
+	defer func() {
+		require.NoError(t, eventBus.Stop())
+	}()
 
 	var wg sync.WaitGroup
 	errors := make(chan error, numGoroutines*eventsPerGoroutine)
@@ -530,7 +546,6 @@ func TestStressEventSystem(t *testing.T) {
 	close(errors)
 
 	elapsed := time.Since(start)
-	totalEvents := numGoroutines * eventsPerGoroutine
 
 	// Check for errors
 	errorCount := 0
@@ -539,11 +554,20 @@ func TestStressEventSystem(t *testing.T) {
 		errorCount++
 	}
 
-	assert.Equal(t, 0, errorCount, "Should have no event publishing errors")
+	require.Equal(t, 0, errorCount, "Should have no event publishing errors")
 
 	eps := float64(totalEvents) / elapsed.Seconds()
-	t.Logf("Event stress test completed: %d events in %v (%.2f events/sec)",
+	t.Logf("Event stress test completed: %d events published in %v (%.2f events/sec)",
 		totalEvents, elapsed, eps)
+
+	// Publishing is only half the contract: every published event must also reach
+	// the subscribed handler. Drain before Stop(), which does not guarantee it.
+	require.Eventually(t, func() bool {
+		return eventCount.Load() == int64(totalEvents)
+	}, 60*time.Second, 10*time.Millisecond,
+		"all published events should be delivered to the handler")
+
+	t.Logf("Event stress test delivered %d events", eventCount.Load())
 
 	// Should handle at least 10,000 events per second
 	assert.Greater(t, eps, 10000.0, "Should handle at least 10,000 events per second")

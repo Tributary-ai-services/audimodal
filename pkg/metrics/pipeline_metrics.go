@@ -7,10 +7,10 @@ type PipelineMetrics struct {
 	SplitterSplitDuration *Timer
 
 	// OCR Worker metrics
-	OCRPagesProcessed  *Counter
-	OCRPageDuration    *Timer
-	OCRActiveWorkers   *Gauge
-	OCRPDFCacheHits    *Counter
+	OCRPagesProcessed   *Counter
+	OCRPageDuration     *Timer
+	OCRActiveWorkers    *Gauge
+	OCRPDFCacheHits     *Counter
 	OCRProcessingErrors *Counter
 
 	// Assembler metrics
@@ -26,14 +26,14 @@ type PipelineMetrics struct {
 	DLPProcessingErrors *Counter
 
 	// Embedding Worker metrics
-	EmbeddingChunksProcessed *Counter
-	EmbeddingChunkDuration   *Timer
+	EmbeddingChunksProcessed  *Counter
+	EmbeddingChunkDuration    *Timer
 	EmbeddingProcessingErrors *Counter
-	EmbeddingFilesCompleted  *Counter
+	EmbeddingFilesCompleted   *Counter
 
 	// Kafka consumer metrics
-	KafkaMessagesConsumed  *Counter
-	KafkaProcessingErrors  *Counter
+	KafkaMessagesConsumed *Counter
+	KafkaProcessingErrors *Counter
 }
 
 // NewPipelineMetrics creates and registers all pipeline metrics.

@@ -2,10 +2,79 @@ package pdf
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jscharber/audimodal/pkg/core"
 )
+
+// requireBinaries skips the test unless every named external binary is on PATH.
+// The PDF reader shells out to poppler-utils and tesseract; tests that exercise
+// the real extraction path cannot run without them.
+func requireBinaries(t *testing.T, names ...string) {
+	t.Helper()
+	var missing []string
+	for _, name := range names {
+		if _, err := exec.LookPath(name); err != nil {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		t.Skipf("skipping: required external binaries not found on PATH: %s (install poppler-utils)",
+			strings.Join(missing, ", "))
+	}
+}
+
+// writeTestPDF builds a minimal, valid PDF containing one text-bearing page per
+// entry in pageTexts and writes it to the test's temp directory. The file is
+// generated rather than committed so the fixture stays readable and diffable.
+func writeTestPDF(t *testing.T, pageTexts ...string) string {
+	t.Helper()
+
+	var objects []string
+	kids := make([]string, 0, len(pageTexts))
+	for i := range pageTexts {
+		kids = append(kids, fmt.Sprintf("%d 0 R", 5+2*i))
+	}
+	objects = append(objects,
+		"<< /Type /Catalog /Pages 2 0 R >>",
+		fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", strings.Join(kids, " "), len(pageTexts)),
+		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+		"<< /Title (Audimodal Fixture) /Author (audimodal tests) >>",
+	)
+	for i, text := range pageTexts {
+		stream := fmt.Sprintf("BT /F1 24 Tf 72 700 Td (%s) Tj ET\n", text)
+		objects = append(objects,
+			fmt.Sprintf("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "+
+				"/Resources << /Font << /F1 3 0 R >> >> /Contents %d 0 R >>", 6+2*i),
+			fmt.Sprintf("<< /Length %d >>\nstream\n%sendstream", len(stream), stream))
+	}
+
+	var buf strings.Builder
+	buf.WriteString("%PDF-1.4\n")
+	offsets := make([]int, len(objects))
+	for i, body := range objects {
+		offsets[i] = buf.Len()
+		fmt.Fprintf(&buf, "%d 0 obj\n%s\nendobj\n", i+1, body)
+	}
+	xrefOffset := buf.Len()
+	fmt.Fprintf(&buf, "xref\n0 %d\n0000000000 65535 f \n", len(objects)+1)
+	for _, off := range offsets {
+		fmt.Fprintf(&buf, "%010d 00000 n \n", off)
+	}
+	fmt.Fprintf(&buf, "trailer\n<< /Size %d /Root 1 0 R /Info 4 0 R >>\nstartxref\n%d\n%%%%EOF\n",
+		len(objects)+1, xrefOffset)
+
+	path := filepath.Join(t.TempDir(), "test.pdf")
+	if err := os.WriteFile(path, []byte(buf.String()), 0o644); err != nil {
+		t.Fatalf("failed to write test PDF: %v", err)
+	}
+	return path
+}
 
 func TestPDFReader_GetConfigSpec(t *testing.T) {
 	reader := NewPDFReader()
@@ -140,38 +209,51 @@ func TestPDFReader_GetBasicInfo(t *testing.T) {
 	}
 }
 
-func TestPDFMetadata_MockExtraction(t *testing.T) {
-	reader := &PDFReader{}
+func TestPDFMetadata_Extraction(t *testing.T) {
+	requireBinaries(t, "pdfinfo")
 
-	// Test with mock file path
-	metadata, err := reader.extractPDFMetadata("/mock/path/test.pdf")
+	reader := &PDFReader{}
+	path := writeTestPDF(t, "Audimodal test page 1", "Audimodal test page 2")
+
+	metadata, err := reader.extractPDFMetadata(path)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if metadata.PageCount <= 0 {
-		t.Error("Expected positive page count")
+	if metadata.PageCount != 2 {
+		t.Errorf("Expected page count 2, got %d", metadata.PageCount)
 	}
 
 	if metadata.PDFVersion == "" {
 		t.Error("Expected PDF version to be set")
 	}
+
+	if metadata.Title != "Audimodal Fixture" {
+		t.Errorf("Expected title 'Audimodal Fixture', got '%s'", metadata.Title)
+	}
+
+	if metadata.Encrypted {
+		t.Error("Expected fixture PDF to be unencrypted")
+	}
 }
 
 func TestPDFReader_ExtractPageText(t *testing.T) {
+	requireBinaries(t, "pdftotext")
+
 	reader := &PDFReader{}
 
 	config := map[string]any{
 		"extract_mode": "auto",
 	}
+	path := writeTestPDF(t, "Audimodal test page 1", "Audimodal test page 2")
 
-	text, method, confidence, err := reader.extractPageText("/mock/path/test.pdf", 1, config)
+	text, method, confidence, err := reader.extractPageText(path, 2, config)
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if text == "" {
-		t.Error("Expected non-empty text")
+	if !strings.Contains(text, "Audimodal test page 2") {
+		t.Errorf("Expected text of page 2, got %q", text)
 	}
 
 	if method != "text" && method != "ocr" {
@@ -184,9 +266,11 @@ func TestPDFReader_ExtractPageText(t *testing.T) {
 }
 
 func TestPDFIterator_Lifecycle(t *testing.T) {
-	// Create mock iterator
+	requireBinaries(t, "pdftotext")
+
+	path := writeTestPDF(t, "Audimodal test page 1", "Audimodal test page 2", "Audimodal test page 3")
 	iterator := &PDFIterator{
-		sourcePath:  "/mock/path/test.pdf",
+		sourcePath:  path,
 		config:      map[string]any{},
 		metadata:    PDFMetadata{PageCount: 3},
 		currentPage: 0,
@@ -207,8 +291,13 @@ func TestPDFIterator_Lifecycle(t *testing.T) {
 			t.Errorf("Unexpected error on iteration %d: %v", i, err)
 		}
 
-		if chunk.Data == "" {
-			t.Errorf("Expected non-empty chunk data on iteration %d", i)
+		data, ok := chunk.Data.(string)
+		if !ok {
+			t.Errorf("Expected string chunk data on iteration %d, got %T", i, chunk.Data)
+		}
+		expectedText := fmt.Sprintf("Audimodal test page %d", i)
+		if !strings.Contains(data, expectedText) {
+			t.Errorf("Expected chunk data to contain %q on iteration %d, got %q", expectedText, i, data)
 		}
 
 		if chunk.Metadata.ChunkType != "pdf_page" {

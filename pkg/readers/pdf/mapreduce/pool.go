@@ -140,7 +140,7 @@ func (p *DefaultWorkerPool) executeWorker(ctx context.Context, jobJSON []byte) (
 	// kill the worker AND all its children (tesseract, etc.) on timeout.
 	if runtime.GOOS == "linux" {
 		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setpgid:   true,           // Create new process group
+			Setpgid:   true,            // Create new process group
 			Pdeathsig: syscall.SIGKILL, // Kill worker if parent dies
 		}
 	}

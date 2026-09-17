@@ -22,7 +22,7 @@ type Chunk struct {
 	S3Bucket       string `gorm:"not null" json:"s3_bucket"`
 	S3Key          string `gorm:"not null" json:"s3_key"`
 	ContentPreview string `gorm:"column:content_preview;type:varchar(500)" json:"content_preview,omitempty"` // First 500 chars
-	ContentHash    string `gorm:"index" json:"content_hash"`                                                // Hash of content for deduplication
+	ContentHash    string `gorm:"index" json:"content_hash"`                                                 // Hash of content for deduplication
 	SizeBytes      int64  `gorm:"not null" json:"size_bytes"`
 
 	// Position information

@@ -51,8 +51,15 @@ func (d *FileDecompressor) DetectCompressionType(filePath string) (string, error
 	}
 	header = header[:n]
 
-	// Check file extension first (most reliable)
-	ext := strings.ToLower(filepath.Ext(filePath))
+	// Check file extension first (most reliable).
+	// Compound extensions must be checked before filepath.Ext, which only
+	// returns the final element (".gz" for "archive.tar.gz").
+	name := strings.ToLower(filepath.Base(filePath))
+	if strings.HasSuffix(name, ".tar.gz") {
+		return "tar.gz", nil
+	}
+
+	ext := filepath.Ext(name)
 	switch ext {
 	case ".zip":
 		return "zip", nil
@@ -61,8 +68,6 @@ func (d *FileDecompressor) DetectCompressionType(filePath string) (string, error
 	case ".tar":
 		return "tar", nil
 	case ".tgz":
-		return "tar.gz", nil
-	case ".tar.gz":
 		return "tar.gz", nil
 	}
 

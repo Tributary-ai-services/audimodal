@@ -94,44 +94,44 @@ func TestMultiRegulation_RegulationSpecificPII(t *testing.T) {
 	checker := compliance.NewBasicComplianceChecker()
 
 	tests := []struct {
-		name            string
-		content         string
-		expectedGDPR    bool
-		expectedHIPAA   bool
-		expectedPCI     bool
-		expectedCCPA    bool
+		name          string
+		content       string
+		expectedGDPR  bool
+		expectedHIPAA bool
+		expectedPCI   bool
+		expectedCCPA  bool
 	}{
 		{
-			name:            "Credit card - PCI only",
-			content:         "Card: 4111111111111111",
-			expectedGDPR:    false,
-			expectedHIPAA:   false,
-			expectedPCI:     true,
-			expectedCCPA:    false,
+			name:          "Credit card - PCI only",
+			content:       "Card: 4111111111111111",
+			expectedGDPR:  false,
+			expectedHIPAA: false,
+			expectedPCI:   true,
+			expectedCCPA:  false,
 		},
 		{
-			name:            "IP address - CCPA only",
-			content:         "User IP: 192.168.1.100",
-			expectedGDPR:    false,
-			expectedHIPAA:   false,
-			expectedPCI:     false,
-			expectedCCPA:    true,
+			name:          "IP address - CCPA only",
+			content:       "User IP: 192.168.1.100",
+			expectedGDPR:  false,
+			expectedHIPAA: false,
+			expectedPCI:   false,
+			expectedCCPA:  true,
 		},
 		{
-			name:            "SSN - Multiple regulations",
-			content:         "SSN: 123-45-6789",
-			expectedGDPR:    true, // GDPR-002 special category
-			expectedHIPAA:   true, // PHI
-			expectedPCI:     false,
-			expectedCCPA:    true,
+			name:          "SSN - Multiple regulations",
+			content:       "SSN: 123-45-6789",
+			expectedGDPR:  true, // GDPR-002 special category
+			expectedHIPAA: true, // PHI
+			expectedPCI:   false,
+			expectedCCPA:  true,
 		},
 		{
-			name:            "Email - GDPR and CCPA",
-			content:         "Email: user@company.com",
-			expectedGDPR:    true,
-			expectedHIPAA:   false,
-			expectedPCI:     false,
-			expectedCCPA:    true,
+			name:          "Email - GDPR and CCPA",
+			content:       "Email: user@company.com",
+			expectedGDPR:  true,
+			expectedHIPAA: false,
+			expectedPCI:   false,
+			expectedCCPA:  true,
 		},
 	}
 

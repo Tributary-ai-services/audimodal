@@ -80,6 +80,7 @@ func uploadTestFileWithMetadata(t *testing.T, filename, content string, metadata
 
 // TestFileCreation validates file upload functionality using multipart form-data
 func TestFileCreation(t *testing.T) {
+	requireIntegrationServices(t)
 	tests := []struct {
 		name         string
 		filename     string
@@ -200,6 +201,7 @@ func TestFileCreation(t *testing.T) {
 
 // TestFileRetrieval tests getting file information
 func TestFileRetrieval(t *testing.T) {
+	requireIntegrationServices(t)
 	// First create a file using multipart upload
 	fileID := uploadTestFile(t, "retrieve_test.txt", "Content for retrieval test")
 	require.NotEmpty(t, fileID, "Failed to create test file")
@@ -229,6 +231,7 @@ func TestFileRetrieval(t *testing.T) {
 
 // TestFileList tests listing files with filters
 func TestFileList(t *testing.T) {
+	requireIntegrationServices(t)
 	// Create multiple files for testing using multipart upload
 	files := []struct {
 		filename string
@@ -292,6 +295,7 @@ func TestFileList(t *testing.T) {
 
 // TestFileAPIErrorHandling validates error scenarios
 func TestFileAPIErrorHandling(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("Get non-existent file", func(t *testing.T) {
 		fakeID := uuid.New().String()
 		url := fmt.Sprintf("%s%s/tenants/%s/files/%s", fileAPIBaseURL, fileAPIPrefix, fileAPITestTenantID, fakeID)
@@ -300,7 +304,8 @@ func TestFileAPIErrorHandling(t *testing.T) {
 		req.Header.Set("X-API-Key", testAPIKey)
 
 		client := &http.Client{}
-		resp, _ := client.Do(req)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -313,7 +318,8 @@ func TestFileAPIErrorHandling(t *testing.T) {
 		req.Header.Set("X-API-Key", testAPIKey)
 
 		client := &http.Client{}
-		resp, _ := client.Do(req)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
 		defer resp.Body.Close()
 
 		// Can be 400 or 401 depending on auth check order
@@ -334,7 +340,8 @@ func TestFileAPIErrorHandling(t *testing.T) {
 		req.Header.Set("X-API-Key", testAPIKey)
 
 		client := &http.Client{}
-		resp, _ := client.Do(req)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
 		defer resp.Body.Close()
 
 		assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -354,7 +361,8 @@ func TestFileAPIErrorHandling(t *testing.T) {
 		req.Header.Set("X-API-Key", testAPIKey)
 
 		client := &http.Client{}
-		resp, _ := client.Do(req)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
 		defer resp.Body.Close()
 
 		// Should fail without file
@@ -375,7 +383,8 @@ func TestFileAPIErrorHandling(t *testing.T) {
 		// Intentionally NOT setting X-Tenant-ID header
 
 		client := &http.Client{}
-		resp, _ := client.Do(req)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
 		defer resp.Body.Close()
 
 		// Should get an error - could be 400, 404, 500, or 503 depending on service state
@@ -385,6 +394,7 @@ func TestFileAPIErrorHandling(t *testing.T) {
 
 // TestFileProcessing tests file processing with embedding generation
 func TestFileProcessing(t *testing.T) {
+	requireIntegrationServices(t)
 	// Create a test file first using multipart upload
 	fileID := uploadTestFile(t, "process_test.txt", "Content for processing test with AI and machine learning topics")
 	require.NotEmpty(t, fileID, "Failed to create test file")
@@ -451,6 +461,7 @@ func TestFileProcessing(t *testing.T) {
 
 // TestVectorSearchFileAPI tests semantic search functionality
 func TestVectorSearchFileAPI(t *testing.T) {
+	requireIntegrationServices(t)
 	// Create a test file with searchable content using multipart upload
 	fileID := uploadTestFileWithMetadata(t, "search_test.txt",
 		"Artificial intelligence and machine learning are transforming healthcare diagnostics",
