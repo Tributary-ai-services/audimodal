@@ -32,7 +32,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
 incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
 exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
 
-`, 50) // ~15KB
+`, 50)  // ~15KB
 
 	largeDocument = strings.Repeat(`
 Comprehensive Data Record
@@ -56,7 +56,7 @@ dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla par
 Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt
 mollit anim id est laborum.
 
-`, 500) // ~150KB
+`, 500)  // ~150KB
 
 	// High density PII document
 	highDensityDocument = strings.Repeat(`SSN: 123-45-6789 Email: user@test.com Card: 4111111111111111 IP: 192.168.1.1
@@ -305,10 +305,10 @@ func BenchmarkAllMatchers_DocumentSizes(b *testing.B) {
 func BenchmarkSSNMatcher_IsValidSSN(b *testing.B) {
 	matcher := NewSSNMatcher()
 	ssns := []string{
-		"123456789",  // valid
-		"000123456",  // invalid prefix
-		"666123456",  // invalid prefix
-		"900123456",  // invalid prefix
+		"123456789", // valid
+		"000123456", // invalid prefix
+		"666123456", // invalid prefix
+		"900123456", // invalid prefix
 	}
 
 	b.ResetTimer()
@@ -323,10 +323,10 @@ func BenchmarkSSNMatcher_IsValidSSN(b *testing.B) {
 func BenchmarkIPAddressMatcher_IsValidIP(b *testing.B) {
 	matcher := NewIPAddressMatcher()
 	ips := []string{
-		"192.168.1.1",   // valid
-		"10.0.0.1",      // valid
-		"256.1.1.1",     // invalid
-		"192.168.1",     // invalid
+		"192.168.1.1", // valid
+		"10.0.0.1",    // valid
+		"256.1.1.1",   // invalid
+		"192.168.1",   // invalid
 	}
 
 	b.ResetTimer()

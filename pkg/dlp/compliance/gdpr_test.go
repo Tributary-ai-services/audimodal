@@ -167,9 +167,9 @@ func TestGDPRChecker_BothRules(t *testing.T) {
 	// Create findings that trigger both GDPR rules
 	scanResult := &types.ScanResult{
 		Findings: []types.Finding{
-			{ID: "1", Type: types.PIITypeEmail, RiskLevel: types.RiskLevelMedium},   // GDPR-001
-			{ID: "2", Type: types.PIITypeName, RiskLevel: types.RiskLevelMedium},    // GDPR-001
-			{ID: "3", Type: types.PIITypeSSN, RiskLevel: types.RiskLevelCritical},   // GDPR-002
+			{ID: "1", Type: types.PIITypeEmail, RiskLevel: types.RiskLevelMedium},     // GDPR-001
+			{ID: "2", Type: types.PIITypeName, RiskLevel: types.RiskLevelMedium},      // GDPR-001
+			{ID: "3", Type: types.PIITypeSSN, RiskLevel: types.RiskLevelCritical},     // GDPR-002
 			{ID: "4", Type: types.PIITypeDateOfBirth, RiskLevel: types.RiskLevelHigh}, // GDPR-002
 		},
 	}

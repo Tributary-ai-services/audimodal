@@ -29,6 +29,7 @@ func addDeepLakeAuth(req *http.Request) {
 
 // TestDeepLakeAuthenticationConfiguration validates the authentication setup
 func TestDeepLakeAuthenticationConfiguration(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("API key environment variable is configured", func(t *testing.T) {
 		apiKey := getDeepLakeAPIKey()
 		assert.NotEmpty(t, apiKey, "DEEPLAKE_API_KEY environment variable must be set")
@@ -63,6 +64,7 @@ func TestDeepLakeAuthenticationConfiguration(t *testing.T) {
 
 // TestServiceCommunication validates AudiModal to DeepLake communication
 func TestServiceCommunication(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("DeepLake API is accessible", func(t *testing.T) {
 		req, _ := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/health", deeplakeAPIURL), nil)
 		addDeepLakeAuth(req)
@@ -99,6 +101,7 @@ func TestServiceCommunication(t *testing.T) {
 
 // TestDefaultDatasetConfiguration validates the default dataset setup
 func TestDefaultDatasetConfiguration(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("Default dataset exists or can be created", func(t *testing.T) {
 		// Try to get the default dataset
 		req, _ := http.NewRequest("GET", fmt.Sprintf("%s/api/v1/datasets/default", deeplakeAPIURL), nil)
@@ -131,6 +134,7 @@ func TestDefaultDatasetConfiguration(t *testing.T) {
 // TestDeepLakeDatasetOperations tests dataset creation and management
 // Note: These tests call DeepLake directly and may fail if JWT config differs from AudiModal's
 func TestDeepLakeDatasetOperations(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("Create dataset", func(t *testing.T) {
 		createData := map[string]interface{}{
 			"name":        testDatasetName,
@@ -204,6 +208,7 @@ func TestDeepLakeDatasetOperations(t *testing.T) {
 // Note: Embedding generation is handled by AudiModal (using OpenAI), not DeepLake.
 // DeepLake only stores and searches vectors.
 func TestDeepLakeEmbeddingGeneration(t *testing.T) {
+	requireIntegrationServices(t)
 	// Ensure dataset exists first
 	createDataset(t)
 
@@ -289,6 +294,7 @@ func TestDeepLakeEmbeddingGeneration(t *testing.T) {
 // TestDeepLakeVectorSearch tests vector search via AudiModal's embedding search endpoint
 // Note: Text-based search requires embedding generation, which is handled by AudiModal
 func TestDeepLakeVectorSearch(t *testing.T) {
+	requireIntegrationServices(t)
 	// Ensure we have embeddings to search
 	setupTestEmbeddings(t)
 
@@ -365,6 +371,7 @@ func TestDeepLakeVectorSearch(t *testing.T) {
 
 // TestAudiModalToDeepLakeIntegration tests the full integration flow
 func TestAudiModalToDeepLakeIntegration(t *testing.T) {
+	requireIntegrationServices(t)
 	// This test verifies that AudiModal correctly calls DeepLake API
 	// by processing a document and generating embeddings
 

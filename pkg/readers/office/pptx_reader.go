@@ -19,13 +19,13 @@ import (
 
 // OOXML namespaces used in PPTX files
 const (
-	nsDC    = "http://purl.org/dc/elements/1.1/"
-	nsDCT   = "http://purl.org/dc/terms/"
-	nsCP    = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
-	nsA     = "http://schemas.openxmlformats.org/drawingml/2006/main"
-	nsP     = "http://schemas.openxmlformats.org/presentationml/2006/main"
-	nsR     = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-	nsRels  = "http://schemas.openxmlformats.org/package/2006/relationships"
+	nsDC   = "http://purl.org/dc/elements/1.1/"
+	nsDCT  = "http://purl.org/dc/terms/"
+	nsCP   = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+	nsA    = "http://schemas.openxmlformats.org/drawingml/2006/main"
+	nsP    = "http://schemas.openxmlformats.org/presentationml/2006/main"
+	nsR    = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+	nsRels = "http://schemas.openxmlformats.org/package/2006/relationships"
 )
 
 // PPTXReader implements DataSourceReader for Microsoft PowerPoint presentations
@@ -373,8 +373,8 @@ type coreProperties struct {
 
 // presentationXML represents ppt/presentation.xml
 type presentationXML struct {
-	XMLName   xml.Name         `xml:"presentation"`
-	SlideList slideIdListXML   `xml:"sldIdLst"`
+	XMLName   xml.Name       `xml:"presentation"`
+	SlideList slideIdListXML `xml:"sldIdLst"`
 }
 
 type slideIdListXML struct {
@@ -401,13 +401,13 @@ type shapeTreeXML struct {
 }
 
 type shapeXML struct {
-	NvSpPr    nvSpPrXML    `xml:"nvSpPr"`
-	TextBody  textBodyXML  `xml:"txBody"`
+	NvSpPr   nvSpPrXML   `xml:"nvSpPr"`
+	TextBody textBodyXML `xml:"txBody"`
 }
 
 type nvSpPrXML struct {
-	CNvPr    cNvPrXML    `xml:"cNvPr"`
-	NvPr     nvPrXML     `xml:"nvPr"`
+	CNvPr cNvPrXML `xml:"cNvPr"`
+	NvPr  nvPrXML  `xml:"nvPr"`
 }
 
 type cNvPrXML struct {

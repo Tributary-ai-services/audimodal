@@ -25,6 +25,7 @@ import (
 
 // TestFileUpload validates file upload functionality
 func TestFileUpload(t *testing.T) {
+	requireIntegrationServices(t)
 	tests := []struct {
 		name           string
 		fileName       string
@@ -161,6 +162,7 @@ func TestFileUpload(t *testing.T) {
 
 // TestEmbeddingGeneration validates embedding generation through DeepLake API
 func TestEmbeddingGeneration(t *testing.T) {
+	requireIntegrationServices(t)
 	tests := []struct {
 		name           string
 		documentID     string
@@ -252,6 +254,7 @@ func TestEmbeddingGeneration(t *testing.T) {
 
 // TestVectorSearch validates search functionality
 func TestVectorSearch(t *testing.T) {
+	requireIntegrationServices(t)
 	// First, populate test data
 	setupSearchTestData(t)
 
@@ -365,6 +368,7 @@ func TestVectorSearch(t *testing.T) {
 
 // TestEndToEndWorkflow validates complete document processing pipeline
 func TestEndToEndWorkflow(t *testing.T) {
+	requireIntegrationServices(t)
 	// 1. Upload document
 	fileContent := `Advanced Machine Learning in Healthcare
 
@@ -419,6 +423,7 @@ func TestEndToEndWorkflow(t *testing.T) {
 
 // TestErrorHandling validates error scenarios
 func TestErrorHandling(t *testing.T) {
+	requireIntegrationServices(t)
 	tests := []struct {
 		name          string
 		testFunc      func(t *testing.T)
@@ -439,7 +444,8 @@ func TestErrorHandling(t *testing.T) {
 				req.Header.Set("X-API-Key", testAPIKey)
 
 				client := &http.Client{}
-				resp, _ := client.Do(req)
+				resp, err := client.Do(req)
+				require.NoError(t, err)
 				defer resp.Body.Close()
 
 				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -460,7 +466,8 @@ func TestErrorHandling(t *testing.T) {
 				req.Header.Set("X-API-Key", testAPIKey)
 
 				client := &http.Client{}
-				resp, _ := client.Do(req)
+				resp, err := client.Do(req)
+				require.NoError(t, err)
 				defer resp.Body.Close()
 
 				assert.Equal(t, http.StatusNotFound, resp.StatusCode)
@@ -485,7 +492,8 @@ func TestErrorHandling(t *testing.T) {
 				req.Header.Set("X-API-Key", testAPIKey)
 
 				client := &http.Client{}
-				resp, _ := client.Do(req)
+				resp, err := client.Do(req)
+				require.NoError(t, err)
 				defer resp.Body.Close()
 
 				assert.Equal(t, http.StatusRequestEntityTooLarge, resp.StatusCode)
@@ -502,6 +510,7 @@ func TestErrorHandling(t *testing.T) {
 
 // TestConcurrentOperations validates system under concurrent load
 func TestConcurrentOperations(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("Concurrent file uploads", func(t *testing.T) {
 		const numUploads = 10
 		done := make(chan bool, numUploads)
@@ -550,6 +559,7 @@ func TestConcurrentOperations(t *testing.T) {
 
 // TestDataPersistence validates data persistence across operations
 func TestDataPersistence(t *testing.T) {
+	requireIntegrationServices(t)
 	// Upload file
 	fileID := uploadTestFile(t, "persistence_test.txt", "Data persistence test content")
 	if fileID == "" {
@@ -654,7 +664,8 @@ func setupSearchTestData(t *testing.T) {
 		req.Header.Set("X-API-Key", testAPIKey)
 
 		client := &http.Client{}
-		resp, _ := client.Do(req)
+		resp, err := client.Do(req)
+		require.NoError(t, err)
 		resp.Body.Close()
 	}
 

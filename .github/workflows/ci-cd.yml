@@ -103,7 +103,11 @@ jobs:
     - name: Run tests
       run: |
         # Run tests excluding problematic Kubernetes controller packages
-        go test -v -timeout 10m -coverprofile=coverage.out \
+        # -short skips the stress and memory tests in tests/performance_test.go;
+        # stress.yml runs those nightly. See also the integration tests in
+        # ./tests/..., which skip themselves when AudiModal and DeepLake are
+        # unreachable (tests/test_helpers.go).
+        go test -v -short -timeout 10m -coverprofile=coverage.out \
           ./tests/... \
           $(go list ./pkg/... | grep -v controllers) \
           ./internal/...
@@ -127,7 +131,12 @@ jobs:
     
     - name: Run integration tests
       run: |
-        go test -v -timeout 5m -tags=integration ./tests/...
+        # nohs must be repeated here: a -tags flag on the command line replaces
+        # the one in GOFLAGS rather than adding to it, and without nohs the
+        # Gatekeeper scanner needs libhyperscan/pkg-config, which the runner
+        # does not have. -short keeps the stress and memory tests out; they run
+        # nightly in stress.yml.
+        go test -v -short -timeout 5m -tags=integration,nohs ./tests/...
       env:
         EAI_DB_HOST: localhost
         EAI_DB_PORT: 5432

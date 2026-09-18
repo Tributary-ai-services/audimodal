@@ -37,21 +37,21 @@ const (
 
 // ProcessingJob tracks Kafka pipeline processing for a file
 type ProcessingJob struct {
-	ID             uuid.UUID       `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	TenantID       uuid.UUID       `gorm:"type:uuid;not null" json:"tenant_id"`
-	FileID         uuid.UUID       `gorm:"type:uuid;not null" json:"file_id"`
-	TotalPages     int             `gorm:"not null" json:"total_pages"`
-	CompletedPages int             `gorm:"default:0" json:"completed_pages"`
-	FailedPages    int             `gorm:"default:0" json:"failed_pages"`
-	Status         string          `gorm:"not null;default:'splitting'" json:"status"`
-	CreatedAt      time.Time       `gorm:"not null" json:"created_at"`
-	UpdatedAt      time.Time       `gorm:"not null" json:"updated_at"`
-	CompletedAt    *time.Time      `json:"completed_at,omitempty"`
-	ErrorMessage   *string         `json:"error_message,omitempty"`
-	Metadata       JobMetadata     `gorm:"type:jsonb" json:"metadata,omitempty"`
+	ID             uuid.UUID   `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	TenantID       uuid.UUID   `gorm:"type:uuid;not null" json:"tenant_id"`
+	FileID         uuid.UUID   `gorm:"type:uuid;not null" json:"file_id"`
+	TotalPages     int         `gorm:"not null" json:"total_pages"`
+	CompletedPages int         `gorm:"default:0" json:"completed_pages"`
+	FailedPages    int         `gorm:"default:0" json:"failed_pages"`
+	Status         string      `gorm:"not null;default:'splitting'" json:"status"`
+	CreatedAt      time.Time   `gorm:"not null" json:"created_at"`
+	UpdatedAt      time.Time   `gorm:"not null" json:"updated_at"`
+	CompletedAt    *time.Time  `json:"completed_at,omitempty"`
+	ErrorMessage   *string     `json:"error_message,omitempty"`
+	Metadata       JobMetadata `gorm:"type:jsonb" json:"metadata,omitempty"`
 
 	// Relationships
-	File        *File              `gorm:"foreignKey:FileID" json:"file,omitempty"`
+	File        *File                `gorm:"foreignKey:FileID" json:"file,omitempty"`
 	PageResults []PipelinePageResult `gorm:"foreignKey:JobID" json:"page_results,omitempty"`
 }
 
@@ -89,20 +89,20 @@ func (j *ProcessingJob) FailureRate() float64 {
 
 // PipelinePageResult tracks individual page processing in the Kafka pipeline
 type PipelinePageResult struct {
-	ID                   uuid.UUID  `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	JobID                uuid.UUID  `gorm:"type:uuid;not null" json:"job_id"`
-	TenantID             uuid.UUID  `gorm:"type:uuid;not null" json:"tenant_id"`
-	FileID               uuid.UUID  `gorm:"type:uuid;not null" json:"file_id"`
-	PageNumber           int        `gorm:"not null" json:"page_number"`
-	Status               string     `gorm:"not null;default:'pending'" json:"status"`
-	ContentS3Key         string     `gorm:"column:content_s3_key" json:"content_s3_key,omitempty"`
-	ExtractionMethod     string     `json:"extraction_method,omitempty"`
-	OCRConfidence        *float64   `json:"ocr_confidence,omitempty"`
-	ProcessingDurationMs *int64     `json:"processing_duration_ms,omitempty"`
-	ErrorType            string     `json:"error_type,omitempty"`
-	ErrorMessage         *string    `json:"error_message,omitempty"`
-	CreatedAt            time.Time  `gorm:"not null" json:"created_at"`
-	UpdatedAt            time.Time  `gorm:"not null" json:"updated_at"`
+	ID                   uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	JobID                uuid.UUID `gorm:"type:uuid;not null" json:"job_id"`
+	TenantID             uuid.UUID `gorm:"type:uuid;not null" json:"tenant_id"`
+	FileID               uuid.UUID `gorm:"type:uuid;not null" json:"file_id"`
+	PageNumber           int       `gorm:"not null" json:"page_number"`
+	Status               string    `gorm:"not null;default:'pending'" json:"status"`
+	ContentS3Key         string    `gorm:"column:content_s3_key" json:"content_s3_key,omitempty"`
+	ExtractionMethod     string    `json:"extraction_method,omitempty"`
+	OCRConfidence        *float64  `json:"ocr_confidence,omitempty"`
+	ProcessingDurationMs *int64    `json:"processing_duration_ms,omitempty"`
+	ErrorType            string    `json:"error_type,omitempty"`
+	ErrorMessage         *string   `json:"error_message,omitempty"`
+	CreatedAt            time.Time `gorm:"not null" json:"created_at"`
+	UpdatedAt            time.Time `gorm:"not null" json:"updated_at"`
 
 	// Relationships
 	Job *ProcessingJob `gorm:"foreignKey:JobID" json:"job,omitempty"`

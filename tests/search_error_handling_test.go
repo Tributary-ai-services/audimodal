@@ -19,6 +19,7 @@ func addAudiModalAuth(req *http.Request) {
 
 // TestSearchErrorHandling tests the improved search error handling we implemented
 func TestSearchErrorHandling(t *testing.T) {
+	requireIntegrationServices(t)
 	// Use shared baseURL and testTenantID from test_helpers.go
 	// For local testing, set AUDIMODAL_URL environment variable
 
@@ -259,6 +260,7 @@ func TestSearchErrorHandling(t *testing.T) {
 
 // TestSearchStatusCodeMapping validates that our error handling maps to correct HTTP status codes
 func TestSearchStatusCodeMapping(t *testing.T) {
+	requireIntegrationServices(t)
 	// Use shared baseURL and testTenantID from test_helpers.go
 
 	tests := []struct {

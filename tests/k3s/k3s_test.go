@@ -14,8 +14,8 @@ import (
 // K3sComplianceSuite is the test suite for K3s integration tests
 type K3sComplianceSuite struct {
 	suite.Suite
-	client       *AudiModalClient
-	config       *Config
+	client        *AudiModalClient
+	config        *Config
 	uploadedFiles []string // Track uploaded files for cleanup
 }
 

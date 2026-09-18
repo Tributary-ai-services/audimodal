@@ -349,8 +349,8 @@ type XLSXCell struct {
 
 // xlsxWorkbookXML represents xl/workbook.xml
 type xlsxWorkbookXML struct {
-	XMLName xml.Name        `xml:"workbook"`
-	Sheets  xlsxSheetsXML   `xml:"sheets"`
+	XMLName xml.Name      `xml:"workbook"`
+	Sheets  xlsxSheetsXML `xml:"sheets"`
 }
 
 type xlsxSheetsXML struct {
@@ -372,8 +372,8 @@ type xlsxSharedStringsXML struct {
 }
 
 type xlsxStringItem struct {
-	Text  string       `xml:"t"`
-	Runs  []xlsxRunXML `xml:"r"`
+	Text string       `xml:"t"`
+	Runs []xlsxRunXML `xml:"r"`
 }
 
 type xlsxRunXML struct {

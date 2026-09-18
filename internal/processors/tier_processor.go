@@ -117,7 +117,7 @@ func GetDefaultTierProcessorConfig() *TierProcessorConfig {
 	return &TierProcessorConfig{
 		SmallFileTierThreshold: 10 * 1024 * 1024,   // 10MB
 		LargeFileTierThreshold: 1024 * 1024 * 1024, // 1GB
-		SmallFileTimeout:       6 * time.Hour,  // Scanned PDFs need long OCR time regardless of file size
+		SmallFileTimeout:       6 * time.Hour,      // Scanned PDFs need long OCR time regardless of file size
 		MediumFileTimeout:      6 * time.Hour,
 		LargeFileTimeout:       6 * time.Hour,
 		CheckpointInterval:     5 * time.Minute,
@@ -391,7 +391,7 @@ func (tp *TierProcessor) generateEmbeddings(ctx context.Context, request *Proces
 		for j, chunk := range batch {
 			chunkInputs[j] = &embeddings.ChunkInput{
 				ID:          chunk.ChunkID,
-				DocumentID:  documentID, // Use Neo4j Document ID for cross-service consistency
+				DocumentID:  documentID,           // Use Neo4j Document ID for cross-service consistency
 				Content:     chunk.ContentPreview, // Use preview for embedding in legacy pipeline
 				ChunkIndex:  chunk.ChunkNumber,
 				ContentType: chunk.ChunkType,

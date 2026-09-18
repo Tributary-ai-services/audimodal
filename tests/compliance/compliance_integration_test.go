@@ -412,10 +412,10 @@ func TestIntegration_ConfidenceScores(t *testing.T) {
 	registry := patterns.NewPatternRegistry()
 
 	tests := []struct {
-		name       string
-		piiType    types.PIIType
-		input      string
-		minConf    float64
+		name    string
+		piiType types.PIIType
+		input   string
+		minConf float64
 	}{
 		{"SSN dashed high confidence", types.PIITypeSSN, "123-45-6789", 0.85},
 		{"SSN plain lower confidence", types.PIITypeSSN, "123456789", 0.6},

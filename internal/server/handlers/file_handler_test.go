@@ -23,7 +23,6 @@ import (
 // Skipping for now - validation tests in file_simple_test.go cover the routing logic adequately.
 func TestFileHandler_CreateFile_ContentTypeRouting(t *testing.T) {
 	t.Skip("Test requires database interface refactoring - see file_simple_test.go for routing tests")
-	return
 
 	tenantID := uuid.New()
 	handler := &FileHandler{}
@@ -107,7 +106,6 @@ func TestFileHandler_CreateFile_ContentTypeRouting(t *testing.T) {
 // NOTE: This test requires database interface refactoring - skipped for now
 func TestFileHandler_CreateFile_MultipartValidation(t *testing.T) {
 	t.Skip("Test requires database interface refactoring - see file_simple_test.go for validation tests")
-	return
 
 	tenantID := uuid.New()
 	dataSourceID := uuid.New()
@@ -202,7 +200,6 @@ func TestFileHandler_CreateFile_MultipartValidation(t *testing.T) {
 // NOTE: This test requires database interface refactoring - skipped for now
 func TestFileHandler_CreateFile_JSONValidation(t *testing.T) {
 	t.Skip("Test requires database interface refactoring - see file_simple_test.go for validation tests")
-	return
 
 	tenantID := uuid.New()
 	dataSourceID := uuid.New()
@@ -321,7 +318,6 @@ func TestFileHandler_CreateFile_JSONValidation(t *testing.T) {
 // NOTE: This test requires database interface refactoring - skipped for now
 func TestFileHandler_FileSizeThresholdValidation(t *testing.T) {
 	t.Skip("Test requires database interface refactoring")
-	return
 
 	tenantID := uuid.New()
 	dataSourceID := uuid.New()
@@ -413,7 +409,6 @@ func TestFileHandler_FileSizeThresholdValidation(t *testing.T) {
 // NOTE: This test requires database interface refactoring - skipped for now
 func TestFileHandler_RequestSizeValidation(t *testing.T) {
 	t.Skip("Test requires database interface refactoring")
-	return
 
 	tenantID := uuid.New()
 	handler := &FileHandler{}

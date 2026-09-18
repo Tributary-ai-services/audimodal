@@ -1,8 +1,13 @@
 package tests
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"testing"
+	"time"
 )
 
 // Common test constants with K8s service discovery defaults
@@ -58,4 +63,52 @@ func generateLargeContent(size int) string {
 		sentences = 1
 	}
 	return strings.Repeat(sentence, sentences)
+}
+
+// requireIntegrationServices skips the calling test unless both AudiModal and
+// DeepLake answer on the URLs above.
+//
+// The defaults are Kubernetes service names, so they resolve inside the cluster
+// and nowhere else — on a CI runner or a laptop the whole suite failed on DNS
+// rather than on anything it was written to test. Probing and skipping keeps
+// those runs honest: the tests still run wherever the services exist (point
+// AUDIMODAL_URL and DEEPLAKE_API_URL at them, or port-forward), and elsewhere
+// they announce what is missing instead of reporting a failure nobody can act
+// on.
+//
+// The probe runs once per package run; each service is reported separately so a
+// skip says which one was unreachable.
+func requireIntegrationServices(t *testing.T) {
+	t.Helper()
+	integrationProbeOnce.Do(func() {
+		integrationProbeErr = probeServices()
+	})
+	if integrationProbeErr != nil {
+		t.Skipf("integration services unavailable: %v "+
+			"(set AUDIMODAL_URL and DEEPLAKE_API_URL to reachable endpoints to run this test)",
+			integrationProbeErr)
+	}
+}
+
+var (
+	integrationProbeOnce sync.Once
+	integrationProbeErr  error
+)
+
+func probeServices() error {
+	client := &http.Client{Timeout: 3 * time.Second}
+	for _, svc := range []struct{ name, url string }{
+		{"audimodal", audimodalAPIURL + "/health"},
+		{"deeplake-api", deeplakeURL + "/api/v1/health"},
+	} {
+		resp, err := client.Get(svc.url)
+		if err != nil {
+			return fmt.Errorf("%s not reachable at %s: %w", svc.name, svc.url, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode >= 500 {
+			return fmt.Errorf("%s at %s returned HTTP %d", svc.name, svc.url, resp.StatusCode)
+		}
+	}
+	return nil
 }
