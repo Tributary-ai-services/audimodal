@@ -130,9 +130,30 @@ func NewEvent(eventType string, tenantID uuid.UUID, payload map[string]interface
 	}
 }
 
+// isRunning reports whether the bus is started.
+//
+// Every access to bus.running goes through isRunning/setRunning: Stop writes
+// the field from the caller's goroutine while publishers and workers read it
+// from theirs, which the race detector flags (backlog AM-10).
+func (bus *InMemoryEventBus) isRunning() bool {
+	bus.mu.RLock()
+	defer bus.mu.RUnlock()
+	return bus.running
+}
+
+// setRunning sets the flag and reports the previous value, so Start and Stop
+// can test-and-set atomically instead of racing between a check and a write.
+func (bus *InMemoryEventBus) setRunning(v bool) bool {
+	bus.mu.Lock()
+	defer bus.mu.Unlock()
+	prev := bus.running
+	bus.running = v
+	return prev
+}
+
 // Publish publishes an event to the bus
 func (bus *InMemoryEventBus) Publish(event *Event) error {
-	if !bus.running {
+	if !bus.isRunning() {
 		return fmt.Errorf("event bus is not running")
 	}
 
@@ -160,7 +181,7 @@ func (bus *InMemoryEventBus) Publish(event *Event) error {
 
 // PublishBatch publishes multiple events atomically
 func (bus *InMemoryEventBus) PublishBatch(events []*Event) error {
-	if !bus.running {
+	if !bus.isRunning() {
 		return fmt.Errorf("event bus is not running")
 	}
 
@@ -240,11 +261,9 @@ func (bus *InMemoryEventBus) Unsubscribe(handler EventHandler, eventTypes ...str
 
 // Start starts the event bus
 func (bus *InMemoryEventBus) Start() error {
-	if bus.running {
+	if bus.setRunning(true) {
 		return fmt.Errorf("event bus is already running")
 	}
-
-	bus.running = true
 
 	// Start worker goroutines
 	for i := 0; i < bus.config.WorkerCount; i++ {
@@ -269,12 +288,14 @@ func (bus *InMemoryEventBus) Start() error {
 
 // Stop stops the event bus gracefully
 func (bus *InMemoryEventBus) Stop() error {
-	if !bus.running {
+	// Clear the flag before tearing anything down, and do the teardown outside
+	// the lock: worker goroutines call isRunning, so holding it across wg.Wait
+	// below would deadlock.
+	if !bus.setRunning(false) {
 		return nil
 	}
 
 	close(bus.stopChan)
-	bus.running = false
 
 	// Close event queue
 	close(bus.eventQueue)
@@ -512,7 +533,7 @@ func (bus *InMemoryEventBus) handleProcessingError(ctx context.Context, event *E
 		// Schedule retry
 		go func() {
 			time.Sleep(retryDelay)
-			if bus.running {
+			if bus.isRunning() {
 				bus.eventQueue <- event
 			}
 		}()

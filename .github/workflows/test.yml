@@ -98,7 +98,10 @@ jobs:
     - name: Set up test environment
       run: |
         echo "DEEPLAKE_API_URL=http://localhost:8000" >> $GITHUB_ENV
-        echo "DEEPLAKE_API_KEY=test-key-12345" >> $GITHUB_ENV
+        # 64 hex chars: tests/configuration_validation_test.go asserts the
+        # configured key is >50 chars, which is how it catches a return to the
+        # old short hardcoded dev key. A 14-char placeholder failed that check.
+        echo "DEEPLAKE_API_KEY=ci0000000000000000000000000000000000000000000000000000000000test" >> $GITHUB_ENV
         echo "DEEPLAKE_TENANT_ID=test-tenant-id" >> $GITHUB_ENV
         echo "LOG_LEVEL=debug" >> $GITHUB_ENV
         
