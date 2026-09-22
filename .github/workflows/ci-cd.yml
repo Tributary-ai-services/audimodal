@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.25'
   # pkg/dlp/shadow links Gatekeeper's scanner; nohs selects its cgo-free Go
   # regexp engine so CI needs neither libhyperscan nor pkg-config.
   GOFLAGS: -tags=nohs
@@ -376,7 +376,7 @@ jobs:
     - name: Set up Go for security scanning
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25'
         check-latest: true
     
     - name: Run Gosec Security Scanner
