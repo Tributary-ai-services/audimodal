@@ -303,12 +303,12 @@ jobs:
         draft: false
         prerelease: false
 
-  # Race detection tests (non-blocking)
+  # Race detection tests. Blocking since AM-10 closed: the InMemoryEventBus
+  # race was fixed in e31332d, so a DATA RACE here is now a real regression.
   race-tests:
     name: Race Detection Tests
     runs-on: ubuntu-latest
-    continue-on-error: true
-    
+
     services:
       postgres:
         image: postgres:15
@@ -347,12 +347,15 @@ jobs:
       run: go mod download
     
     - name: Run race detection tests
+      # -short, as every other test step here does since a80ae59: without it
+      # the throughput assertions in tests/performance_test.go blow the 10m
+      # timeout. That failure used to be hidden by `|| echo`, which made this
+      # job report success while the `tests` package was panicking.
       run: |
-        echo "Running tests with race detection (known issues in event bus)..."
-        go test -v -race -timeout 10m \
+        go test -v -race -short -timeout 10m \
           ./tests/... \
           $(go list ./pkg/... | grep -v controllers) \
-          ./internal/... || echo "Race detection completed with known issues - see KNOWN_ISSUES.md"
+          ./internal/...
       env:
         EAI_DB_HOST: localhost
         EAI_DB_PORT: 5432
