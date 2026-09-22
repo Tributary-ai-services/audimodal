@@ -327,13 +327,13 @@ type docxCoreProperties struct {
 
 // docxAppProperties represents docProps/app.xml
 type docxAppProperties struct {
-	XMLName    xml.Name `xml:"Properties"`
-	Pages      int      `xml:"Pages"`
-	Words      int      `xml:"Words"`
-	Characters int      `xml:"Characters"`
-	Paragraphs int      `xml:"Paragraphs"`
-	Company    string   `xml:"Company"`
-	Application string  `xml:"Application"`
+	XMLName     xml.Name `xml:"Properties"`
+	Pages       int      `xml:"Pages"`
+	Words       int      `xml:"Words"`
+	Characters  int      `xml:"Characters"`
+	Paragraphs  int      `xml:"Paragraphs"`
+	Company     string   `xml:"Company"`
+	Application string   `xml:"Application"`
 }
 
 // extractDOCXMetadata extracts metadata from DOCX file

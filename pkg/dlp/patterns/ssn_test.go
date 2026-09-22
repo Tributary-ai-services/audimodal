@@ -64,10 +64,10 @@ func TestSSNMatcher_ConfidenceScore(t *testing.T) {
 	matcher := NewSSNMatcher()
 
 	tests := []struct {
-		name        string
-		input       string
-		minConf     float64
-		maxConf     float64
+		name    string
+		input   string
+		minConf float64
+		maxConf float64
 	}{
 		{"dashed format high confidence", "123-45-6789", 0.85, 1.0},
 		{"space format high confidence", "123 45 6789", 0.85, 1.0},
@@ -178,12 +178,12 @@ func TestSSNMatcher_IsValidSSN(t *testing.T) {
 	}
 
 	invalidSSNs := []string{
-		"000123456", // starts with 000
-		"666123456", // starts with 666
-		"900123456", // starts with 9
-		"123004567", // middle 00
-		"123450000", // last 0000
-		"12345678",  // too short
+		"000123456",  // starts with 000
+		"666123456",  // starts with 666
+		"900123456",  // starts with 9
+		"123004567",  // middle 00
+		"123450000",  // last 0000
+		"12345678",   // too short
 		"1234567890", // too long
 	}
 

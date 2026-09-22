@@ -60,6 +60,7 @@ func TestAudiModalConfigurationValidation(t *testing.T) {
 
 // TestContainerEnvironmentConfiguration validates the Docker container environment
 func TestContainerEnvironmentConfiguration(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("AudiModal service is accessible", func(t *testing.T) {
 		audimodalURL := getEnvOrDefault("AUDIMODAL_URL", "http://audimodal:8080")
 
@@ -87,6 +88,7 @@ func TestContainerEnvironmentConfiguration(t *testing.T) {
 
 // TestAuthenticationIntegration validates the full authentication flow
 func TestAuthenticationIntegration(t *testing.T) {
+	requireIntegrationServices(t)
 	t.Run("Authentication configuration matches between services", func(t *testing.T) {
 		// Get the API key that AudiModal is configured to use
 		audimodalAPIKey := os.Getenv("DEEPLAKE_API_KEY")

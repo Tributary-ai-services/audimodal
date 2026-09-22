@@ -80,18 +80,18 @@ type PipelineMetrics struct {
 
 // ProcessingRequest represents a file processing request
 type ProcessingRequest struct {
-	TenantID        uuid.UUID              `json:"tenant_id"`
-	SessionID       uuid.UUID              `json:"session_id"`
-	FileID          uuid.UUID              `json:"file_id"`
-	FilePath        string                 `json:"file_path"`
-	ReaderType      string                 `json:"reader_type,omitempty"`
-	StrategyType    string                 `json:"strategy_type,omitempty"`
-	ReaderConfig    map[string]any         `json:"reader_config,omitempty"`
-	StrategyConfig  map[string]any         `json:"strategy_config,omitempty"`
-	Priority        string                 `json:"priority"`
-	DLPScanEnabled  bool                   `json:"dlp_scan_enabled"`
+	TenantID        uuid.UUID               `json:"tenant_id"`
+	SessionID       uuid.UUID               `json:"session_id"`
+	FileID          uuid.UUID               `json:"file_id"`
+	FilePath        string                  `json:"file_path"`
+	ReaderType      string                  `json:"reader_type,omitempty"`
+	StrategyType    string                  `json:"strategy_type,omitempty"`
+	ReaderConfig    map[string]any          `json:"reader_config,omitempty"`
+	StrategyConfig  map[string]any          `json:"strategy_config,omitempty"`
+	Priority        string                  `json:"priority"`
+	DLPScanEnabled  bool                    `json:"dlp_scan_enabled"`
 	RedactionMode   types.RedactionStrategy `json:"redaction_mode,omitempty"` // mask, replace, hash, remove, tokenize, none
-	ComplianceRules []string               `json:"compliance_rules,omitempty"`
+	ComplianceRules []string                `json:"compliance_rules,omitempty"`
 }
 
 // ProcessingResult contains the results of file processing
@@ -150,7 +150,7 @@ func GetDefaultPipelineConfig() *PipelineConfig {
 	return &PipelineConfig{
 		MaxConcurrentFiles:  2, // Reduced from 5 to limit peak memory (60% reduction)
 		MaxConcurrentChunks: 20,
-		ChunkBatchSize:      5, // Reduced from 10 for faster GC cycles and lower peak memory
+		ChunkBatchSize:      5,             // Reduced from 10 for faster GC cycles and lower peak memory
 		ProcessingTimeout:   6 * time.Hour, // Must accommodate large OCR PDFs (122-page scan can take hours)
 		RetryAttempts:       3,
 		RetryDelay:          5 * time.Second,

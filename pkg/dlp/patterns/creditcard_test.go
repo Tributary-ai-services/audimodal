@@ -69,12 +69,12 @@ func TestCreditCardMatcher_LuhnValidation(t *testing.T) {
 
 	// Test cards that pass Luhn algorithm
 	validCards := []string{
-		"4532015112830366",  // Visa
-		"5425233430109903",  // Mastercard
-		"378282246310005",   // Amex
-		"6011111111111117",  // Discover
-		"4111111111111111",  // Test Visa
-		"5500000000000004",  // Test MC
+		"4532015112830366", // Visa
+		"5425233430109903", // Mastercard
+		"378282246310005",  // Amex
+		"6011111111111117", // Discover
+		"4111111111111111", // Test Visa
+		"5500000000000004", // Test MC
 	}
 
 	for _, card := range validCards {
@@ -85,9 +85,9 @@ func TestCreditCardMatcher_LuhnValidation(t *testing.T) {
 
 	// Test cards that fail Luhn algorithm or validation
 	invalidCards := []string{
-		"4532015112830367",  // Visa (checksum off by 1)
-		"5425233430109904",  // MC (checksum off by 1)
-		"1234567890123456",  // Random number fails Luhn
+		"4532015112830367", // Visa (checksum off by 1)
+		"5425233430109904", // MC (checksum off by 1)
+		"1234567890123456", // Random number fails Luhn
 	}
 	// Note: All zeros (0000000000000000) technically passes Luhn mathematically
 	// but fails card prefix validation
@@ -196,10 +196,10 @@ func TestCreditCardMatcher_CardTypes(t *testing.T) {
 
 	// Test detection of specific card types
 	cardTypes := map[string]string{
-		"4111111111111111":  "Visa",
-		"5500000000000004":  "Mastercard",
-		"340000000000009":   "Amex",
-		"6011000000000004":  "Discover",
+		"4111111111111111": "Visa",
+		"5500000000000004": "Mastercard",
+		"340000000000009":  "Amex",
+		"6011000000000004": "Discover",
 	}
 
 	for card, cardType := range cardTypes {

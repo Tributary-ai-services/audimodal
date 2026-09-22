@@ -12,8 +12,9 @@
 // MinIO path pattern: .../documents/{neo4j_document_id}/filename
 //
 // Usage:
-//   go run scripts/backfill_neo4j_document_ids.go --dry-run  # Preview changes
-//   go run scripts/backfill_neo4j_document_ids.go            # Apply changes
+//
+//	go run scripts/backfill_neo4j_document_ids.go --dry-run  # Preview changes
+//	go run scripts/backfill_neo4j_document_ids.go            # Apply changes
 package main
 
 import (

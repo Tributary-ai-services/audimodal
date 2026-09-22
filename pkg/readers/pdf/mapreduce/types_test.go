@@ -18,11 +18,11 @@ func TestDefaultExtractionConfig(t *testing.T) {
 		expected interface{}
 	}{
 		{"OCRLanguage", config.OCRLanguage, "eng"},
-		{"OCRDPI", config.OCRDPI, 150},
-		{"OCRTimeout", config.OCRTimeout, 300},
+		{"OCRDPI", config.OCRDPI, 300},
+		{"OCRTimeout", config.OCRTimeout, 600},
 		{"TextThreshold", config.TextThreshold, 100},
 		{"LargeImageThreshold", config.LargeImageThreshold, 50},
-		{"MaxMemoryMB", config.MaxMemoryMB, 1024},
+		{"MaxMemoryMB", config.MaxMemoryMB, 2048},
 		{"PreserveLayout", config.PreserveLayout, true},
 		{"ExtractImages", config.ExtractImages, false},
 	}

@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.25'
   # pkg/dlp/shadow links Gatekeeper's scanner; nohs selects its cgo-free Go
   # regexp engine so CI needs neither libhyperscan nor pkg-config.
   GOFLAGS: -tags=nohs
@@ -103,7 +103,11 @@ jobs:
     - name: Run tests
       run: |
         # Run tests excluding problematic Kubernetes controller packages
-        go test -v -timeout 10m -coverprofile=coverage.out \
+        # -short skips the stress and memory tests in tests/performance_test.go;
+        # stress.yml runs those nightly. See also the integration tests in
+        # ./tests/..., which skip themselves when AudiModal and DeepLake are
+        # unreachable (tests/test_helpers.go).
+        go test -v -short -timeout 10m -coverprofile=coverage.out \
           ./tests/... \
           $(go list ./pkg/... | grep -v controllers) \
           ./internal/...
@@ -127,7 +131,12 @@ jobs:
     
     - name: Run integration tests
       run: |
-        go test -v -timeout 5m -tags=integration ./tests/...
+        # nohs must be repeated here: a -tags flag on the command line replaces
+        # the one in GOFLAGS rather than adding to it, and without nohs the
+        # Gatekeeper scanner needs libhyperscan/pkg-config, which the runner
+        # does not have. -short keeps the stress and memory tests out; they run
+        # nightly in stress.yml.
+        go test -v -short -timeout 5m -tags=integration,nohs ./tests/...
       env:
         EAI_DB_HOST: localhost
         EAI_DB_PORT: 5432
@@ -294,12 +303,12 @@ jobs:
         draft: false
         prerelease: false
 
-  # Race detection tests (non-blocking)
+  # Race detection tests. Blocking since AM-10 closed: the InMemoryEventBus
+  # race was fixed in e31332d, so a DATA RACE here is now a real regression.
   race-tests:
     name: Race Detection Tests
     runs-on: ubuntu-latest
-    continue-on-error: true
-    
+
     services:
       postgres:
         image: postgres:15
@@ -338,12 +347,15 @@ jobs:
       run: go mod download
     
     - name: Run race detection tests
+      # -short, as every other test step here does since a80ae59: without it
+      # the throughput assertions in tests/performance_test.go blow the 10m
+      # timeout. That failure used to be hidden by `|| echo`, which made this
+      # job report success while the `tests` package was panicking.
       run: |
-        echo "Running tests with race detection (known issues in event bus)..."
-        go test -v -race -timeout 10m \
+        go test -v -race -short -timeout 10m \
           ./tests/... \
           $(go list ./pkg/... | grep -v controllers) \
-          ./internal/... || echo "Race detection completed with known issues - see KNOWN_ISSUES.md"
+          ./internal/...
       env:
         EAI_DB_HOST: localhost
         EAI_DB_PORT: 5432
@@ -367,7 +379,7 @@ jobs:
     - name: Set up Go for security scanning
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25'
         check-latest: true
     
     - name: Run Gosec Security Scanner

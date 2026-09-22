@@ -2,46 +2,43 @@
 
 This document tracks known issues in the codebase that are being worked on or require future attention.
 
-## Race Conditions in Event Bus (2025-08-04)
+## ~~Race Conditions in Event Bus~~ — RESOLVED 2026-09-22 (opened 2025-08-04)
 
-### Issue
-Data races detected in the InMemoryEventBus implementation when running tests with `-race` flag.
+Fixed in `e31332d` (PR #37). Kept here rather than deleted, because the
+"workaround" below described the CI configuration for over a year and anyone
+who remembers it will expect the old behaviour.
 
-### Details
+### The issue, as it was
+Data races in `InMemoryEventBus` when running tests with `-race`: every access
+to the running flag was unguarded, so `Stop()` wrote it from the caller's
+goroutine while `Publish()` and the workers read it from theirs.
+
 - **Location**: `pkg/events/bus.go`
 - **Affected Methods**: `Stop()` and `Publish()`
-- **Error**: Concurrent access to `eb.stopped` flag and channel operations
 
-### Stack Trace
-```
-WARNING: DATA RACE
-Write at 0x00c0000b9250 by goroutine 35:
-  github.com/jscharber/eAIIngest/pkg/events.(*InMemoryEventBus).Stop()
-      /pkg/events/bus.go:277 +0xcf
+### The fix
+All access now goes through `isRunning`/`setRunning`; `Start` and `Stop`
+test-and-set under one lock, so a double `Start` still reports an error. `Stop`
+deliberately releases the lock before `close`/`wg.Wait`, because the workers
+call `isRunning` and holding it across the wait would deadlock.
 
-Previous read at 0x00c0000b9250 by goroutine 47:
-  github.com/jscharber/eAIIngest/pkg/events.(*InMemoryEventBus).Publish()
-      /pkg/events/bus.go:135 +0x9d
-```
+### What changed in CI
+The old workaround was: *"CI tests run without `-race` in the main test job; a
+separate non-blocking `race-tests` job runs with race detection for
+visibility."* Both halves are gone:
 
-### Impact
-- Tests fail when run with `-race` flag
-- Potential for event loss or panics in production under high concurrency
+- `test.yml` runs `go test -race -short` in the main test job, and it is blocking.
+- `ci-cd.yml`'s `race-tests` job no longer sets `continue-on-error: true`, and
+  no longer swallows the result with `|| echo`. A DATA RACE now fails the build.
 
-### Workaround
-- CI tests run without `-race` flag in main test job
-- Separate non-blocking `race-tests` job runs with race detection for visibility
-
-### Resolution Plan
-1. Add proper mutex protection to the `stopped` flag
-2. Implement graceful shutdown with event draining
-3. Add context cancellation for clean shutdown
-4. Re-enable `-race` flag in main CI tests
+That second job was reporting **success while the `tests` package panicked on a
+10m timeout** — it lacked the `-short` flag the other test steps use, so it ran
+the throughput tests in `tests/performance_test.go`. Fixed alongside.
 
 ### Related Files
-- `.github/workflows/ci-cd.yml` - Temporary removal of `-race` flag
-- `pkg/events/bus.go` - Needs synchronization fixes
+- `pkg/events/bus.go` — the fix
+- `.github/workflows/ci-cd.yml`, `.github/workflows/test.yml` — race detection is blocking
 
 ---
 
-*Last Updated: 2025-08-04*
+*Last Updated: 2026-09-22*

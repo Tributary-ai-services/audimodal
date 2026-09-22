@@ -15,6 +15,7 @@ import (
 
 // TestEndToEndEmbeddingGeneration tests the complete flow from file creation through embedding generation
 func TestEndToEndEmbeddingGeneration(t *testing.T) {
+	requireIntegrationServices(t)
 	// Use the same URLs as other tests for K8s compatibility
 	apiPrefix := "/api/v1"
 

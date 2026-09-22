@@ -1,0 +1,61 @@
+name: Stress and memory tests
+
+# The long-running tests in tests/performance_test.go guard themselves with
+# testing.Short(), and every PR-gating job now passes -short, so they never run
+# there. They still need somewhere to run: this is that place.
+#
+# Failures here are expected to be investigated, not to block a merge. As of
+# 2026-09-17 two of the three are known-broken and are left unchanged on
+# purpose, so this workflow starts red by design:
+#
+#   TestStressAuthentication - 100 goroutines x 100 full password logins, then
+#     asserts >1000 req/sec. Those are bcrypt verifies at PasswordCost 12
+#     (~237ms/op measured), so the ceiling is NumCPU/0.237 — about 34 req/sec on
+#     8 cores. The assertion cannot be met on any plausible machine; it needs to
+#     move to JWT validation, or the test needs an explicit low-cost config.
+#   TestMemoryUsage - DEADLOCKS permanently on its first iteration.
+#     classification.NewService(&ServiceConfig{}) passes a zero-value config,
+#     which (unlike nil) skips the defaults, so MaxConcurrentClassifications is
+#     0 and the semaphore channel is unbuffered; Classify blocks forever on a
+#     context that never cancels. No timeout saves it, so the package timeout
+#     below is what ends this job.
+#
+# TestStressEventSystem was repaired (its bus was never started, and a
+# zero-value config gave it no workers) and is expected to pass in ~1s.
+
+on:
+  schedule:
+    # 04:30 UTC daily, after the nightly TAS backup window.
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+env:
+  # pkg/dlp/shadow links Gatekeeper's scanner; nohs selects its cgo-free Go
+  # regexp engine so CI needs neither libhyperscan nor pkg-config.
+  GOFLAGS: -tags=nohs
+
+jobs:
+  stress:
+    name: Stress and memory
+    runs-on: ubuntu-latest
+    # Bounded deliberately: TestMemoryUsage deadlocks, so the package timeout
+    # below is what ends the run — as a reported test failure with a goroutine
+    # dump, rather than a silently cancelled job.
+    timeout-minutes: 25
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        check-latest: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run stress and memory tests
+      # No -short, which is the whole point of this workflow.
+      run: go test -v -timeout 15m -run 'TestStress|TestMemoryUsage' ./tests/

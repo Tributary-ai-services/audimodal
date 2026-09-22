@@ -54,10 +54,10 @@ const (
 
 // Violation represents a compliance violation found during scanning
 type Violation struct {
-	Rule        string        `json:"rule"`        // e.g., "GDPR-001"
-	Regulation  string        `json:"regulation"`  // e.g., "GDPR"
-	Severity    string        `json:"severity"`    // critical, high, medium, low
-	PIIType     types.PIIType `json:"pii_type"`    // e.g., "email", "ssn"
+	Rule        string        `json:"rule"`       // e.g., "GDPR-001"
+	Regulation  string        `json:"regulation"` // e.g., "GDPR"
+	Severity    string        `json:"severity"`   // critical, high, medium, low
+	PIIType     types.PIIType `json:"pii_type"`   // e.g., "email", "ssn"
 	Description string        `json:"description"`
 	FindingIDs  []string      `json:"finding_ids"`
 }
