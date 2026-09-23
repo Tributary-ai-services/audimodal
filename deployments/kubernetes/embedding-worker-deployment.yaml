@@ -87,12 +87,25 @@ spec:
               key: DEEPLAKE_API_KEY
         - name: EMBEDDING_MODEL
           value: "text-embedding-3-small"
+        # Profiled 2026-09-23 (Phase 2 tier A of MEMORY-RIGHTSIZING-PLAN.md).
+        # p95 working set over 23h is 9Mi against a 256Mi request — 28x.
+        #
+        # requests -> 64Mi, a floor rather than a fitted value: 4x the observed
+        # p95 would be 36Mi, which is too tight to be meaningful for a worker
+        # measured while idle. The limit stays 1Gi for the same reason as the
+        # OCR worker — it is the ceiling an embedding batch needs, and cutting
+        # it to a multiple of an idle p95 is how this becomes an OOM.
+        #
+        # Re-profile once embedding traffic has run:
+        #   quantile_over_time(0.95, container_memory_working_set_bytes{
+        #     namespace="aether-be",pod=~"audimodal-embedding-worker.*",
+        #     container="embedding-worker"}[7d])
         resources:
           limits:
             memory: "1Gi"
             cpu: "1000m"
           requests:
-            memory: "256Mi"
+            memory: "64Mi"
             cpu: "200m"
         livenessProbe:
           httpGet:

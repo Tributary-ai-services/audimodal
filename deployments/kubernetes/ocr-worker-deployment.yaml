@@ -57,12 +57,31 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        # Profiled 2026-09-23 (Phase 2 tier A of MEMORY-RIGHTSIZING-PLAN.md).
+        # p95 working set over 23h is 52Mi against a 512Mi request — a ~10x
+        # over-reservation that the scheduler counts twice over, once per
+        # replica, while the pod never uses it.
+        #
+        # requests -> 224Mi (4x observed p95, not 1x). The 4x is deliberate:
+        # this is a WORKER, and the 23h window is an idle one — no OCR jobs
+        # ran. Its loaded footprint is unknown and certainly higher, so the
+        # request is a scheduling floor with room, not a fitted value.
+        #
+        # THE LIMIT IS DELIBERATELY UNCHANGED at 2Gi. That is the ceiling a
+        # large PDF needs, it costs nothing while unused, and lowering it to
+        # some multiple of an idle p95 is exactly how this work turns into an
+        # OOM kill. Requests govern scheduling; limits govern survival.
+        #
+        # Re-profile once real OCR traffic has run:
+        #   quantile_over_time(0.95, container_memory_working_set_bytes{
+        #     namespace="aether-be",pod=~"audimodal-ocr-worker.*",
+        #     container="ocr-worker"}[7d])
         resources:
           limits:
             memory: "2Gi"
             cpu: "2000m"
           requests:
-            memory: "512Mi"
+            memory: "224Mi"
             cpu: "500m"
         livenessProbe:
           httpGet:
