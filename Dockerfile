@@ -1,5 +1,5 @@
 # Multi-stage build for eAIIngest platform
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Install build dependencies including C compiler for CGO
 RUN apk add --no-cache git ca-certificates tzdata gcc musl-dev

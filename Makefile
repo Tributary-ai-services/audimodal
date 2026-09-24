@@ -75,7 +75,7 @@ test-race: ## Run tests with race detection
 .PHONY: test-bench
 test-bench: ## Run benchmark tests
 	@echo "Running benchmark tests..."
-	go test -v -bench=. -benchmem $(shell go list ./tests/... ./pkg/... ./internal/... | grep -v -E "(cmd/|controllers)")
+	go test -v -bench=. -benchmem -run '^$$' $(shell go list ./tests/... ./pkg/... ./internal/... | grep -v -E "(cmd/|controllers)")
 
 .PHONY: test-verbose
 test-verbose: ## Run tests with verbose output
