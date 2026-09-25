@@ -201,10 +201,17 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
     
+    # Docker refs must be lowercase, and github.sha is NOT a tag metadata-action
+    # publishes — it emits main / main-<short sha>. Scanning by digest sidesteps
+    # both: it is exactly the artifact the build step just pushed.
+    - name: Compute image ref for scanning
+      id: imgref
+      run: echo "ref=${REGISTRY}/${IMAGE_NAME,,}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        image-ref: ${{ steps.imgref.outputs.ref }}
         format: 'sarif'
         output: 'trivy-results.sarif'
     
