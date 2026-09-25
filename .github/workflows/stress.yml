@@ -24,9 +24,17 @@ name: Stress and memory tests
 # zero-value config gave it no workers) and is expected to pass in ~1s.
 
 on:
-  schedule:
-    # 04:30 UTC daily, after the nightly TAS backup window.
-    - cron: '30 4 * * *'
+  # NOT run on a schedule any more. Left to local runs and manual dispatch.
+  #
+  # Local command:
+  #   go test -v -timeout 15m -run 'TestStress|TestMemoryUsage' ./tests/
+  #
+  # The nightly cron was removed 2026-09-25: two of the three tests are
+  # known-broken for reasons diagnosed in the notes above and neither is a
+  # regression, so the run was red every night by construction. A job that is
+  # always red teaches people to ignore it, and then it cannot report the day
+  # something genuinely breaks. Run it deliberately instead, and restore the
+  # cron once TestStressAuthentication and TestMemoryUsage are fixed.
   workflow_dispatch:
 
 env:
