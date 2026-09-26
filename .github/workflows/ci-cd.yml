@@ -201,7 +201,12 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        platforms: linux/amd64,linux/arm64
+        # amd64 only. Nothing consumes arm64: both cluster nodes (um773dev, pinova01)
+        # report architecture=amd64, and no arm64 node exists. Building it cost ~40min
+        # of QEMU emulation per push — the two Docker jobs together took ~60min of the
+        # hour-long pipeline. Re-add linux/arm64 if an arm64 node or an arm64 dev
+        # machine ever needs to pull these images.
+        platforms: linux/amd64
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
