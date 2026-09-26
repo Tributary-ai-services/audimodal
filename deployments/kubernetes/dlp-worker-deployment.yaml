@@ -26,7 +26,7 @@ spec:
     spec:
       containers:
       - name: dlp-worker
-        image: registry-api.tas.scharber.com/audimodal:g6-93f5615
+        image: ghcr.io/tributary-ai-services/audimodal:main-4806afa
         command: ["./dlpworker"]
         ports:
         - name: health
