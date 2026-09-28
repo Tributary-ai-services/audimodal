@@ -88,10 +88,21 @@ jobs:
         args: --timeout=5m
     
     - name: Run Gosec Security Scanner
+      # The module path was github.com/securecodewarrior/gosec, which does not
+      # exist (404 on the proxy), so `go install` failed and — the default shell
+      # being `bash -e` — the step exited before gosec ever ran. It has never
+      # scanned anything. gosec lives at securego/gosec.
+      #
+      # continue-on-error stays: this step has produced no findings yet, so
+      # gating on it would block every PR on a first-run backlog. But the
+      # `|| echo` that used to swallow gosec's exit code is gone, so the step
+      # now reports honestly as failed when there are findings, instead of
+      # being indistinguishable from a clean pass (AM-27). The `ls` diagnostic
+      # is dropped for the same reason — the upload step's hashFiles() guard
+      # already says whether a report was written.
       run: |
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-        gosec -fmt sarif -out gosec-report.sarif ./... || echo "Gosec completed with findings"
-        ls -la gosec-report.sarif || echo "SARIF file not found"
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        gosec -fmt sarif -out gosec-report.sarif ./...
       continue-on-error: true
     
     - name: Upload Gosec scan results to GitHub Security tab
@@ -402,10 +413,21 @@ jobs:
         check-latest: true
     
     - name: Run Gosec Security Scanner
+      # The module path was github.com/securecodewarrior/gosec, which does not
+      # exist (404 on the proxy), so `go install` failed and — the default shell
+      # being `bash -e` — the step exited before gosec ever ran. It has never
+      # scanned anything. gosec lives at securego/gosec.
+      #
+      # continue-on-error stays: this step has produced no findings yet, so
+      # gating on it would block every PR on a first-run backlog. But the
+      # `|| echo` that used to swallow gosec's exit code is gone, so the step
+      # now reports honestly as failed when there are findings, instead of
+      # being indistinguishable from a clean pass (AM-27). The `ls` diagnostic
+      # is dropped for the same reason — the upload step's hashFiles() guard
+      # already says whether a report was written.
       run: |
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-        gosec -fmt sarif -out gosec-report.sarif ./... || echo "Gosec completed with findings"
-        ls -la gosec-report.sarif || echo "SARIF file not found"
+        go install github.com/securego/gosec/v2/cmd/gosec@latest
+        gosec -fmt sarif -out gosec-report.sarif ./...
       continue-on-error: true
     
     - name: Upload Gosec scan results to GitHub Security tab
